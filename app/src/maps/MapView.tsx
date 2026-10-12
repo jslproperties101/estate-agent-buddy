@@ -99,6 +99,8 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
     if (!el.current || map.current) return;
     map.current = new maps.Map(el.current, {
       center: center ?? { lat: 2.8205, lng: 101.8036 }, zoom, mapTypeId: mapType, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
+      // Google's round camera control would sit under the ◎ My Location button; pinch / scroll zoom is unchanged.
+      cameraControl: false,
     });
     map.current.addListener?.('click', (e: any) => { const ll = e?.latLng; if (ll) handlers.current.onMapClick?.(ll.lat(), ll.lng()); });
     // Moving the map by hand stops following (the ◎ button stays and recentres again).
