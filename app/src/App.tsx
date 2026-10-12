@@ -36,6 +36,7 @@ import {
   IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconSubsale, IconProject, IconCobroke,
 } from './icons';
 import { explorerProgress } from './domain/explorer';
+import { nativeLook } from './native/native';
 
 /** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone). `soon` marks a card whose screen says
  *  plainly that the feature is not built yet. */
@@ -60,6 +61,7 @@ const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: bool
 export default function App() {
   const [store, setStore] = useState<Store | null>(null);
   useEffect(() => { void openBackend().then(Store.open).then(setStore); }, []);
+  useEffect(() => { if (store) void nativeLook(); }, [store]);
   if (!store) return <div className="shell"><p className="loading" role="status">Estate Agent Buddy…</p></div>;
   return <StoreContext.Provider value={store}><Shell /></StoreContext.Provider>;
 }

@@ -7,9 +7,13 @@
 // All of them can instead be typed on the phone in Agent Profile → Settings.
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { capacitorPlugin } from './capacitor-resolve.mjs';
 
 const env = { ...process.env };
-if (existsSync('.env')) {
+// `--no-env` (used by the tests) builds without app/.env and without EAB_* settings, so tests never use real keys.
+const noEnv = process.argv.includes('--no-env');
+if (noEnv) for (const k of Object.keys(env)) if (k.startsWith('EAB_')) delete env[k];
+if (!noEnv && existsSync('.env')) {
   for (const line of readFileSync('.env', 'utf8').split(/\r?\n/)) {
     const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
     if (m && !line.trim().startsWith('#') && env[m[1]] === undefined) env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
@@ -35,9 +39,10 @@ await build({
   sourcemap: true,
   outdir: 'dist',
   define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config) },
+  plugins: [capacitorPlugin()],
   logLevel: 'info',
 });
 
 copyFileSync('index.html', 'dist/index.html');
 const set = Object.entries(config).filter(([, v]) => v).map(([k]) => k);
-console.log(`Build finished: dist/ (configured: ${set.length ? set.join(', ') : 'none — set keys in Settings on the phone'})`);
+console.log(`Build finished: dist/ (configured: ${set.length ? set.join(', ') : 'none — set keys in Settings on the phone'}; Capacitor: ${capacitorPlugin.real() ? 'real' : 'browser stand-in'})`);

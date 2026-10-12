@@ -7,3 +7,7 @@ dist/
 *.keystore
 *.jks
 .env
+
+# Debug signing key for the Android debug APK (not a secret: standard debug passwords). Committed so every
+# debug build has the same signature and installs over the previous one.
+!app/android-config/debug.keystore

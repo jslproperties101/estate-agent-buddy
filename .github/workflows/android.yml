@@ -1,0 +1,141 @@
+# Estate Agent Buddy — build and check on every push.
+#  test     type check, lint, unit tests, browser screen tests (no keys needed)
+#  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
+#           with the Maps key secret set, also loads the real Google map in a browser and attaches a screenshot
+#  web      the same app as a website on GitHub Pages (needs Pages source = GitHub Actions)
+#
+# Settings → Secrets and variables → Actions → Repository secrets (none are written in the code):
+#   EAB_GOOGLE_MAPS_API_KEY   Google Maps key (browser key, restricted by website)
+#   EAB_SUPABASE_URL          Supabase project URL (login and cloud sync)
+#   EAB_SUPABASE_ANON_KEY     Supabase anon (public) key
+#   EAB_EXPERT_API_URL        optional Ask Expert AI function URL
+name: Build
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - name: Install (without the Android packages)
+        run: npm install --omit=optional --no-audit --no-fund
+      - name: Browser for screen tests
+        run: npx playwright install --with-deps chromium
+      - name: Tests
+        run: npm test
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: screens, path: app/tests/screens, if-no-files-found: ignore }
+
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    env:
+      EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
+      EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
+      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
+      EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Build the app
+        run: npm run build
+      - name: Android project
+        run: |
+          npx cap add android
+          npx @capacitor/assets generate --android --iconBackgroundColor '#08080A' --iconBackgroundColorDark '#08080A' --splashBackgroundColor '#08080A' --splashBackgroundColorDark '#08080A'
+          npx cap sync android
+          node scripts/android-setup.mjs
+      - name: Build the APK
+        run: |
+          mkdir -p ~/.android && cp android-config/debug.keystore ~/.android/debug.keystore
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Name the APK
+        id: apk
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          OUT="EstateAgentBuddy-${SHORT}-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../$OUT"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+          echo "tag=android-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "maps=$([ -n "$EAB_GOOGLE_MAPS_API_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+          echo "supabase=$([ -n "$EAB_SUPABASE_URL" ] && [ -n "$EAB_SUPABASE_ANON_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: '${{ steps.apk.outputs.file }}' }
+      - name: Real Google Maps check (only with the Maps key secret)
+        id: maps
+        if: steps.apk.outputs.maps == 'yes'
+        continue-on-error: true
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/maps-check.mjs ../maps-check.png ../maps-check.txt
+      - name: Release with the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd ..
+          TAG='${{ steps.apk.outputs.tag }}'
+          {
+            echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
+            echo
+            echo "Install: open this page on the Android phone, tap the .apk below, allow installing from this source, then Install."
+            echo
+            echo "- Google Maps key in this build: ${{ steps.apk.outputs.maps }}"
+            echo "- Google login (Supabase) in this build: ${{ steps.apk.outputs.supabase }}"
+            if [ -f maps-check.txt ]; then echo; echo "Google Maps check (browser, referrer https://localhost/):"; echo '```'; cat maps-check.txt; echo '```'; fi
+          } > notes.md
+          FILES="${{ steps.apk.outputs.file }}"
+          [ -f maps-check.png ] && FILES="$FILES maps-check.png"
+          [ -f maps-check.txt ] && FILES="$FILES maps-check.txt"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" $FILES --prerelease --target "$GITHUB_SHA" --title "Estate Agent Buddy ${TAG}" --notes-file notes.md
+
+  web:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update'
+    environment: { name: github-pages, url: '${{ steps.deploy.outputs.page_url }}' }
+    defaults: { run: { working-directory: app } }
+    env:
+      EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
+      EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
+      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
+      EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - run: npm install --omit=optional --no-audit --no-fund
+        env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
+      - run: npm run build && rm -f dist/*.map
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: app/dist }
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -7,7 +7,9 @@
 
 export type Permission = 'granted' | 'denied' | 'default' | 'unsupported';
 
-const native = (): any => (globalThis as any).Capacitor?.Plugins?.LocalNotifications;
+import { plugin } from '../native/native';
+
+const native = (): any => plugin('LocalNotifications');
 
 export function permission(): Permission {
   if (native()) return 'granted';
