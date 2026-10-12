@@ -467,6 +467,8 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await page.getByTestId('card-map').click();
   assert.match(await page.getByTestId('map-title').innerText(), /For sale sign, corner lot/);
   assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/);
+  await page.getByTestId('my-position-text').waitFor(); // the GPS reading arrives a moment after the map
+  await page.waitForFunction(() => window.__markers.some(m => m.o.icon?.fillColor === '#4285F4'));
   const pins = await page.evaluate(() => window.__markers.map(m => (m.o.icon?.fillColor === '#4285F4' ? 'me' : 'property')));
   assert.equal(pins.filter(x => x === 'property').length, 1, 'only real saved positions are shown');
   assert.equal(pins.filter(x => x === 'me').length, 1, 'your GPS position is shown');
