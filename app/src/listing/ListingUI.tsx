@@ -2,6 +2,8 @@
 // Cards hide the reference number; the detail page shows it. Every detail section has its own Edit button that
 // opens the form straight at that section.
 import { useMemo, useState } from 'react';
+import { BannerDot } from '../gps/BannersUI';
+import { activeBanners } from '../domain/banners';
 import { MoneyInput } from '../ui/MoneyInput';
 import { Lang } from '../i18n';
 import { listingStrings, ListingStrings, typeLabel } from './strings';
@@ -17,7 +19,7 @@ import { useApp, useStore } from '../data/useStore';
 import { Go, FormSection } from '../nav';
 import { SectionCard, StoredImage } from '../ui/common';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
-import { monthText } from '../lib/dates';
+import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
 
 export type Layout = 'grid' | 'large';
@@ -393,6 +395,19 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
           {row('arrangement', l.arrangement && s.arrangement[l.arrangement])}{row('arrangementNote', l.arrangementNote)}
         </dl>
         {!hasAny(l.status, l.arrangement) && empty}
+      </SectionCard>
+
+      <SectionCard title={s.sec.banner} onEdit={edit('banner')} editLabel={EL} testId="sec-banner-view">
+        {(() => {
+          const up = activeBanners(state.banners, l.id);
+          return (
+            <>
+              <div className="between"><span>{s.bannerQ}</span><BannerDot status={l.bannerStatus} lang={lang} /></div>
+              {up.length > 0 && <small className="muted" data-testid="banner-summary">{s.bannerUp(up.length)} · {s.bannerLast(fmtDate(up[0].placedOn, lang))}</small>}
+              <button className="btn small secondary" onClick={() => go({ name: 'banners', propertyId: l.id })} data-testid="open-banners">🪧 {s.bannerOpen}</button>
+            </>
+          );
+        })()}
       </SectionCard>
 
       <SectionCard title={s.sec.marketing} onEdit={edit('marketing')} editLabel={EL} testId="marketing">

@@ -112,6 +112,25 @@ export interface Journey extends Base {
   status: 'recording' | 'paused' | 'saved';
 }
 
+// ---------- banners (My Banner Location) ----------
+/** One "For Sale / For Rent" banner put up for a property: where it stands, when, and a photo of it. A property can
+ *  have several (for example one at the gate and one at the main road junction). */
+export interface Banner extends Base {
+  propertyId: string;
+  lat: number;
+  lng: number;
+  /** GPS accuracy in metres, when the position came from the phone's GPS. */
+  acc?: number;
+  /** Where the position came from: the phone's GPS at the spot, a tap on Google Maps, or typed in. */
+  source: 'gps' | 'map' | 'manual';
+  /** yyyy-mm-dd */
+  placedOn: string;
+  note?: string;
+  photoFileId?: string;
+  /** yyyy-mm-dd: set when the banner is taken down. The record is kept as history. */
+  removedOn?: string;
+}
+
 // ---------- Agent Financial ----------
 export type DealStatus = 'estimated' | 'confirmed' | 'received';
 export const DEAL_STATUSES: DealStatus[] = ['estimated', 'confirmed', 'received'];
@@ -210,10 +229,11 @@ export interface Collections {
   incomes: Income;
   targets: Target;
   expertThreads: ExpertThread;
+  banners: Banner;
 }
 export type CollectionName = keyof Collections;
 export const COLLECTIONS: CollectionName[] = [
-  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads',
+  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners',
 ];
 
 export interface Singletons { profile: Profile; settings: Settings; options: OptionLists; meta: Meta }

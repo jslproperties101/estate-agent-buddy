@@ -1,5 +1,7 @@
-// GPS Assistance: two large cards — House Shopping (route tracker that saves properties found on the way) and
-// Map (saved properties on Google Maps, move between them, navigate). Only real saved positions are shown.
+// GPS Assistance: four large cards — House Shopping (route tracker that saves properties found on the way),
+// My Banner Location (gps/BannersUI.tsx), My Property Map (saved properties on Google Maps, move between them,
+// navigate; shows each property's banner status) and Co-broke Opportunity Map (Coming Soon).
+// Only real saved positions are shown.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MoneyInput } from '../ui/MoneyInput';
 import { Lang, strings } from '../i18n';
@@ -21,7 +23,9 @@ import { Confirm, Empty, StoredImage } from '../ui/common';
 import { useToast } from '../ui/toast';
 import { defaultPrefix, makeRef, nextNumber } from '../domain/refs';
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, DEFAULT_COUNTRY } from '../domain/places';
-import { IconGps } from '../icons';
+import { IconGps, IconCobroke } from '../icons';
+import { BannerDot } from './BannersUI';
+import { activeBanners } from '../domain/banners';
 import type { Journey } from '../data/types';
 
 export function GpsHome({ lang, go }: { lang: Lang; go: Go }) {
@@ -33,10 +37,22 @@ export function GpsHome({ lang, go }: { lang: Lang; go: Go }) {
         <strong>{g.houseShopping}</strong>
         <small>{g.houseShoppingSub}</small>
       </button>
+      <button className="big-card" onClick={() => go({ name: 'banners' })} data-testid="card-banners">
+        <span className="big-card-icon" aria-hidden="true">🪧</span>
+        <strong>{g.banners}</strong>
+        <small>{g.bannersSub}</small>
+      </button>
       <button className="big-card" onClick={() => go({ name: 'propertyMap' })} data-testid="card-map">
         <span className="big-card-icon" aria-hidden="true"><IconGps size={40} /></span>
         <strong>{g.map}</strong>
         <small>{g.mapSub}</small>
+      </button>
+      <button className="big-card soon" onClick={() => go({ name: 'comingSoon', key: 'cobrokeMap' })} data-testid="card-cobroke-map"
+        aria-label={`${g.cobrokeMap} (${strings[lang].comingSoon})`}>
+        <span className="big-card-icon" aria-hidden="true"><IconCobroke size={40} /></span>
+        <strong>{g.cobrokeMap}</strong>
+        <small>{g.cobrokeMapSub}</small>
+        <span className="badge soon-badge fit">{strings[lang].comingSoon}</span>
       </button>
     </section>
   );
@@ -356,6 +372,11 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
               <div className="small muted">{[ls.types[p.type ?? ''] ?? p.type, placeName(p)].filter(Boolean).join(' · ')}</div>
               <div className="small"><PriceLine l={p} s={ls} /></div>
             </div>
+          </div>
+          <div className="between map-banner" data-testid="map-banner">
+            <span className="small">{ls.bannerQ} <BannerDot status={p.bannerStatus} lang={lang} /></span>
+            {activeBanners(state.banners, p.id).length > 0 && <small className="muted">{ls.bannerUp(activeBanners(state.banners, p.id).length)}</small>}
+            <button className="btn small secondary" onClick={() => go({ name: 'banners', propertyId: p.id })}>🪧 {ls.bannerOpen}</button>
           </div>
           {route?.info && <small className="ok-text">{route.info}</small>}
           {routeMsg && <small className="warn-text">{routeMsg}</small>}

@@ -11,7 +11,7 @@ export const newId = () =>
 export function emptyState(): AppState {
   return {
     properties: [], contacts: [], inquiries: [], appointments: [], tasks: [], journeys: [],
-    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [],
+    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [],
     profile: {},
     settings: { lang: 'en', layout: 'grid' },
     options: {},

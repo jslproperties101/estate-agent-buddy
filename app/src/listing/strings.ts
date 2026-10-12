@@ -48,6 +48,11 @@ const en = {
   landUse: { building: 'Building', industry: 'Industry', agriculture: 'Agriculture' } as Record<string, string>,
   docCat: { title: 'Title documents', brochure: 'Brochures', floorplan: 'Floor plans', correspondence: 'Owner correspondence and screenshots', transaction: 'Rental or sales documents', other: 'Other documents' } as Record<string, string>,
   adStatus: { planned: 'Planned', live: 'Live', needs_update: 'Needs update', paused: 'Paused', expired: 'Expired' } as Record<string, string>,
+  banner: { yes: 'Yes, placed', no: 'No', not_yet: 'Not yet', not_allowed: 'Owner doesn’t allow', removed: 'Removed', unset: 'Not set' } as Record<string, string>,
+  bannerQ: 'Banner placed?',
+  bannerUp: (n: number) => `${n} banner${n === 1 ? '' : 's'} up`,
+  bannerLast: (d: string) => `Last placed ${d}`,
+  bannerOpen: 'Banner locations',
   yesNo: { yes: 'Yes', no: 'No' } as Record<string, string>,
   yearsLeft: (n: number) => `${n} years remaining`,
   availableFrom: (m: string) => `Available from ${m}`,
@@ -55,7 +60,7 @@ const en = {
   sec: {
     basics: 'Type & Headline', tenure: 'Tenure & Title', photos: 'Photos', location: 'Location', details: 'Property details',
     building: 'Building specifications', land: 'Land', money: 'Price, rental and fees', tenancy: 'Tenancy', availability: 'Availability and condition',
-    status: 'Listing status', owner: 'Owner / vendor', arrangement: 'Listing arrangement and status', marketing: 'Marketing and advertising',
+    status: 'Listing status', owner: 'Owner / vendor', arrangement: 'Listing arrangement and status', marketing: 'Marketing and advertising', banner: 'Banner',
     notes: 'Internal notes', docs: 'Documents', history: 'Change history', missing: 'Still missing', reference: 'Reference',
   },
   missingNone: 'All the main details are filled in.',
@@ -73,6 +78,7 @@ const en = {
   confidential: 'Confidential: kept on this phone only; never sent to AI or shared without your approval.',
   open1: 'Open',
   l: {
+    bannerStatus: 'Banner placed?',
     ref: 'Reference', refPrefix: 'Prefix', refNo: 'Number', headline: 'Headline (short title)', type: 'Property type',
     country: 'Country', state: 'State', city: 'City / town', township: 'Township', lotNo: 'Lot number', street: 'Jalan / street (number or name)', unitNo: 'Unit number',
     lat: 'Map position', bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', floors: 'Storeys', parking: 'Parking bays', landSqft: 'Land area (sq ft)', builtUpSqft: 'Built-up (sq ft)',
@@ -129,6 +135,10 @@ const en = {
     refTaken: (n: number) => `Another property already has this reference. Next free number: ${n}.`,
   },
   useSuggested: (n: number) => `Use ${n}`,
+  refPick: {
+    free: 'Available', used: (refs: string) => `Used by ${refs}`, current: 'This property', typeOwn: 'Type a number',
+    typeHint: 'Or type any unused number', legend: 'Red numbers are already used and cannot be chosen.', listLabel: 'Reference numbers',
+  },
   voice: {
     open: 'Voice', title: 'Voice',
     listHint: 'Say or type, for example "Create a new semi-detached factory in Salak Tinggi, Jalan Logistik 2, land area 20,000 square feet, asking price RM3.2 million, leasehold, owner Mr Lim 012 345 6789."',
@@ -209,6 +219,11 @@ const bm: ListingStrings = {
   landUse: { building: 'Bangunan', industry: 'Perusahaan', agriculture: 'Pertanian' },
   docCat: { title: 'Dokumen hakmilik', brochure: 'Brosur', floorplan: 'Pelan lantai', correspondence: 'Surat-menyurat pemilik dan tangkapan skrin', transaction: 'Dokumen sewa atau jual', other: 'Dokumen lain' },
   adStatus: { planned: 'Dirancang', live: 'Aktif', needs_update: 'Perlu dikemas kini', paused: 'Dihentikan sementara', expired: 'Tamat' },
+  banner: { yes: 'Ya, dipasang', no: 'Tidak', not_yet: 'Belum', not_allowed: 'Pemilik tidak benarkan', removed: 'Ditanggalkan', unset: 'Belum ditetapkan' },
+  bannerQ: 'Banner dipasang?',
+  bannerUp: (n: number) => `${n} banner dipasang`,
+  bannerLast: (d: string) => `Terakhir dipasang ${d}`,
+  bannerOpen: 'Lokasi banner',
   yesNo: { yes: 'Ya', no: 'Tidak' },
   yearsLeft: (n: number) => `Baki ${n} tahun`,
   availableFrom: (m: string) => `Ada mulai ${m}`,
@@ -216,7 +231,7 @@ const bm: ListingStrings = {
   sec: {
     basics: 'Jenis & Tajuk', tenure: 'Pegangan & Hakmilik', photos: 'Foto', location: 'Lokasi', details: 'Butiran hartanah',
     building: 'Spesifikasi bangunan', land: 'Tanah', money: 'Harga, sewa dan yuran', tenancy: 'Penyewaan', availability: 'Ketersediaan dan keadaan',
-    status: 'Status senarai', owner: 'Pemilik / penjual', arrangement: 'Susunan dan status senarai', marketing: 'Pemasaran dan iklan',
+    status: 'Status senarai', owner: 'Pemilik / penjual', arrangement: 'Susunan dan status senarai', marketing: 'Pemasaran dan iklan', banner: 'Banner',
     notes: 'Catatan dalaman', docs: 'Dokumen', history: 'Sejarah perubahan', missing: 'Masih tiada', reference: 'Rujukan',
   },
   missingNone: 'Semua butiran utama telah diisi.',
@@ -234,6 +249,7 @@ const bm: ListingStrings = {
   confidential: 'Sulit: disimpan dalam telefon ini sahaja; tidak dihantar kepada AI atau dikongsi tanpa kelulusan anda.',
   open1: 'Buka',
   l: {
+    bannerStatus: 'Banner dipasang?',
     ref: 'Rujukan', refPrefix: 'Awalan', refNo: 'Nombor', headline: 'Tajuk ringkas', type: 'Jenis hartanah',
     country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', lotNo: 'Nombor lot', street: 'Jalan (nombor atau nama)', unitNo: 'Nombor unit',
     lat: 'Kedudukan peta', bedrooms: 'Bilik tidur', bathrooms: 'Bilik air', floors: 'Tingkat', parking: 'Petak parkir', landSqft: 'Keluasan tanah (kps)', builtUpSqft: 'Keluasan binaan (kps)',
@@ -290,6 +306,10 @@ const bm: ListingStrings = {
     refTaken: (n: number) => `Hartanah lain sudah menggunakan rujukan ini. Nombor kosong seterusnya: ${n}.`,
   },
   useSuggested: (n: number) => `Guna ${n}`,
+  refPick: {
+    free: 'Tersedia', used: (refs: string) => `Digunakan oleh ${refs}`, current: 'Hartanah ini', typeOwn: 'Taip nombor',
+    typeHint: 'Atau taip mana-mana nombor yang belum digunakan', legend: 'Nombor merah sudah digunakan dan tidak boleh dipilih.', listLabel: 'Nombor rujukan',
+  },
   voice: {
     open: 'Suara', title: 'Suara',
     listHint: 'Sebut atau taip, contohnya "Create a new semi-detached factory in Salak Tinggi, Jalan Logistik 2, land area 20,000 square feet, asking price RM3.2 million, leasehold, owner Mr Lim 012 345 6789."',
@@ -369,6 +389,11 @@ const zh: ListingStrings = {
   landUse: { building: '建筑', industry: '工业', agriculture: '农业' },
   docCat: { title: '地契文件', brochure: '宣传册', floorplan: '平面图', correspondence: '屋主往来信息与截图', transaction: '租赁或买卖文件', other: '其他文件' },
   adStatus: { planned: '计划中', live: '刊登中', needs_update: '需更新', paused: '已暂停', expired: '已过期' },
+  banner: { yes: '是，已挂', no: '否', not_yet: '尚未', not_allowed: '业主不允许', removed: '已拆除', unset: '未设置' },
+  bannerQ: '已挂横幅？',
+  bannerUp: (n: number) => `已挂 ${n} 个横幅`,
+  bannerLast: (d: string) => `最近挂上：${d}`,
+  bannerOpen: '横幅位置',
   yesNo: { yes: '是', no: '否' },
   yearsLeft: (n: number) => `剩余 ${n} 年`,
   availableFrom: (m: string) => `${m} 起可入住`,
@@ -376,7 +401,7 @@ const zh: ListingStrings = {
   sec: {
     basics: '类型与标题', tenure: '地契与产权', photos: '照片', location: '地点', details: '房产详情',
     building: '建筑规格', land: '土地', money: '价格、租金与费用', tenancy: '租约', availability: '可用性与状况',
-    status: '挂牌状态', owner: '屋主 / 卖家', arrangement: '委托方式与状态', marketing: '营销与广告',
+    status: '挂牌状态', owner: '屋主 / 卖家', arrangement: '委托方式与状态', marketing: '营销与广告', banner: '横幅',
     notes: '内部备注', docs: '文件', history: '修改记录', missing: '尚缺资料', reference: '编号',
   },
   missingNone: '主要资料都已填写。',
@@ -394,6 +419,7 @@ const zh: ListingStrings = {
   confidential: '机密：只保存在此手机；未经您的同意不会发送给 AI 或分享。',
   open1: '打开',
   l: {
+    bannerStatus: '已挂横幅？',
     ref: '编号', refPrefix: '前缀', refNo: '号码', headline: '标题（简短）', type: '房产类型',
     country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', lotNo: '地段号', street: '街道（门牌或路名）', unitNo: '单位号',
     lat: '地图位置', bedrooms: '卧室', bathrooms: '浴室', floors: '楼层', parking: '车位', landSqft: '土地面积（平方尺）', builtUpSqft: '建筑面积（平方尺）',
@@ -450,6 +476,10 @@ const zh: ListingStrings = {
     refTaken: (n: number) => `已有其他房产使用此编号。下一个可用号码：${n}。`,
   },
   useSuggested: (n: number) => `使用 ${n}`,
+  refPick: {
+    free: '可用', used: (refs: string) => `已被 ${refs} 使用`, current: '本房产', typeOwn: '输入号码',
+    typeHint: '或输入任何未使用的号码', legend: '红色号码已被使用，不能选择。', listLabel: '编号号码',
+  },
   voice: {
     open: '语音', title: '语音',
     listHint: '说出或输入，例如 "Create a new semi-detached factory in Salak Tinggi, Jalan Logistik 2, land area 20,000 square feet, asking price RM3.2 million, leasehold, owner Mr Lim 012 345 6789."',

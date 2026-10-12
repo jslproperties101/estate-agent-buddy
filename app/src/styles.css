@@ -202,6 +202,21 @@ label.btn { position: relative; cursor: pointer; }
 .opt-new { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; }
 .opt-new input { flex: 1 1 160px; }
 
+/* Combo box: a field you can type in, with a gold button that opens a list (used for reference numbers). */
+.combo { display: flex; align-items: stretch; min-width: 0; }
+.combo input { border-top-right-radius: 0; border-bottom-right-radius: 0; flex: 1 1 auto; min-width: 0; }
+.combo-btn { flex: none; width: 48px; min-height: 48px; border: 1px solid var(--field-line); border-left: 0; border-radius: 0 10px 10px 0;
+  background: #1E1B15; color: var(--gold-hi); font-size: 18px; box-shadow: var(--field-inner); }
+.combo-btn[aria-expanded="true"] { border-color: var(--field-focus); background: #2A2312; }
+.ref-list { max-height: 300px; position: relative; }
+.ref-legend { padding: 6px 10px; color: var(--muted); }
+.ref-opt { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ref-opt small { font-weight: 600; }
+.ref-opt.free small { color: var(--ok); }
+.ref-opt.used, .ref-opt.used:disabled { color: var(--red); background: #1E0F0C; cursor: not-allowed; opacity: 1; }
+.ref-opt.used strong { text-decoration: line-through; text-decoration-thickness: 2px; }
+.ref-opt.used small { color: var(--red); }
+
 /* Section cards with their own Edit button */
 .sec-card { position: relative; }
 .sec-foot { display: flex; justify-content: flex-end; margin-top: 2px; }
@@ -470,6 +485,24 @@ label.btn { position: relative; cursor: pointer; }
 .map-card-body > div { min-width: 0; }
 .map-thumb { width: 88px; height: 66px; border-radius: 10px; overflow: hidden; flex: none; display: block; background: var(--card-2); }
 .map-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.big-card.soon { border-style: dashed; }
+.big-card.soon .big-card-icon { opacity: .75; }
+
+/* My Banner Location: one card per property, left edge in the banner-status colour. */
+.banner-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; background: var(--card-2); border: 1px solid var(--line-2); border-radius: 12px; padding: 2px 10px; }
+.banner-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.banner-card { border-left: 6px solid #4B5563; scroll-margin-top: 80px; }
+.banner-card.sel { box-shadow: 0 0 0 2px var(--gold); }
+.banner-title { color: var(--gold-hi); overflow-wrap: anywhere; min-width: 0; }
+.banner-row { display: flex; gap: 10px; align-items: flex-start; border-top: 1px solid var(--line); padding-top: 8px; }
+.banner-row.down { opacity: .8; }
+.banner-row-main { flex: 1; min-width: 0; }
+.banner-photo { width: 72px; height: 72px; border-radius: 10px; overflow: hidden; flex: none; background: var(--card-2); border: 1px solid var(--line-2); display: block; }
+.banner-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.banner-photo.big { width: 100%; height: 160px; }
+.banner-history summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--gold-hi); font-weight: 700; }
+.map-banner { border-top: 1px solid var(--line); padding-top: 8px; }
 
 /* Agent Financial */
 .fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

@@ -284,7 +284,10 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
             toast(t.sampleLoaded);
           }}>{t.loadSample}</button>
           <button className="btn secondary danger-text" data-testid="remove-sample" onClick={() => {
+            const sampleProps = new Set(state.properties.filter(p => p.sample).map(p => p.id));
             for (const c of COLLECTIONS as CollectionName[]) for (const r of state[c] as { id: string; sample?: boolean }[]) if (r.sample) store.remove(c, r.id);
+            // Banners recorded on a sample property go with it, so none is left pointing at a property that is gone.
+            for (const b of state.banners) if (sampleProps.has(b.propertyId)) { if (b.photoFileId) store.removeFile(b.photoFileId); store.remove('banners', b.id); }
             toast(t.sampleRemoved);
           }}>{t.removeSample}</button>
         </div>

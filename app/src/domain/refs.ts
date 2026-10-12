@@ -67,3 +67,33 @@ export function defaultPrefix(custom: CustomOption[] = [], lastPrefix?: string):
   if (lastPrefix && choices.some(c => c.value === lastPrefix.toUpperCase())) return lastPrefix.toUpperCase();
   return choices[0].value;
 }
+
+export interface NumberChoice {
+  no: number;
+  /** References already using this number (shown in red, cannot be chosen). Empty when the number is free. */
+  usedBy: string[];
+  /** The number this property already has (kept when editing). */
+  current: boolean;
+}
+
+/**
+ * Numbers for the reference-number dropdown: every number from 1001 up to 10 past the highest one in use, so gaps
+ * left by deleted properties can be reused. Used numbers come back with the references that use them (shown in red).
+ * Under the owner's rule the number is unique across all prefixes, so A1003 also makes 1003 "used" for P.
+ */
+export function numberChoices(list: HasRef[], exceptId?: string, extraFree = 10): NumberChoice[] {
+  const byNo = new Map<number, string[]>();
+  let currentNo: number | undefined;
+  for (const r of list) {
+    const n = numberOf(r);
+    if (n === undefined) continue;
+    if (r.id === exceptId) { currentNo = n; continue; }
+    byNo.set(n, [...(byNo.get(n) ?? []), r.ref ?? (r.refPrefix ? makeRef(r.refPrefix, n) : String(n))]);
+  }
+  const highest = Math.max(FIRST_NUMBER - 1, ...byNo.keys(), currentNo ?? 0);
+  const out: NumberChoice[] = [];
+  for (let n = FIRST_NUMBER; n <= highest + extraFree; n++) out.push({ no: n, usedBy: byNo.get(n) ?? [], current: n === currentNo });
+  // Old records may carry numbers below 1001; list them too so they show as used.
+  for (const n of [...byNo.keys()].filter(x => x < FIRST_NUMBER).sort((a, b) => a - b)) out.unshift({ no: n, usedBy: byNo.get(n)!, current: false });
+  return out;
+}

@@ -101,13 +101,13 @@ Tap opens details (DONE). Long-press preview, accessible preview control: NOT DO
 ### 11. GPS Assistance
 | Item | Status | Notes |
 | --- | --- | --- |
-| Four cards | PARTIAL | Two cards exist: House Shopping, Map. |
+| Four cards | DONE (browser) | House Shopping, My Banner Location, My Property Map, Co-broke Opportunity Map (Coming Soon). |
 | House Shopping: start/pause/resume/stop, distance, time, route sketch, saved journeys, marks, save property on the way | DONE in browser (test U13 with simulated positions) / NOT PROVEN on a phone | |
 | Google map display | BLOCKED | Needs your Maps API key. Without it the app says so and draws a route sketch only. |
 | Background / screen-off tracking | NOT DONE / BLOCKED (needs native app) | Limitation is shown in the app. |
-| My Banner Location | NOT DONE | No existing banner feature found. Purpose not specified — **decision needed**. |
-| Rename Map → My Property Map | NOT DONE |
-| Co-broke Opportunity Map (Coming Soon) | NOT DONE |
+| My Banner Location | DONE in browser / NOT PROVEN on a phone | Banner positions, dates, photos, history; per-property banner status. Map display needs your Google key. |
+| Rename Map → My Property Map | DONE |
+| Co-broke Opportunity Map (Coming Soon) | DONE (Coming Soon screen) |
 
 ### 12. Photo enhancement, privacy masking, AI declutter — NOT DONE
 Only automatic resize/compression on upload.
@@ -193,9 +193,16 @@ Listing Tracker with Add Fake Listing, expiry reminders and cost summaries.
 
 **Stage 7 — final verification** on your devices and live services.
 
-## Decisions needed from you (none block Stage 1)
+## Decisions (owner, 12 Oct 2026, 17:31)
 
-1. Reference numbers: unique across all prefixes (current) or per prefix?
-2. What should the **Subsale** and **Project** cards do? (Shown as Coming Soon until you say.)
-3. What should **My Banner Location** record? (e.g. where you placed "For Sale" banners, with photo, date and the
-   property, so you can collect them later?)
+1. **Reference numbers** — the number box is now a dropdown: used numbers in red (with the property using each),
+   free numbers selectable; typing still works. The existing rule (number unique across all prefixes) is kept, so
+   a number used as A1004 also shows red for P. If you want numbers to repeat across prefixes (P1004 and A1004
+   both allowed), that is a one-line change in `domain/refs.ts`.
+2. **Subsale and Project** — stay empty ("Coming Soon") for now.
+3. **My Banner Location** — built: each banner put up is recorded with its position (phone GPS at the banner, a tap
+   on Google Maps, or typed), date, note and optional photo, with Navigate; taking it down keeps it as history.
+   Every property has **Banner placed?**: Yes / No / Not yet / Owner doesn't allow / Removed, shown on the detail
+   page (own section with Edit), on My Banner Location (one card per property, coloured by status, filter by
+   status) and on the property's card in My Property Map. Adding a banner sets Yes; taking down the last one sets
+   Removed. GPS Assistance now has its four cards.

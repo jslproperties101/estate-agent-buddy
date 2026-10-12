@@ -24,6 +24,7 @@ import { ListingForm } from './listing/ListingForm';
 import { ContactsList, ContactDetail, ContactForm } from './contacts/ContactsUI';
 import { ActivityScreen, InquiryForm, ApptForm, TodoScreen, TaskForm, CalendarScreen } from './agenda/AgendaUI';
 import { GpsHome, HouseShopping, JourneyDetail, PropertyMap } from './gps/GpsUI';
+import { BannerScreen } from './gps/BannersUI';
 import { FinanceScreen, DealForm, MoneyForm } from './finance/FinanceUI';
 import { CalculatorScreen } from './calculator/CalculatorUI';
 import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './profile/ProfileUI';
@@ -199,6 +200,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'houseShopping': return gs.houseShopping;
     case 'journey': return state.journeys.find(x => x.id === s.id)?.title || gs.houseShopping;
     case 'propertyMap': return gs.map;
+    case 'banners': return gs.banners;
     case 'finance': return financeStrings[lang].title;
     case 'dealForm': return s.id ? financeStrings[lang].editDeal : financeStrings[lang].newDeal;
     case 'expenseForm': return s.id ? financeStrings[lang].editExpense : financeStrings[lang].newExpense;
@@ -212,7 +214,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'expertAsk': return expertStrings[lang].experts[s.expert];
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
     case 'voice': return t.tiles.voice;
-    case 'comingSoon': return t.tiles[s.key];
+    case 'comingSoon': return s.key === 'cobrokeMap' ? gs.cobrokeMap : t.tiles[s.key];
     case 'cobroke': return t.tiles.cobroke;
   }
 }
@@ -240,6 +242,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'houseShopping': return <HouseShopping lang={lang} go={(next, o) => go(next, { replace: next.name === 'journey', ...o })} />;
     case 'journey': return <JourneyDetail key={s.id} lang={lang} go={go} id={s.id} />;
     case 'propertyMap': return <PropertyMap key={s.id ?? ''} lang={lang} go={go} id={s.id} />;
+    case 'banners': return <BannerScreen key={s.propertyId ?? ''} lang={lang} go={go} propertyId={s.propertyId} />;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
     case 'dealForm': return <DealForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} />;
     case 'expenseForm': return <MoneyForm key={s.id ?? 'new-e'} lang={lang} back={back} id={s.id} kind="expense" />;

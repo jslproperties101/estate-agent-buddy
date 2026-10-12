@@ -7,7 +7,7 @@ import { listingStrings } from './strings';
 import { mapStrings } from '../maps/strings';
 import {
   Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
-  FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS,
+  FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
   rm, yearsRemaining, commissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
   ALL_FORM_FIELDS, hasPosition,
 } from './model';
@@ -20,7 +20,7 @@ import { StoredImage, Confirm } from '../ui/common';
 import { SpeechBox } from '../ui/SpeechBox';
 import { MoneyInput } from '../ui/MoneyInput';
 import { readDetails, ChangeKey } from './commands';
-import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix } from '../domain/refs';
+import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix, numberChoices } from '../domain/refs';
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
 
@@ -50,12 +50,21 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [picker, setPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [refErr, setRefErr] = useState<string | null>(null);
+  const [refOpen, setRefOpen] = useState(false);
   const addedFiles = useRef<string[]>([]);
   const removedFiles = useRef<string[]>([]);
   const shownNum = (k: string, v: unknown) => (raw[k] !== undefined && num(raw[k]) === v ? raw[k] : v ?? '');
   const vf = fieldsFor(d.type);
   const show = (k: FormField) => vf.has(k);
   const fieldDefs = (state.options['marketingFields'] ?? []).map(o => o.value);
+
+  // When the number list opens, scroll the list itself (not the page) to the chosen or suggested number.
+  useEffect(() => {
+    if (!refOpen) return;
+    const list = document.querySelector<HTMLElement>('[data-testid="ref-no-list"]');
+    const target = list?.querySelector<HTMLElement>('[aria-selected="true"]') ?? list?.querySelector<HTMLElement>(`[data-no="${nextNumber(state.properties, d.id)}"]`);
+    if (list && target) list.scrollTop = target.offsetTop - list.clientHeight / 2;
+  }, [refOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!section) return;
@@ -243,10 +252,33 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             builtIns={BUILTIN_PREFIXES.map(v => ({ value: v }))} value={d.refPrefix}
             normalise={v => v.trim().toUpperCase()} validate={v => (checkPrefix(v) ? s.refProblem.invalidPrefix : null)}
             onChange={v => { if (v) { setD(p => ({ ...p, refPrefix: v.toUpperCase() })); setRefErr(null); } }} />
-          <label className="ff">{s.l.refNo}
-            <input data-field="refNo" inputMode="numeric" aria-invalid={!!(refErr || refProblem)} value={refNoText} onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
-          </label>
+          <div className="ff">
+            <label htmlFor="ref-no-input">{s.l.refNo}</label>
+            <div className="combo">
+              <input id="ref-no-input" data-field="refNo" inputMode="numeric" aria-invalid={!!(refErr || refProblem)} value={refNoText}
+                onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
+              <button type="button" className="combo-btn" aria-haspopup="listbox" aria-expanded={refOpen} aria-label={s.refPick.listLabel}
+                data-testid="ref-no-open" onClick={() => setRefOpen(o => !o)}>▾</button>
+            </div>
+          </div>
         </div>
+        {refOpen && (
+          <div className="opt-list ref-list" role="listbox" aria-label={s.refPick.listLabel} data-testid="ref-no-list">
+            <small className="ref-legend">{s.refPick.legend}</small>
+            {numberChoices(state.properties, d.id).map(ch => {
+              const used = ch.usedBy.length > 0;
+              const chosen = ch.no === refNo;
+              return (
+                <button key={ch.no} type="button" role="option" aria-selected={chosen} aria-disabled={used} disabled={used}
+                  className={`opt-item ref-opt ${used ? 'used' : 'free'}`} data-no={ch.no} data-used={used || undefined}
+                  onClick={() => { if (used) return; setRefNoText(String(ch.no)); setRefErr(null); setRefOpen(false); }}>
+                  <strong>{makeRef(d.refPrefix ?? '', ch.no)}</strong>
+                  <small>{used ? s.refPick.used(ch.usedBy.join(', ')) : ch.current ? s.refPick.current : s.refPick.free}</small>
+                </button>
+              );
+            })}
+          </div>
+        )}
         <small className="muted">{s.refHint}</small>
         <strong className="ref-preview" data-testid="ref-preview">{s.refPreview(makeRef(d.refPrefix ?? '', refNo ?? 0))}</strong>
         {(refErr || refProblem) && (
@@ -422,6 +454,11 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         )}
       </div>
 
+      <div className="card stack-sm" id="sec-banner" data-testid="sec-banner-form">
+        <div className="card-title">{s.sec.banner}</div>
+        {Select({ k: 'bannerStatus', options: BANNER_STATUSES, labels: s.banner })}
+      </div>
+
       <div className="card stack-sm" id="sec-marketing" data-testid="sec-marketing">
         <div className="card-title">{s.sec.marketing}</div>
         <label className="ff">{s.l.advertised}
@@ -517,6 +554,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           onOk={() => {
             for (const p of initial.photos) if (p.fileId) store.removeFile(p.fileId);
             for (const x of initial.documents ?? []) if (x.fileId) store.removeFile(x.fileId);
+            for (const b of state.banners.filter(x => x.propertyId === initial.id)) { if (b.photoFileId) store.removeFile(b.photoFileId); store.remove('banners', b.id); }
             store.remove('properties', initial.id);
             go({ name: 'listing' });
           }} />

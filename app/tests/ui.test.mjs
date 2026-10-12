@@ -635,6 +635,7 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
     ['subsale', async () => { await page.locator('nav.grid > button').nth(12).click(); }],
     ['project', async () => { await page.locator('nav.grid > button').nth(13).click(); }],
     ['cobroke', async () => { await page.locator('nav.grid > button').nth(14).click(); }],
+    ['banners', async () => { await page.locator('nav.grid > button').nth(6).click(); await page.getByTestId('card-banners').click(); }],
   ];
   const report = [];
   for (const lang of ['EN', 'BM', '中文']) {
@@ -794,6 +795,117 @@ test('U25 new cards: Subsale and Project say Coming Soon; Co-broke lists real co
   await home(page);
   assert.equal(await page.getByTestId('xp-trips').innerText(), '0');
   assert.match(await page.getByTestId('xp-mapped').innerText(), /^0\/0$/);
+  await page.context().close();
+});
+
+test('U26 reference number dropdown: used numbers red and not selectable, free numbers chosen with one tap, typing still works', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Property List');
+  await page.locator('.add-property').click();
+  const suggested = await page.locator('[data-field="refNo"]').inputValue();
+  await page.getByTestId('ref-no-open').click();
+  const list = page.getByTestId('ref-no-list');
+  await list.waitFor();
+  const used = list.locator('[data-used="true"]');
+  const usedCount = await used.count();
+  assert.ok(usedCount >= 10, `sample references show as used (${usedCount})`);
+  assert.match(await used.first().innerText(), /Used by P\d+/);
+  assert.equal(await used.first().evaluate(el => getComputedStyle(el).color), 'rgb(255, 138, 122)', 'used numbers are red');
+  assert.ok(await used.first().isDisabled(), 'used numbers cannot be chosen');
+  // A used number cannot be picked even by a forced tap.
+  await used.first().click({ force: true });
+  assert.equal(await page.locator('[data-field="refNo"]').inputValue(), suggested);
+  // Pick a free number further down.
+  const free = list.locator('.ref-opt.free').nth(3);
+  const no = await free.getAttribute('data-no');
+  assert.match(await free.innerText(), /Available/);
+  await free.click();
+  assert.equal(await page.locator('[data-field="refNo"]').inputValue(), no);
+  assert.equal(await list.count(), 0, 'list closes after choosing');
+  assert.match(await page.getByTestId('ref-preview').innerText(), new RegExp(`P${no}`));
+  // Typing a used number by hand is still refused.
+  await page.locator('[data-field="refNo"]').fill('1001');
+  assert.ok(await page.getByTestId('ref-error').isVisible());
+  await page.getByTestId('ref-no-open').click();
+  await shot(page, '26-ref-dropdown', false);
+  await page.context().close();
+});
+
+test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, status follows, shown on detail page and My Property Map', async () => {
+  const page = await phone({ maps: true, geo: { latitude: 2.8210, longitude: 101.8040, accuracy: 7 } });
+  await loadSample(page);
+  await tile(page, 'GPS Assistance');
+  assert.deepEqual(await page.locator('.gps-home .big-card strong').allInnerTexts(), ['House Shopping', 'My Banner Location', 'My Property Map', 'Co-broke Opportunity Map']);
+  assert.match(await page.getByTestId('card-cobroke-map').innerText(), /Coming Soon/);
+  await page.getByTestId('card-cobroke-map').click();
+  assert.ok(await page.getByTestId('soon-cobrokeMap').isVisible());
+  await page.locator('header .icon-btn').first().click();
+  await shot(page, '27a-gps-four-cards', false);
+
+  await page.getByTestId('card-banners').click();
+  const cards = page.getByTestId('banner-card');
+  const total = await cards.count();
+  assert.ok(total >= 10, 'one banner card per property');
+  const first = cards.first();
+  const title = await first.locator('.banner-title').innerText();
+  // 1) Banner placed by standing at it (GPS).
+  await first.getByTestId('banner-add').click();
+  await page.getByTestId('banner-gps').click();
+  await page.getByTestId('banner-pos-set').waitFor();
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.82100, 101\.80400 · GPS ±7 m/);
+  await page.locator('[data-field="bannerNote"]').fill('Gate, facing main road');
+  await page.getByTestId('banner-save').click();
+  const card = page.locator('[data-testid="banner-card"]', { hasText: title });
+  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/);
+  assert.equal(await card.getByTestId('banner-up').count(), 1);
+  assert.match(await card.getByTestId('banner-up').innerText(), /Gate, facing main road/);
+  assert.match(await card.getByTestId('banner-navigate').getAttribute('href'), /2\.821/);
+  // 2) A second banner placed by tapping the map.
+  await card.getByTestId('banner-add').click();
+  await page.evaluate(() => window.__mapClick(2.8301, 101.8102));
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/);
+  await page.getByTestId('banner-save').click();
+  assert.equal(await card.getByTestId('banner-up').count(), 2);
+  assert.match(await page.getByTestId('banner-map-count').innerText(), /2 banners on the map/);
+  await shot(page, '27b-banner-location', false);
+  // 3) Take both down: still Yes after the first, Removed after the last; both kept as history.
+  await card.getByTestId('banner-takedown').first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
+  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/);
+  await card.getByTestId('banner-takedown').first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
+  assert.match(await card.locator('.banner-chip').innerText(), /Removed/);
+  assert.equal(await card.getByTestId('banner-up').count(), 0);
+  assert.equal(await card.getByTestId('banner-old').count(), 2, 'taken-down banners stay in the history');
+  // 4) Status chosen by hand, and the filter.
+  await card.locator('[data-field="bannerStatus"]').selectOption('not_allowed');
+  await page.locator('[data-filter="not_allowed"]').click();
+  assert.ok(await page.locator('[data-testid="banner-card"]', { hasText: title }).isVisible());
+  assert.ok((await page.getByTestId('banner-card').allInnerTexts()).every(t => /Owner doesn’t allow/.test(t)));
+
+  // Detail page shows the banner section; its Edit opens the form at Banner.
+  await page.locator('[data-testid="banner-card"]', { hasText: title }).getByRole('button', { name: 'Open property' }).click();
+  const sec = page.getByTestId('sec-banner-view');
+  assert.match(await sec.innerText(), /Banner placed\?[\s\S]*Owner doesn’t allow/);
+  await sec.getByRole('button', { name: /Edit/ }).click();
+  await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('not_yet');
+  // give the property a map position so it shows on My Property Map
+  await page.locator('[data-field="lat"]').fill('2.82');
+  await page.locator('[data-field="lng"]').fill('101.80');
+  await page.getByTestId('save-property').click();
+  assert.match(await page.getByTestId('sec-banner-view').innerText(), /Not yet/);
+  await page.getByRole('button', { name: 'Show on map' }).click();
+  assert.match(await page.getByTestId('map-banner').innerText(), /Banner placed\?[\s\S]*Not yet/);
+  await page.getByTestId('map-banner').getByRole('button', { name: /Banner locations/ }).click();
+  assert.ok(await page.getByTestId('banner-screen').isVisible());
+
+  // Everything is still there after closing and reopening the app.
+  await page.reload(); await page.waitForSelector('nav.grid');
+  const kept = await page.evaluate(() => new Promise(res => {
+    const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAllKeys(); q.onsuccess = () => res(q.result.filter(k => String(k).startsWith('c:banners:')).length); };
+  }));
+  assert.equal(kept, 2, 'banner records survive a restart');
   await page.context().close();
 });
 

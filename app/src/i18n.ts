@@ -60,6 +60,7 @@ const en = {
   soon: {
     subsale: 'Subsale will gather secondary-market (resale) properties and their owners, enquiries and paperwork in one place. It is not built yet: your existing properties stay in the Property List.',
     project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Property List for now.',
+    cobrokeMap: 'The Co-broke Opportunity Map will show other agents’ listings and buyers that match yours, on the map. It needs co-broke sharing, which is not built yet.',
     note: 'Nothing on this screen is pretending to work. Tell us what you need here and it will be built next.',
   },
   cobrokePage: {
@@ -172,6 +173,7 @@ const bm: Strings = {
   soon: {
     subsale: 'Subsale akan menghimpunkan hartanah pasaran sekunder (jualan semula) bersama pemilik, pertanyaan dan dokumennya di satu tempat. Ia belum dibina: hartanah sedia ada kekal dalam Senarai Hartanah.',
     project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Hartanah.',
+    cobrokeMap: 'Peta Peluang Co-broke akan menunjukkan senarai dan pembeli ejen lain yang sepadan dengan anda, pada peta. Ia memerlukan perkongsian co-broke, yang belum dibina.',
     note: 'Tiada apa-apa di skrin ini yang berpura-pura berfungsi. Beritahu kami apa yang anda perlukan di sini dan ia akan dibina seterusnya.',
   },
   cobrokePage: {
@@ -282,6 +284,7 @@ const zh: Strings = {
   soon: {
     subsale: '二手房功能将把二手（转售）房产及其业主、询问和文件集中在一处。尚未建立：您现有的房产仍在房产列表中。',
     project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在房产列表中。',
+    cobrokeMap: '联合代理商机地图将在地图上显示与您匹配的其他经纪人房源和买家。它需要联合代理共享功能，目前尚未建立。',
     note: '此页面没有任何假装可用的功能。告诉我们您需要什么，下一步就会建立。',
   },
   cobrokePage: {

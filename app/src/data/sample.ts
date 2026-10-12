@@ -129,5 +129,8 @@ export function sampleData(now = Date.now()) {
     { id: 'x1', ...base, date: day(-2), category: 'Advertising', amount: 150, note: 'PropertyGuru credits (sample)' },
     { id: 'x2', ...base, date: day(-1), category: 'Fuel', amount: 80 },
   ];
+  // Banner status only (no banner positions: those must come from the agent's own GPS, map tap or typing).
+  const bannerMix = ['not_yet', 'no', 'not_allowed', 'not_yet', 'removed', 'no', 'not_yet', 'not_allowed', 'no', 'not_yet'] as const;
+  properties.forEach((p, i) => { p.bannerStatus = bannerMix[i % bannerMix.length]; });
   return { properties, contacts, inquiries, appointments, tasks, deals, expenses };
 }

@@ -4,7 +4,7 @@ import type { ApptKind, ExpertKey, Task } from './data/types';
 
 export type FormSection =
   | 'basics' | 'tenure' | 'photos' | 'location' | 'details' | 'specs' | 'money' | 'tenancy' | 'availability'
-  | 'owner' | 'arrangement' | 'marketing' | 'notes' | 'docs';
+  | 'owner' | 'arrangement' | 'banner' | 'marketing' | 'notes' | 'docs';
 
 export type Screen =
   | { name: 'home' }
@@ -26,6 +26,7 @@ export type Screen =
   | { name: 'houseShopping' }
   | { name: 'journey'; id: string }
   | { name: 'propertyMap'; id?: string }
+  | { name: 'banners'; propertyId?: string }
   | { name: 'finance' }
   | { name: 'dealForm'; id?: string; propertyId?: string }
   | { name: 'expenseForm'; id?: string }
@@ -39,7 +40,7 @@ export type Screen =
   | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
   | { name: 'expertThread'; id: string }
   | { name: 'voice' }
-  | { name: 'comingSoon'; key: 'subsale' | 'project' }
+  | { name: 'comingSoon'; key: 'subsale' | 'project' | 'cobrokeMap' }
   | { name: 'cobroke' };
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */

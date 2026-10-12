@@ -12,6 +12,9 @@ the staged plan are in [`docs/AUDIT.md`](docs/AUDIT.md).
 Co-broke added; "Profile & Name Card" renamed **Agent Profile**); explorer progress strip from real data; one shared
 RM formatter and money box for every money field.
 
+**Owner requests (12 Oct, done):** reference-number dropdown (used numbers red, free ones selectable); **My Banner
+Location** in GPS Assistance (four cards now) with a **Banner placed?** status on every property.
+
 ## Current state (Version 2.0, 12 Oct 2026)
 
 Version 2.0 turns the v1L prototype into a working app that keeps its data. Smart Capture has been removed
@@ -41,9 +44,9 @@ completely; property information is captured by voice.
 | --- | --- |
 | Type check (every file, strict) | Passed |
 | Lint (project checks) | Passed |
-| Unit tests | 40 / 40 |
+| Unit tests | 42 / 42 |
 | Build | Passed |
-| Screen tests | 25 / 25 |
+| Screen tests | 27 / 27 |
 
 Screen tests use a stand-in for Google Maps and simulated GPS positions. They do not prove real Google Maps,
 real GPS, speech recognition, WhatsApp or notifications on the phone.

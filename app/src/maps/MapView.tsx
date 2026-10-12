@@ -37,7 +37,7 @@ export function MapsNotice({ lang, status }: { lang: Lang; status: MapsStatus })
   return <p className="notice warn" role="status" data-testid={`maps-${status}`}>{text}</p>;
 }
 
-export interface MapMarker { id: string; lat: number; lng: number; title?: string; label?: string; selected?: boolean; kind?: 'property' | 'mark' | 'me' | 'pick' }
+export interface MapMarker { id: string; lat: number; lng: number; title?: string; label?: string; selected?: boolean; kind?: 'property' | 'mark' | 'me' | 'pick' | 'banner'; /** Pin colour for banners (status colour). */ colour?: string }
 
 export function MapView({ maps, markers, path, route, center, zoom = 15, fit, onMarkerClick, onMapClick, onMarkerDrag, height = 320, testId }: {
   maps: Maps; markers: MapMarker[]; path?: { lat: number; lng: number }[]; route?: { lat: number; lng: number }[];
@@ -68,7 +68,8 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
         map: m, position: { lat: mk.lat, lng: mk.lng }, title: mk.title, label: mk.label,
         draggable: !!handlers.current.onMarkerDrag && mk.kind === 'pick',
         zIndex: mk.selected ? 1000 : undefined,
-        icon: mk.kind === 'me' ? { path: maps.SymbolPath?.CIRCLE ?? 0, scale: 8, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
+        icon: mk.kind === 'banner' ? { path: maps.SymbolPath?.CIRCLE ?? 0, scale: mk.selected ? 11 : 9, fillColor: mk.colour ?? '#22C55E', fillOpacity: 1, strokeColor: mk.selected ? '#F6E3A1' : '#08080A', strokeWeight: mk.selected ? 3 : 2 }
+          : mk.kind === 'me' ? { path: maps.SymbolPath?.CIRCLE ?? 0, scale: 8, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
           : mk.kind === 'mark' ? { path: maps.SymbolPath?.CIRCLE ?? 0, scale: 7, fillColor: '#D4AF37', fillOpacity: 1, strokeColor: '#08080A', strokeWeight: 2 }
             : mk.selected ? undefined : undefined,
       });

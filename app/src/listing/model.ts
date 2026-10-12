@@ -18,6 +18,8 @@ export type Furnishing = 'unfurnished' | 'partly' | 'fully';
 export type LandUse = 'building' | 'industry' | 'agriculture';
 export type DocCategory = 'title' | 'brochure' | 'floorplan' | 'correspondence' | 'transaction' | 'other';
 export type AdStatus = 'planned' | 'live' | 'needs_update' | 'paused' | 'expired';
+/** Is a "For Sale / For Rent" banner up for this property? (owner, 12 Oct 2026) */
+export type BannerStatus = 'yes' | 'no' | 'not_yet' | 'not_allowed' | 'removed';
 
 export const TYPES = [
   'Terrace house', 'Semi-D house', 'Bungalow', 'Townhouse', 'Condo / apartment', 'Shoplot', 'Office',
@@ -48,6 +50,7 @@ export const DOC_CATEGORIES: DocCategory[] = ['title', 'brochure', 'floorplan', 
 export const CONFIDENTIAL_DOCS: DocCategory[] = ['title', 'correspondence', 'transaction'];
 export const PLATFORMS = ['PropertyGuru', 'iProperty', 'Mudah', 'The Edge Property', 'Facebook Ads', 'Facebook Marketplace'] as const;
 export const AD_STATUSES: AdStatus[] = ['planned', 'live', 'needs_update', 'paused', 'expired'];
+export const BANNER_STATUSES: BannerStatus[] = ['yes', 'not_yet', 'no', 'not_allowed', 'removed'];
 export const MAX_CUSTOM_FIELDS = 10;
 
 /** A photo is either a stored file (fileId, kept in the phone's storage) or a built-in sample picture (url). */
@@ -135,6 +138,8 @@ export interface Listing {
   arrangement?: Arrangement;
   arrangementNote?: string;
   marketing?: Marketing;
+  /** Banner placed? Where each banner stands is kept in the banners records (data/types.ts). */
+  bannerStatus?: BannerStatus;
   status?: Status;
   handledBy?: string;
   notes?: string;
