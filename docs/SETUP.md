@@ -64,3 +64,10 @@ over it (same signing key) and keep your data. Open **Estate Agent Buddy** from 
 
 Debug signing key fingerprint (only needed if Google's native Android services are added later):
 SHA-1 `1A:F9:28:D6:59:1C:90:C7:02:CD:67:D3:E9:54:3F:34:3C:DD:94:64`, package `com.jslproperties.estateagentbuddy`.
+
+## 5. Starting a build by hand
+
+GitHub shows the **Run workflow** button (Actions → Build) only when the workflow file is on the repository's default
+branch, `main`. Until the pull request is merged into `main`, the Build workflow lives only on
+`feature/v2-full-update`, so it starts automatically on every push to that branch but has no manual button.
+After merging, Actions → Build → Run workflow → choose the branch.
