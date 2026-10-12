@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { loadMaps, Maps, MapsError, mapsAuthFailed, lastMapsError } from './google';
+import { useLivePosition, PositionState } from './position';
 import { mapStrings } from './strings';
 import type { Lang } from '../i18n';
 
@@ -54,25 +55,58 @@ export function MapsNotice({ lang, status }: { lang: Lang; status: MapsStatus })
 
 export interface MapMarker { id: string; lat: number; lng: number; title?: string; label?: string; selected?: boolean; kind?: 'property' | 'mark' | 'me' | 'pick' | 'banner'; /** Pin colour for banners (status colour). */ colour?: string }
 
-export function MapView({ maps, markers, path, route, center, zoom = 15, fit, onMarkerClick, onMapClick, onMarkerDrag, height = 320, testId }: {
+export type MapType = 'roadmap' | 'satellite' | 'hybrid';
+export const MAP_TYPES: MapType[] = ['roadmap', 'satellite', 'hybrid'];
+
+/**
+ * A Google map with markers, an optional route line and click handling. Drawn only when Google Maps is loaded.
+ * Every map also has:
+ *  - your live GPS position (blue dot with an accuracy circle), from `me` when the screen already tracks it
+ *    (House Shopping), otherwise watched here while the map is open;
+ *  - a ◎ My Location button that always recentres on the latest real position and then follows you until you move
+ *    the map by hand (moving the map never removes the button);
+ *  - Map / Satellite / Hybrid, remembered for next time; switching keeps the position, zoom and every marker.
+ * `follow`: the screen's `center` is a live position (House Shopping) — the map follows it until you drag.
+ */
+export function MapView({ maps, markers, path, route, center, zoom = 15, fit, onMarkerClick, onMapClick, onMarkerDrag, height = 320, testId, me, meState, onLocate, follow = false, locate = true }: {
   maps: Maps; markers: MapMarker[]; path?: { lat: number; lng: number }[]; route?: { lat: number; lng: number }[];
   center?: { lat: number; lng: number }; zoom?: number; fit?: boolean;
   onMarkerClick?: (id: string) => void; onMapClick?: (lat: number, lng: number) => void; onMarkerDrag?: (id: string, lat: number, lng: number) => void;
   height?: number; testId?: string;
+  me?: { lat: number; lng: number; acc?: number } | null; follow?: boolean; locate?: boolean;
+  /** When the screen supplies `me`: its GPS state and how to (re)start it, so the map reports refusals correctly. */
+  meState?: PositionState; onLocate?: () => void;
 }) {
+  const { state, store } = useApp();
+  const lang = state.settings.lang ?? 'en';
+  const ms = mapStrings[lang];
+  const mapType: MapType = state.settings.mapType ?? 'roadmap';
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
-  const drawn = useRef<{ markers: any[]; line?: any; route?: any }>({ markers: [] });
+  const drawn = useRef<{ markers: any[]; line?: any; route?: any; me?: any; acc?: any }>({ markers: [] });
   const handlers = useRef({ onMarkerClick, onMapClick, onMarkerDrag });
   handlers.current = { onMarkerClick, onMapClick, onMarkerDrag };
+  const live = useLivePosition(locate && me === undefined);
+  const myPos = me === undefined ? live.pos : me;
+  const posState: PositionState = me === undefined ? live.state : (meState ?? (me ? 'live' : 'locating'));
+  // Following you: on for live screens until the map is dragged; the ◎ button turns it on again.
+  const [following, setFollowing] = useState(follow);
+  const followingRef = useRef(following);
+  followingRef.current = following;
+  const wantRecentre = useRef(false);
 
   useEffect(() => {
     if (!el.current || map.current) return;
     map.current = new maps.Map(el.current, {
-      center: center ?? { lat: 2.8205, lng: 101.8036 }, zoom, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
+      center: center ?? { lat: 2.8205, lng: 101.8036 }, zoom, mapTypeId: mapType, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
     });
     map.current.addListener?.('click', (e: any) => { const ll = e?.latLng; if (ll) handlers.current.onMapClick?.(ll.lat(), ll.lng()); });
+    // Moving the map by hand stops following (the ◎ button stays and recentres again).
+    map.current.addListener?.('dragstart', () => setFollowing(false));
   }, [maps]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Map / Satellite / Hybrid: the same map object, so position, zoom and markers stay as they are.
+  useEffect(() => { map.current?.setMapTypeId?.(mapType); }, [mapType]);
 
   useEffect(() => {
     const m = map.current;
@@ -99,8 +133,42 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
     for (const x of drawn.current.markers) x.setMap(null);
     drawn.current.line?.setMap(null);
     drawn.current.route?.setMap(null);
+    drawn.current.me?.setMap(null);
+    drawn.current.acc?.setMap(null);
     drawn.current = { markers: [] };
   }, []);
+
+  // Your position: blue dot and accuracy circle, moved (not redrawn) as the GPS updates.
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    if (!myPos) { drawn.current.me?.setMap(null); drawn.current.acc?.setMap(null); drawn.current.me = drawn.current.acc = undefined; return; }
+    const at = { lat: myPos.lat, lng: myPos.lng };
+    if (!drawn.current.me) {
+      drawn.current.me = new maps.Marker({ map: m, position: at, zIndex: 2000, title: ms.check.here, clickable: false,
+        icon: { path: maps.SymbolPath?.CIRCLE ?? 0, scale: 8, fillColor: '#4285F4', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+    } else drawn.current.me.setPosition?.(at);
+    if (maps.Circle && myPos.acc) {
+      if (!drawn.current.acc) drawn.current.acc = new maps.Circle({ map: m, center: at, radius: myPos.acc, clickable: false, strokeColor: '#4285F4', strokeOpacity: 0.4, strokeWeight: 1, fillColor: '#4285F4', fillOpacity: 0.12 });
+      else { drawn.current.acc.setCenter?.(at); drawn.current.acc.setRadius?.(myPos.acc); }
+    }
+    if (wantRecentre.current || followingRef.current) {
+      m.panTo?.(at);
+      if (wantRecentre.current && (m.getZoom?.() ?? 16) < 15) m.setZoom?.(16);
+      wantRecentre.current = false;
+    }
+  }, [maps, myPos?.lat, myPos?.lng, myPos?.acc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function recentre() {
+    setFollowing(true);
+    if (myPos) {
+      map.current?.panTo?.({ lat: myPos.lat, lng: myPos.lng });
+      if ((map.current?.getZoom?.() ?? 16) < 15) map.current?.setZoom?.(16);
+    } else {
+      wantRecentre.current = true;
+      if (me === undefined) live.locate(); else onLocate?.();
+    }
+  }
 
   useEffect(() => {
     const m = map.current;
@@ -115,16 +183,40 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
     const m = map.current;
     if (!m) return;
     const pts = [...markers.map(x => ({ lat: x.lat, lng: x.lng })), ...(path ?? []), ...(route ?? [])];
+    if (follow) {
+      // A live position screen: follow only while following (dragging the map stops it).
+      if (center && followingRef.current) m.panTo?.(center);
+      else if (!center && fit && pts.length > 1 && maps.LatLngBounds) { const b = new maps.LatLngBounds(); for (const p of pts) b.extend(p); m.fitBounds(b, 40); }
+      return;
+    }
     if (fit && pts.length > 1 && maps.LatLngBounds) {
       const b = new maps.LatLngBounds();
       for (const p of pts) b.extend(p);
       m.fitBounds(b, 40);
     } else if (center) {
+      setFollowing(false); // a chosen place (for example another property) takes over from following you
       m.panTo?.(center);
     } else if (pts.length === 1) {
       m.panTo?.(pts[0]);
     }
   }, [maps, fit, center?.lat, center?.lng, markers.length, path?.length, route?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return <div ref={el} className="gmap" style={{ height }} data-testid={testId ?? 'gmap'} />;
+  const status = posState === 'denied' ? ms.meDenied : posState === 'off' ? ms.check.gpsOff : posState === 'locating' && (wantRecentre.current || following) ? ms.locatingMe : '';
+  return (
+    <div className="gmap-wrap" style={{ height }}>
+      <div ref={el} className="gmap" style={{ height }} data-testid={testId ?? 'gmap'} />
+      <div className="map-types" role="radiogroup" aria-label={ms.mapType} data-testid="map-types">
+        {MAP_TYPES.map(t => (
+          <button key={t} type="button" role="radio" aria-checked={mapType === t} data-type={t}
+            onClick={() => store.setSingleton('settings', { mapType: t })}>{ms.types[t]}</button>
+        ))}
+      </div>
+      {locate && (
+        <button type="button" className={`map-me ${following && myPos ? 'on' : ''}`} onClick={recentre} aria-label={ms.recentre} title={ms.recentre} data-testid="map-my-location" data-following={following ? 'yes' : 'no'}>
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" /></svg>
+        </button>
+      )}
+      {status && <span className="map-status" role="status" data-testid="map-status">{status}</span>}
+    </div>
+  );
 }

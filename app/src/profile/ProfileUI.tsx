@@ -2,6 +2,7 @@
 // Sending: the app prepares the message and opens WhatsApp (or the phone's share sheet for the card images).
 // The agent reviews it there and presses Send; nothing is ever sent automatically.
 import { useState } from 'react';
+import { AboutCard } from '../native/UpdateUI';
 import { MapsCheck } from '../maps/MapsCheck';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
@@ -233,6 +234,7 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
         }}>{t.saveSettings}</button>
       </div>
       <AccountCard lang={lang} />
+      <AboutCard lang={lang} />
       <div className="card stack-sm">
         <div className="card-title">{t.notif}</div>
         <small className="muted">{strings[lang].reminders.note}</small>

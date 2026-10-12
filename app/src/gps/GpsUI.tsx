@@ -159,9 +159,10 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
           <MapsNotice lang={lang} status={status} />
           {maps ? (
             <MapView maps={maps} fit={!tracker.fix} center={tracker.fix ? { lat: tracker.fix.lat, lng: tracker.fix.lng } : undefined} height={300}
+              follow me={tracker.fix ? { lat: tracker.fix.lat, lng: tracker.fix.lng, acc: tracker.fix.acc } : null}
+              meState={tracker.error === 'denied' ? 'denied' : tracker.error && !tracker.fix ? 'off' : tracker.fix ? 'live' : 'locating'}
               path={j!.points}
               markers={[
-                ...(tracker.fix ? [{ id: 'me', lat: tracker.fix.lat, lng: tracker.fix.lng, kind: 'me' as const }] : []),
                 ...j!.marks.map(m => ({ id: m.id, lat: m.lat, lng: m.lng, kind: 'mark' as const })),
                 ...withPos.filter(p => here && metres(here, { lat: p.lat!, lng: p.lng! }) < 3000).map(p => ({ id: p.id, lat: p.lat!, lng: p.lng!, title: cardTitle(p), kind: 'property' as const })),
               ]}
@@ -328,9 +329,7 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
   const { maps, status } = useGoogleMaps(lang);
   const list = useMemo(() => state.properties.filter(hasPosition).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || '')), [state.properties]);
   const [sel, setSel] = useState<string | undefined>(id ?? list[0]?.id);
-  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
-  const mine = useMyPosition();
-  useEffect(() => { if (mine.pos) setMe({ lat: mine.pos.lat, lng: mine.pos.lng }); }, [mine.pos]);
+  const mine = useMyPosition(false);
   const [route, setRoute] = useState<{ path: { lat: number; lng: number }[]; info?: string } | null>(null);
   const [routeMsg, setRouteMsg] = useState('');
   const idx = Math.max(0, list.findIndex(p => p.id === sel));
@@ -340,8 +339,7 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
   if (!list.length) return (
     <section className="stack" data-testid="property-map">
       <MapsNotice lang={lang} status={status} />
-      {maps && mine.pos && <MapView maps={maps} height={300} center={mine.pos} zoom={15} markers={[{ id: 'me', lat: mine.pos.lat, lng: mine.pos.lng, kind: 'me' }]} />}
-      <MyPositionButton lang={lang} mine={mine} />
+      {maps ? <MapView maps={maps} height={300} zoom={15} markers={[]} /> : <MyPositionButton lang={lang} mine={mine} />}
       <Empty>{g.mapNone}</Empty>
     </section>
   );
@@ -352,7 +350,6 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
     setRouteMsg('');
     navigator.geolocation?.getCurrentPosition(async pos => {
       const from = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setMe(from);
       const r = await routePreview(maps, from, { lat: p.lat!, lng: p.lng! });
       if (!r) { setRouteMsg(g.routeNone); return; }
       setRoute({ path: r.path, info: r.distanceM !== undefined && r.durationS !== undefined ? g.routeInfo(kmText(r.distanceM), Math.round(r.durationS / 60)) : undefined });
@@ -365,10 +362,10 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
       <MapsNotice lang={lang} status={status} />
       {maps && (
         <MapView maps={maps} height={340} center={p ? { lat: p.lat!, lng: p.lng! } : undefined} zoom={16} route={route?.path}
-          markers={[...list.map(x => ({ id: x.id, lat: x.lat!, lng: x.lng!, title: cardTitle(x), selected: x.id === p?.id, kind: 'property' as const })), ...(me ? [{ id: 'me', lat: me.lat, lng: me.lng, kind: 'me' as const }] : [])]}
-          onMarkerClick={x => { if (x !== 'me') setSel(x); }} />
+          markers={list.map(x => ({ id: x.id, lat: x.lat!, lng: x.lng!, title: cardTitle(x), selected: x.id === p?.id, kind: 'property' as const }))}
+          onMarkerClick={x => setSel(x)} />
       )}
-      <MyPositionButton lang={lang} mine={mine} />
+      {!maps && <MyPositionButton lang={lang} mine={mine} />}
       {!maps && <div className="card stack-sm"><div className="card-title">{g.listMode}</div>
         {list.map(x => <button key={x.id} className={`link-row ${x.id === p?.id ? 'on' : ''}`} onClick={() => setSel(x.id)}>{cardTitle(x) || ls.untitled} <small className="muted">{x.lat!.toFixed(4)}, {x.lng!.toFixed(4)}</small></button>)}
       </div>}
@@ -413,12 +410,11 @@ function IdleMap({ lang, go, maps, status }: { lang: Lang; go: Go; maps: unknown
   return (
     <div className="card stack-sm" data-testid="house-shopping-map">
       <MapsNotice lang={lang} status={status} />
-      {maps && mine.pos ? (
-        <MapView maps={maps} height={260} center={mine.pos} zoom={15}
-          markers={[{ id: 'me', lat: mine.pos.lat, lng: mine.pos.lng, kind: 'me' as const }, ...near.map(p => ({ id: p.id, lat: p.lat!, lng: p.lng!, title: cardTitle(p), kind: 'property' as const }))]}
-          onMarkerClick={id => { if (id !== 'me') go({ name: 'listingDetail', id }); }} />
-      ) : null}
-      <MyPositionButton lang={lang} mine={mine} />
+      {maps ? (
+        <MapView maps={maps} height={260} center={mine.pos ?? undefined} zoom={15} follow me={mine.pos} meState={mine.state} onLocate={mine.locate}
+          markers={near.map(p => ({ id: p.id, lat: p.lat!, lng: p.lng!, title: cardTitle(p), kind: 'property' as const }))}
+          onMarkerClick={id => go({ name: 'listingDetail', id })} />
+      ) : <MyPositionButton lang={lang} mine={mine} />}
     </div>
   );
 }

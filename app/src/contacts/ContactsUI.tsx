@@ -14,7 +14,7 @@ import { TaskRow } from '../agenda/AgendaUI';
 import { completeTask, sortTasks } from '../domain/workflow';
 import { cardTitle, normalisePhone, phoneDigits } from '../listing/model';
 import { fmtDate } from '../lib/dates';
-import { pickPhoneContacts, phonebookSupported } from '../lib/phonebook';
+import { pickPhoneContacts, phonebookSupported, PhonebookDenied, PickedContact } from '../lib/phonebook';
 import { useToast } from '../ui/toast';
 
 const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
@@ -29,11 +29,12 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
   const all = useMemo(() => state.contacts.filter(c => inRole(c, role)), [state.contacts, role]);
   const shown = all
     .filter(c => lead === 'all' || c.leadStatus === lead)
-    .filter(c => !q.trim() || [c.name, c.phone, c.company, c.email].some(v => (v ?? '').toLowerCase().includes(q.trim().toLowerCase()) || (q.replace(/\D/g, '').length > 3 && phoneDigits(v).includes(q.replace(/\D/g, '')))))
+    .filter(c => !q.trim() || [c.name, c.phone, c.whatsapp, c.company, c.email].some(v => (v ?? '').toLowerCase().includes(q.trim().toLowerCase()) || (q.replace(/\D/g, '').length > 3 && phoneDigits(v).includes(q.replace(/\D/g, '')))))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   async function importPhone() {
-    const picked = await pickPhoneContacts(true);
+    let picked: PickedContact[] | null;
+    try { picked = await pickPhoneContacts(true); } catch (e) { toast(e instanceof PhonebookDenied ? s.pickDenied : s.importUnsupported); return; }
     if (picked === null) { toast(s.importUnsupported); return; }
     let added = 0, skipped = 0;
     for (const p of picked) {
@@ -95,6 +96,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         <div className="row-wrap">{c.roles.map(r => <span key={r} className="chip-tag">{s.roles[r]}</span>)}{c.profession && <span className="chip-tag">{s.experts[c.profession]}</span>}</div>
         <dl className="dl">
           {c.phone && <div className="dl-row"><dt>{s.f.phone}</dt><dd>{c.phone}</dd></div>}
+          {c.whatsapp && <div className="dl-row"><dt>{s.whatsapp}</dt><dd data-testid="contact-whatsapp">{c.whatsapp}</dd></div>}
           {c.email && <div className="dl-row"><dt>{s.f.email}</dt><dd>{c.email}</dd></div>}
           {c.company && <div className="dl-row"><dt>{s.f.company}</dt><dd>{c.company}</dd></div>}
           {c.source && <div className="dl-row"><dt>{s.f.source}</dt><dd>{c.source}</dd></div>}
@@ -106,6 +108,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
           {c.phone && <a className="btn secondary" href={`tel:+${phoneDigits(c.phone)}`}>{t.c.call}</a>}
           {c.phone && <a className="btn secondary" href={`https://wa.me/${phoneDigits(c.phone)}`} target="_blank" rel="noreferrer">{t.c.whatsapp}</a>}
         </div>
+        {!c.phone && c.whatsapp && <small className="muted">{s.aliasOnly(c.whatsapp)}</small>}
       </div>
       <div className="card stack-sm"><LeadPicker lang={lang} value={c.leadStatus} onChange={v => store.upsert('contacts', { ...c, leadStatus: v })} /></div>
       <SectionCard title={s.properties}>
@@ -135,13 +138,35 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
   const [err, setErr] = useState(false);
   const [del, setDel] = useState(false);
   const dup = d.phone && phoneDigits(d.phone).length >= 8 ? state.contacts.find(x => x.id !== d.id && x.phone && phoneDigits(x.phone) === phoneDigits(d.phone)) : undefined;
+  const [replace, setReplace] = useState<PickedContact | null>(null);
+  const apply = (p: PickedContact) => setD(x => ({ ...x, name: p.name || x.name, phone: normalisePhone(p.tel) ?? x.phone, email: x.email || p.email }));
+  async function pick() {
+    let got: PickedContact[] | null;
+    try { got = await pickPhoneContacts(false); } catch (e) { toast(e instanceof PhonebookDenied ? s.pickDenied : s.importUnsupported); return; }
+    if (got === null) { toast(s.importUnsupported); return; }
+    const p = got[0];
+    if (!p) { toast(s.pickNone); return; }
+    // Something different already typed: ask before replacing it.
+    const differs = (d.name.trim() && p.name && d.name.trim() !== p.name) || (d.phone && p.tel && phoneDigits(d.phone) !== phoneDigits(p.tel));
+    if (differs) setReplace(p); else apply(p);
+  }
   const toggleRole = (r: ContactRole) => setD(x => ({ ...x, roles: x.roles.includes(r) ? x.roles.filter(y => y !== r) : [...x.roles, r] }));
   return (
     <section className="stack" data-testid="contact-form">
       <div className="card stack-sm">
         <label className="ff">{s.f.name}<input data-field="name" aria-invalid={err} value={d.name} onChange={e => { setD(x => ({ ...x, name: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{t.c.nameRequired}</p>}
-        <label className="ff">{s.f.phone}<input data-field="phone" type="tel" inputMode="tel" value={d.phone ?? ''} onChange={e => setD(x => ({ ...x, phone: e.target.value || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
+        <div className="ff">
+          <label htmlFor="contact-phone">{s.f.phone}</label>
+          <div className="combo">
+            <input id="contact-phone" data-field="phone" type="tel" inputMode="tel" value={d.phone ?? ''} onChange={e => setD(x => ({ ...x, phone: e.target.value || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} />
+            <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={s.pickFromPhone} title={s.pickFromPhone} data-testid="pick-contact">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12a1 1 0 011 1v16a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1zM3 7h2M3 12h2M3 17h2" /><circle cx="12" cy="10" r="2.5" /><path d="M8.5 16a3.5 3.5 0 017 0" /></svg>
+            </button>
+          </div>
+        </div>
+        <label className="ff">{s.whatsapp}<input data-field="whatsapp" autoComplete="off" autoCapitalize="none" placeholder="@" value={d.whatsapp ?? ''} onChange={e => setD(x => ({ ...x, whatsapp: e.target.value || undefined }))} />
+          <small className="muted">{s.whatsappHint}</small></label>
         {dup && <p className="warn-text" role="status">{s.duplicate(dup.name)} <button className="link-btn" onClick={() => go({ name: 'contactDetail', id: dup.id })}>{s.openExisting}</button></p>}
         <label className="ff">{s.f.email}<input type="email" value={d.email ?? ''} onChange={e => setD(x => ({ ...x, email: e.target.value || undefined }))} /></label>
         <label className="ff">{s.f.company}<input value={d.company ?? ''} onChange={e => setD(x => ({ ...x, company: e.target.value || undefined }))} /></label>
@@ -164,11 +189,14 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         <button className="btn secondary" onClick={back}>{t.c.cancel}</button>
         <button className="btn primary" data-testid="save-contact" onClick={() => {
           if (!d.name.trim()) { setErr(true); return; }
-          const saved = store.upsert('contacts', { ...d, name: d.name.trim(), phone: normalisePhone(d.phone), roles: d.roles.length ? d.roles : ['other'] });
+          const saved = store.upsert('contacts', { ...d, name: d.name.trim(), phone: normalisePhone(d.phone), whatsapp: d.whatsapp?.trim() || undefined, roles: d.roles.length ? d.roles : ['other'] });
           toast(t.c.saved);
           if (existing) back(); else go({ name: 'contactDetail', id: saved.id });
         }}>{t.c.save}</button>
       </div></div>
+      {replace && <Confirm lang={lang} title={s.replaceQ} danger={false} okLabel={s.replaceOk}
+        body={s.replaceBody([d.name, d.phone].filter(Boolean).join(' · '), [replace.name, replace.tel].filter(Boolean).join(' · '))}
+        onCancel={() => setReplace(null)} onOk={() => { apply(replace); setReplace(null); }} />}
       {del && existing && <Confirm lang={lang} title={t.c.deleteQ} body={s.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('contacts', existing.id); go({ name: 'home' }); }} />}
     </section>
   );

@@ -50,13 +50,6 @@ const en = {
     clear: 'Nothing due today.',
   },
   comingSoon: 'Coming Soon',
-  explorer: {
-    title: 'Explorer progress',
-    km: 'km explored this week',
-    mapped: 'properties on the map',
-    trips: 'routes recorded',
-    empty: 'Start House Shopping in GPS Assistance to record your first route.',
-  },
   soon: {
     subsale: 'Subsale will gather secondary-market (resale) properties and their owners, enquiries and paperwork in one place. It is not built yet: your existing properties stay in the Property List.',
     project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Property List for now.',
@@ -70,6 +63,15 @@ const en = {
     none: 'No co-broke properties yet. Set “Arrangement” to Co-broke on a property to list it here.',
     soonTitle: 'Coming Soon',
     soonBody: 'Sharing listings with other agents, co-broke terms and splits, and the Co-broke Opportunity Map.',
+  },
+  update: {
+    ready: 'A new version of the app is ready.', restart: 'Restart now', later: 'Later',
+    web: 'A new version of Estate Agent Buddy is available.', reload: 'Reload',
+    apk: 'A new Android app is needed for new phone features. Your data stays when you install it over this one.', download: 'Download the new app',
+    about: 'About this app', version: (v: string, sha: string, n: number) => `Version ${v} · build ${sha} · native ${n}`,
+    check: 'Check for updates', checking: 'Checking…', upToDate: 'This is the latest version.', failed: (m: string) => `Could not check for updates (${m}).`,
+    howTitle: 'How updates arrive',
+    how: 'Ordinary improvements download by themselves and are used the next time the app starts — no reinstall. Only changes that need new phone permissions or features need a new APK; the app tells you when.',
   },
   recentProperties: 'Recent properties',
   reminders: {
@@ -163,13 +165,6 @@ const bm: Strings = {
     clear: 'Tiada yang perlu dibuat hari ini.',
   },
   comingSoon: 'Akan Datang',
-  explorer: {
-    title: 'Kemajuan penjelajah',
-    km: 'km dijelajah minggu ini',
-    mapped: 'hartanah pada peta',
-    trips: 'laluan direkod',
-    empty: 'Mulakan Cari Rumah dalam Bantuan GPS untuk merekod laluan pertama anda.',
-  },
   soon: {
     subsale: 'Subsale akan menghimpunkan hartanah pasaran sekunder (jualan semula) bersama pemilik, pertanyaan dan dokumennya di satu tempat. Ia belum dibina: hartanah sedia ada kekal dalam Senarai Hartanah.',
     project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Hartanah.',
@@ -183,6 +178,15 @@ const bm: Strings = {
     none: 'Belum ada hartanah co-broke. Tetapkan “Susunan” kepada Co-broke pada hartanah untuk menyenaraikannya di sini.',
     soonTitle: 'Akan Datang',
     soonBody: 'Berkongsi senarai dengan ejen lain, terma dan pembahagian co-broke, serta Peta Peluang Co-broke.',
+  },
+  update: {
+    ready: 'Versi baharu aplikasi sudah sedia.', restart: 'Mulakan semula sekarang', later: 'Nanti',
+    web: 'Versi baharu Estate Agent Buddy tersedia.', reload: 'Muat semula',
+    apk: 'Aplikasi Android baharu diperlukan untuk ciri telefon baharu. Data anda kekal apabila anda memasangnya di atas aplikasi ini.', download: 'Muat turun aplikasi baharu',
+    about: 'Tentang aplikasi ini', version: (v: string, sha: string, n: number) => `Versi ${v} · binaan ${sha} · natif ${n}`,
+    check: 'Semak kemas kini', checking: 'Sedang menyemak…', upToDate: 'Ini versi terkini.', failed: (m: string) => `Tidak dapat menyemak kemas kini (${m}).`,
+    howTitle: 'Bagaimana kemas kini sampai',
+    how: 'Penambahbaikan biasa dimuat turun sendiri dan digunakan apabila aplikasi dimulakan semula — tanpa pasang semula. Hanya perubahan yang memerlukan kebenaran atau ciri telefon baharu memerlukan APK baharu; aplikasi akan memberitahu anda.',
   },
   recentProperties: 'Hartanah terkini',
   reminders: {
@@ -274,13 +278,6 @@ const zh: Strings = {
     clear: '今天没有到期事项。',
   },
   comingSoon: '即将推出',
-  explorer: {
-    title: '探索进度',
-    km: '本周探索公里数',
-    mapped: '已上地图的房产',
-    trips: '已记录路线',
-    empty: '在 GPS 助手中开始“看房路线”，记录您的第一条路线。',
-  },
   soon: {
     subsale: '二手房功能将把二手（转售）房产及其业主、询问和文件集中在一处。尚未建立：您现有的房产仍在房产列表中。',
     project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在房产列表中。',
@@ -294,6 +291,15 @@ const zh: Strings = {
     none: '暂无联合代理房产。在房产的“安排”中选择联合代理即可显示在此。',
     soonTitle: '即将推出',
     soonBody: '与其他经纪人共享房源、联合代理条款与分成，以及联合代理商机地图。',
+  },
+  update: {
+    ready: '应用的新版本已准备好。', restart: '立即重启', later: '稍后',
+    web: 'Estate Agent Buddy 有新版本。', reload: '重新加载',
+    apk: '新的手机功能需要新的 Android 应用。覆盖安装时您的数据会保留。', download: '下载新应用',
+    about: '关于本应用', version: (v: string, sha: string, n: number) => `版本 ${v} · 构建 ${sha} · 原生 ${n}`,
+    check: '检查更新', checking: '正在检查…', upToDate: '已是最新版本。', failed: (m: string) => `无法检查更新（${m}）。`,
+    howTitle: '更新如何送达',
+    how: '一般改进会自动下载，并在应用下次启动时使用——无需重新安装。只有需要新手机权限或功能的更改才需要新的 APK；应用会提示您。',
   },
   recentProperties: '最近的房产',
   reminders: {

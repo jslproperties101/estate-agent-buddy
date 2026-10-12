@@ -1,6 +1,10 @@
-// Speech to text through the browser's speech service (Web Speech API), where the browser offers it.
-// In Chrome on Android this normally sends the audio to Google's speech service to turn it into text.
-// Estate Agent Buddy itself does not record, keep or upload audio.
+// Speech to text.
+//  - Android app: Android's own speech recogniser (plugin @capacitor-community/speech-recognition). The Android
+//    WebView has no Web Speech API, so this is the only way voice works inside the installed app.
+//  - Browser: the Web Speech API where the browser offers it (Chrome on Android/desktop, Safari).
+// Both normally send the audio to the phone maker's / Google's speech service to turn it into text.
+// Estate Agent Buddy itself does not record, keep or upload audio, and listens only while the microphone is on.
+import { plugin } from '../native/native';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface VoiceLang { code: string; label: string; short: string }
@@ -26,13 +30,16 @@ function ctor(): any {
   const w = globalThis as any;
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
-export const speechSupported = () => !!ctor();
+const nativeSpeech = (): any => plugin('SpeechRecognition');
+export const speechSupported = () => !!nativeSpeech() || !!ctor();
 
 export interface Listening { stop(): void; abort(): void }
 
 const KNOWN: VoiceError[] = ['not-allowed', 'service-not-allowed', 'network', 'no-speech', 'audio-capture', 'language-not-supported', 'aborted'];
 
 export function listen(lang: string, h: Handlers, maxMs = 60000): Listening | null {
+  const n = nativeSpeech();
+  if (n) return listenNative(n, lang, h, maxMs);
   const C = ctor();
   if (!C) { h.error('unsupported'); return null; }
   const r = new C();
@@ -58,5 +65,42 @@ export function listen(lang: string, h: Handlers, maxMs = 60000): Listening | nu
   return {
     stop: () => { try { r.stop(); } catch { /* ignore */ } },
     abort: () => { try { r.abort(); } catch { /* ignore */ } },
+  };
+}
+
+/** Android app: Android's speech recogniser, with live words while speaking and the last words as the result. */
+function listenNative(n: any, lang: string, h: Handlers, maxMs: number): Listening {
+  let ended = false;
+  let last = '';
+  const subs: { remove?: () => unknown }[] = [];
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    clearTimeout(timer);
+    for (const x of subs) { try { void x.remove?.(); } catch { /* ignore */ } }
+    if (last) h.final(last);
+    h.interim('');
+    h.end();
+  };
+  const timer = setTimeout(() => { void Promise.resolve(n.stop()).catch(() => {}); finish(); }, maxMs);
+  void (async () => {
+    try {
+      const avail = await n.available();
+      if (!avail?.available) { h.error('unsupported'); finish(); return; }
+      let perm = await n.checkPermissions();
+      if (perm?.speechRecognition !== 'granted') perm = await n.requestPermissions();
+      if (perm?.speechRecognition !== 'granted') { h.error('not-allowed'); finish(); return; }
+      subs.push(await n.addListener('partialResults', (d: { matches?: string[] }) => { last = (d?.matches?.[0] ?? '').trim(); h.interim(last); }));
+      subs.push(await n.addListener('listeningState', (d: { status?: string }) => { if (d?.status === 'stopped') setTimeout(finish, 250); }));
+      await n.start({ language: lang, maxResults: 1, partialResults: true, popup: false });
+    } catch (e) {
+      const msg = String((e as Error)?.message ?? e);
+      h.error(/permission/i.test(msg) ? 'not-allowed' : /no match|no speech|didn't understand/i.test(msg) ? 'no-speech' : /network/i.test(msg) ? 'network' : 'other');
+      finish();
+    }
+  })();
+  return {
+    stop: () => { void Promise.resolve(n.stop()).catch(() => {}); setTimeout(finish, 400); },
+    abort: () => { last = ''; void Promise.resolve(n.stop()).catch(() => {}); finish(); },
   };
 }

@@ -20,6 +20,12 @@ push by GitHub Actions and attached to a GitHub Release; real Google Maps with "
 GPS position on the maps; Google sign-in through Supabase with team roles enforced by the database (tested on
 PostgreSQL). What you still need to set up is in [`docs/SETUP.md`](docs/SETUP.md).
 
+**Updates without reinstalling (12 Oct, built):** from native version 2 the installed app downloads new versions by
+itself from GitHub Pages and keeps all its data; a new APK is needed only for new phone permissions or plugins
+(docs/SETUP.md §6). Explorer Progress removed from the dashboard (owner, 12 Oct). Maps: always-visible My Location
+button that recentres after moving the map, Map / Satellite / Hybrid. Voice and phonebook use Android's own services
+in the app; WhatsApp ID / Alias on contacts.
+
 ## Current state (Version 2.0, 12 Oct 2026)
 
 Version 2.0 turns the v1L prototype into a working app that keeps its data. Smart Capture has been removed

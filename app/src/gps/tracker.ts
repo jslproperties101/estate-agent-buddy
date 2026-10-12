@@ -114,7 +114,9 @@ export class Tracker {
         if (r.result === 'added') { this.save(r.journey); this.onPoint?.(r.journey); } else this.emit();
       },
       e => { this.error = e.code === 1 ? 'denied' : e.code === 3 ? 'timeout' : 'unavailable'; this.emit(); },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 },
+      // A reading up to 3 s old is accepted for the first fix (another map screen may already have the GPS running);
+      // every point still passes the accuracy and jitter checks in domain/journey.ts.
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 30000 },
     );
     void this.keepAwake();
     this.emit();

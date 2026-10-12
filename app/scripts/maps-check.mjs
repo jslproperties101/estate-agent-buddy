@@ -8,7 +8,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
 const [shotPath = 'maps-check.png', textPath = 'maps-check.txt'] = process.argv.slice(2);
-const DIST = new URL('../dist/', import.meta.url).pathname;
+// MAPS_CHECK_DIST: a build without sign-in (the check must reach Settings without a Google account).
+const DIST = process.env.MAPS_CHECK_DIST ? `${process.env.MAPS_CHECK_DIST.replace(/\/$/, '')}/` : new URL('../dist/', import.meta.url).pathname;
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 
 const browser = await chromium.launch();

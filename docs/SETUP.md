@@ -71,3 +71,20 @@ GitHub shows the **Run workflow** button (Actions → Build) only when the workf
 branch, `main`. Until the pull request is merged into `main`, the Build workflow lives only on
 `feature/v2-full-update`, so it starts automatically on every push to that branch but has no manual button.
 After merging, Actions → Build → Run workflow → choose the branch.
+
+## 6. Updates without reinstalling (from native version 2)
+
+Install the APK from build `android-…` with native version 2 **once** (Agent Profile → Settings → About shows
+"native 2"). After that, ordinary changes (screens, wording, layouts, calculations, maps behaviour, fixes) arrive by
+themselves:
+
+1. Every build publishes the app bundle on GitHub Pages with `updates/latest.json`.
+2. The installed app checks shortly after it opens, when it comes back to the front, and every six hours; it downloads
+   the new bundle in the background and shows **"A new version of the app is ready — Restart now"**.
+3. It keeps running from the same address (`https://localhost`), so everything saved on the phone stays. If a new
+   version fails to start, the app goes back to the previous one by itself.
+
+**A new APK is still needed** (the app says "A new Android app is needed" with a Download button) only when the
+Android app itself changes: new phone permissions, new native plugins (for example background GPS tracking), the app
+icon or name, or Android settings. Each build's `nativeVersion` (in `app/package.json`) records this; it is raised only
+for such changes. Install the new APK over the old one — same signing key, data kept.

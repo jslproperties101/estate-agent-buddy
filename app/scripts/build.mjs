@@ -26,6 +26,13 @@ const config = {
   expertApiUrl: env.EAB_EXPERT_API_URL ?? '',
 };
 
+// Which build this is: shown in Settings → About and compared with updates/latest.json for automatic updates.
+// nativeVersion (package.json) goes up only when the Android app itself must change (new permissions or plugins).
+const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+let sha = (env.GITHUB_SHA ?? '').slice(0, 7);
+if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { sha = 'dev'; } }
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString() };
+
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist', { recursive: true });
 
@@ -38,7 +45,7 @@ await build({
   minify: true,
   sourcemap: true,
   outdir: 'dist',
-  define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config) },
+  define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config), __EAB_BUILD__: JSON.stringify(buildInfo) },
   plugins: [capacitorPlugin()],
   logLevel: 'info',
 });

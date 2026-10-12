@@ -22,6 +22,8 @@ const PERMS = [
   'android.permission.ACCESS_FINE_LOCATION',
   'android.permission.CAMERA',
   'android.permission.POST_NOTIFICATIONS',
+  'android.permission.RECORD_AUDIO',     // voice commands (Android speech recogniser)
+  'android.permission.READ_CONTACTS',    // phonebook button (asked only when tapped)
 ];
 edit(`${A}/AndroidManifest.xml`, s => {
   for (const p of PERMS) {
@@ -29,6 +31,10 @@ edit(`${A}/AndroidManifest.xml`, s => {
   }
   if (!s.includes('android.hardware.location.gps')) {
     s = s.replace(/<\/manifest>\s*$/, '    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>\n');
+  }
+  // Android 11+: apps must declare that they look for the speech service, or voice reports "not available".
+  if (!s.includes('android.speech.RecognitionService')) {
+    s = s.replace(/<application/, '<queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n\n    <application');
   }
   // The Capacitor template normally already has this filter; add it if not.
   if (!s.includes('@string/custom_url_scheme') && !s.includes(`android:scheme="${cfg.appId}"`)) {
@@ -66,7 +72,8 @@ if (existsSync(styles)) edit(styles, s => (s.includes('android:windowBackground'
 //    Debug signing: always the committed android-config/debug.keystore, so each new APK installs over the last one.
 const run = Number(process.env.GITHUB_RUN_NUMBER || 1);
 edit('android/app/build.gradle', s => {
-  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`);
+  // The version name carries the native version ("2.0.0-n2"): automatic updates check it before installing a bundle.
+  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}-n${pkg.nativeVersion ?? 1}"`);
   if (!s.includes('android-config/debug.keystore')) {
     s = s.replace(/android\s*\{/, `android {
     signingConfigs {

@@ -3,7 +3,8 @@
 #  database Supabase migrations: roles and row-level security tested on PostgreSQL
 #  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
 #           with the Maps key secret set, also loads the real Google map in a browser and attaches a screenshot
-#  web      the same app as a website on GitHub Pages (needs Pages source = GitHub Actions)
+#  web      the same bundle as a website on GitHub Pages, plus updates/latest.json + the bundle zip that installed
+#           apps download by themselves (needs Pages source = GitHub Actions)
 #
 # Settings → Secrets and variables → Actions → Repository secrets (none are written in the code):
 #   EAB_GOOGLE_MAPS_API_KEY   Google Maps key (browser key, restricted by website)
@@ -89,8 +90,27 @@ jobs:
         run: |
           node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           npm install --no-audit --no-fund
+      - name: Build for the Google Maps check (without sign-in, so the check reaches Settings)
+        if: env.EAB_GOOGLE_MAPS_API_KEY != ''
+        run: |
+          EAB_SUPABASE_URL= EAB_SUPABASE_ANON_KEY= npm run build
+          rm -rf ../dist-maps-check && cp -r dist ../dist-maps-check
       - name: Build the app
         run: npm run build && rm -f dist/*.map
+      - name: Update package for installed apps (no reinstall needed)
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p ../site && cp -r dist/. ../site/ && mkdir -p ../site/updates
+          (cd dist && zip -qr "../../site/updates/bundle-${SHORT}.zip" .)
+          BASE="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-${SHORT}/EstateAgentBuddy-${SHORT}-debug.apk"
+          printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/updates/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
+            "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > ../site/updates/latest.json
+          cat ../site/updates/latest.json
+      - uses: actions/upload-artifact@v4
+        with: { name: site, path: site }
       - name: Android project
         run: |
           npx cap add android
@@ -124,7 +144,7 @@ jobs:
         continue-on-error: true
         run: |
           npx playwright install --with-deps chromium
-          node scripts/maps-check.mjs ../maps-check.png ../maps-check.txt
+          MAPS_CHECK_DIST=../dist-maps-check node scripts/maps-check.mjs ../maps-check.png ../maps-check.txt
       - name: Release with the APK
         env:
           GH_TOKEN: ${{ github.token }}
@@ -147,25 +167,17 @@ jobs:
           gh release create "$TAG" $FILES --prerelease --target "$GITHUB_SHA" --title "Estate Agent Buddy ${TAG}" --notes-file notes.md
 
   web:
+    # The web version and the update package for installed apps: exactly the bundle built (and tested) for the APK.
+    needs: android
     runs-on: ubuntu-latest
     continue-on-error: true
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update'
     environment: { name: github-pages, url: '${{ steps.deploy.outputs.page_url }}' }
-    defaults: { run: { working-directory: app } }
-    env:
-      EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
-      EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
-      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
-      EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '${{ env.NODE_VERSION }}' }
-      - run: npm install --omit=optional --no-audit --no-fund
-        env: { PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1' }
-      - run: npm run build && rm -f dist/*.map
+      - uses: actions/download-artifact@v4
+        with: { name: site, path: site }
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
-        with: { path: app/dist }
+        with: { path: site }
       - id: deploy
         uses: actions/deploy-pages@v4

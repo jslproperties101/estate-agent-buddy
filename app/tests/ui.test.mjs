@@ -36,10 +36,13 @@ after(async () => { await browser?.close(); server?.close(); });
 const FAKE_MAPS = `(() => {
   const listeners = [];
   class LatLng { constructor(a, b) { this.a = a; this.b = b; } lat() { return this.a; } lng() { return this.b; } }
-  class Map { constructor(el) { this.el = el; el.textContent = 'MAP'; window.__maps = (window.__maps || 0) + 1; }
-    addListener(t, fn) { if (t === 'click') listeners.push(fn); } panTo(c) { window.__center = c; } fitBounds() {} setCenter() {} }
+  const drags = [];
+  class Map { constructor(el, o) { this.el = el; el.textContent = 'MAP'; window.__maps = (window.__maps || 0) + 1; window.__mapType = o?.mapTypeId; this.zoom = o?.zoom ?? 15; }
+    addListener(t, fn) { if (t === 'click') listeners.push(fn); if (t === 'dragstart') drags.push(fn); } panTo(c) { window.__center = c; window.__pans = (window.__pans || 0) + 1; } fitBounds() {} setCenter() {}
+    setMapTypeId(t) { window.__mapType = t; } getZoom() { return this.zoom; } setZoom(z) { this.zoom = z; } }
   class Marker { constructor(o) { this.o = o; (window.__markers ||= []).push(this); this.h = {}; } setMap(m) { if (!m) window.__markers = window.__markers.filter(x => x !== this); }
-    addListener(t, fn) { this.h[t] = fn; } }
+    setPosition(p) { this.o = { ...this.o, position: p }; } addListener(t, fn) { this.h[t] = fn; } }
+  class Circle { constructor(o) { this.o = o; window.__circle = o; } setMap() {} setCenter(c) { window.__circle = { ...window.__circle, center: c }; } setRadius(r) { window.__circle = { ...window.__circle, radius: r }; } }
   class Polyline { constructor(o) { window.__lines = (window.__lines || 0) + 1; this.o = o; } setMap() {} }
   class LatLngBounds { extend() {} }
   class Geocoder { async geocode(req) { const r = window.__geocode || { street: 'Jalan Fake 1', township: 'Tmn Desa Nilai', city: 'Nilai', state: 'Negeri Sembilan' };
@@ -52,8 +55,9 @@ const FAKE_MAPS = `(() => {
         { long_name: r.state, short_name: r.state, types: ['administrative_area_level_1'] },
         { long_name: 'Malaysia', short_name: 'MY', types: ['country'] }] }] }; } }
   class DirectionsService { async route(r) { return { routes: [{ overview_path: [new LatLng(r.origin.lat, r.origin.lng), new LatLng(r.destination.lat, r.destination.lng)], legs: [{ distance: { value: 5300 }, duration: { value: 540 } }] }] }; } }
-  window.google = { maps: { Map, Marker, Polyline, LatLngBounds, Geocoder, DirectionsService, SymbolPath: { CIRCLE: 0 }, TravelMode: { DRIVING: 'DRIVING' }, importLibrary: async () => ({}) } };
+  window.google = { maps: { Map, Marker, Circle, Polyline, LatLngBounds, Geocoder, DirectionsService, SymbolPath: { CIRCLE: 0 }, TravelMode: { DRIVING: 'DRIVING' }, importLibrary: async () => ({}) } };
   window.__mapClick = (lat, lng) => listeners.forEach(fn => fn({ latLng: new LatLng(lat, lng) }));
+  window.__drag = () => drags.forEach(fn => fn());
 })();`;
 
 async function phone({ maps = false, geo } = {}) {
@@ -99,16 +103,17 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard: Estate Agent Buddy, explorer progress, 15 cards in 3 × 5, Agent Profile, no sideways scroll', async () => {
+test('U1 dashboard: Estate Agent Buddy, 15 cards in 3 × 5 first, no Explorer Progress, no GPS Map tile, Agent Profile', async () => {
   const page = await phone();
   assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent Buddy');
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
   assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Property List', 'Vendor List', 'Buyer List', 'GPS Assistance',
     'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'Voice Command',
     'Subsale (Coming Soon)', 'Project (Coming Soon)', 'Co-broke']);
-  // Master instruction (12 Oct 2026): explorer progress near the top, then all 15 cards together in one grid.
-  assert.deepEqual(await page.evaluate(() => [...document.querySelector('main.content > section').children].slice(0, 2).map(e => e.getAttribute('data-testid') ?? e.tagName)),
-    ['explorer-progress', 'NAV']);
+  // Owner, 12 Oct 2026 (latest): Explorer Progress removed completely; the page starts with the cards.
+  assert.equal(await page.evaluate(() => document.querySelector('main.content > section > *')?.tagName), 'NAV');
+  for (const gone of [/Explorer progress/i, /km explored/i, /routes recorded/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
+  assert.equal(await page.getByTestId('explorer-progress').count(), 0);
   // 3 columns × 5 rows on a phone.
   const boxes = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
   assert.equal(new Set(boxes.map(b => b[0])).size, 3, 'three columns');
@@ -467,8 +472,7 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await page.getByTestId('card-map').click();
   assert.match(await page.getByTestId('map-title').innerText(), /For sale sign, corner lot/);
   assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/);
-  await page.getByTestId('my-position-text').waitFor(); // the GPS reading arrives a moment after the map
-  await page.waitForFunction(() => window.__markers.some(m => m.o.icon?.fillColor === '#4285F4'));
+  await page.waitForFunction(() => window.__markers.some(m => m.o.icon?.fillColor === '#4285F4')); // the GPS reading arrives a moment after the map
   const pins = await page.evaluate(() => window.__markers.map(m => (m.o.icon?.fillColor === '#4285F4' ? 'me' : 'property')));
   assert.equal(pins.filter(x => x === 'property').length, 1, 'only real saved positions are shown');
   assert.equal(pins.filter(x => x === 'me').length, 1, 'your GPS position is shown');
@@ -796,10 +800,6 @@ test('U25 new cards: Subsale and Project say Coming Soon; Co-broke lists real co
   assert.ok(count >= 1, 'sample data has co-broke properties');
   await page.getByRole('button', { name: 'Show co-broke properties' }).click();
   assert.equal(await page.getByTestId('listing-card').count(), count, 'only co-broke properties are listed');
-  // Explorer progress counts real records only (sample data is left out).
-  await home(page);
-  assert.equal(await page.getByTestId('xp-trips').innerText(), '0');
-  assert.match(await page.getByTestId('xp-mapped').innerText(), /^0\/0$/);
   await page.context().close();
 });
 
@@ -990,6 +990,131 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   await page.getByTestId('login').waitFor();
   assert.ok(seen.includes('POST /auth/v1/logout'));
   await ctx.close();
+});
+
+test('U29 maps: My Location recentres after moving the map, follows until dragged, Map/Satellite/Hybrid keep markers, denied permission explained', async () => {
+  const page = await phone({ maps: true, geo: { latitude: 2.8200, longitude: 101.8000, accuracy: 8 } });
+  const ctx = page.context();
+  const center = () => page.evaluate(() => window.__center);
+  const meAt = () => page.evaluate(() => window.__markers.find(m => m.o.icon?.fillColor === '#4285F4')?.o.position);
+  // A property with a saved position.
+  await tile(page, 'Property List'); await page.locator('.add-property').click();
+  await page.locator('[data-field="street"]').fill('Jalan Peta 1');
+  await page.locator('[data-field="lat"]').fill('2.8300'); await page.locator('[data-field="lng"]').fill('101.8100');
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-map').click();
+  await page.waitForFunction(() => window.__markers?.some(m => m.o.icon?.fillColor === '#4285F4'));
+  assert.deepEqual(await center(), { lat: 2.83, lng: 101.81 }, 'the selected property is centred');
+  assert.equal(await page.getByTestId('map-my-location').getAttribute('data-following'), 'no');
+  // Move the map by hand, then My Location: back to the real GPS position.
+  await page.evaluate(() => window.__drag());
+  await page.getByTestId('map-my-location').click();
+  assert.deepEqual(await center(), { lat: 2.82, lng: 101.8 });
+  assert.equal(await page.getByTestId('map-my-location').getAttribute('data-following'), 'yes');
+  // It follows new GPS positions…
+  await ctx.setGeolocation({ latitude: 2.8210, longitude: 101.8000, accuracy: 8 });
+  await page.waitForFunction(() => Math.abs(window.__center.lat - 2.821) < 1e-9);
+  // …until the map is moved by hand; the dot keeps moving; the button still recentres.
+  await page.evaluate(() => window.__drag());
+  assert.equal(await page.getByTestId('map-my-location').getAttribute('data-following'), 'no');
+  await ctx.setGeolocation({ latitude: 2.8220, longitude: 101.8000, accuracy: 8 });
+  await page.waitForFunction(() => Math.abs(window.__markers.find(m => m.o.icon?.fillColor === '#4285F4').o.position.lat - 2.822) < 1e-9);
+  assert.equal((await center()).lat, 2.821, 'not pulled back while you look elsewhere');
+  assert.equal((await meAt()).lat, 2.822, 'the dot is up to date');
+  assert.equal(await page.evaluate(() => window.__circle?.radius), 8, 'accuracy circle');
+  await page.getByTestId('map-my-location').click();
+  assert.equal((await center()).lat, 2.822);
+  // Map / Satellite / Hybrid: same map, same markers, same position; remembered.
+  const pins = await page.evaluate(() => window.__markers.length);
+  const before = await center();
+  for (const t of ['satellite', 'hybrid', 'roadmap', 'hybrid']) {
+    await page.getByTestId('map-types').locator(`[data-type="${t}"]`).click();
+    assert.equal(await page.evaluate(() => window.__mapType), t);
+    assert.equal(await page.getByTestId('map-types').locator(`[data-type="${t}"]`).getAttribute('aria-checked'), 'true');
+    assert.equal(await page.evaluate(() => window.__markers.length), pins, `markers kept on ${t}`);
+    assert.deepEqual(await center(), before, `position kept on ${t}`);
+  }
+  await shot(page, '29a-map-hybrid-my-location', false);
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'GPS Assistance'); await page.getByTestId('card-map').click();
+  await page.waitForFunction(() => window.__mapType === 'hybrid');
+  // House Shopping while recording: follows you, a drag stops it, My Location resumes.
+  await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-house-shopping').click();
+  await page.getByTestId('trk-start').click();
+  await ctx.setGeolocation({ latitude: 2.8230, longitude: 101.8000, accuracy: 6 });
+  await page.waitForFunction(() => Math.abs((window.__center?.lat ?? 0) - 2.823) < 1e-9);
+  await page.evaluate(() => window.__drag());
+  await ctx.setGeolocation({ latitude: 2.8240, longitude: 101.8000, accuracy: 6 });
+  await page.waitForTimeout(1500);
+  assert.equal((await center()).lat, 2.823, 'recording does not fight a manual move');
+  await page.getByTestId('map-my-location').last().click();
+  assert.equal((await center()).lat, 2.824);
+  await page.getByTestId('trk-stop').click();
+  await page.context().close();
+  // Location refused (as Android reports it: error code 1): the map says so and the button stays.
+  const p2 = await phone({ maps: true });
+  await p2.evaluate(() => {
+    const refuse = (_ok, err) => { setTimeout(() => err({ code: 1, message: 'User denied Geolocation' }), 50); return 1; };
+    navigator.geolocation.watchPosition = refuse; navigator.geolocation.getCurrentPosition = refuse;
+  });
+  await tile(p2, 'GPS Assistance'); await p2.getByTestId('card-house-shopping').click();
+  await p2.getByTestId('map-my-location').click();
+  await p2.getByTestId('map-status').filter({ hasText: /permission was refused/ }).waitFor();
+  assert.ok(await p2.getByTestId('map-my-location').isVisible());
+  await p2.context().close();
+});
+
+test('U30 updates: a newer published version is offered on the web; About shows the build; same version = up to date', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
+  let published = 'newer99';
+  await ctx.addInitScript(() => localStorage.setItem('eab-update-manifest', 'https://updates.test/latest.json'));
+  await ctx.route('https://updates.test/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
+    body: JSON.stringify({ sha: published, version: '2.0.0', nativeVersion: 2, bundle: 'https://updates.test/b.zip', apk: 'https://updates.test/a.apk', builtAt: '2026-10-12' }) }));
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid');
+  await page.getByTestId('update-bar').waitFor({ timeout: 10000 });
+  assert.equal(await page.getByTestId('update-bar').getAttribute('data-kind'), 'web-reload');
+  assert.match(await page.getByTestId('update-bar').innerText(), /new version/i);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  const v = await page.getByTestId('about-version').innerText();
+  assert.match(v, /Version 2\.0\.0 · build \w+ · native 2/);
+  published = v.match(/build (\w+)/)[1];
+  await page.getByTestId('check-update').click();
+  assert.match(await page.getByTestId('update-msg').innerText(), /latest version/);
+  await ctx.close();
+});
+
+test('U31 contacts: phonebook button fills name and phone (asks before replacing), WhatsApp alias kept separately', async () => {
+  const page = await phone();
+  // The phone's contact picker (Chrome on Android); the Android app uses Android's own picker the same way.
+  await page.evaluate(() => {
+    window.ContactsManager = function () {};
+    Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Puan Siti'], tel: ['012-345 6789'], email: [] }] } });
+  });
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.getByTestId('pick-contact').click();
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Puan Siti');
+  assert.equal(await page.locator('[data-field="phone"]').inputValue(), '+60 12-345 6789');
+  // Different details already typed: ask first; Cancel keeps them.
+  await page.locator('[data-field="name"]').fill('Encik Lim');
+  await page.getByTestId('pick-contact').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Encik Lim');
+  await page.getByTestId('pick-contact').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace' }).click();
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Puan Siti');
+  await page.locator('[data-field="whatsapp"]').fill('@siti.property');
+  await page.getByTestId('save-contact').click();
+  assert.equal(await page.getByTestId('contact-whatsapp').innerText(), '@siti.property');
+  // Alias only, no phone number: allowed, and never turned into a phone number.
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Alias Only');
+  await page.locator('[data-field="whatsapp"]').fill('@aliasonly');
+  await page.getByTestId('save-contact').click();
+  assert.equal(await page.getByTestId('contact-whatsapp').innerText(), '@aliasonly');
+  assert.match(await page.getByTestId('contact-detail').innerText(), /search this alias in WhatsApp/);
+  await shot(page, '31-contact-alias', false);
+  await page.context().close();
 });
 
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {

@@ -91,8 +91,8 @@ function CheckRun({ lang }: { lang: Lang }) {
   return (
     <div className="stack-sm">
       {maps && (
-        <MapView maps={maps} height={260} fit testId="maps-check-map"
-          markers={[{ id: 'pin', lat: NILAI.lat, lng: NILAI.lng, title: m.pin, kind: 'property' }, ...(me ? [{ id: 'me', lat: me.lat, lng: me.lng, title: m.here, kind: 'me' as const }] : [])]} />
+        <MapView maps={maps} height={260} fit testId="maps-check-map" me={me}
+          markers={[{ id: 'pin', lat: NILAI.lat, lng: NILAI.lng, title: m.pin, kind: 'property' }, ...(me ? [{ id: 'gps', lat: me.lat, lng: me.lng, title: m.here, kind: 'mark' as const }] : [])]} />
       )}
       <ul className="check-list">
         {ITEMS.map(k => {

@@ -24,6 +24,8 @@ export const EXPERTS: ExpertKey[] = ['lawyer', 'banker', 'financial_advisor', 't
 export interface Contact extends Base {
   name: string;
   phone?: string;
+  /** WhatsApp username or alias (for example @example). Not a phone number; may exist without one. */
+  whatsapp?: string;
   email?: string;
   company?: string;
   roles: ContactRole[];
@@ -200,6 +202,8 @@ export interface Settings {
   /** Prefix used for the last new property reference. */
   lastPrefix?: string;
   calc?: Record<string, number>;
+  /** Map / Satellite / Hybrid, kept for every map screen. */
+  mapType?: 'roadmap' | 'satellite' | 'hybrid';
 }
 
 export interface CustomOption { value: string; added: number; used: number }

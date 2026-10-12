@@ -35,8 +35,8 @@ import {
   IconBack, IconNews, IconTodo, IconCalendar, IconTrend, IconHome, IconVendor, IconBuyer, IconGps, IconExpert,
   IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconSubsale, IconProject, IconCobroke,
 } from './icons';
-import { explorerProgress } from './domain/explorer';
 import { nativeLook } from './native/native';
+import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, syncNow, SyncError } from './data/sync';
@@ -172,6 +172,7 @@ function Shell() {
           </div>
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
+        <UpdateBanner lang={lang} />
 
         {alerts.length > 0 && (
           <div className="alerts" role="status" data-testid="reminder-alerts">
@@ -317,19 +318,8 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const ls = listingStrings[lang];
   const today = todayCounts(state.tasks, state.appointments, new Date());
   const recent = [...state.properties].sort((a, b) => b.updated - a.updated).slice(0, 3);
-  const xp = explorerProgress(state.journeys, state.properties);
   return (
     <section className="stack home">
-      <button className="explorer" onClick={() => go({ name: 'gps' })} data-testid="explorer-progress" aria-label={`${t.explorer.title}: ${xp.kmWeek} ${t.explorer.km}, ${xp.mapped} / ${xp.total} ${t.explorer.mapped}, ${xp.trips} ${t.explorer.trips}`}>
-        <span className="explorer-title"><IconGps size={18} /> {t.explorer.title}</span>
-        <span className="explorer-stats">
-          <span><strong data-testid="xp-km">{xp.kmWeek}</strong><small>{t.explorer.km}</small></span>
-          <span><strong data-testid="xp-mapped">{xp.mapped}<em>/{xp.total}</em></strong><small>{t.explorer.mapped}</small></span>
-          <span><strong data-testid="xp-trips">{xp.trips}</strong><small>{t.explorer.trips}</small></span>
-        </span>
-        {xp.total > 0 && <span className="explorer-bar" aria-hidden="true"><i style={{ width: `${Math.round((xp.mapped / xp.total) * 100)}%` }} /></span>}
-        {xp.trips === 0 && <small className="muted">{t.explorer.empty}</small>}
-      </button>
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
           <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''} ${tile.soon ? 'soon' : ''}`} data-tile={i + 1} onClick={() => go(tile.target)}

@@ -6,8 +6,6 @@
 //    are never invented: without Google Maps the banners are listed with their coordinates and a Navigate button.
 //  - Adding a banner sets the property's status to Yes; taking down the last one sets it to Removed (domain/banners).
 import { useEffect, useMemo, useState } from 'react';
-import { useMyPosition } from '../maps/position';
-import { MyPositionButton } from '../maps/MyPositionButton';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
@@ -47,7 +45,6 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
   const [sel, setSel] = useState<string | undefined>(propertyId);
   const [adding, setAdding] = useState<string | null>(null);
   const [takeDown, setTakeDown] = useState<Banner | null>(null);
-  const mine = useMyPosition();
 
   const counts = bannerCounts(state.properties);
   const list = useMemo(() => {
@@ -93,7 +90,6 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
         <>
           <MapView maps={maps} fit height={300} testId="banner-map"
             markers={[
-              ...(mine.pos ? [{ id: 'me', lat: mine.pos.lat, lng: mine.pos.lng, kind: 'me' as const }] : []),
               ...up.map(x => ({ id: x.id, lat: x.lat, lng: x.lng, kind: 'banner' as const, colour: BANNER_COLOURS[state.properties.find(p => p.id === x.propertyId)?.bannerStatus ?? 'yes'], selected: x.propertyId === sel,
                 title: cardTitle(state.properties.find(p => p.id === x.propertyId)!) })),
             ]}
@@ -104,7 +100,6 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
               document.querySelector(`[data-banner-card="${x.propertyId}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
             }} />
           <small className="muted" data-testid="banner-map-count">{b.mapBanners(up.length)}</small>
-          <MyPositionButton lang={lang} mine={mine} />
         </>
       ) : status !== 'loading' && <small className="muted">{b.noMap}</small>}
 

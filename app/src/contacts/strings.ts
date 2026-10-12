@@ -24,6 +24,15 @@ const en = {
   allLeads: 'All',
   deleteBody: 'The contact is deleted from this phone. Properties, inquiries and viewings linked to it stay, without the name.',
   phoneMissing: 'No phone number.',
+  pickFromPhone: 'Choose from phone contacts',
+  whatsapp: 'WhatsApp ID / Alias (optional)',
+  whatsappHint: 'A WhatsApp username or alias such as @example. It is kept separately from the phone number and may be left empty.',
+  replaceQ: 'Replace what is already typed?',
+  replaceBody: (now: string, picked: string) => `Now: ${now}. From the phone: ${picked}`,
+  replaceOk: 'Replace',
+  pickDenied: 'Contacts permission was refused. Allow Contacts for this app in the phone settings, or type the details.',
+  pickNone: 'No contact was chosen.',
+  aliasOnly: (alias: string) => `WhatsApp: ${alias} (search this alias in WhatsApp)`,
 };
 export type ContactStrings = typeof en;
 
@@ -50,6 +59,15 @@ const bm: ContactStrings = {
   allLeads: 'Semua',
   deleteBody: 'Kenalan dipadam daripada telefon ini. Hartanah, pertanyaan dan lawatan yang dipautkan kekal, tanpa nama.',
   phoneMissing: 'Tiada nombor telefon.',
+  pickFromPhone: 'Pilih daripada kenalan telefon',
+  whatsapp: 'ID / Alias WhatsApp (pilihan)',
+  whatsappHint: 'Nama pengguna atau alias WhatsApp seperti @contoh. Ia disimpan berasingan daripada nombor telefon dan boleh dibiarkan kosong.',
+  replaceQ: 'Ganti apa yang sudah ditaip?',
+  replaceBody: (now: string, picked: string) => `Sekarang: ${now}. Daripada telefon: ${picked}`,
+  replaceOk: 'Ganti',
+  pickDenied: 'Kebenaran Kenalan ditolak. Benarkan Kenalan untuk aplikasi ini dalam tetapan telefon, atau taip butirannya.',
+  pickNone: 'Tiada kenalan dipilih.',
+  aliasOnly: (alias: string) => `WhatsApp: ${alias} (cari alias ini dalam WhatsApp)`,
 };
 
 const zh: ContactStrings = {
@@ -75,6 +93,15 @@ const zh: ContactStrings = {
   allLeads: '全部',
   deleteBody: '联系人将从此手机删除。相关的房产、询问和看房记录会保留，但不显示姓名。',
   phoneMissing: '没有电话号码。',
+  pickFromPhone: '从手机通讯录选择',
+  whatsapp: 'WhatsApp ID / 别名（可选）',
+  whatsappHint: 'WhatsApp 用户名或别名，例如 @example。它与电话号码分开保存，可以留空。',
+  replaceQ: '替换已输入的内容？',
+  replaceBody: (now: string, picked: string) => `现在：${now}；来自手机：${picked}`,
+  replaceOk: '替换',
+  pickDenied: '通讯录权限被拒绝。请在手机设置中允许本应用使用通讯录，或手动输入。',
+  pickNone: '未选择联系人。',
+  aliasOnly: (alias: string) => `WhatsApp：${alias}（在 WhatsApp 中搜索此别名）`,
 };
 
 export const contactStrings: Record<Lang, ContactStrings> = { en, bm, zh };
