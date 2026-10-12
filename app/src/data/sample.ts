@@ -1,8 +1,10 @@
-// Invented sample records for trying the app out. They are only added when the agent taps "Load sample data" in
-// Profile → Settings, every one is marked sample, and "Remove sample data" deletes them all again.
-// Sample properties have NO map position: the map only ever shows positions the agent really saved.
+// Invented sample records for trying the app out. They are added only when the agent chooses "Populate with Sample
+// Data" on first start, or taps "Load sample data" in Settings. Every one is marked sample (and "(sample)" in its
+// name), is shown with a Sample tag, is never sent to the cloud (data/sync.ts), and "Remove sample data" deletes
+// them all again. Sample properties have NO map position: the map only ever shows positions the agent really saved.
 import type { Listing, Marketing } from '../listing/model';
-import type { Appointment, Contact, Deal, Expense, Inquiry, Task } from './types';
+import type { Store } from './store';
+import { COLLECTIONS, type Appointment, type Contact, type Deal, type Expense, type Inquiry, type Task } from './types';
 import { addDays, startOfDay, ymd } from '../lib/dates';
 
 const noAds: Marketing = { advertised: 'no', ads: [], custom: {} };
@@ -86,21 +88,22 @@ export function sampleData(now = Date.now()) {
 
   const c = (id: string, name: string, roles: Contact['roles'], x: Partial<Contact> = {}): Contact => ({ id, ...base, name, roles, ...x });
   const contacts: Contact[] = [
-    c('v1', 'Owner A (sample)', ['vendor'], { phone: '+60 12-345 6789' }),
-    c('v2', 'Owner B (sample)', ['vendor'], { phone: '+60 13-210 4455' }),
-    c('v3', 'Owner E (sample)', ['vendor'], { phone: '+60 17-888 1200' }),
-    c('v4', 'Encik Ahmad (sample)', ['vendor'], { phone: '+60 19-222 3344' }),
-    c('v5', 'Puan Siti (sample)', ['vendor'], { phone: '+60 16-555 0101' }),
-    c('v6', 'Mr Lim (sample)', ['vendor', 'landlord'], { phone: '+60 12-700 8811' }),
-    c('v7', 'Owner F (sample)', ['vendor']),
-    c('v8', 'Ms Tan (sample)', ['landlord'], { phone: '+60 11-2233 4455' }),
-    c('v9', 'Syarikat G Sdn Bhd (sample)', ['vendor'], { phone: '+60 3-8888 1234' }),
-    c('v10', 'Owner H (sample)', ['landlord'], { phone: '+60 14-909 3030' }),
+    c('v1', 'Owner A (sample)', ['vendor'], { phone: '+60 12-345 6789', vendorStatus: 'listed' }),
+    c('v2', 'Owner B (sample)', ['vendor'], { phone: '+60 13-210 4455', vendorStatus: 'negotiating' }),
+    c('v3', 'Owner E (sample)', ['vendor'], { phone: '+60 17-888 1200', vendorStatus: 'pending_info', notes: 'Waiting for the title copy and the latest quit rent receipt.' }),
+    c('v4', 'Encik Ahmad (sample)', ['vendor'], { phone: '+60 19-222 3344', vendorStatus: 'pending_follow_up', notes: 'Call back after Buyer L views the house.' }),
+    c('v5', 'Puan Siti (sample)', ['vendor'], { phone: '+60 16-555 0101', vendorStatus: 'closed' }),
+    c('v6', 'Mr Lim (sample)', ['vendor', 'landlord'], { phone: '+60 12-700 8811', vendorStatus: 'listed' }),
+    c('v7', 'Owner F (sample)', ['vendor'], { vendorStatus: 'pending_info', notes: 'Phone number not given yet; land search pending.' }),
+    c('v8', 'Ms Tan (sample)', ['landlord'], { phone: '+60 11-2233 4455', vendorStatus: 'listed' }),
+    c('v9', 'Syarikat G Sdn Bhd (sample)', ['vendor'], { phone: '+60 3-8888 1234', vendorStatus: 'on_hold', company: 'Syarikat G Sdn Bhd (sample)' }),
+    c('v10', 'Owner H (sample)', ['landlord'], { phone: '+60 14-909 3030', vendorStatus: 'pending_follow_up' }),
     c('b1', 'Buyer K (sample)', ['buyer'], { phone: '+60 12-111 2222', leadStatus: 'hot', source: 'PropertyGuru' }),
     c('b2', 'Buyer L (sample)', ['buyer'], { phone: '+60 13-333 4444', leadStatus: 'warm', source: 'Referral' }),
     c('b3', 'Tenant M (sample)', ['tenant'], { phone: '+60 17-555 6666', leadStatus: 'cold', source: 'Mudah' }),
     c('b4', 'Investor N (sample)', ['investor'], { phone: '+60 19-777 8888', leadStatus: 'dropped' }),
     c('b5', 'Buyer O (sample)', ['buyer'], { leadStatus: 'inactive' }),
+    c('b6', 'Tenant R (sample)', ['tenant'], { phone: '+60 16-404 5050', leadStatus: 'hot', source: 'Facebook', notes: 'Needs a 20,000 sq ft factory near KLIA within 2 months.' }),
     c('e1', 'Lawyer P (sample)', ['professional'], { profession: 'lawyer', phone: '+60 3-2222 1111', company: 'Messrs P & Co (sample)' }),
     c('e2', 'Banker Q (sample)', ['professional'], { profession: 'banker', phone: '+60 12-999 0000', company: 'Bank Q (sample)' }),
   ];
@@ -108,29 +111,60 @@ export function sampleData(now = Date.now()) {
   const inquiries: Inquiry[] = [
     { id: 'i1', ...base, contactId: 'b2', propertyId: 's4', at: at(-1, '20:15'), channel: 'whatsapp', message: 'Is the price negotiable? Can view on Saturday?' },
     { id: 'i2', ...base, contactId: 'b3', propertyId: 's8', at: at(-3, '10:05'), channel: 'portal', message: 'Asked about move-in date and parking.' },
+    { id: 'i3', ...base, contactId: 'b6', propertyId: 's10', at: at(0, '09:40'), channel: 'call', message: 'Wants to view the Salak Tinggi factory this week; asked about loading bays.' },
   ];
   const appointments: Appointment[] = [
     { id: 'ap1', ...base, kind: 'viewing', status: 'scheduled', start: at(1, '11:00'), durationMin: 45, propertyId: 's1', contactId: 'b1', reminders: [1440, 60], notes: 'Bring the brochure.' },
     { id: 'ap2', ...base, kind: 'viewing', status: 'completed', start: at(-9, '15:00'), propertyId: 's1', contactId: 'b1', reminders: [], outcome: 'Liked the side land; asked about power upgrade.', completedAt: now },
-    { id: 'ap3', ...base, kind: 'meeting', status: 'pending', start: at(4, '14:30'), contactId: 'e1', title: 'SPA review with lawyer', reminders: [4320, 1440] },
+    { id: 'ap3', ...base, kind: 'meeting', status: 'pending', start: at(4, '14:30'), contactId: 'e1', title: 'SPA review with lawyer (sample)', reminders: [4320, 1440] },
+    { id: 'ap4', ...base, kind: 'viewing', status: 'pending', start: at(2, '10:30'), propertyId: 's10', contactId: 'b6', reminders: [60], notes: 'Confirm the time with Owner H first.' },
+    { id: 'ap5', ...base, kind: 'site_visit', status: 'scheduled', start: at(0, '16:00'), durationMin: 60, propertyId: 's3', contactId: 'v3', title: 'Site visit and photos (sample)', reminders: [60] },
   ];
   const tasks: Task[] = [
-    { id: 't1', ...base, title: 'Send updated brochure to Buyer K', due: day(0), priority: 'high', done: false, kind: 'follow_up', contactId: 'b1', propertyId: 's1', reminders: [0] },
-    { id: 't2', ...base, title: 'Update Facebook Marketplace price', due: day(-1), priority: 'medium', done: false, kind: 'task', propertyId: 's1', reminders: [] },
-    { id: 't3', ...base, title: 'Collect keys from Owner B', due: day(3), priority: 'low', done: false, kind: 'task', propertyId: 's2', contactId: 'v2', reminders: [1440] },
-    { id: 't4', ...base, title: 'Call Puan Siti about SPA date', due: day(-4), priority: 'medium', done: true, completedAt: now, kind: 'follow_up', contactId: 'v5', reminders: [] },
+    { id: 't1', ...base, title: 'Send updated brochure to Buyer K (sample)', due: day(0), priority: 'high', done: false, kind: 'follow_up', contactId: 'b1', propertyId: 's1', reminders: [0] },
+    { id: 't2', ...base, title: 'Update Facebook Marketplace price (sample)', due: day(-1), priority: 'medium', done: false, kind: 'task', propertyId: 's1', reminders: [] },
+    { id: 't3', ...base, title: 'Collect keys from Owner B (sample)', due: day(3), priority: 'low', done: false, kind: 'task', propertyId: 's2', contactId: 'v2', reminders: [1440] },
+    { id: 't5', ...base, title: 'Get title copy and quit rent receipt from Owner E (sample)', due: day(1), priority: 'high', done: false, kind: 'follow_up', contactId: 'v3', propertyId: 's3', reminders: [60] },
+    { id: 't6', ...base, title: 'Call Encik Ahmad after the viewing (sample)', due: `${day(2)}T18:00`, priority: 'medium', done: false, kind: 'follow_up', contactId: 'v4', propertyId: 's4', reminders: [30] },
+    { id: 't4', ...base, title: 'Call Puan Siti about SPA date (sample)', due: day(-4), priority: 'medium', done: true, completedAt: now, kind: 'follow_up', contactId: 'v5', reminders: [] },
   ];
   const deals: Deal[] = [
-    { id: 'dl1', ...base, title: 'Semi-D, Bandar Baru Salak Tinggi', propertyId: 's5', side: 'sale', date: day(-20), value: 950000, commissionPct: 2.5, commission: 23750, sharePct: 70, status: 'received', receivedDate: day(-5), receivedAmount: 16625 },
-    { id: 'dl2', ...base, title: 'Shoplot tenancy, Sepang', propertyId: 's6', side: 'rent', date: day(-12), value: 6000, commission: 6000, sharePct: 70, status: 'confirmed' },
-    { id: 'dl3', ...base, title: 'Semi-D factory, Unit 6', propertyId: 's2', side: 'sale', date: day(30), value: 3050000, commissionPct: 2, commission: 61000, sharePct: 50, status: 'estimated' },
+    { id: 'dl1', ...base, title: 'Semi-D, Bandar Baru Salak Tinggi (sample)', propertyId: 's5', side: 'sale', date: day(-20), value: 950000, commissionPct: 2.5, commission: 23750, sharePct: 70, status: 'received', receivedDate: day(-5), receivedAmount: 16625 },
+    { id: 'dl2', ...base, title: 'Shoplot tenancy, Sepang (sample)', propertyId: 's6', side: 'rent', date: day(-12), value: 6000, commission: 6000, sharePct: 70, status: 'confirmed' },
+    { id: 'dl3', ...base, title: 'Semi-D factory, Unit 6 (sample)', propertyId: 's2', side: 'sale', date: day(30), value: 3050000, commissionPct: 2, commission: 61000, sharePct: 50, status: 'estimated' },
   ];
   const expenses: Expense[] = [
     { id: 'x1', ...base, date: day(-2), category: 'Advertising', amount: 150, note: 'PropertyGuru credits (sample)' },
-    { id: 'x2', ...base, date: day(-1), category: 'Fuel', amount: 80 },
+    { id: 'x2', ...base, date: day(-1), category: 'Fuel', amount: 80, note: 'Site visits, Nilai (sample)' },
   ];
   // Banner status only (no banner positions: those must come from the agent's own GPS, map tap or typing).
   const bannerMix = ['not_yet', 'no', 'not_allowed', 'not_yet', 'removed', 'no', 'not_yet', 'not_allowed', 'no', 'not_yet'] as const;
   properties.forEach((p, i) => { p.bannerStatus = bannerMix[i % bannerMix.length]; });
   return { properties, contacts, inquiries, appointments, tasks, deals, expenses };
+}
+
+/** "collection:id" of every sample record, so a deleted sample record is never sent to the cloud either. */
+let keys: Set<string> | null = null;
+export function isSampleKey(key: string): boolean {
+  if (!keys) {
+    const d = sampleData(0) as unknown as Record<string, { id: string }[]>;
+    keys = new Set(COLLECTIONS.flatMap(c => (d[c] ?? []).map(r => `${c}:${r.id}`)));
+  }
+  return keys.has(key);
+}
+
+/** True when the phone holds no records at all (a new user's empty workspace). */
+export function isEmptyWorkspace(state: Record<string, unknown>): boolean {
+  return COLLECTIONS.every(c => !((state[c] as unknown[] | undefined)?.length));
+}
+
+/** Adds every sample record that is not on the phone yet. Returns how many were added. */
+export function loadSampleInto(store: Store): number {
+  const d = sampleData();
+  const st = store.getState();
+  let n = 0;
+  for (const c of Object.keys(d) as (keyof typeof d)[]) {
+    for (const r of d[c]) if (!(st[c] as { id: string }[]).some(x => x.id === r.id)) { store.upsert(c, r as never); n++; }
+  }
+  return n;
 }

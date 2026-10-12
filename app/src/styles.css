@@ -31,7 +31,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { overflow-x: hidden; }
+html, body { overflow-x: clip; }
 body { margin: 0; background: var(--bg); color: var(--ink); overflow-wrap: break-word; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -55,7 +55,7 @@ small, .small { font-size: 14px; }
   display: flex; align-items: center; gap: 6px;
   padding: calc(10px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 10px max(10px, env(safe-area-inset-left, 0px)); background: rgba(8, 8, 10, .96); color: var(--ink);
   border-bottom: 1px solid transparent; border-image: var(--gold-edge) 1;
-  backdrop-filter: blur(6px);
+
 }
 .topbar h1 { flex: 1; font-size: 18px; font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
 .topbar h1.brand { display: flex; align-items: center; gap: 8px; font-family: 'Noto Serif', Georgia, serif; font-weight: 700; }
@@ -63,7 +63,7 @@ small, .small { font-size: 14px; }
 .wordmark span { font-size: 15px; color: var(--ink); }
 .wordmark em { font-size: 22px; }
 .wordmark em { font-style: normal; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.topbar h1.brand svg { flex: none; }
+.topbar h1.brand svg, .topbar h1.brand img { flex: none; }
 .icon-btn {
   width: 46px; height: 46px; flex: none; border-radius: 23px; border: 1px solid var(--line-2);
   display: inline-flex; align-items: center; justify-content: center;
@@ -280,6 +280,10 @@ label.btn { position: relative; cursor: pointer; }
 /* Voice */
 .mic { min-height: 60px; border-radius: 30px; border: 0; background: var(--gold-grad); color: var(--on-gold); font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 20px rgba(212,175,55,.25); text-align: center; padding: 6px 14px; }
 .mic.on { background: var(--red-bg); color: #fff; }
+.mic.busy { background: #2A2312; color: var(--gold-hi); box-shadow: none; cursor: progress; }
+.mic.busy:disabled { background: #2A2312; color: var(--gold-hi); border: 0; }
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(246,227,161,.3); border-top-color: var(--gold-hi); animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .mic .dot { width: 14px; height: 14px; border-radius: 7px; background: #fff; animation: pulse 1s infinite; flex: none; }
 @keyframes pulse { 50% { opacity: .3; } }
 .engine-note { color: #CFE0F5; background: #121722; border: 1px solid #2F3F5A; border-radius: 8px; padding: 6px 8px; }
@@ -587,3 +591,89 @@ label.btn { position: relative; cursor: pointer; }
   .photo-card .photo { height: 110px; }
   .lc-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* Field Help "?" and its explanation */
+.help-q { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-height: 44px; margin: -10px 0 -10px -6px; padding: 0;
+  border: 0; background: transparent; color: var(--gold-hi); vertical-align: middle; flex: none; position: relative; font-size: 0; }
+.help-q::after { content: '?'; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid var(--gold-lo); background: #1E1B15; font-size: 14px; font-weight: 800; line-height: 1; }
+.help-q[aria-expanded="true"]::after { background: var(--gold); color: var(--on-gold); }
+.help-pop { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 6px 0 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--gold-lo);
+  background: #17150F; color: var(--ink); font-size: 14px; font-weight: 400; line-height: 1.4; text-align: left; }
+.help-pop b { color: var(--gold-hi); font-weight: 700; }
+.help-what { font-weight: 600; }
+.help-close { align-self: flex-end; color: var(--muted); font-size: 13px; }
+
+/* Required profile fields and the name-card activation message */
+.req { color: var(--gold-hi); font-weight: 800; }
+.req-flag { color: var(--amber); font-weight: 700; }
+.stack-xs { display: flex; flex-direction: column; gap: 2px; }
+.activate-hint { padding: 0 4px; }
+.pb-msg { margin-top: -2px; }
+
+/* Startup logo animation (about 1 second): the logo spins in like a game start screen, then fades away. */
+.intro { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg);
+  animation: intro-out .16s ease-in .84s forwards; }
+.intro-stage { perspective: 700px; }
+.intro .logo-img { display: block; border-radius: 22%; filter: drop-shadow(0 0 24px rgba(212,175,55,.35));
+  animation: intro-spin .8s cubic-bezier(.2,.7,.25,1) both; will-change: transform; }
+@keyframes intro-spin {
+  0% { transform: scale(.35) rotateY(-540deg); opacity: 0; }
+  35% { opacity: 1; }
+  100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+}
+@keyframes intro-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .intro .logo-img { animation: intro-fade .3s ease-out both; }
+}
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Logo in the header and on the sign-in screen (slightly larger than the old mark). */
+.logo-img { display: block; flex: none; object-fit: contain; border-radius: 22%; }
+
+/* Top bar: Co-broke Opportunities (Coming Soon) and Notifications */
+.top-btn { position: relative; flex: none; }
+.topbar.home .top-btn { width: 40px; min-width: 40px; }
+.top-soon { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 14px; line-height: 1; font-weight: 800; letter-spacing: .02em;
+  padding: 1px 4px; border-radius: 6px; background: #2A2312; color: var(--gold-hi); border: 1px solid var(--gold-lo); white-space: nowrap; }
+.top-badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
+  font-size: 14px; font-weight: 800; line-height: 22px; text-align: center; }
+.topbar.home .wordmark span { font-size: 14px; }
+.topbar.home .wordmark em { font-size: 18px; white-space: nowrap; }
+.topbar .lang button { min-width: 34px; padding: 0 4px; }
+
+/* Contacts hub: Buyers and Vendors */
+.hub { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hub-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 10px; min-height: 140px; border-radius: 16px; text-align: center;
+  border: 1px solid transparent; background: linear-gradient(160deg, #1B1A1F, #0E0E10) padding-box, var(--gold-edge) border-box; color: var(--ink); }
+.hub-card strong { font-size: 18px; font-family: 'Noto Serif', Georgia, serif; }
+.hub-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--gold-hi); border: 1px solid var(--gold-lo); background: #1E1B15; }
+.hub-icon svg { width: 30px; height: 30px; }
+.notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.notif-list .link-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.sample-tag { background: #2A2312; color: var(--gold-hi); border-color: var(--gold-lo); }
+.sample-note { border-color: var(--gold-lo); }
+
+/* Property form: collapsible sections and the floating Save */
+.form-tools { align-items: center; }
+.form-sec { padding-top: 0; padding-bottom: 0; gap: 0; }
+.form-sec.open { padding-bottom: 14px; }
+.sec-head { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 56px; padding: 12px 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.sec-head .card-title { flex: 1; margin: 0; }
+.sec-sum { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.sec-caret { color: var(--gold-hi); font-size: 18px; transition: transform .15s ease; }
+.form-sec.open .sec-caret { transform: rotate(180deg); }
+.sec-body { padding-top: 4px; }
+.grow { flex: 1; }
+.save-bar.floating { position: fixed; left: 50%; transform: translateX(-50%); width: min(calc(100% - 16px), 704px); bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 15; }
+.listing[data-testid="listing-form"] { padding-bottom: 96px; }
+
+/* New-user start choice */
+.start-scrim { z-index: 60; }
+.start-choice { align-items: stretch; text-align: center; gap: 12px; }
+.start-logo { display: flex; justify-content: center; }
+.choice-card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 16px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); }
+.choice-card strong { font-size: 17px; }
+.choice-card small { color: var(--muted); }
+.choice-card.rec { border: 2px solid var(--gold); background: #1E1B15; }
+.rec-badge { background: var(--gold-grad); color: var(--on-gold); border: 0; font-weight: 800; }

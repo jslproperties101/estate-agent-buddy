@@ -22,6 +22,13 @@ export function plugin<T = any>(name: string): T | undefined {
   return cache.get(name) as T;
 }
 
+/** True in the installed app when this APK does not contain the plugin's native part (an older APK, or a build
+ *  where the plugin was not bundled). The screens then say that a new APK is needed instead of failing silently. */
+export function pluginMissing(name: string): boolean {
+  if (!isNative()) return false;
+  try { return !Capacitor.isPluginAvailable(name); } catch { return false; }
+}
+
 /** Opens a web page in the phone's own browser tab (Custom Tabs on Android), or a new tab on the web. */
 export async function openInBrowser(url: string): Promise<boolean> {
   const b = plugin('Browser');
@@ -47,10 +54,15 @@ export async function onBrowserClosed(fn: () => void): Promise<Listener | null> 
   try { return await b.addListener('browserFinished', fn); } catch { return null; }
 }
 
-/** Status bar and splash screen in the app's black and gold look. */
+/** Status bar in the app's black and gold look. */
 export async function nativeLook(): Promise<void> {
   if (!isNative()) return;
   try { await plugin('StatusBar')?.setStyle({ style: 'DARK' }); } catch { /* not available */ }
   try { await plugin('StatusBar')?.setBackgroundColor({ color: '#08080A' }); } catch { /* iOS has no colour */ }
-  try { await plugin('SplashScreen')?.hide(); } catch { /* already hidden */ }
+}
+
+/** Hides Android's still splash screen as soon as the app draws its own (spinning) startup logo. */
+export async function hideSplash(): Promise<void> {
+  if (!isNative()) return;
+  try { await plugin('SplashScreen')?.hide({ fadeOutDuration: 120 }); } catch { /* already hidden */ }
 }

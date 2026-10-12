@@ -1,7 +1,7 @@
 {
   "name": "estate-agent-buddy",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
@@ -36,5 +36,5 @@
     "@capacitor-community/speech-recognition": "^7.0.0",
     "@capacitor-community/contacts": "^7.0.0"
   },
-  "nativeVersion": 2
+  "nativeVersion": 3
 }

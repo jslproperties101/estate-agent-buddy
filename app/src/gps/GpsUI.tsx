@@ -13,6 +13,8 @@ import { Go } from '../nav';
 import { gpsStrings } from './strings';
 import { trackerFor } from './tracker';
 import { MapView, MapsNotice, useGoogleMaps } from '../maps/MapView';
+import { SpotPicker, Spot } from '../maps/SpotPicker';
+import type { Maps } from '../maps/google';
 import { reverseGeocode, routePreview } from '../maps/google';
 import { elapsedMs, bounds } from '../domain/journey';
 import { durationText, kmText, metres, navigationUrl, nearby } from '../lib/geo';
@@ -149,7 +151,7 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
             }}>■ {g.stop}</button>
           </div>
         )}
-        {recording && <button className="btn primary" disabled={!here} onClick={() => setMarking(true)} data-testid="mark-here">📍 {g.markHere}</button>}
+        {recording && <button className="btn primary" disabled={!here && !maps} onClick={() => setMarking(true)} data-testid="mark-here">📍 {g.markHere}</button>}
       </div>
 
       {!recording && <IdleMap lang={lang} go={go} maps={maps} status={status} />}
@@ -168,7 +170,7 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
               ]}
               onMarkerClick={id => { if (state.properties.some(p => p.id === id)) go({ name: 'listingDetail', id }); }} />
           ) : <RouteSketch points={j!.points} marks={j!.marks} label={g.routeSketch} />}
-          <JourneyLists lang={lang} go={go} j={j!} />
+          <JourneyLists lang={lang} go={go} j={j!} maps={maps} onMoveMark={(id, sp) => tracker.update(x => ({ ...x, marks: x.marks.map(m => (m.id === id ? { ...m, lat: sp.lat, lng: sp.lng } : m)) }))} />
         </>
       )}
 
@@ -182,15 +184,16 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
         ))}
       </div>
 
-      {marking && here && <MarkSheet lang={lang} at={here} acc={tracker.fix?.acc} maps={maps} onClose={() => setMarking(false)}
+      {marking && (here || maps) && <MarkSheet lang={lang} at={here ?? null} acc={here ? tracker.fix?.acc : undefined} maps={maps} onClose={() => setMarking(false)}
         onMark={mark => { tracker.update(x => ({ ...x, marks: [...x.marks, mark] })); setMarking(false); }} />}
     </section>
   );
 }
 
-function JourneyLists({ lang, go, j }: { lang: Lang; go: Go; j: Journey }) {
+function JourneyLists({ lang, go, j, maps, onMoveMark }: { lang: Lang; go: Go; j: Journey; maps?: Maps | null; onMoveMark?: (id: string, s: Spot) => void }) {
   const { state } = useApp();
   const g = gpsStrings[lang];
+  const [moving, setMoving] = useState<Journey['marks'][number] | null>(null);
   return (
     <>
       <div className="card stack-sm" data-testid="journey-places">
@@ -207,47 +210,75 @@ function JourneyLists({ lang, go, j }: { lang: Lang; go: Go; j: Journey }) {
             <div key={m.id} className="mark-row">
               <span>📍 {p ? [p.ref, cardTitle(p)].filter(Boolean).join(' · ') : m.note || `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`}</span>
               <small className="muted">{fmtDateTime(m.at, lang)}</small>
-              {p && <button className="btn small secondary" onClick={() => go({ name: 'listingDetail', id: p.id })}>{g.openProperty}</button>}
+              <div className="row-wrap">
+                {p && <button className="btn small secondary" onClick={() => go({ name: 'listingDetail', id: p.id })}>{g.openProperty}</button>}
+                {onMoveMark && <button className="btn small secondary" onClick={() => setMoving(m)} data-testid="move-mark">✥ {g.moveMark}</button>}
+              </div>
             </div>
           );
         })}
       </div>
+      {moving && onMoveMark && <MoveMarkSheet lang={lang} maps={maps ?? null} mark={moving} onClose={() => setMoving(null)} onSave={sp => { onMoveMark(moving.id, sp); setMoving(null); }} />}
     </>
+  );
+}
+
+/** Correct a mark's position later: tap the right spot on the map, or use the current GPS position. */
+function MoveMarkSheet({ lang, maps, mark, onClose, onSave }: { lang: Lang; maps: Maps | null; mark: Journey['marks'][number]; onClose: () => void; onSave: (s: Spot) => void }) {
+  const g = gpsStrings[lang];
+  const c = strings[lang].c;
+  const [spot, setSpot] = useState<Spot>({ lat: mark.lat, lng: mark.lng, source: 'map' });
+  const moved = spot.lat !== mark.lat || spot.lng !== mark.lng;
+  return (
+    <div className="sheet-scrim" role="presentation">
+      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="mv-t" data-testid="move-mark-sheet">
+        <div className="between"><h2 id="mv-t">{g.moveMark}</h2><button className="btn small secondary" onClick={onClose}>{c.close}</button></div>
+        <SpotPicker lang={lang} maps={maps} spot={spot} onChange={setSpot} testId="move-map" />
+        <div className="sheet-actions two">
+          <button className="btn secondary" onClick={onClose}>{c.cancel}</button>
+          <button className="btn primary" disabled={!moved} onClick={() => onSave(spot)} data-testid="move-mark-save">{c.save}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 /** Mark a property at the current spot: link a saved one nearby, save a new one, or just mark the spot. */
 function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
-  lang: Lang; at: { lat: number; lng: number }; acc?: number; maps: unknown; onClose: () => void;
+  lang: Lang; at: { lat: number; lng: number } | null; acc?: number; maps: Maps | null; onClose: () => void;
   onMark: (m: Journey['marks'][number]) => void;
 }) {
   const { state, store } = useApp();
+  // Starts at the current GPS spot; the agent can tap the map (or drag the pin) to the exact property. Without a GPS
+  // fix nothing is chosen until the agent taps the map (positions are never invented).
+  const [spot, setSpot] = useState<Spot | null>(at ? { lat: at.lat, lng: at.lng, acc, source: 'gps' } : null);
   const g = gpsStrings[lang];
   const c = strings[lang].c;
   const ls = listingStrings[lang];
   const toast = useToast();
-  const near = nearby(at, state.properties, 100);
+  const near = spot ? nearby(spot, state.properties, 100) : [];
   const [type, setType] = useState<string | undefined>();
   const [note, setNote] = useState('');
   const [price, setPrice] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-  const mark = (propertyId?: string, n?: string) => onMark({ id: newId(), lat: at.lat, lng: at.lng, at: Date.now(), propertyId, note: n });
+  const mark = (propertyId?: string, n?: string) => { if (spot) onMark({ id: newId(), lat: spot.lat, lng: spot.lng, at: Date.now(), propertyId, note: n }); };
 
   async function saveNew() {
+    if (!spot) return;
     setBusy(true);
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
     const no = nextNumber(state.properties);
     const p: Listing = {
       id: newId(), created: Date.now(), updated: Date.now(), photos: [], ref: makeRef(prefix, no), refPrefix: prefix, refNo: no,
       type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), status: 'needs_check', country: DEFAULT_COUNTRY,
-      lat: at.lat, lng: at.lng, geoSource: 'gps', geoAccuracy: acc, askingPrice: price || undefined,
+      lat: spot.lat, lng: spot.lng, geoSource: spot.source === 'gps' ? 'gps' : 'manual', geoAccuracy: spot.source === 'gps' ? spot.acc : undefined, askingPrice: price || undefined,
       history: [{ at: Date.now(), source: 'map', summary: 'House Shopping' }],
     };
     // Address parts from Google Maps are used only when they match the saved dropdown values; anything new is
     // left for the agent to confirm later with "Add from Google Map".
     if (maps) {
       try {
-        const r = await reverseGeocode(maps, at.lat, at.lng);
+        const r = await reverseGeocode(maps, spot.lat, spot.lng);
         if (r) {
           const saved = (list: string, b: readonly string[]) => [...b, ...(state.options[list] ?? []).map(o => o.value)];
           const pick = (v: string | undefined, list: string, b: readonly string[]) => { const x = checkField(v, saved(list, b)); return x.status === 'ok' ? x.value : undefined; };
@@ -271,7 +302,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
     <div className="sheet-scrim" role="presentation">
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="mk-t" data-testid="mark-sheet">
         <div className="between"><h2 id="mk-t">{g.markTitle}</h2><button className="btn small secondary" onClick={onClose}>{c.close}</button></div>
-        <small className="muted">{ls.position(at.lat.toFixed(5), at.lng.toFixed(5))}{acc ? ` · ±${acc} m` : ''}</small>
+        <SpotPicker lang={lang} maps={maps} spot={spot} onChange={setSpot} testId="mark-map" />
         <div className="card stack-sm">
           <div className="card-title">{g.nearbySaved}</div>
           {near.length === 0 ? <small className="muted">{g.noneNearby}</small> : near.map(({ item, distance }) => (
@@ -284,9 +315,9 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
           <OptionSelect lang={lang} label={g.quickType} listKey="type" builtIns={TYPES.map(v => ({ value: v, label: ls.types[v] }))} value={type} onChange={setType} />
           <label className="ff">{g.quickNote}<input value={note} onChange={e => setNote(e.target.value)} /></label>
           <label className="ff">{g.quickPrice}<MoneyInput value={price} onChange={setPrice} /></label>
-          <button className="btn primary" disabled={busy} onClick={() => void saveNew()} data-testid="save-found">{g.saveProperty}</button>
+          <button className="btn primary" disabled={busy || !spot} onClick={() => void saveNew()} data-testid="save-found">{g.saveProperty}</button>
         </div>
-        <button className="btn secondary" onClick={() => mark(undefined, note.trim() || undefined)}>{g.markOnly}</button>
+        <button className="btn secondary" disabled={!spot} onClick={() => mark(undefined, note.trim() || undefined)}>{g.markOnly}</button>
       </div>
     </div>
   );
@@ -314,7 +345,7 @@ export function JourneyDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         ? <MapView maps={maps} fit height={300} path={j.points} markers={j.marks.map(m => ({ id: m.propertyId ?? m.id, lat: m.lat, lng: m.lng, kind: 'mark' as const }))}
           onMarkerClick={x => { if (state.properties.some(p => p.id === x)) go({ name: 'listingDetail', id: x }); }} />
         : <RouteSketch points={j.points} marks={j.marks} label={g.routeSketch} />}
-      <JourneyLists lang={lang} go={go} j={j} />
+      <JourneyLists lang={lang} go={go} j={j} maps={maps} onMoveMark={(mid, sp) => store.upsert('journeys', { ...j, marks: j.marks.map(m => (m.id === mid ? { ...m, lat: sp.lat, lng: sp.lng } : m)) })} />
       <button className="btn ghost danger-text" onClick={() => setDel(true)}>{g.delete}</button>
       {del && <Confirm lang={lang} title={g.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('journeys', j.id); go({ name: 'houseShopping' }); }} />}
     </section>

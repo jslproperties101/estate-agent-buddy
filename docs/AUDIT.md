@@ -206,3 +206,43 @@ Listing Tracker with Add Fake Listing, expiry reminders and cost summaries.
    page (own section with Edit), on My Banner Location (one card per property, coloured by status, filter by
    status) and on the property's card in My Property Map. Adding a banner sets Yes; taking down the last one sets
    Removed. GPS Assistance now has its four cards.
+
+## 13 Oct 2026 update
+
+Owner's 21-point list, implemented as one change on `feature/v2-full-update`. Checkpoint before it: branch
+`checkpoint/pre-oct13` (commit `a4950d9`). Status labels as above. **Nothing below has been tested on the phone yet**;
+"DONE" means implemented and verified by an automated test in Chromium at 384 × 824 px with stand-ins for Google Maps,
+GPS, the speech service and the contact picker.
+
+| # | Item | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | Voice: text after End recording | DONE (browser) · NOT PROVEN (phone) | Cause found: after the recording ended the app stopped listening 250–400 ms later, before Android delivered the final words; phones whose recogniser gives no live words showed nothing. Now waits up to 8 s for the final words, shows "Recognising your words…", and explains "No words were recognised" instead of silence. Unit tests SR1–SR5, screen test U32. Gold card unchanged. |
+| 2, 12 | Phone book (contact form, Send Name Card) | DONE (browser) · NOT PROVEN (phone) | Name card button ignored a refused permission (unhandled error = "nothing happens"). One shared button now: asks permission, opens the picker, fills editable name and number, and always says what happened (refused, cancelled, not in this APK, not in this browser). The APK build now fails if the speech or contacts plugin is missing. U31, U33, N4. |
+| 3, 15, 20 | Logo, name, startup animation | DONE | Owner's artwork, white border removed (`app/assets/brand/`), larger in header (46 px) and sign-in (132 px); app icon and splash regenerated; ~1 s spin then the app (U39). Android splash now hides as soon as the app draws. |
+| 4 | Typing / Backspace lag | PARTIAL — needs the phone | Measured in Chromium (CPU ×6): no lag reproduced; per keystroke the property form did ~6 ms JS work. Likely phone cause found in the Android config: `captureInput: true` replaces the WebView's keyboard connection with a minimal one (Capacitor source: `BaseInputConnection(this, false)`), so Samsung/Gboard send every key and Backspace one by one. Removed. Also: closed form sections are not drawn, the speech box no longer redraws on every key, and a page-level `overflow` setting that broke sticky bars was corrected. Paint per keystroke halved in the trace. Must be confirmed on the S23 with the new APK. |
+| 5 | My Location recentre | DONE (browser) · NOT PROVEN (phone) | Every press now asks the GPS for a fresh reading and restarts live updates that went quiet (Android stops them after the screen was off); previously it re-used the last watched position. U29, U38 (live updates stopped after the first reading, three presses). |
+| 6 | Map / Satellite / Hybrid | DONE (unchanged, re-verified) | Same map object; position, zoom and markers kept (U29). |
+| 7 | Location selection | DONE (browser) · NOT PROVEN (phone) | Banner: tap / drag / GPS / typed, and **Change location** later (same record). House Shopping: mark at a tapped spot, **Move to the right spot** later; no position is invented without GPS. Property: picker GPS errors shown; location editable later (U27, U38, U8). Pick maps start at your own position. |
+| 8 | Sample data + new-user choice | DONE | First start on an empty phone (after the first sync when signed in): "Populate with Sample Data (Recommended)" or "Start Without Sample Data"; asked once. 47 records (10 properties, 18 contacts incl. 10 vendors with statuses, 6 to-dos, 5 calendar events incl. viewings, 3 inquiries, 3 deals, 2 expenses), all marked Sample / "(sample)". Sample records are never uploaded or downloaded (N3), so they cannot mix with the team's real data. U34. |
+| 9 | Contacts: Buyers / Vendors; vendor statuses | DONE | One Contacts card → Buyers / Vendors. Vendor status: Pending Property Info, Pending Follow-up, Listed, Negotiating, On Hold, Closed (Sold / Rented), Withdrawn — separate field from buyer lead colours (unchanged). U35. |
+| 10, 16–19 | Dashboard, Notifications, News, Co-broke | DONE | 15 cards, Voice Command = 15 (bright gold). Freed places filled with existing screens: **Inquiries & Viewings** (6) and **Settings** (14) — owner to confirm or swap. Notifications (top): reminders for the next 7 days; push messages marked Coming Soon. Co-broke (top): marked Coming Soon; still lists properties set to Co-broke. U1, U25. |
+| 11 | Send Name Card activation | DONE | Required: full name, registration type, registration number, agency, contact number (≥ 9 digits) — marked * in Edit profile; the button stays off with the message until complete, then switches on. Card text from the saved profile. U36, N1. |
+| 13 | New Property form | DONE | Every section collapsible (closed at first; Edit from a detail card opens that section; voice fill opens the filled sections); header shows "n filled"; Save bar fixed at the bottom of the screen; everything entered is saved (U37). |
+| 14 | Field help | DONE | "?" with What / Enter / Example / Why on property fields, profile registration, WhatsApp alias, buyer and vendor status (28 topics, EN/BM/ZH; BM/ZH drafts). N5. |
+| 21 | Testing | Automated DONE · phone NOT DONE | Type check, lint (102 files), unit 59/59, screen 39/39. |
+
+### Needs a new APK (native version 3)
+
+Removing `captureInput` (typing), app name, launcher icon and splash, the splash timing, and the plugin check in the
+build. Everything else also arrives by the automatic update, but install the new APK once so all of it applies.
+
+### To test on the S23 Ultra (owner)
+
+1. Voice Command: Start speaking → "Test 1 2 3" → End recording → the words appear (also try saying nothing).
+2. Contact form and Send Name Card → Choose from phone book: permission prompt, picker, name/number filled and editable.
+3. Agent Profile: Send Name Card off with the message → fill the * fields → on.
+4. GPS: My Property Map → move the map → My Location (several times, also after the screen was off). Banner: tap the
+   map, save, Change location. House Shopping: Mark here → tap the spot → later Move.
+5. New Property: sections open/close, Save from the middle of the form, "?" help.
+6. Typing and Backspace speed in long fields (headline, notes) with the Samsung keyboard.
+7. Startup: logo spin, then sign-in / dashboard. First start on a clean install: the sample-data choice.

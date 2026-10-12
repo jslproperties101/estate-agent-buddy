@@ -119,7 +119,10 @@ jobs:
           node scripts/android-setup.mjs
       - name: Build the APK
         run: |
-          grep -q '"@capacitor/app"' android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugins missing"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
+          # Every phone feature must have its native part in the APK, or its button cannot work on the phone.
+          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"'; do
+            grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
+          done
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
       - name: Check the APK signature (same debug key every build)
         run: |

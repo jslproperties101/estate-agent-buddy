@@ -104,8 +104,17 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
     onApply({ lat: pos.lat, lng: pos.lng, placeId: geo?.placeId, fields });
   }
 
+  const [gpsErr, setGpsErr] = useState<'denied' | 'off' | null>(null);
+  const [locating, setLocating] = useState(false);
   function locate() {
-    navigator.geolocation?.getCurrentPosition(p => void readAt(p.coords.latitude, p.coords.longitude), () => {}, { enableHighAccuracy: true, timeout: 15000 });
+    setGpsErr(null);
+    if (!('geolocation' in navigator)) { setGpsErr('off'); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      p => { setLocating(false); void readAt(p.coords.latitude, p.coords.longitude); },
+      e => { setLocating(false); setGpsErr(e.code === 1 ? 'denied' : 'off'); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
+    );
   }
 
   const label = (k: FieldKey) => m.field[k];
@@ -137,7 +146,9 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
             <MapView maps={maps} center={pos ?? undefined} zoom={pos ? 17 : 13} height={260} testId="picker-map"
               markers={pos ? [{ id: 'pick', lat: pos.lat, lng: pos.lng, kind: 'pick' }] : []}
               onMapClick={(lat, lng) => void readAt(lat, lng)} onMarkerDrag={(_, lat, lng) => void readAt(lat, lng)} />
-            <button className="btn secondary" onClick={locate}>{m.myLocation}</button>
+            <button className="btn secondary" onClick={locate} disabled={locating} data-testid="picker-gps">📍 {locating ? m.locatingMe : m.myLocation}</button>
+            {gpsErr && <p className="error" role="alert">{gpsErr === 'denied' ? m.meDenied : m.check.gpsOff}</p>}
+            {pos && <small className="ok-text" data-testid="picker-pos">{ls.position(pos.lat.toFixed(5), pos.lng.toFixed(5))}</small>}
           </>
         )}
         {reading && <p className="muted" role="status">{m.reading}</p>}

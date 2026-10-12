@@ -1,7 +1,33 @@
-# Estate Agent Buddy
+# Estate Agent AI Buddy
 
-Field app for a Malaysian property negotiator working mainly in Nilai and Sepang (formerly "Property Explorer").
+Field app for a Malaysian property negotiator working mainly in Nilai and Sepang (formerly "Estate Agent Buddy" and
+"Property Explorer"). The Android package id stays `com.jslproperties.estateagentbuddy`, so new APKs install over the old one.
 Target: a native Android app (Capacitor) for the Samsung S23 Ultra, with Supabase (Singapore) as the cloud backend.
+
+## Update of 13 Oct 2026 (version 2.1.0, native version 3 — needs the new APK)
+
+One coordinated update from the owner's 21-point list. Details, test evidence and what still needs the phone:
+[`docs/AUDIT.md` → "13 Oct 2026 update"](docs/AUDIT.md#13-oct-2026-update).
+
+- **Name and logo:** Estate Agent AI Buddy; the owner's logo (white outer border removed) in the header, sign-in,
+  app icon, splash, and a ~1 s spinning startup animation.
+- **Dashboard (15 cards):** To-Do, Calendar, Opportunities, Property List, **Contacts** (Buyers + Vendors),
+  Inquiries & Viewings, GPS Assistance, Agent Financial, Property Calculator, Agent Profile, Ask Expert, **News**,
+  Project (Coming Soon), Settings, **Voice Command (15, bright gold)**. Top bar: **Co-broke Opportunities (Coming
+  Soon)** and **Notifications** (replaces Big News).
+- **Vendors** have their own status (Pending Property Info, Pending Follow-up, Listed, Negotiating, On Hold, Closed,
+  Withdrawn); buyer lead colours unchanged.
+- **Voice:** after End recording the app waits for Android's final words (it used to stop listening too early) and
+  explains when nothing was recognised. **Phone book** buttons (contact form, Send Name Card) always say what
+  happened; picked name and number stay editable.
+- **Agent Profile:** required fields marked; Send Name Card switches on when they are complete.
+- **New Property form:** collapsible sections (closed at first), floating Save bar, "?" field help.
+- **GPS:** My Location takes a fresh reading every press; tap-to-select and later change for banners, House Shopping
+  marks and property location.
+- **Sample data:** new users choose "Populate with Sample Data (Recommended)" or "Start Without Sample Data"; sample
+  records are marked and never sent to the cloud.
+- **Typing lag:** `captureInput` removed from the Android config (it replaced the keyboard connection with a simple
+  key-by-key one); less work per keystroke in the property form.
 
 ## Master instruction progress (12 Oct 2026)
 

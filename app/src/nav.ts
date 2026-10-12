@@ -9,6 +9,8 @@ export type FormSection =
 export type Screen =
   | { name: 'home' }
   | { name: 'news' }
+  | { name: 'notifications' }
+  | { name: 'contactsHome' }
   | { name: 'opportunities' }
   | { name: 'listing'; filters?: Filters }
   | { name: 'listingDetail'; id: string }

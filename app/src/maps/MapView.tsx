@@ -90,10 +90,13 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
   const myPos = me === undefined ? live.pos : me;
   const posState: PositionState = me === undefined ? live.state : (meState ?? (me ? 'live' : 'locating'));
   // Following you: on for live screens until the map is dragged; the ◎ button turns it on again.
-  const [following, setFollowing] = useState(follow);
+  // A map for choosing a spot (tap to select) with nothing chosen yet starts at your own position, so the agent
+  // standing at the property sees it straight away; tapping or dragging the map stops following.
+  const [following, setFollowing] = useState(follow || (!!onMapClick && !center && !fit));
   const followingRef = useRef(following);
   followingRef.current = following;
   const wantRecentre = useRef(false);
+  const [, setPresses] = useState(0); // redraw the status line after a press
 
   useEffect(() => {
     if (!el.current || map.current) return;
@@ -102,7 +105,7 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
       // Google's round camera control would sit under the ◎ My Location button; pinch / scroll zoom is unchanged.
       cameraControl: false,
     });
-    map.current.addListener?.('click', (e: any) => { const ll = e?.latLng; if (ll) handlers.current.onMapClick?.(ll.lat(), ll.lng()); });
+    map.current.addListener?.('click', (e: any) => { const ll = e?.latLng; if (ll) { if (handlers.current.onMapClick) setFollowing(false); handlers.current.onMapClick?.(ll.lat(), ll.lng()); } });
     // Moving the map by hand stops following (the ◎ button stays and recentres again).
     map.current.addListener?.('dragstart', () => setFollowing(false));
   }, [maps]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -159,17 +162,20 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
       if (wantRecentre.current && (m.getZoom?.() ?? 16) < 15) m.setZoom?.(16);
       wantRecentre.current = false;
     }
-  }, [maps, myPos?.lat, myPos?.lng, myPos?.acc]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [maps, myPos?.lat, myPos?.lng, myPos?.acc, (myPos as { t?: number } | null | undefined)?.t]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** ◎ My Location: works every time it is pressed. Pans straight to the last position (if it is recent), asks the
+   *  GPS for a fresh reading, and pans again (zooming in if needed) when that reading arrives. */
   function recentre() {
     setFollowing(true);
-    if (myPos) {
+    wantRecentre.current = true;
+    const fresh = myPos && (!('t' in myPos) || Date.now() - ((myPos as { t?: number }).t ?? 0) < 60_000);
+    if (myPos && fresh) {
       map.current?.panTo?.({ lat: myPos.lat, lng: myPos.lng });
       if ((map.current?.getZoom?.() ?? 16) < 15) map.current?.setZoom?.(16);
-    } else {
-      wantRecentre.current = true;
-      if (me === undefined) live.locate(); else onLocate?.();
     }
+    if (me === undefined) live.refresh(); else onLocate?.();
+    setPresses(n => n + 1);
   }
 
   useEffect(() => {

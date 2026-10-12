@@ -15,24 +15,46 @@ const allowedBefore = () => { try { return localStorage.getItem(ALLOWED_KEY) ===
  * Live position while the calling screen is open. Starts by itself when location was allowed before (no surprise
  * permission prompt); otherwise `locate()` (the My Location button) starts it and asks for permission.
  */
-export function useLivePosition(enabled = true): { pos: MyPosition | null; state: PositionState; locate: () => void } {
+export function useLivePosition(enabled = true): { pos: MyPosition | null; state: PositionState; locate: () => void; refresh: () => void } {
   const [pos, setPos] = useState<MyPosition | null>(null);
   const [state, setState] = useState<PositionState>('idle');
   const watch = useRef<number | null>(null);
+  const lastFix = useRef(0);
 
   const stop = () => { if (watch.current !== null) { try { navigator.geolocation.clearWatch(watch.current); } catch { /* ignore */ } watch.current = null; } };
+  const apply = useCallback((p: GeolocationPosition) => {
+    rememberAllowed();
+    lastFix.current = Date.now();
+    setPos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: Date.now() });
+    setState('live');
+  }, []);
   const locate = useCallback(() => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) { setState('off'); return; }
     if (watch.current !== null) return; // already live: the caller recentres on the last position
     setState(s => (s === 'live' ? s : 'locating'));
     watch.current = navigator.geolocation.watchPosition(
-      p => { rememberAllowed(); setPos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy), t: p.timestamp || Date.now() }); setState('live'); },
+      apply,
       // Only a refused permission ends the watch. No signal or a slow fix (codes 2 and 3) is often brief: keep
       // watching so the position comes back by itself; say "no GPS" only while there is no position at all.
       e => { if (e.code === 1) { stop(); setState('denied'); } else setState(s => (s === 'live' ? s : 'off')); },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
     );
-  }, []);
+  }, [apply]);
+  /**
+   * My Location pressed: get a brand-new GPS reading now (not a cached one), and restart the live watch when it has
+   * gone quiet (Android can stop delivering updates after the screen was off or the app was in the background).
+   * The new reading arrives through `pos`, which the map uses to recentre.
+   */
+  const refresh = useCallback(() => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) { setState('off'); return; }
+    if (watch.current !== null && Date.now() - lastFix.current > 20_000) stop();
+    locate();
+    navigator.geolocation.getCurrentPosition(
+      apply,
+      e => { if (e.code === 1) { stop(); setState('denied'); } },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
+    );
+  }, [apply, locate]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -44,7 +66,7 @@ export function useLivePosition(enabled = true): { pos: MyPosition | null; state
     return () => { live = false; stop(); };
   }, [enabled, locate]);
 
-  return { pos, state, locate };
+  return { pos, state, locate, refresh };
 }
 
 /** One-off reading API kept for screens without a map (same behaviour, live updates included). */

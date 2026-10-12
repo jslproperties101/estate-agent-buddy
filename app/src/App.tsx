@@ -1,4 +1,4 @@
-// Estate Agent Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
+// Estate Agent AI Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
@@ -8,6 +8,7 @@ import { StoreContext, useApp } from './data/useStore';
 import { Screen, Go } from './nav';
 import { ToastContext } from './ui/toast';
 import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './domain/workflow';
+import { permission } from './lib/notify';
 import { showNow, scheduleNative, idFor } from './lib/notify';
 import { fmtDateTime } from './lib/dates';
 import { cardTitle, mainPhoto, placeName } from './listing/model';
@@ -21,7 +22,7 @@ import { profileStrings } from './profile/strings';
 import { expertStrings } from './expert/strings';
 import { PropertyListing, ListingDetails, PriceLine } from './listing/ListingUI';
 import { ListingForm } from './listing/ListingForm';
-import { ContactsList, ContactDetail, ContactForm } from './contacts/ContactsUI';
+import { ContactsList, ContactDetail, ContactForm, ContactsHome } from './contacts/ContactsUI';
 import { ActivityScreen, InquiryForm, ApptForm, TodoScreen, TaskForm, CalendarScreen } from './agenda/AgendaUI';
 import { GpsHome, HouseShopping, JourneyDetail, PropertyMap } from './gps/GpsUI';
 import { BannerScreen } from './gps/BannersUI';
@@ -31,42 +32,68 @@ import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './prof
 import { ExpertHome, ExpertAsk, ExpertThreadScreen } from './expert/ExpertUI';
 import { VoiceCommand } from './voice/VoiceCommandUI';
 import { StoredImage } from './ui/common';
+import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
-  IconBack, IconNews, IconTodo, IconCalendar, IconTrend, IconHome, IconVendor, IconBuyer, IconGps, IconExpert,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconSubsale, IconProject, IconCobroke,
+  IconBack, IconNews, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat, IconGear,
+  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconCobroke,
 } from './icons';
-import { nativeLook } from './native/native';
+import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, syncNow, SyncError } from './data/sync';
 
-/** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone). `soon` marks a card whose screen says
- *  plainly that the feature is not built yet. */
-const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
+/** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone), recalculated on 13 Oct 2026:
+ *  Buyer List + Vendor List → one Contacts card (Buyers and Vendors inside); Subsale → News; Co-broke moved to the
+ *  top bar (Coming Soon); Voice Command is card 15. Inquiries & Viewings and Settings (both existing screens) fill
+ *  the places that became free. `soon` marks a card whose screen says plainly that the feature is not built yet. */
+export const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
   { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
   { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
   { key: 'property', icon: () => <IconHome />, target: { name: 'listing' } },
-  { key: 'vendor', icon: () => <IconVendor />, target: { name: 'contacts', role: 'vendor' } },
-  { key: 'buyer', icon: () => <IconBuyer />, target: { name: 'contacts', role: 'buyer' } },
+  { key: 'contacts', icon: () => <IconContacts />, target: { name: 'contactsHome' } },
+  { key: 'activity', icon: () => <IconChat />, target: { name: 'activity' } },
   { key: 'gps', icon: () => <IconGps />, target: { name: 'gps' } },
   { key: 'finance', icon: () => <IconMoney />, target: { name: 'finance' } },
   { key: 'calculator', icon: () => <IconCalc />, target: { name: 'calculator' } },
   { key: 'profile', icon: () => <IconCard />, target: { name: 'profile' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
-  { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
-  { key: 'subsale', icon: () => <IconSubsale />, target: { name: 'comingSoon', key: 'subsale' }, soon: true },
+  { key: 'news', icon: () => <IconNews />, target: { name: 'news' } },
   { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' }, soon: true },
-  { key: 'cobroke', icon: () => <IconCobroke />, target: { name: 'cobroke' } },
+  { key: 'settings', icon: () => <IconGear />, target: { name: 'settings' } },
+  { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
 ];
+
+/** How long the startup logo animation shows (about one second, as agreed). The phone's storage opens at the same
+ *  time underneath, so the animation adds no waiting of its own beyond this. */
+export const INTRO_MS = 1000;
 
 export default function App() {
   const [store, setStore] = useState<Store | null>(null);
+  const [intro, setIntro] = useState(true);
   useEffect(() => { void openBackend().then(Store.open).then(setStore); }, []);
+  // The Android splash (a still logo) is hidden as soon as the app can draw, so the spinning logo follows straight on.
+  useEffect(() => { void hideSplash(); const x = setTimeout(() => setIntro(false), INTRO_MS); return () => clearTimeout(x); }, []);
   useEffect(() => { if (store) void nativeLook(); }, [store]);
-  if (!store) return <div className="shell"><p className="loading" role="status">Estate Agent Buddy…</p></div>;
-  return <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>;
+  return (
+    <>
+      {store
+        ? <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>
+        : <div className="shell"><p className="loading" role="status">{intro ? '' : 'Estate Agent AI Buddy…'}</p></div>}
+      {intro && <StartupLogo />}
+    </>
+  );
+}
+
+/** Startup animation: the Estate Agent AI Buddy logo spins once (like a game's start screen), then the app or the
+ *  sign-in screen appears. People who ask the phone for reduced motion get a short fade instead of the spin. */
+function StartupLogo() {
+  return (
+    <div className="intro" data-testid="startup-logo" aria-hidden="true">
+      <div className="intro-stage"><IconLogo size={168} big /></div>
+    </div>
+  );
 }
 
 /** Sign-in first when Google sign-in is set up and nobody is signed in on this phone; otherwise the app. */
@@ -157,6 +184,8 @@ function Shell() {
   }, [state.tasks, state.appointments, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const title = screenTitle(screen, lang, state);
+  // Bell badge: reminders due today that are not yet done.
+  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue;
 
   return (
     <ToastContext.Provider value={showToast}>
@@ -164,9 +193,16 @@ function Shell() {
         <header className={screen.name === 'home' ? 'topbar home' : 'topbar'}>
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
           {screen.name === 'home'
-            ? <h1 className="brand" aria-label={t.appName}><IconLogo size={34} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
+            ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
             : <h1>{title}</h1>}
-          <button className="icon-btn news-btn" onClick={() => go({ name: 'news' })} aria-label={t.news} title={t.news}><IconNews /></button>
+          {screen.name === 'home' && <>
+            <button className="icon-btn top-btn cobroke-btn" onClick={() => go({ name: 'cobroke' })} aria-label={`${t.cobrokeTop} (${t.comingSoon})`} title={`${t.cobrokeTop} · ${t.comingSoon}`} data-testid="top-cobroke">
+              <IconCobroke /><span className="top-soon" aria-hidden="true">{t.soonShort}</span>
+            </button>
+            <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
+              <IconBell />{notifCount > 0 && <span className="top-badge" aria-hidden="true">{notifCount > 9 ? '9+' : notifCount}</span>}
+            </button>
+          </>}
           <div className="lang" role="group" aria-label={t.langSwitch}>
             {LANGS.map(l => <button key={l.code} aria-pressed={lang === l.code} aria-label={l.label} onClick={() => store.setSingleton('settings', { lang: l.code })}>{l.short}</button>)}
           </div>
@@ -194,6 +230,8 @@ function Shell() {
         <main className="content">
           <ScreenView screen={screen} lang={lang} go={go} back={back} />
         </main>
+
+        {needsStartChoice(state) && <StartChoice lang={lang} />}
 
         {toast && (
           <div className="toast" role="status">
@@ -228,6 +266,8 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
   switch (s.name) {
     case 'home': return t.appName;
     case 'news': return t.news;
+    case 'notifications': return t.notifications;
+    case 'contactsHome': return cs.contacts;
     case 'opportunities': return t.tiles.opportunities;
     case 'listing': return ls.title;
     case 'listingDetail': { const l = state.properties.find(x => x.id === s.id); return (l && cardTitle(l)) || ls.untitled; }
@@ -260,7 +300,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
     case 'voice': return t.tiles.voice;
     case 'comingSoon': return s.key === 'cobrokeMap' ? gs.cobrokeMap : t.tiles[s.key];
-    case 'cobroke': return t.tiles.cobroke;
+    case 'cobroke': return t.cobrokeTop;
   }
 }
 
@@ -269,6 +309,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
   switch (s.name) {
     case 'home': return <Home lang={lang} go={go} />;
     case 'news': return <News lang={lang} />;
+    case 'notifications': return <Notifications lang={lang} go={go} />;
+    case 'contactsHome': return <ContactsHome lang={lang} go={go} />;
     case 'opportunities': return <section className="card stack-sm" data-testid="opportunities"><h2>{t.notBuilt}</h2><p>{t.opportunitiesBody}</p></section>;
     case 'listing': return <PropertyListing key={JSON.stringify(s.filters ?? {})} lang={lang} go={go} initial={s.filters} />;
     case 'listingDetail': return <ListingDetails key={s.id} lang={lang} id={s.id} go={go} />;
@@ -364,7 +406,7 @@ function News({ lang }: { lang: Lang }) {
   return (
     <section className="stack">
       <div className="news-banner">
-        <span className="badge light">BIG NEWS</span>
+        <span className="badge soon-badge fit">{strings[lang].comingSoon}</span>
         <h2>{n.banner}</h2>
         <p className="small">{n.sampleOnly}</p>
       </div>
@@ -380,22 +422,62 @@ function News({ lang }: { lang: Lang }) {
   );
 }
 
+function Notifications({ lang, go }: { lang: Lang; go: Go }) {
+  const { state } = useApp();
+  const t = strings[lang];
+  const now = Date.now();
+  const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
+  const perm = permission();
+  return (
+    <section className="stack" data-testid="notifications">
+      <div className="card stack-sm">
+        <div className="card-title">{t.notif.upcoming}</div>
+        {soon.length === 0 ? <small className="muted">{t.notif.none}</small> : (
+          <ul className="notif-list">
+            {soon.map(r => {
+              const x = reminderText(r, state, lang);
+              return (
+                <li key={r.key}>
+                  <button className="link-row" onClick={() => go(r.kind === 'task' ? { name: 'taskForm', id: r.id } : { name: 'apptForm', id: r.id })}>
+                    <strong>🔔 {x.title}</strong><small className="muted">{fmtDateTime(r.at, lang)} · {x.body}</small>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+      <div className="card stack-sm coming-soon">
+        <div className="between"><div className="card-title">{t.notif.push}</div><span className="badge soon-badge fit">{t.comingSoon}</span></div>
+        <small className="muted">{t.notif.pushBody}</small>
+      </div>
+      <div className="card stack-sm">
+        <div className="card-title">{t.notif.settings}</div>
+        <small className="muted">{t.reminders.note}</small>
+        {perm === 'granted' ? <small className="ok-text">{t.reminders.allowed}</small> : perm === 'denied' ? <small className="warn-text">{t.reminders.blocked}</small> : null}
+        <button className="btn secondary" onClick={() => go({ name: 'settings' })}>⚙ {t.tiles.settings}</button>
+      </div>
+    </section>
+  );
+}
+
 function Cobroke({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
   const t = strings[lang].cobrokePage;
   const n = state.properties.filter(p => p.arrangement === 'cobroke').length;
   return (
     <section className="stack" data-testid="cobroke">
+      <div className="card stack-sm coming-soon" data-testid="cobroke-soon">
+        <span className="badge soon-badge fit">{strings[lang].comingSoon}</span>
+        <p>{t.soonBody}</p>
+        <small className="muted">{strings[lang].soon.note}</small>
+      </div>
       <div className="card stack-sm">
         <p>{t.intro}</p>
         <strong data-testid="cobroke-count">{t.count(n)}</strong>
         {n > 0
           ? <button className="btn primary" onClick={() => go({ name: 'listing', filters: { arrangement: 'cobroke' } })}>{t.show}</button>
           : <small className="muted">{t.none}</small>}
-      </div>
-      <div className="card stack-sm coming-soon">
-        <span className="badge soon-badge fit">{t.soonTitle}</span>
-        <p>{t.soonBody}</p>
       </div>
     </section>
   );

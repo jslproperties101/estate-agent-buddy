@@ -14,6 +14,14 @@ export const LEAD_COLOURS: Record<LeadStatus, string> = {
 };
 
 export type ContactRole = 'vendor' | 'landlord' | 'buyer' | 'tenant' | 'investor' | 'professional' | 'other';
+/** Vendor (owner / landlord) status — a separate system from the buyer lead colours (owner, 13 Oct 2026). It says
+ *  what is waiting with this owner, not how "hot" they are. */
+export type VendorStatus = 'pending_info' | 'pending_follow_up' | 'listed' | 'negotiating' | 'on_hold' | 'closed' | 'withdrawn';
+export const VENDOR_STATUSES: VendorStatus[] = ['pending_info', 'pending_follow_up', 'listed', 'negotiating', 'on_hold', 'closed', 'withdrawn'];
+export const VENDOR_COLOURS: Record<VendorStatus, string> = {
+  pending_info: '#F0C060', pending_follow_up: '#E8963A', listed: '#6FD49B', negotiating: '#8EC1F5', on_hold: '#A39883', closed: '#D4AF37', withdrawn: '#6B6558',
+};
+
 export const VENDOR_ROLES: ContactRole[] = ['vendor', 'landlord'];
 export const BUYER_ROLES: ContactRole[] = ['buyer', 'tenant', 'investor'];
 export const CONTACT_ROLES: ContactRole[] = ['vendor', 'landlord', 'buyer', 'tenant', 'investor', 'professional', 'other'];
@@ -31,7 +39,10 @@ export interface Contact extends Base {
   roles: ContactRole[];
   /** For professional contacts: which Ask Expert specialist they are. */
   profession?: ExpertKey;
+  /** Buyer / tenant lead colour (Cold, Warm, Hot, Dropped, Inactive). */
   leadStatus?: LeadStatus;
+  /** Vendor / landlord status (Pending Property Info, Pending Follow-up, …), kept separate from the buyer colours. */
+  vendorStatus?: VendorStatus;
   source?: string;
   notes?: string;
   /** Last meaningful interaction (inquiry, viewing, completed task or appointment). Routine edits do not change it. */
@@ -204,6 +215,8 @@ export interface Settings {
   calc?: Record<string, number>;
   /** Map / Satellite / Hybrid, kept for every map screen. */
   mapType?: 'roadmap' | 'satellite' | 'hybrid';
+  /** The new-user choice on first start: sample data or a clean workspace (asked once per phone). */
+  startChoice?: 'sample' | 'empty';
 }
 
 export interface CustomOption { value: string; added: number; used: number }

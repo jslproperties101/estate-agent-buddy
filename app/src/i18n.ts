@@ -11,10 +11,10 @@ export const LANGS: { code: Lang; short: string; label: string }[] = [
 export const htmlLang = (l: Lang) => (l === 'bm' ? 'ms' : l === 'zh' ? 'zh-Hans' : 'en');
 
 const en = {
-  appName: 'Estate Agent Buddy',
-  appNameA: 'Estate Agent', appNameB: 'Buddy',
+  appName: 'Estate Agent AI Buddy',
+  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
   back: 'Back',
-  news: 'News & Big News',
+  news: 'News',
   langSwitch: 'Language',
   home: 'Home',
   tiles: {
@@ -22,7 +22,16 @@ const en = {
     vendor: 'Vendor List', buyer: 'Buyer List', gps: 'GPS Assistance', finance: 'Agent Financial',
     calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'Voice Command',
     subsale: 'Subsale', project: 'Project', cobroke: 'Co-broke',
+    contacts: 'Contacts', news: 'News', activity: 'Inquiries & Viewings', settings: 'Settings',
   } as Record<string, string>,
+  notifications: 'Notifications',
+  soonShort: 'Soon',
+  cobrokeTop: 'Co-broke Opportunities',
+  notif: {
+    upcoming: 'Coming up (next 7 days)', none: 'No reminders in the next 7 days.', recent: 'Earlier today',
+    push: 'Push messages', pushBody: 'Messages from your agency or team (for example new co-broke listings) will appear here. Push messages are not set up yet.',
+    settings: 'Notification settings',
+  },
   c: {
     save: 'Save', cancel: 'Cancel', edit: 'Edit', delete: 'Delete', add: 'Add', close: 'Close', search: 'Search', open: 'Open',
     yes: 'Yes', no: 'No', notSet: 'Not set', others: 'Others…', othersHint: 'Type a new value', addValue: 'Add', use: 'Use',
@@ -36,6 +45,8 @@ const en = {
   },
   lead: { cold: 'Cold', warm: 'Warm', hot: 'Hot', dropped: 'Dropped', inactive: 'Inactive' } as Record<string, string>,
   leadLabel: 'Lead status',
+  vendorStatusLabel: 'Vendor status',
+  vendorStatus: { pending_info: 'Pending Property Info', pending_follow_up: 'Pending Follow-up', listed: 'Listed', negotiating: 'Negotiating', on_hold: 'On Hold', closed: 'Closed (Sold / Rented)', withdrawn: 'Withdrawn' } as Record<string, string>,
   storage: {
     notPersistent: 'This browser is not allowing storage: changes will be lost when the app is closed.',
     writeError: 'Could not save to the phone’s storage. Please try again.',
@@ -50,6 +61,8 @@ const en = {
     clear: 'Nothing due today.',
   },
   comingSoon: 'Coming Soon',
+  sampleTag: 'Sample',
+  sampleNote: 'This is example data, not a real record. Remove all sample data in Settings → Sample data.',
   soon: {
     subsale: 'Subsale will gather secondary-market (resale) properties and their owners, enquiries and paperwork in one place. It is not built yet: your existing properties stay in the Property List.',
     project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Property List for now.',
@@ -66,7 +79,7 @@ const en = {
   },
   update: {
     ready: 'A new version of the app is ready.', restart: 'Restart now', later: 'Later',
-    web: 'A new version of Estate Agent Buddy is available.', reload: 'Reload',
+    web: 'A new version of Estate Agent AI Buddy is available.', reload: 'Reload',
     apk: 'A new Android app is needed for new phone features. Your data stays when you install it over this one.', download: 'Download the new app',
     about: 'About this app', version: (v: string, sha: string, n: number) => `Version ${v} · build ${sha} · native ${n}`,
     check: 'Check for updates', checking: 'Checking…', upToDate: 'This is the latest version.', failed: (m: string) => `Could not check for updates (${m}).`,
@@ -101,9 +114,10 @@ const en = {
   },
   voice: {
     mic: 'Start speaking',
-    stop: 'Listening… tap to stop',
+    stop: 'Listening… End recording',
+    processing: 'Recognising your words…',
     noticeTitle: 'How speech becomes text',
-    notice: 'Your phone’s speech service (Google) turns your voice into text. It normally sends the sound to Google and needs internet. Estate Agent Buddy does not record or keep any audio. Do not say IC or bank numbers.',
+    notice: 'Your phone’s speech service (Google) turns your voice into text. It normally sends the sound to Google and needs internet. Estate Agent AI Buddy does not record or keep any audio. Do not say IC or bank numbers.',
     noticeOk: 'Use the speech service',
     noticeNo: 'Type instead',
     offline: 'No internet: the speech service usually needs internet. You can type, or use your keyboard microphone.',
@@ -119,6 +133,9 @@ const en = {
       'language-not-supported': 'This language is not available in the speech service on this phone.',
       aborted: 'Stopped.',
       other: 'Speech to text stopped unexpectedly. Your text so far is kept.',
+      busy: 'The phone’s speech service is busy (another app may be using it). Wait a moment and try again.',
+      'no-result': 'No words were recognised. Speak clearly and close to the phone, wait a second, then tap End recording. You can also type.',
+      'plugin-missing': 'This installed version of the app does not include speech recognition. Install the latest APK (see Settings → About), or type.',
     } as Record<string, string>,
   },
 };
@@ -126,10 +143,10 @@ const en = {
 export type Strings = typeof en;
 
 const bm: Strings = {
-  appName: 'Estate Agent Buddy',
-  appNameA: 'Estate Agent', appNameB: 'Buddy',
+  appName: 'Estate Agent AI Buddy',
+  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
   back: 'Kembali',
-  news: 'Berita & Berita Besar',
+  news: 'Berita',
   langSwitch: 'Bahasa',
   home: 'Utama',
   tiles: {
@@ -137,6 +154,15 @@ const bm: Strings = {
     vendor: 'Senarai Penjual', buyer: 'Senarai Pembeli', gps: 'Bantuan GPS', finance: 'Kewangan Ejen',
     calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Suara',
     subsale: 'Subsale', project: 'Projek', cobroke: 'Co-broke',
+    contacts: 'Kenalan', news: 'Berita', activity: 'Pertanyaan & Lawatan', settings: 'Tetapan',
+  },
+  notifications: 'Pemberitahuan',
+  soonShort: 'Segera',
+  cobrokeTop: 'Peluang Co-broke',
+  notif: {
+    upcoming: 'Akan datang (7 hari)', none: 'Tiada peringatan dalam 7 hari akan datang.', recent: 'Awal hari ini',
+    push: 'Mesej tolak (push)', pushBody: 'Mesej daripada agensi atau pasukan anda (contohnya senarai co-broke baharu) akan dipaparkan di sini. Mesej push belum disediakan.',
+    settings: 'Tetapan pemberitahuan',
   },
   c: {
     save: 'Simpan', cancel: 'Batal', edit: 'Ubah', delete: 'Padam', add: 'Tambah', close: 'Tutup', search: 'Cari', open: 'Buka',
@@ -151,6 +177,8 @@ const bm: Strings = {
   },
   lead: { cold: 'Sejuk', warm: 'Suam', hot: 'Panas', dropped: 'Digugurkan', inactive: 'Tidak aktif' },
   leadLabel: 'Status prospek',
+  vendorStatusLabel: 'Status penjual',
+  vendorStatus: { pending_info: 'Menunggu Maklumat Hartanah', pending_follow_up: 'Menunggu Susulan', listed: 'Disenaraikan', negotiating: 'Dalam Rundingan', on_hold: 'Ditangguhkan', closed: 'Selesai (Dijual / Disewa)', withdrawn: 'Ditarik Balik' },
   storage: {
     notPersistent: 'Pelayar ini tidak membenarkan storan: perubahan akan hilang apabila aplikasi ditutup.',
     writeError: 'Tidak dapat menyimpan ke storan telefon. Sila cuba lagi.',
@@ -165,6 +193,8 @@ const bm: Strings = {
     clear: 'Tiada yang perlu dibuat hari ini.',
   },
   comingSoon: 'Akan Datang',
+  sampleTag: 'Contoh',
+  sampleNote: 'Ini data contoh, bukan rekod sebenar. Buang semua data contoh di Tetapan → Data contoh.',
   soon: {
     subsale: 'Subsale akan menghimpunkan hartanah pasaran sekunder (jualan semula) bersama pemilik, pertanyaan dan dokumennya di satu tempat. Ia belum dibina: hartanah sedia ada kekal dalam Senarai Hartanah.',
     project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Hartanah.',
@@ -181,7 +211,7 @@ const bm: Strings = {
   },
   update: {
     ready: 'Versi baharu aplikasi sudah sedia.', restart: 'Mulakan semula sekarang', later: 'Nanti',
-    web: 'Versi baharu Estate Agent Buddy tersedia.', reload: 'Muat semula',
+    web: 'Versi baharu Estate Agent AI Buddy tersedia.', reload: 'Muat semula',
     apk: 'Aplikasi Android baharu diperlukan untuk ciri telefon baharu. Data anda kekal apabila anda memasangnya di atas aplikasi ini.', download: 'Muat turun aplikasi baharu',
     about: 'Tentang aplikasi ini', version: (v: string, sha: string, n: number) => `Versi ${v} · binaan ${sha} · natif ${n}`,
     check: 'Semak kemas kini', checking: 'Sedang menyemak…', upToDate: 'Ini versi terkini.', failed: (m: string) => `Tidak dapat menyemak kemas kini (${m}).`,
@@ -216,9 +246,10 @@ const bm: Strings = {
   },
   voice: {
     mic: 'Mula bercakap',
-    stop: 'Sedang mendengar… ketik untuk berhenti',
+    stop: 'Sedang mendengar… Tamat rakaman',
+    processing: 'Mengecam perkataan anda…',
     noticeTitle: 'Bagaimana suara menjadi teks',
-    notice: 'Perkhidmatan pertuturan telefon anda (Google) menukar suara kepada teks. Biasanya bunyi dihantar kepada Google dan memerlukan internet. Estate Agent Buddy tidak merakam atau menyimpan audio. Jangan sebut nombor IC atau akaun bank.',
+    notice: 'Perkhidmatan pertuturan telefon anda (Google) menukar suara kepada teks. Biasanya bunyi dihantar kepada Google dan memerlukan internet. Estate Agent AI Buddy tidak merakam atau menyimpan audio. Jangan sebut nombor IC atau akaun bank.',
     noticeOk: 'Guna perkhidmatan pertuturan',
     noticeNo: 'Taip sahaja',
     offline: 'Tiada internet: perkhidmatan pertuturan biasanya memerlukan internet. Anda boleh menaip, atau guna mikrofon papan kekunci.',
@@ -234,15 +265,18 @@ const bm: Strings = {
       'language-not-supported': 'Bahasa ini tiada dalam perkhidmatan pertuturan telefon ini.',
       aborted: 'Dihentikan.',
       other: 'Pertuturan ke teks berhenti tiba-tiba. Teks setakat ini disimpan.',
+      busy: 'Perkhidmatan pertuturan telefon sedang sibuk (mungkin digunakan aplikasi lain). Tunggu sebentar dan cuba lagi.',
+      'no-result': 'Tiada perkataan dikenal pasti. Bercakap dengan jelas dan dekat dengan telefon, tunggu sesaat, kemudian ketik Tamat rakaman. Anda juga boleh menaip.',
+      'plugin-missing': 'Versi aplikasi yang dipasang tidak mengandungi pengecaman pertuturan. Pasang APK terkini (Tetapan → Perihal), atau taip.',
     },
   },
 };
 
 const zh: Strings = {
-  appName: 'Estate Agent Buddy',
-  appNameA: 'Estate Agent', appNameB: 'Buddy',
+  appName: 'Estate Agent AI Buddy',
+  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
   back: '返回',
-  news: '新闻与要闻',
+  news: '新闻',
   langSwitch: '语言',
   home: '主页',
   tiles: {
@@ -250,6 +284,15 @@ const zh: Strings = {
     vendor: '卖家列表', buyer: '买家列表', gps: 'GPS 助手', finance: '代理财务',
     calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: '语音指令',
     subsale: '二手房', project: '新项目', cobroke: '联合代理',
+    contacts: '联系人', news: '新闻', activity: '询问与看房', settings: '设置',
+  },
+  notifications: '通知',
+  soonShort: '即将',
+  cobrokeTop: '联合代理机会',
+  notif: {
+    upcoming: '即将到来（7 天内）', none: '未来 7 天没有提醒。', recent: '今天较早',
+    push: '推送消息', pushBody: '来自您的公司或团队的消息（例如新的联合代理盘源）将显示在这里。推送消息尚未设置。',
+    settings: '通知设置',
   },
   c: {
     save: '保存', cancel: '取消', edit: '编辑', delete: '删除', add: '添加', close: '关闭', search: '搜索', open: '打开',
@@ -264,6 +307,8 @@ const zh: Strings = {
   },
   lead: { cold: '冷', warm: '温', hot: '热', dropped: '已放弃', inactive: '不活跃' },
   leadLabel: '客户热度',
+  vendorStatusLabel: '卖家状态',
+  vendorStatus: { pending_info: '待补房产资料', pending_follow_up: '待跟进', listed: '已上架', negotiating: '洽谈中', on_hold: '暂缓', closed: '已成交（售出/租出）', withdrawn: '已撤回' },
   storage: {
     notPersistent: '此浏览器不允许存储：关闭应用后更改将会丢失。',
     writeError: '无法保存到手机存储，请重试。',
@@ -278,6 +323,8 @@ const zh: Strings = {
     clear: '今天没有到期事项。',
   },
   comingSoon: '即将推出',
+  sampleTag: '示例',
+  sampleNote: '这是示例数据，不是真实记录。可在 设置 → 示例数据 中全部删除。',
   soon: {
     subsale: '二手房功能将把二手（转售）房产及其业主、询问和文件集中在一处。尚未建立：您现有的房产仍在房产列表中。',
     project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在房产列表中。',
@@ -294,7 +341,7 @@ const zh: Strings = {
   },
   update: {
     ready: '应用的新版本已准备好。', restart: '立即重启', later: '稍后',
-    web: 'Estate Agent Buddy 有新版本。', reload: '重新加载',
+    web: 'Estate Agent AI Buddy 有新版本。', reload: '重新加载',
     apk: '新的手机功能需要新的 Android 应用。覆盖安装时您的数据会保留。', download: '下载新应用',
     about: '关于本应用', version: (v: string, sha: string, n: number) => `版本 ${v} · 构建 ${sha} · 原生 ${n}`,
     check: '检查更新', checking: '正在检查…', upToDate: '已是最新版本。', failed: (m: string) => `无法检查更新（${m}）。`,
@@ -329,9 +376,10 @@ const zh: Strings = {
   },
   voice: {
     mic: '开始说话',
-    stop: '正在聆听… 点按停止',
+    stop: '正在聆听… 结束录音',
+    processing: '正在识别您的话…',
     noticeTitle: '语音如何转为文字',
-    notice: '您手机的语音服务（Google）会把语音转为文字，通常会将声音发送给 Google 并需要网络。Estate Agent Buddy 不会录制或保存任何音频。请勿说出身份证或银行账号。',
+    notice: '您手机的语音服务（Google）会把语音转为文字，通常会将声音发送给 Google 并需要网络。Estate Agent AI Buddy 不会录制或保存任何音频。请勿说出身份证或银行账号。',
     noticeOk: '使用语音服务',
     noticeNo: '改为打字',
     offline: '没有网络：语音服务通常需要网络。您可以打字，或使用键盘上的麦克风。',
@@ -347,6 +395,9 @@ const zh: Strings = {
       'language-not-supported': '此手机的语音服务不支持该语言。',
       aborted: '已停止。',
       other: '语音转文字意外停止。已保留目前的文字。',
+      busy: '手机的语音服务正忙（可能有其他应用在使用）。请稍候再试。',
+      'no-result': '没有识别到文字。请清楚地靠近手机说话，停一秒后再点按“结束录音”。也可以直接输入。',
+      'plugin-missing': '已安装的应用版本不包含语音识别。请安装最新的 APK（设置 → 关于），或直接输入。',
     },
   },
 };

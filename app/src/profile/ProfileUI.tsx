@@ -3,6 +3,7 @@
 // The agent reviews it there and presses Send; nothing is ever sent automatically.
 import { useState } from 'react';
 import { AboutCard } from '../native/UpdateUI';
+import { BUILD } from '../native/updates';
 import { MapsCheck } from '../maps/MapsCheck';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
@@ -11,15 +12,16 @@ import { profileStrings } from './strings';
 import { OptionSelect } from '../ui/OptionSelect';
 import { StoredImage } from '../ui/common';
 import { useToast } from '../ui/toast';
-import { DEFAULT_SHARE, shareText, shareFiles, whatsappLink, anyChosen } from '../domain/namecard';
+import { DEFAULT_SHARE, shareText, shareFiles, whatsappLink, anyChosen, missingProfile, REQUIRED_PROFILE, RequiredProfileField } from '../domain/namecard';
 import { Profile, ShareChoice, COLLECTIONS, CollectionName } from '../data/types';
 import { normalisePhone, phoneDigits } from '../listing/model';
 import { compressImage } from '../lib/images';
-import { pickPhoneContacts } from '../lib/phonebook';
+import { PhonebookButton } from '../ui/PhonebookButton';
+import { FieldHelp } from '../ui/FieldHelp';
 import { config } from '../config';
 import { AccountCard } from '../auth/AccountUI';
 import { permission, requestPermission } from '../lib/notify';
-import { sampleData } from '../data/sample';
+import { loadSampleInto } from '../data/sample';
 
 export const REG_TYPES = ['REN', 'PEA', 'REA'] as const;
 
@@ -28,6 +30,7 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
   const t = profileStrings[lang];
   const p = state.profile;
   const has = !!(p.fullName || p.phone || p.agency);
+  const missing = missingProfile(p);
   return (
     <section className="stack" data-testid="profile">
       <div className="namecard">
@@ -47,7 +50,13 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
           {p.cardBackFileId && <figure><StoredImage fileId={p.cardBackFileId} /><figcaption className="small muted">{t.f.back}</figcaption></figure>}
         </div>
       )}
-      <button className="btn primary" onClick={() => go({ name: 'nameCard' })} disabled={!has}>{t.send}</button>
+      <button className="btn primary" data-testid="send-namecard" onClick={() => go({ name: 'nameCard' })} disabled={missing.length > 0}>{t.send}</button>
+      {missing.length > 0 && (
+        <div className="stack-xs activate-hint" data-testid="namecard-hint" role="note">
+          <small className="warn-text">{t.activateHint}</small>
+          <small className="muted">{t.missingList(missing.map(k => t.f[k]).join(', '))}</small>
+        </div>
+      )}
       <button className="btn secondary" onClick={() => go({ name: 'profileEdit' })}>{t.edit}</button>
       <button className="btn secondary" onClick={() => go({ name: 'settings' })}>⚙ {t.settings}</button>
     </section>
@@ -80,6 +89,18 @@ function ImageField({ lang, label, fileId, onChange, testId }: { lang: Lang; lab
   );
 }
 
+/** Label of a required profile field: a gold * and, once missing, the word "required". */
+function Req({ lang, k, missing, help }: { lang: Lang; k: RequiredProfileField; missing: RequiredProfileField[]; help?: string }) {
+  const t = profileStrings[lang];
+  return (
+    <span className="between">
+      <span>{t.f[k]} <span className="req" aria-label={t.requiredMark}>*</span>{help && <FieldHelp lang={lang} topic={help} />}</span>
+      {missing.includes(k) && <small className="req-flag">{t.requiredMark}</small>}
+    </span>
+  );
+}
+void REQUIRED_PROFILE;
+
 export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
   const { state, store } = useApp();
   const t = profileStrings[lang];
@@ -88,16 +109,21 @@ export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
   const [p, setP] = useState<Profile>({ ...state.profile });
   const set = (k: keyof Profile, v: string | undefined) => setP(x => ({ ...x, [k]: v || undefined }));
   // Images are saved straight away (they are files); text fields are saved with Save.
+  const missing = missingProfile(p);
+  const [tried, setTried] = useState(false);
   const setImg = (k: 'photoFileId' | 'cardFrontFileId' | 'cardBackFileId') => (id: string | undefined) => { setP(x => ({ ...x, [k]: id })); store.setSingleton('profile', { [k]: id }); };
   return (
     <section className="stack" data-testid="profile-edit">
       <div className="card stack-sm">
-        <label className="ff">{t.f.fullName}<input data-field="fullName" value={p.fullName ?? ''} onChange={e => set('fullName', e.target.value)} /></label>
-        <OptionSelect lang={lang} label={t.f.regType} listKey="regType" builtIns={REG_TYPES.map(v => ({ value: v }))} value={p.regType} onChange={v => set('regType', v)} testId="opt-regType" />
-        <label className="ff">{t.f.regNo}<input data-field="regNo" value={p.regNo ?? ''} onChange={e => set('regNo', e.target.value)} /></label>
-        <label className="ff">{t.f.agency}<input data-field="agency" value={p.agency ?? ''} onChange={e => set('agency', e.target.value)} /></label>
-        <label className="ff">{t.f.phone}<input data-field="phone" type="tel" inputMode="tel" value={p.phone ?? ''} onChange={e => set('phone', e.target.value)} onBlur={() => setP(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
+        <small className="muted"><span className="req" aria-hidden="true">*</span> {t.required}</small>
+        <label className="ff"><Req lang={lang} k="fullName" missing={missing} /><input data-field="fullName" aria-required="true" aria-invalid={tried && missing.includes('fullName')} value={p.fullName ?? ''} onChange={e => set('fullName', e.target.value)} /></label>
+        <OptionSelect lang={lang} label={`${t.f.regType} *`} listKey="regType" builtIns={REG_TYPES.map(v => ({ value: v }))} value={p.regType} onChange={v => set('regType', v)} testId="opt-regType" />
+        <label className="ff"><Req lang={lang} k="regNo" missing={missing} help="regNo" /><input data-field="regNo" aria-required="true" aria-invalid={tried && missing.includes('regNo')} value={p.regNo ?? ''} onChange={e => set('regNo', e.target.value)} /></label>
+        <label className="ff"><Req lang={lang} k="agency" missing={missing} /><input data-field="agency" aria-required="true" aria-invalid={tried && missing.includes('agency')} value={p.agency ?? ''} onChange={e => set('agency', e.target.value)} /></label>
+        <label className="ff"><Req lang={lang} k="phone" missing={missing} /><input data-field="phone" type="tel" inputMode="tel" aria-required="true" aria-invalid={tried && missing.includes('phone')} value={p.phone ?? ''} onChange={e => set('phone', e.target.value)} onBlur={() => setP(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
+        {tried && missing.includes('phone') && p.phone && <small className="error">{t.phoneShort}</small>}
         <label className="ff">{t.f.email}<input data-field="email" type="email" value={p.email ?? ''} onChange={e => set('email', e.target.value)} /></label>
+        {missing.length > 0 && <small className="muted" data-testid="profile-missing">{t.missingList(missing.map(k => t.f[k]).join(', '))}</small>}
       </div>
       <div className="card stack-sm">
         <ImageField lang={lang} label={t.f.photo} fileId={p.photoFileId} onChange={setImg('photoFileId')} testId="photo-upload" />
@@ -107,7 +133,9 @@ export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
         <button className="btn primary" data-testid="save-profile" onClick={() => {
-          store.setSingleton('profile', { fullName: p.fullName, regType: p.regType, regNo: p.regNo, agency: p.agency, phone: normalisePhone(p.phone), email: p.email });
+          // Saving is always allowed (details can be filled step by step); the name card switches on once complete.
+          setTried(true);
+          store.setSingleton('profile', { fullName: p.fullName?.trim() || undefined, regType: p.regType, regNo: p.regNo?.trim() || undefined, agency: p.agency?.trim() || undefined, phone: normalisePhone(p.phone), email: p.email?.trim() || undefined });
           toast(c.saved); back();
         }}>{c.save}</button>
       </div></div>
@@ -125,11 +153,15 @@ export function NameCardSend({ lang }: { lang: Lang }) {
   const [choice, setChoice] = useState<ShareChoice>(p.shareDefaults ?? DEFAULT_SHARE);
   const [source, setSource] = useState<Source>('app');
   const [contactId, setContactId] = useState('');
-  const [picked, setPicked] = useState<{ name: string; tel?: string } | null>(null);
-  const [typed, setTyped] = useState('');
+  // Phone book / typed: a name and number in normal boxes that stay editable after choosing from the phone book.
+  const [toName, setToName] = useState('');
+  const [toTel, setToTel] = useState('');
   const [msg, setMsg] = useState('');
   const contact = state.contacts.find(x => x.id === contactId);
-  const recipient = source === 'app' ? (contact?.phone ? { name: contact.name, tel: contact.phone } : null) : source === 'phone' ? (picked?.tel ? picked : null) : (phoneDigits(typed).length >= 9 ? { name: typed, tel: typed } : null);
+  const recipient = source === 'app'
+    ? (contact?.phone ? { name: contact.name, tel: contact.phone } : null)
+    : (phoneDigits(toTel).length >= 9 ? { name: toName.trim() || toTel, tel: toTel } : null);
+  const missing = missingProfile(p);
   const text = shareText(p, choice, { greeting: t.greeting, regLabel: t.regLabel, agency: t.inc.agency, phone: t.inc.phone, email: t.inc.email, closing: t.closing });
   const files = shareFiles(p, choice);
   const remember = () => store.setSingleton('profile', { shareDefaults: choice });
@@ -148,6 +180,7 @@ export function NameCardSend({ lang }: { lang: Lang }) {
 
   return (
     <section className="stack" data-testid="namecard-send">
+      {missing.length > 0 && <p className="warn-text" role="alert">{t.activateHint}</p>}
       <div className="card stack-sm">
         <div className="card-title">{t.recipient}</div>
         <div className="seg" role="group" aria-label={t.recipient}>
@@ -159,14 +192,13 @@ export function NameCardSend({ lang }: { lang: Lang }) {
             {[...state.contacts].filter(x => x.phone).sort((a, b) => a.name.localeCompare(b.name)).map(x => <option key={x.id} value={x.id}>{x.name} · {x.phone}</option>)}
           </select>
         )}
-        {source === 'phone' && (
-          <button className="btn secondary" onClick={async () => {
-            const r = await pickPhoneContacts(false);
-            if (r === null) { setMsg(t.phoneUnsupported); return; }
-            if (r[0]) setPicked({ name: r[0].name, tel: r[0].tel });
-          }}>{t.pickPhone}</button>
+        {source === 'phone' && <PhonebookButton lang={lang} testId="namecard-pick" onPicked={c => { setToName(c.name); setToTel(normalisePhone(c.tel) ?? ''); setMsg(''); }} />}
+        {source !== 'app' && (
+          <div className="stack-sm" data-testid="recipient-fields">
+            <label className="ff">{t.recipientName}<input data-field="toName" value={toName} onChange={e => setToName(e.target.value)} /></label>
+            <label className="ff">{t.recipientPhone}<input data-field="toTel" type="tel" inputMode="tel" placeholder="+60" value={toTel} onChange={e => setToTel(e.target.value)} onBlur={() => setToTel(x => normalisePhone(x) ?? x)} /></label>
+          </div>
         )}
-        {source === 'typed' && <input aria-label={t.typed} type="tel" inputMode="tel" placeholder="+60" value={typed} onChange={e => setTyped(e.target.value)} />}
         {recipient && <small className="ok-text" data-testid="recipient">{t.chosen(`${recipient.name}${recipient.tel && recipient.tel !== recipient.name ? ` · ${recipient.tel}` : ''}`)}</small>}
       </div>
       <div className="card stack-sm" data-testid="share-choices">
@@ -183,9 +215,9 @@ export function NameCardSend({ lang }: { lang: Lang }) {
       </div>
       <p className="small muted">{t.neverAuto}</p>
       {msg && <p className="warn-text" role="status">{msg}</p>}
-      <a className={`btn primary ${recipient && anyChosen(choice) ? '' : 'disabled'}`} data-testid="open-whatsapp" aria-disabled={!recipient}
+      <a className={`btn primary ${recipient && anyChosen(choice) && !missing.length ? '' : 'disabled'}`} data-testid="open-whatsapp" aria-disabled={!recipient || missing.length > 0}
         href={recipient ? whatsappLink(recipient.tel, text) : undefined} target="_blank" rel="noreferrer"
-        onClick={e => { if (!recipient) { e.preventDefault(); setMsg(t.needRecipient); return; } remember(); toast(strings[lang].c.saved); }}>{t.openWhatsApp}</a>
+        onClick={e => { if (missing.length) { e.preventDefault(); setMsg(t.activateHint); return; } if (!recipient) { e.preventDefault(); setMsg(t.needRecipient); return; } remember(); toast(strings[lang].c.saved); }}>{t.openWhatsApp}</a>
       {(choice.front || choice.back) && <>
         <button className="btn secondary" onClick={() => void shareWithImages()}>{t.shareImages}</button>
         <small className="muted">{t.imagesNote}</small>
@@ -251,8 +283,8 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
         <small className="muted">{t.sampleHelp}</small>
         <div className="two">
           <button className="btn secondary" data-testid="load-sample" onClick={() => {
-            const d = sampleData();
-            for (const c of Object.keys(d) as (keyof typeof d)[]) for (const r of d[c]) if (!(state[c] as { id: string }[]).some(x => x.id === r.id)) store.upsert(c, r as never);
+            loadSampleInto(store);
+            store.setSingleton('settings', { startChoice: 'sample' });
             toast(t.sampleLoaded);
           }}>{t.loadSample}</button>
           <button className="btn secondary danger-text" data-testid="remove-sample" onClick={() => {
@@ -264,7 +296,7 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
           }}>{t.removeSample}</button>
         </div>
       </div>
-      <small className="muted">{t.version} 2.0.0</small>
+      <small className="muted">{t.version} {BUILD.version}</small>
     </section>
   );
 }

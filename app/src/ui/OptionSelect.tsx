@@ -3,15 +3,17 @@
 //  - Custom values show first (most recently used on top) and can be removed with ✕.
 //  - Built-in values cannot be removed. Others is always available.
 // The list opens inside the page (not a floating pop-up), so long words in any language wrap instead of being cut.
-import { useId, useState } from 'react';
+import { ReactNode, useId, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { strings, Lang } from '../i18n';
 
 export interface Choice { value: string; label?: string }
 
-export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate }: {
+export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, help }: {
   lang: Lang; label: string; listKey: string; builtIns: Choice[]; value?: string; onChange: (v: string | undefined) => void;
   allowEmpty?: boolean; emptyLabel?: string; testId?: string; hint?: string;
+  /** A Field Help "?" shown after the label. */
+  help?: ReactNode;
   /** Applied to a typed value before it is checked and saved (for example upper case for prefixes). */
   normalise?: (v: string) => string;
   /** Returns an error message for a typed value that cannot be used. */
@@ -45,7 +47,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
 
   return (
     <div className="ff opt" data-testid={testId}>
-      <span id={`${id}-l`}>{label}</span>
+      <span><span id={`${id}-l`}>{label}</span>{help}</span>
       <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}>
         <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span><span aria-hidden="true" className="opt-caret">▾</span>
       </button>

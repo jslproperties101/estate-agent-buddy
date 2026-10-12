@@ -42,10 +42,11 @@ await build({
   format: 'esm',
   target: ['chrome110', 'safari16'],
   jsx: 'automatic',
-  minify: true,
+  minify: process.env.EAB_NOMINIFY ? false : true,
   sourcemap: true,
   outdir: 'dist',
   define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config), __EAB_BUILD__: JSON.stringify(buildInfo) },
+  loader: { '.webp': 'dataurl' },
   plugins: [capacitorPlugin()],
   logLevel: 'info',
 });

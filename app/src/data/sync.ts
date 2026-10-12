@@ -6,8 +6,10 @@
 // workspace, a team leader reads it all and edits own/assigned records, an agent sees own/assigned records, a limited
 // user only reads own/assigned records (its changes stay on the phone).
 // Conflicts: the most recently changed copy of a record wins. Photos and documents stay on the phone (not synced yet).
+// Sample records are never sent up or taken down, so they never mix with real data in the team workspace.
 import type { Store } from './store';
 import { COLLECTIONS, CollectionName, Meta } from './types';
+import { isSampleKey } from './sample';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -88,6 +90,7 @@ export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = 
   const remoteNewer = new Set<string>();
   for (const row of rows) {
     if (!(COLLECTIONS as string[]).includes(row.collection)) continue;
+    if (row.data && (row.data as { sample?: boolean }).sample) continue; // sample data never comes from the cloud
     const c = row.collection as CollectionName;
     const key = `${c}:${row.id}`;
     const local = (store.getState()[c] as { id: string; updated: number }[]).find(x => x.id === row.id);
@@ -105,7 +108,9 @@ export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = 
   const body: (Row & { user_id: string; workspace_id: string })[] = [];
   for (const key of toPush) {
     const [c, id] = key.split(':') as [CollectionName, string];
-    const rec = (store.getState()[c] as { id: string; updated: number }[] | undefined)?.find(x => x.id === id);
+    const rec = (store.getState()[c] as { id: string; updated: number; sample?: boolean }[] | undefined)?.find(x => x.id === id);
+    // Sample records stay on this phone: they must never mix with the team's real data in the cloud.
+    if (rec?.sample || (!rec && isSampleKey(key))) continue;
     if (rec) body.push({ user_id: session.userId, workspace_id: ws, collection: c, id, data: rec as unknown as Record<string, unknown>, deleted: false, updated: rec.updated });
     else if (m.tombstones.includes(key)) body.push({ user_id: session.userId, workspace_id: ws, collection: c, id, data: null, deleted: true, updated: Date.now() });
   }

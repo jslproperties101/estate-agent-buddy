@@ -1,6 +1,6 @@
 // Configures the Android project that `npx cap add android` generates (run by the GitHub Actions build).
 // The generated android/ folder is not committed; this script makes every build the same:
-//  - app name "Estate Agent Buddy", package com.jslproperties.estateagentbuddy (from capacitor.config.json);
+//  - app name "Estate Agent AI Buddy", package com.jslproperties.estateagentbuddy (from capacitor.config.json);
 //  - permissions: precise/approximate location (GPS Assistance), camera (property and banner photos),
 //    notifications (reminders, Android 13+), internet;
 //  - the sign-in return link com.jslproperties.estateagentbuddy://auth-callback opens the app (Google login);

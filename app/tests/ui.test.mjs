@@ -60,7 +60,7 @@ const FAKE_MAPS = `(() => {
   window.__drag = () => drags.forEach(fn => fn());
 })();`;
 
-async function phone({ maps = false, geo } = {}) {
+async function phone({ maps = false, geo, start = 'empty' } = {}) {
   const ctx = await browser.newContext({
     viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
     permissions: geo ? ['geolocation'] : [], geolocation: geo,
@@ -72,10 +72,31 @@ async function phone({ maps = false, geo } = {}) {
   page.on('pageerror', e => consoleErrors.push(String(e)));
   await page.goto(base);
   await page.waitForSelector('nav.grid');
+  if (start) await chooseStart(page, start);
   return page;
 }
+/** New-user choice on first start: 'empty' (default for tests), 'sample', or null to leave it open. */
+async function chooseStart(page, which) {
+  await page.getByTestId('start-choice').waitFor({ timeout: 5000 });
+  await page.getByTestId(which === 'sample' ? 'start-sample' : 'start-empty').click();
+  await page.getByTestId('start-choice').waitFor({ state: 'detached' });
+}
 const shot = (page, name, fullPage = true) => page.screenshot({ path: `${SHOTS}${name}.png`, fullPage });
-const tile = (page, name) => page.locator('nav.grid > button', { hasText: name }).first().click();
+/** Opens a dashboard card. Buyers and vendors are inside the Contacts card since 13 Oct 2026. */
+async function tile(page, name) {
+  if (name === 'Buyer List' || name === 'Vendor List') {
+    await page.locator('nav.grid > button', { hasText: 'Contacts' }).first().click();
+    await page.getByTestId(name === 'Buyer List' ? 'hub-buyers' : 'hub-vendors').click();
+    return;
+  }
+  await page.locator('nav.grid > button', { hasText: name }).first().click();
+}
+/** Opens every section of the property form (they start closed). */
+async function expandForm(page) {
+  await page.waitForSelector('[data-testid="listing-form"]');
+  if ((await page.getByTestId('toggle-all').innerText()).match(/Open|Buka|展开/)) await page.getByTestId('toggle-all').click();
+}
+async function newProperty(page) { await page.locator('.add-property').click(); await expandForm(page); }
 async function home(page) { while (await page.locator('header button[aria-label="Back"], header button[aria-label="Kembali"], header button[aria-label="返回"]').count()) await page.locator('header .icon-btn').first().click(); }
 async function loadSample(page) {
   await tile(page, 'Agent Profile');
@@ -103,13 +124,34 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard: Estate Agent Buddy, 15 cards in 3 × 5 first, no Explorer Progress, no GPS Map tile, Agent Profile', async () => {
+test('U1 dashboard: Estate Agent AI Buddy, 15 cards in 3 × 5 (Contacts, News, Voice Command = 15), Notifications and Co-broke (Coming Soon) at the top', async () => {
   const page = await phone();
-  assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent Buddy');
+  assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent AI Buddy');
+  assert.equal(await page.title(), 'Estate Agent AI Buddy');
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
-  assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Property List', 'Vendor List', 'Buyer List', 'GPS Assistance',
-    'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'Voice Command',
-    'Subsale (Coming Soon)', 'Project (Coming Soon)', 'Co-broke']);
+  // Owner, 13 Oct 2026: Buyers + Vendors → one Contacts card; Subsale → News; Co-broke → top bar; Voice Command = 15.
+  assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Property List', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
+    'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'News',
+    'Project (Coming Soon)', 'Settings', 'Voice Command']);
+  assert.equal(names.indexOf('Voice Command') + 1, 15, 'Voice Command is card 15');
+  for (const gone of ['Buyer List', 'Vendor List', 'Subsale (Coming Soon)', 'Co-broke']) assert.ok(!names.includes(gone), `no ${gone} card`);
+  assert.equal(await page.locator('nav.grid > button.voice-tile').getAttribute('data-tile'), '15', 'the bright-gold Voice Command card is number 15');
+  // Top bar: Co-broke Opportunities (Coming Soon) and Notifications (the old Big News button).
+  assert.equal(await page.getByTestId('top-cobroke').getAttribute('aria-label'), 'Co-broke Opportunities (Coming Soon)');
+  assert.equal(await page.getByTestId('top-notifications').getAttribute('aria-label'), 'Notifications');
+  assert.equal(await page.getByText('BIG NEWS').count(), 0);
+  await page.getByTestId('top-notifications').click();
+  await page.getByTestId('notifications').waitFor();
+  await home(page);
+  await page.getByTestId('top-cobroke').click();
+  assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/);
+  await home(page);
+  await tile(page, 'News');
+  assert.match(await page.locator('main').innerText(), /Coming Soon/, 'News content is marked as not live');
+  await home(page);
+  await tile(page, 'Contacts');
+  assert.deepEqual(await page.locator('.hub-card strong').allInnerTexts(), ['Buyers', 'Vendors']);
+  await home(page);
   // Owner, 12 Oct 2026 (latest): Explorer Progress removed completely; the page starts with the cards.
   assert.equal(await page.evaluate(() => document.querySelector('main.content > section > *')?.tagName), 'NAV');
   for (const gone of [/Explorer progress/i, /km explored/i, /routes recorded/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
@@ -178,7 +220,7 @@ test('U3 Property List: Grid first and default, Large cards second, references h
 test('U4 saved data is permanent: a new property is still there after closing and reopening', async () => {
   const page = await phone();
   await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="headline"]').fill('Persistence test house');
   await page.locator('[data-field="askingPrice"]').fill('450000');
   await page.getByTestId('save-property').click();
@@ -194,7 +236,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: P1011', 'P1010 exists → P1011');
   // a number already used by another property, whatever the prefix
   await page.locator('[data-field="refNo"]').fill('1004');
@@ -214,7 +256,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   assert.match(await page.getByTestId('ref-row').innerText(), /KL1011/);
   // next new property: KL is the default and on top of the list
   await home(page); await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: KL1012');
   await page.getByTestId('ref-prefix').locator('.opt-btn').click();
   const items = await page.getByTestId('ref-prefix').locator('.opt-list [role="option"]').evaluateAll(b => b.map(x => x.textContent.split('·')[0].trim()));
@@ -251,7 +293,7 @@ test('U6 detail page: each section has its own Edit button that opens the form a
 test('U7 dropdowns with Others: remembered for every property, removable with X, built-ins kept', async () => {
   const page = await phone();
   await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   assert.match(await page.getByTestId('opt-country').innerText(), /Malaysia/, 'Malaysia is the default country');
   const labels = await page.locator('#sec-location .ff > span:first-child, #sec-location label.ff').evaluateAll(xs => xs.map(x => x.textContent.trim()));
   const want = ['Country', 'State', 'City / town', 'Township', 'Lot number', 'Jalan / street (number or name)'];
@@ -265,7 +307,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   await home(page); await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.getByTestId('opt-township').locator('.opt-btn').click();
   const t2 = page.getByTestId('opt-township');
   assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/ }).count(), 1, 'remembered');
@@ -280,7 +322,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
 test('U8 Add from Google Map: minor differences use saved values; real differences ask; new values saved only after confirming', async () => {
   const page = await phone({ maps: true });
   await tile(page, 'Property List');
-  await page.getByRole('button', { name: 'Add New Property' }).first().click();
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   // the property already has a township typed by the agent
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn').click();
@@ -357,7 +399,7 @@ test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Green Dropped, Gray Ina
   await tile(page, 'Buyer List');
   const colours = await page.locator('[role="radiogroup"] .lead-dot').evaluateAll(d => d.map(x => getComputedStyle(x).backgroundColor));
   assert.deepEqual(colours, ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(34, 197, 94)', 'rgb(156, 163, 175)']);
-  const hot = page.locator('[data-testid="contact-row"][data-lead="hot"]');
+  const hot = page.locator('[data-testid="contact-row"][data-lead="hot"]').first();
   assert.equal(await hot.evaluate(el => getComputedStyle(el).borderLeftColor), 'rgb(239, 68, 68)');
   await page.getByRole('radio', { name: /Warm/ }).click();
   assert.equal(await page.getByTestId('contact-row').count(), 1);
@@ -616,7 +658,7 @@ test('U19 Voice Command: property, to-do, calendar and contact commands open the
   await page.getByRole('button', { name: 'Show proposed details' }).click();
   assert.match(await page.getByTestId('proposal').innerText(), /Encik Ahmad/);
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
-  await page.waitForSelector('[data-testid="listing-form"]');
+  await expandForm(page);
   assert.equal(await page.locator('[data-field="askingPrice"]').inputValue(), '580,000', 'RM shown with thousands separators');
   assert.match(await page.getByTestId('opt-township').innerText(), /Putra Nilai/);
   assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), 'Encik Ahmad');
@@ -631,7 +673,7 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
     ['home', async () => {}],
     ['list', async () => { await page.locator('nav.grid > button').nth(3).click(); }],
     ['detail', async () => { await page.locator('nav.grid > button').nth(3).click(); await page.getByTestId('listing-card').first().click(); }],
-    ['form', async () => { await page.locator('nav.grid > button').nth(3).click(); await page.locator('.add-property').click(); }],
+    ['form', async () => { await page.locator('nav.grid > button').nth(3).click(); await newProperty(page); }],
     ['todo', async () => { await page.locator('nav.grid > button').nth(0).click(); }],
     ['calendar', async () => { await page.locator('nav.grid > button').nth(1).click(); }],
     ['buyers', async () => { await page.locator('nav.grid > button').nth(5).click(); }],
@@ -706,10 +748,10 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
       labelColour: label ? getComputedStyle(label).color : null, labelSize: label ? parseFloat(getComputedStyle(label).fontSize) : null };
   });
   const forms = [
-    ['property form', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="street"]'],
-    ['property form dropdown', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="purpose"]'],
-    ['property form custom dropdown', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '.opt-btn'],
-    ['property form money', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="askingPrice"]'],
+    ['property form', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="street"]'],
+    ['property form dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="purpose"]'],
+    ['property form custom dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '.opt-btn'],
+    ['property form money', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="askingPrice"]'],
     ['contact form', async () => { await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click(); }, '[data-field="name"]'],
     ['calculator', async () => { await tile(page, 'Property Calculator'); }, '[data-field="price"]'],
     ['to-do form', async () => { await tile(page, 'To-Do'); await page.getByRole('button', { name: /New to-do|Add/ }).first().click(); }, '[data-field="title"]'],
@@ -737,7 +779,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
   assert.equal((await fieldLook('[data-field="name"]')).border, 'rgb(255, 138, 122)', 'field with an error is red');
   await shot(page, '23-contact-error', false);
   // Open custom dropdown: gold border on the box and the list.
-  await home(page); await tile(page, 'Property List'); await page.locator('.add-property').click();
+  await home(page); await tile(page, 'Property List'); await newProperty(page);
   await page.getByTestId('opt-type').locator('.opt-btn').click();
   await page.mouse.move(0, 0); await page.waitForTimeout(250);
   assert.equal(await page.getByTestId('opt-type').locator('.opt-btn').evaluate(el => getComputedStyle(el).borderTopColor), 'rgb(212, 175, 55)');
@@ -748,7 +790,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
 test('U24 RM money boxes: separators while typing, plain number saved, paste understood, same everywhere', async () => {
   const page = await phone();
   await tile(page, 'Property List');
-  await page.locator('.add-property').click();
+  await newProperty(page);
   const price = page.locator('[data-field="askingPrice"]');
   await price.click();
   await price.pressSequentially('1500000');
@@ -785,17 +827,16 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await page.context().close();
 });
 
-test('U25 new cards: Subsale and Project say Coming Soon; Co-broke lists real co-broke properties only', async () => {
+test('U25 Coming Soon: Project card and Co-broke (top bar) say so; Co-broke lists real co-broke properties only; no Subsale card', async () => {
   const page = await phone();
-  await tile(page, 'Subsale');
-  assert.ok(await page.getByTestId('soon-subsale').isVisible());
-  assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/);
-  await home(page); await tile(page, 'Project');
+  assert.equal(await page.locator('nav.grid > button', { hasText: 'Subsale' }).count(), 0, 'Subsale became News');
+  await tile(page, 'Project');
   assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/);
-  await home(page); await tile(page, 'Co-broke');
+  await home(page); await page.getByTestId('top-cobroke').click();
+  assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/, 'not pretending to be finished');
   assert.match(await page.getByTestId('cobroke-count').innerText(), /^0 co-broke/);
   await home(page); await loadSample(page);
-  await tile(page, 'Co-broke');
+  await page.getByTestId('top-cobroke').click();
   const count = Number((await page.getByTestId('cobroke-count').innerText()).match(/\d+/)[0]);
   assert.ok(count >= 1, 'sample data has co-broke properties');
   await page.getByRole('button', { name: 'Show co-broke properties' }).click();
@@ -807,7 +848,7 @@ test('U26 reference number dropdown: used numbers red and not selectable, free n
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.locator('.add-property').click();
+  await newProperty(page);
   const suggested = await page.locator('[data-field="refNo"]').inputValue();
   await page.getByTestId('ref-no-open').click();
   const list = page.getByTestId('ref-no-list');
@@ -894,8 +935,11 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   const sec = page.getByTestId('sec-banner-view');
   assert.match(await sec.innerText(), /Banner placed\?[\s\S]*Owner doesn’t allow/);
   await sec.getByRole('button', { name: /Edit/ }).click();
+  assert.equal(await page.locator('#sec-banner').getAttribute('data-open'), 'yes', 'Edit opens the Banner section');
+  assert.equal(await page.locator('#sec-location').getAttribute('data-open'), 'no', 'other sections start closed');
   await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('not_yet');
-  // give the property a map position so it shows on My Property Map
+  // give the property a map position so it shows on My Property Map (open the closed Location section first)
+  await page.locator('[data-sec="location"]').click();
   await page.locator('[data-field="lat"]').fill('2.82');
   await page.locator('[data-field="lng"]').fill('101.80');
   await page.getByTestId('save-property').click();
@@ -947,7 +991,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
     return route.fulfill({ status: 404, body: '' });
   });
   const page = await ctx.newPage();
-  await page.goto(base); await page.waitForSelector('nav.grid');
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   // Without sign-in set up, the app opens straight away and Settings says what is missing.
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
   assert.ok(await page.getByTestId('account-not-set-up').isVisible());
@@ -998,7 +1042,7 @@ test('U29 maps: My Location recentres after moving the map, follows until dragge
   const center = () => page.evaluate(() => window.__center);
   const meAt = () => page.evaluate(() => window.__markers.find(m => m.o.icon?.fillColor === '#4285F4')?.o.position);
   // A property with a saved position.
-  await tile(page, 'Property List'); await page.locator('.add-property').click();
+  await tile(page, 'Property List'); await newProperty(page);
   await page.locator('[data-field="street"]').fill('Jalan Peta 1');
   await page.locator('[data-field="lat"]').fill('2.8300'); await page.locator('[data-field="lng"]').fill('101.8100');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
@@ -1069,15 +1113,15 @@ test('U30 updates: a newer published version is offered on the web; About shows 
   let published = 'newer99';
   await ctx.addInitScript(() => localStorage.setItem('eab-update-manifest', 'https://updates.test/latest.json'));
   await ctx.route('https://updates.test/**', r => r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' },
-    body: JSON.stringify({ sha: published, version: '2.0.0', nativeVersion: 2, bundle: 'https://updates.test/b.zip', apk: 'https://updates.test/a.apk', builtAt: '2026-10-12' }) }));
+    body: JSON.stringify({ sha: published, version: '2.1.0', nativeVersion: 3, bundle: 'https://updates.test/b.zip', apk: 'https://updates.test/a.apk', builtAt: '2026-10-12' }) }));
   const page = await ctx.newPage();
-  await page.goto(base); await page.waitForSelector('nav.grid');
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   await page.getByTestId('update-bar').waitFor({ timeout: 10000 });
   assert.equal(await page.getByTestId('update-bar').getAttribute('data-kind'), 'web-reload');
   assert.match(await page.getByTestId('update-bar').innerText(), /new version/i);
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
   const v = await page.getByTestId('about-version').innerText();
-  assert.match(v, /Version 2\.0\.0 · build \w+ · native 2/);
+  assert.match(v, /Version 2\.1\.0 · build \w+ · native 3/);
   published = v.match(/build (\w+)/)[1];
   await page.getByTestId('check-update').click();
   assert.match(await page.getByTestId('update-msg').innerText(), /latest version/);
@@ -1115,6 +1159,233 @@ test('U31 contacts: phonebook button fills name and phone (asks before replacing
   assert.match(await page.getByTestId('contact-detail').innerText(), /search this alias in WhatsApp/);
   await shot(page, '31-contact-alias', false);
   await page.context().close();
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// 13 Oct 2026 update. Browser stand-ins replace the phone's speech service, contact picker and GPS here; the same
+// flows still have to be checked on the S23 Ultra (see README).
+
+/** A stand-in for the browser speech service: says `words` as live (not final) text, then ends shortly after
+ *  "End recording" without marking it final — the case that used to lose the words. '' = nothing recognised. */
+const FAKE_SPEECH = words => `(() => {
+  class R { start() { setTimeout(() => { if (${JSON.stringify(words)}) this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: ${JSON.stringify(words)} }], { isFinal: false })] }); }, 50); }
+    stop() { setTimeout(() => this.onend?.(), 400); } abort() { this.onend?.(); } }
+  window.SpeechRecognition = R;
+})();`;
+
+test('U32 voice: End recording shows the recognised words; nothing recognised gives a clear message (bright-gold card unchanged)', async () => {
+  for (const [words, expectText] of [['Test 1 2 3', true], ['', false]]) {
+    const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, isMobile: true, hasTouch: true });
+    await ctx.addInitScript(FAKE_SPEECH(words));
+    const page = await ctx.newPage();
+    await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+    assert.match(await page.locator('nav.grid > button.voice-tile').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/, 'gold Voice Command card');
+    await tile(page, 'Voice Command');
+    await page.getByTestId('voice-start').first().click();
+    await page.getByRole('button', { name: 'Use the speech service' }).click();
+    await page.getByTestId('voice-stop').first().click();
+    await page.getByTestId('voice-processing').first().waitFor(); // "Recognising your words…" while the service finishes
+    await page.getByTestId('voice-start').first().waitFor();
+    const box = page.getByTestId('voice-command').locator('textarea').first();
+    if (expectText) assert.equal(await box.inputValue(), 'Test 1 2 3');
+    else { assert.equal(await box.inputValue(), ''); assert.match(await page.getByTestId('voice-error').first().innerText(), /No words were recognised/); }
+    await ctx.close();
+  }
+});
+
+test('U33 phone book: Send Name Card picker fills editable name and number; refusals and missing support are explained, never silent', async () => {
+  const page = await phone();
+  // Complete the required profile so the name card is active.
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click();
+  await page.locator('[data-field="fullName"]').fill('Agent J'); await page.locator('[data-field="regNo"]').fill('12345');
+  await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
+  await page.locator('[data-field="agency"]').fill('JSL Properties'); await page.locator('[data-field="phone"]').fill('0123456789');
+  await page.getByTestId('save-profile').click();
+  await page.getByTestId('send-namecard').click();
+  // Browser without a contact picker: the button works and says why it cannot open.
+  await page.getByRole('button', { name: 'Phone book' }).click();
+  await page.getByTestId('namecard-pick').click();
+  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /not available in this browser/);
+  // With the phone's contact picker: name and number filled, and still editable.
+  await page.evaluate(() => {
+    window.ContactsManager = function () {};
+    Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Buyer Z'], tel: ['013-222 3333'], email: [] }] } });
+  });
+  await page.getByTestId('namecard-pick').click();
+  assert.equal(await page.locator('[data-field="toName"]').inputValue(), 'Buyer Z');
+  assert.equal(await page.locator('[data-field="toTel"]').inputValue(), '+60 13-222 3333');
+  await page.locator('[data-field="toName"]').fill('Encik Z');
+  assert.match(await page.getByTestId('recipient').innerText(), /Encik Z · \+60 13-222 3333/);
+  assert.match(await page.getByTestId('open-whatsapp').getAttribute('href'), /^https:\/\/wa\.me\/60132223333\?text=.*Agent%20J/);
+  // Picker closed without choosing: says so.
+  await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [] } }));
+  await page.getByTestId('namecard-pick').click();
+  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /No contact was chosen/);
+  await shot(page, '33-namecard-phonebook', false);
+  await page.context().close();
+});
+
+test('U34 new user: Populate with Sample Data (recommended) or Start Without; sample clearly marked; clean workspace stays empty', async () => {
+  const empty = await phone({ start: null });
+  assert.match(await empty.getByTestId('start-choice').innerText(), /Populate with Sample Data[\s\S]*Recommended[\s\S]*Start Without Sample Data/);
+  await empty.getByTestId('startup-logo').waitFor({ state: 'detached' });
+  await shot(empty, '34a-start-choice', false);
+  await empty.getByTestId('start-empty').click();
+  await tile(empty, 'Property List');
+  assert.equal(await empty.getByTestId('listing-card').count(), 0, 'clean workspace stays empty');
+  await empty.reload(); await empty.waitForSelector('nav.grid');
+  assert.equal(await empty.getByTestId('start-choice').count(), 0, 'asked only once');
+  await empty.context().close();
+
+  const page = await phone({ start: 'sample' });
+  await tile(page, 'Property List');
+  const n = await page.getByTestId('listing-card').count();
+  assert.ok(n >= 10, 'sample properties');
+  assert.equal(await page.locator('[data-testid="listing-card"] .lc-sample').count(), n, 'every sample property is marked Sample');
+  await home(page); await tile(page, 'Vendor List');
+  assert.ok(await page.locator('[data-testid="contact-row"] .sample-tag').count() >= 10, 'sample vendors marked');
+  assert.ok(await page.locator('[data-vstat="pending_info"]').count() >= 1, 'vendor statuses in the sample');
+  await home(page); await tile(page, 'To-Do');
+  assert.match(await page.locator('main').innerText(), /\(sample\)/);
+  await home(page); await tile(page, 'Calendar');
+  await home(page); await tile(page, 'Inquiries & Viewings');
+  assert.match(await page.locator('main').innerText(), /Buyer L \(sample\)|Tenant R \(sample\)/);
+  await page.context().close();
+});
+
+test('U35 vendors have their own status (Pending Property Info, Pending Follow-up…); buyers keep Cold/Warm/Hot/Dropped/Inactive', async () => {
+  const page = await phone({ start: 'sample' });
+  await tile(page, 'Vendor List');
+  const vs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
+  assert.deepEqual(vs, ['Pending Property Info', 'Pending Follow-up', 'Listed', 'Negotiating', 'On Hold', 'Closed (Sold / Rented)', 'Withdrawn']);
+  for (const old of ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive']) assert.ok(!vs.includes(old), `no ${old} for vendors`);
+  await page.getByTestId('status-filter').locator('[data-status="pending_follow_up"]').click();
+  const rows = await page.getByTestId('contact-row').count();
+  assert.ok(rows >= 1);
+  await page.getByTestId('contact-row').first().locator('.row-main').click();
+  await page.getByTestId('vendor-status-picker').locator('[data-vstat="pending_info"]').click();
+  assert.equal(await page.getByTestId('vendor-status-picker').locator('[aria-checked="true"]').getAttribute('data-vstat'), 'pending_info');
+  await home(page); await tile(page, 'Buyer List');
+  const bs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
+  assert.deepEqual(bs, ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive']);
+  await shot(page, '35-buyers', false);
+  await page.context().close();
+});
+
+test('U36 Agent Profile: Send Name Card stays off until the required details are complete, with the reason; then switches on', async () => {
+  const page = await phone();
+  await tile(page, 'Agent Profile');
+  assert.equal(await page.getByTestId('send-namecard').isDisabled(), true);
+  assert.match(await page.getByTestId('namecard-hint').innerText(), /Please complete the required information in Edit Profile to activate your Name Card\.[\s\S]*Full name, Registration type, Registration \/ agent number, Agency \/ company, Contact number/);
+  await page.getByRole('button', { name: /Edit/ }).first().click();
+  assert.equal(await page.locator('[data-testid="profile-edit"] .req').count() >= 5, true, 'required fields are marked');
+  await page.locator('[data-field="fullName"]').fill('Agent J'); await page.locator('[data-field="agency"]').fill('JSL Properties');
+  await page.locator('[data-field="phone"]').fill('0123456789');
+  await page.getByTestId('save-profile').click();
+  assert.equal(await page.getByTestId('send-namecard').isDisabled(), true, 'still missing the registration');
+  assert.match(await page.getByTestId('namecard-hint').innerText(), /Registration type, Registration \/ agent number$/);
+  await page.getByRole('button', { name: /Edit/ }).first().click();
+  await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
+  await page.locator('[data-field="regNo"]').fill('12345');
+  await page.getByTestId('save-profile').click();
+  assert.equal(await page.getByTestId('send-namecard').isDisabled(), false, 'switched on automatically');
+  assert.equal(await page.getByTestId('namecard-hint').count(), 0);
+  await page.getByTestId('send-namecard').click();
+  assert.match(await page.getByTestId('share-preview').innerText(), /\*Agent J\*[\s\S]*REN No\.: 12345[\s\S]*JSL Properties[\s\S]*\+60 12-345 6789/);
+  await page.context().close();
+});
+
+test('U37 property form: sections start closed, open and close, Save floats on screen, everything entered is saved; ? explains fields', async () => {
+  const page = await phone();
+  await tile(page, 'Property List'); await page.locator('.add-property').click();
+  const secs = page.locator('[data-testid="listing-form"] .form-sec');
+  assert.ok(await secs.count() >= 12);
+  assert.deepEqual([...new Set(await secs.evaluateAll(x => x.map(e => e.dataset.open)))], ['no'], 'all closed at first');
+  await page.locator('[data-sec="basics"]').click();
+  await page.locator('[data-field="headline"]').fill('Collapsible test');
+  await page.locator('[data-sec="basics"]').click(); // close it again
+  assert.equal(await page.locator('[data-field="headline"]').count(), 0);
+  assert.match(await page.locator('[data-sec="basics"]').innerText(), /1 filled/);
+  await page.locator('[data-sec="money"]').click();
+  await page.locator('[data-field="askingPrice"]').fill('480000');
+  await page.locator('[data-sec="notes"]').click();
+  // Field help
+  await page.locator('[data-sec="tenure"]').click();
+  await page.locator('[data-help="tenure"]').click();
+  assert.match(await page.getByTestId('help-tenure').innerText(), /freehold[\s\S]*Enter:[\s\S]*Example:[\s\S]*Why it matters:/);
+  // Save floats: visible at the bottom of the screen while the middle of the form is shown.
+  await page.locator('#sec-notes').scrollIntoViewIfNeeded();
+  const box = await page.getByTestId('save-floating').boundingBox();
+  assert.ok(box && box.y + box.height <= 824 && box.y > 600, `save bar on screen (${box?.y})`);
+  await page.getByTestId('save-property').click();
+  await page.getByTestId('listing-details').waitFor();
+  assert.match(await page.locator('main').innerText(), /Collapsible test[\s\S]*RM 480,000/);
+  await shot(page, '37-form-saved', false);
+  await page.context().close();
+});
+
+test('U38 GPS: My Location gets a fresh position every time (even when live updates stop); tap-to-select banner and House Shopping spots, changeable later', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+    permissions: ['geolocation'], geolocation: { latitude: 2.8200, longitude: 101.8000, accuracy: 8 } });
+  await ctx.addInitScript(FAKE_MAPS);
+  // Live updates that stop after the first reading (as Android can do after the screen was off).
+  await ctx.addInitScript(() => {
+    const g = navigator.geolocation; const real = g.watchPosition.bind(g);
+    g.watchPosition = (ok, err, o) => { let first = true; return real(p => { if (first) { first = false; ok(p); } }, err, o); };
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'sample');
+  const center = () => page.evaluate(() => window.__center);
+  await tile(page, 'GPS Assistance'); await page.getByTestId('card-map').click();
+  await page.waitForFunction(() => window.__markers?.some(m => m.o.icon?.fillColor === '#4285F4'));
+  for (const lat of [2.8250, 2.8300, 2.8350]) {
+    await page.evaluate(() => window.__drag());
+    await ctx.setGeolocation({ latitude: lat, longitude: 101.8000, accuracy: 8 });
+    await page.getByTestId('map-my-location').click();
+    await page.waitForFunction(l => Math.abs(window.__center.lat - l) < 1e-9, lat);
+  }
+  assert.equal((await center()).lat, 2.835, 'recentred on the newest position after three presses');
+  // Banner: tap the map to choose the spot, save, then change it later.
+  await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-banners').click();
+  await page.getByTestId('banner-card').first().getByTestId('banner-add').click();
+  await page.getByTestId('banner-pick-map').waitFor();
+  await page.evaluate(() => window.__mapClick(2.8111, 101.8111));
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.81110, 101\.81110 · map/i);
+  await page.getByTestId('banner-save').click();
+  await page.getByTestId('banner-card').first().getByTestId('banner-edit').click();
+  await page.getByTestId('banner-pick-map').waitFor();
+  await page.evaluate(() => window.__mapClick(2.8122, 101.8122));
+  await page.getByTestId('banner-save').click();
+  assert.match(await page.getByTestId('banner-card').first().getByTestId('banner-pos').innerText(), /2\.81220, 101\.81220/);
+  assert.equal(await page.getByTestId('banner-card').first().getByTestId('banner-up').count(), 1, 'moved, not duplicated');
+  // House Shopping: mark a spot by tapping the map, then move the mark.
+  await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-house-shopping').click();
+  await page.getByTestId('trk-start').click();
+  await page.getByTestId('mark-here').click();
+  await page.getByTestId('mark-map').waitFor();
+  await page.evaluate(() => window.__mapClick(2.8133, 101.8133));
+  await page.waitForFunction(() => document.querySelector('[data-testid="mark-map-pos"]')?.textContent.includes('2.81330, 101.81330'));
+  await page.getByRole('button', { name: 'Mark the spot only' }).click();
+  await page.getByTestId('move-mark').first().click();
+  await page.getByTestId('move-map').waitFor();
+  await page.evaluate(() => window.__mapClick(2.8144, 101.8144));
+  await page.getByTestId('move-mark-save').click();
+  assert.match(await page.getByTestId('journey-marks').innerText(), /2\.81440, 101\.81440/);
+  await ctx.close();
+});
+
+test('U39 startup: the logo spins for about one second, then the app opens', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  await page.goto(base);
+  await page.getByTestId('startup-logo').waitFor({ state: 'attached', timeout: 2000 });
+  assert.match(await page.locator('.intro .logo-img').evaluate(e => getComputedStyle(e).animationName), /intro-spin/);
+  await page.getByTestId('startup-logo').waitFor({ state: 'detached', timeout: 3000 });
+  const took = Date.now() - t0;
+  assert.ok(took >= 900 && took < 2500, `about one second (${took} ms)`);
+  await page.waitForSelector('nav.grid');
+  await ctx.close();
 });
 
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {

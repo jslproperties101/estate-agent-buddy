@@ -65,7 +65,7 @@ export function LoginScreen({ lang }: { lang: Lang }) {
   return (
     <div className="shell login" data-testid="login">
       <section className="login-card stack">
-        <span className="login-logo"><IconLogo size={72} /></span>
+        <span className="login-logo"><IconLogo size={132} big /></span>
         <h1 className="login-title">{a.welcome}</h1>
         <p className="muted">{a.sub}</p>
         {!ready ? (

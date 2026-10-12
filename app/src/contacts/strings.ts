@@ -2,7 +2,9 @@
 import type { Lang } from '../i18n';
 
 const en = {
-  vendors: 'Vendor List', buyers: 'Buyer List',
+  vendors: 'Vendors', buyers: 'Buyers', contacts: 'Contacts',
+  countPeople: (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`, hotCount: (n: number) => `${n} hot`, waitingCount: (n: number) => `${n} waiting on you`,
+  hubNote: 'Buyers and tenants use the lead colours (Cold, Warm, Hot, Dropped, Inactive). Vendors and landlords have their own status: Pending Property Info, Pending Follow-up, Listed and so on.',
   addVendor: '+ New vendor', addBuyer: '+ New buyer',
   search: 'Search name, phone, company',
   none: 'No contacts yet.',
@@ -32,12 +34,15 @@ const en = {
   replaceOk: 'Replace',
   pickDenied: 'Contacts permission was refused. Allow Contacts for this app in the phone settings, or type the details.',
   pickNone: 'No contact was chosen.',
+  pluginMissing: 'This installed version of the app does not include the phone book. Install the latest APK (Settings → About).',
   aliasOnly: (alias: string) => `WhatsApp: ${alias} (search this alias in WhatsApp)`,
 };
 export type ContactStrings = typeof en;
 
 const bm: ContactStrings = {
-  vendors: 'Senarai Penjual', buyers: 'Senarai Pembeli',
+  vendors: 'Penjual', buyers: 'Pembeli', contacts: 'Kenalan',
+  countPeople: (n: number) => `${n} orang`, hotCount: (n: number) => `${n} panas`, waitingCount: (n: number) => `${n} menunggu tindakan`,
+  hubNote: 'Pembeli dan penyewa menggunakan warna prospek (Sejuk, Suam, Panas, Digugurkan, Tidak aktif). Penjual dan tuan rumah mempunyai status sendiri: Menunggu Maklumat Hartanah, Menunggu Susulan, Disenaraikan dan lain-lain.',
   addVendor: '+ Penjual baharu', addBuyer: '+ Pembeli baharu',
   search: 'Cari nama, telefon, syarikat',
   none: 'Belum ada kenalan.',
@@ -67,11 +72,14 @@ const bm: ContactStrings = {
   replaceOk: 'Ganti',
   pickDenied: 'Kebenaran Kenalan ditolak. Benarkan Kenalan untuk aplikasi ini dalam tetapan telefon, atau taip butirannya.',
   pickNone: 'Tiada kenalan dipilih.',
+  pluginMissing: 'Versi aplikasi yang dipasang tidak mengandungi buku telefon. Pasang APK terkini (Tetapan → Perihal).',
   aliasOnly: (alias: string) => `WhatsApp: ${alias} (cari alias ini dalam WhatsApp)`,
 };
 
 const zh: ContactStrings = {
-  vendors: '卖家列表', buyers: '买家列表',
+  vendors: '卖家', buyers: '买家', contacts: '联系人',
+  countPeople: (n: number) => `${n} 人`, hotCount: (n: number) => `${n} 位热门`, waitingCount: (n: number) => `${n} 位待处理`,
+  hubNote: '买家和租客使用客户热度颜色（冷、温、热、已放弃、不活跃）。卖家和房东有自己的状态：待补房产资料、待跟进、已上架等。',
   addVendor: '+ 新卖家', addBuyer: '+ 新买家',
   search: '搜索姓名、电话、公司',
   none: '还没有联系人。',
@@ -101,6 +109,7 @@ const zh: ContactStrings = {
   replaceOk: '替换',
   pickDenied: '通讯录权限被拒绝。请在手机设置中允许本应用使用通讯录，或手动输入。',
   pickNone: '未选择联系人。',
+  pluginMissing: '已安装的应用版本不包含通讯录功能。请安装最新的 APK（设置 → 关于）。',
   aliasOnly: (alias: string) => `WhatsApp：${alias}（在 WhatsApp 中搜索此别名）`,
 };
 

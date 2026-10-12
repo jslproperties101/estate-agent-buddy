@@ -2,7 +2,8 @@
 import { ReactNode, useState } from 'react';
 import { useApp, useFileUrl } from '../data/useStore';
 import { strings, Lang } from '../i18n';
-import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole } from '../data/types';
+import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
+import { FieldHelp } from './FieldHelp';
 import { REMINDER_CHOICES } from '../domain/workflow';
 import { cardTitle, normalisePhone } from '../listing/model';
 import { newId } from '../data/store';
@@ -37,11 +38,38 @@ export function LeadDot({ status, lang, withText = true }: { status?: LeadStatus
   );
 }
 
+export function VendorDot({ status, lang }: { status?: VendorStatus; lang: Lang }) {
+  if (!status) return null;
+  const label = strings[lang].vendorStatus[status];
+  return (
+    <span className={`lead vstat vstat-${status}`} title={label} data-vstat={status}>
+      <span className="lead-dot" style={{ background: VENDOR_COLOURS[status] }} aria-hidden="true" /><span>{label}</span>
+    </span>
+  );
+}
+
+export function VendorStatusPicker({ lang, value, onChange }: { lang: Lang; value?: VendorStatus; onChange: (v: VendorStatus | undefined) => void }) {
+  const t = strings[lang];
+  return (
+    <div className="ff" data-testid="vendor-status-picker">
+      <span>{t.vendorStatusLabel}<FieldHelp lang={lang} topic="vendorStatus" label={t.vendorStatusLabel} /></span>
+      <div className="chip-row" role="radiogroup" aria-label={t.vendorStatusLabel}>
+        {VENDOR_STATUSES.map(s => (
+          <button key={s} type="button" role="radio" aria-checked={value === s} className={`chip-btn lead-chip ${value === s ? 'on' : ''}`} data-vstat={s}
+            onClick={() => onChange(value === s ? undefined : s)}>
+            <span className="lead-dot" style={{ background: VENDOR_COLOURS[s] }} aria-hidden="true" /> {t.vendorStatus[s]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LeadPicker({ lang, value, onChange }: { lang: Lang; value?: LeadStatus; onChange: (v: LeadStatus | undefined) => void }) {
   const t = strings[lang];
   return (
     <div className="ff">
-      <span>{t.leadLabel}</span>
+      <span>{t.leadLabel}<FieldHelp lang={lang} topic="buyerStatus" label={t.leadLabel} /></span>
       <div className="chip-row" role="radiogroup" aria-label={t.leadLabel}>
         {LEAD_STATUSES.map(s => (
           <button key={s} type="button" role="radio" aria-checked={value === s} className={`chip-btn lead-chip ${value === s ? 'on' : ''}`}

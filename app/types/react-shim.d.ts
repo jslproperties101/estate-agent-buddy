@@ -21,6 +21,7 @@ declare module 'react' {
   export function useContext<T>(c: Context<T>): T;
   export function useSyncExternalStore<T>(subscribe: (cb: () => void) => () => void, getSnapshot: () => T): T;
   export const StrictMode: (p: { children?: ReactNode }) => any;
+  export function memo<P>(c: (props: P) => any): (props: P) => any;
 }
 declare module 'react/jsx-runtime' { export const jsx: any; export const jsxs: any; export const Fragment: any; }
 declare module 'react-dom/client' { export function createRoot(el: Element): { render(node: any): void } }
@@ -43,6 +44,9 @@ declare namespace JSX {
 }
 // @capacitor/core is installed only for the Android/iOS build; type-check against the same small surface the app uses.
 declare module '@capacitor/core' {
-  export const Capacitor: { isNativePlatform(): boolean; getPlatform(): string };
+  export const Capacitor: { isNativePlatform(): boolean; getPlatform(): string; isPluginAvailable(name: string): boolean };
   export function registerPlugin<T = any>(name: string): T;
 }
+
+// Images bundled into the code as data URLs (scripts/build.mjs loader).
+declare module '*.webp' { const url: string; export default url; }

@@ -1,7 +1,9 @@
 // Add / edit property form. Sections in the agreed order: 1 Type & Headline, 2 Tenure & Title, 3 Photos,
-// 4 the remaining property information, 5 Documents at the end. Opening it with a section (from the Edit button of
-// a detail card) scrolls straight to that section. Every input has data-field so voice can fill it for review.
-import { useEffect, useRef, useState } from 'react';
+// 4 the remaining property information, 5 Documents at the end. Every section can be opened and closed (closed at
+// first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
+// a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
+// Fields that may not be obvious have a "?" (ui/FieldHelp).
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { listingStrings } from './strings';
 import { mapStrings } from '../maps/strings';
@@ -23,6 +25,39 @@ import { readDetails, ChangeKey } from './commands';
 import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix, numberChoices } from '../domain/refs';
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
+import { FieldHelp } from '../ui/FieldHelp';
+
+/** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
+const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'specs', 'money', 'tenancy', 'availability', 'owner', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
+const SECTION_KEYS: Record<string, string[]> = {
+  basics: ['type', 'headline', 'purpose'],
+  tenure: ['tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
+  location: ['country', 'state', 'city', 'township', 'lotNo', 'street', 'unitNo', 'lat'],
+  details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing'],
+  specs: ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse', 'roadAccess', 'specs'],
+  money: ['askingPrice', 'negotiable', 'commissionPct', 'monthlyRent', 'securityDepositMonths', 'utilityDepositMonths', 'maintenanceFee'],
+  availability: ['availability', 'availableFrom', 'condition', 'features'],
+  owner: ['vendorId', 'ownerName', 'ownerPhone'],
+  arrangement: ['arrangement', 'arrangementNote', 'status', 'handledBy'],
+  banner: ['bannerStatus'],
+  notes: ['notes'],
+};
+
+/** One collapsible section of the form. Closed sections keep everything entered (it lives in the form's state). */
+function Sec({ id, title, testId, open, onToggle, summary, children }: {
+  id: string; title: string; testId?: string; open: boolean; onToggle: () => void; summary: string; children: ReactNode;
+}) {
+  return (
+    <div className={`card stack-sm form-sec ${open ? 'open' : ''}`} id={`sec-${id}`} data-testid={testId} data-open={open ? 'yes' : 'no'}>
+      <button type="button" className="sec-head" aria-expanded={open} aria-controls={`sec-${id}-body`} onClick={onToggle} data-sec={id}>
+        <span className="card-title">{title}</span>
+        <span className="sec-sum">{summary}</span>
+        <span className="sec-caret" aria-hidden="true">▾</span>
+      </button>
+      {open && <div id={`sec-${id}-body`} className="stack-sm sec-body">{children}</div>}
+    </div>
+  );
+}
 
 const num = (v: string) => { const x = parseFloat(v.replace(/[^\d.]/g, '')); return Number.isFinite(x) ? x : undefined; };
 
@@ -51,6 +86,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [refErr, setRefErr] = useState<string | null>(null);
   const [refOpen, setRefOpen] = useState(false);
+  // Collapsible sections: closed at first (the form is long); opening from a detail card's Edit opens that section.
+  const [open, setOpen] = useState<Set<string>>(() => new Set(section ? [section] : []));
+  const allOpen = SECTION_IDS.every(x => open.has(x));
+  const toggle = (sid: string) => setOpen(o => { const n = new Set(o); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const addedFiles = useRef<string[]>([]);
   const removedFiles = useRef<string[]>([]);
   const shownNum = (k: string, v: unknown) => (raw[k] !== undefined && num(raw[k]) === v ? raw[k] : v ?? '');
@@ -79,7 +118,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   // Called as functions (not components) so inputs keep focus while typing.
   const Text = ({ k, numeric, area, hint, money }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string; money?: boolean }) => (
     <label className="ff" key={k}>
-      <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
+      <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
       {money ? <MoneyInput data-field={k as string} value={d[k] as number | undefined} onChange={n => set(k, n as never)} /> : area
         ? <textarea data-field={k} rows={3} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)} />
         : <input data-field={k} inputMode={numeric ? 'decimal' : undefined} placeholder={hint}
@@ -89,7 +128,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   );
   const Select = ({ k, options, labels }: { k: keyof Listing; options: readonly string[]; labels?: Record<string, string> }) => (
     <label className="ff" key={k}>
-      <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
+      <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
       <select data-field={k} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)}>
         <option value="">{s.notSet}</option>
         {options.map(o => <option key={o} value={o}>{labels ? labels[o] : o}</option>)}
@@ -99,7 +138,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const Opt = ({ k, listKey, builtIns, labels }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string> }) => (
     <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
       builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined}
-      onChange={v => set(k, v as never)} />
+      onChange={v => set(k, v as never)} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
   );
   const pair = (...els: (JSX.Element | null | false)[]) => {
     const xs = els.filter(Boolean) as JSX.Element[];
@@ -176,7 +215,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       }
       return next;
     });
-    setTimeout(() => setWordsMsg(s.wordsDone(filled.length)), 0);
+    setTimeout(() => {
+      setWordsMsg(s.wordsDone(filled.length));
+      // Open the sections that received details, so the agent can check them.
+      const secs = SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => filled.includes(k as ChangeKey)));
+      if (secs.length) setOpen(o => new Set([...o, ...secs]));
+    }, 0);
   }
 
   const setTen = (k: keyof NonNullable<Listing['tenancy']>, v: string | number | undefined) => setD(prev => {
@@ -200,8 +244,22 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const suggestion = nextNumber(state.properties, d.id);
   const refText = (p: ReturnType<typeof checkRef>) => (p === 'numberTaken' || p === 'refTaken' ? s.refProblem[p](suggestion) : p ? s.refProblem[p] : null);
 
+  /** How many details a section holds, shown on its closed header so nothing entered is hidden from view. */
+  const filled = (sid: string): number => {
+    const rec = d as unknown as Record<string, unknown>;
+    const has = (k: string) => rec[k] !== undefined && rec[k] !== '' && rec[k] !== null;
+    switch (sid) {
+      case 'photos': return d.photos.length;
+      case 'docs': return (d.documents ?? []).length;
+      case 'tenancy': return Object.keys(d.tenancy ?? {}).length;
+      case 'marketing': return (d.marketing?.ads.length ?? 0) + Object.values(d.marketing?.custom ?? {}).filter(Boolean).length + (d.marketing?.advertised ? 1 : 0);
+      default: return (SECTION_KEYS[sid] ?? []).filter(has).length;
+    }
+  };
+  const secProps = (sid: string) => { const n = filled(sid); return { open: open.has(sid), onToggle: () => toggle(sid), summary: n ? s.secFilled(n) : s.secEmpty }; };
+
   function save() {
-    if (refProblem) { setRefErr(refText(refProblem)); document.getElementById('sec-basics')?.scrollIntoView({ block: 'start' }); return; }
+    if (refProblem) { setRefErr(refText(refProblem)); setOpen(o => new Set([...o, 'basics'])); setTimeout(() => document.getElementById('sec-basics')?.scrollIntoView({ block: 'start' }), 0); return; }
     const clean: Listing = { ...d, refNo, ref: makeRef(d.refPrefix!, refNo!), refPrefix: d.refPrefix!.toUpperCase() };
     for (const k of ALL_FORM_FIELDS) if (!vf.has(k)) delete clean[k];
     if (!forSale(clean)) { delete clean.askingPrice; delete clean.negotiable; delete clean.commissionPct; }
@@ -235,6 +293,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   return (
     <section className="stack listing" data-testid="listing-form">
       <p className="notice">{s.allOptional}</p>
+      <div className="between form-tools">
+        <small className="muted">{s.formTip}</small>
+        <button type="button" className="btn small ghost" data-testid="toggle-all" onClick={() => setOpen(allOpen ? new Set() : new Set(SECTION_IDS))}>{allOpen ? s.collapseAll : s.expandAll}</button>
+      </div>
 
       <details className="card stack-sm words" data-testid="voice-fill">
         <summary className="card-title">🎙 {s.voiceFill}</summary>
@@ -245,15 +307,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </details>
 
       {/* 1. Type & Headline (with the reference) */}
-      <div className="card stack-sm" id="sec-basics" data-testid="sec-basics-form">
-        <div className="card-title">1 · {s.sec.basics}</div>
+      <Sec id="basics" title={`1 · ${s.sec.basics}`} testId="sec-basics-form" {...secProps('basics')}>
         <div className="ref-row">
-          <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false}
+          <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false} help={<FieldHelp lang={lang} topic="refPrefix" label={s.l.refPrefix} />}
             builtIns={BUILTIN_PREFIXES.map(v => ({ value: v }))} value={d.refPrefix}
             normalise={v => v.trim().toUpperCase()} validate={v => (checkPrefix(v) ? s.refProblem.invalidPrefix : null)}
             onChange={v => { if (v) { setD(p => ({ ...p, refPrefix: v.toUpperCase() })); setRefErr(null); } }} />
           <div className="ff">
-            <label htmlFor="ref-no-input">{s.l.refNo}</label>
+            <span><label htmlFor="ref-no-input">{s.l.refNo}</label><FieldHelp lang={lang} topic="refNo" label={s.l.refNo} /></span>
             <div className="combo">
               <input id="ref-no-input" data-field="refNo" inputMode="numeric" aria-invalid={!!(refErr || refProblem)} value={refNoText}
                 onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
@@ -291,11 +352,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {!d.type && <small className="muted">{s.chooseTypeFirst}</small>}
         {Text({ k: 'headline' })}
         {Select({ k: 'purpose', options: PURPOSES, labels: s.purpose })}
-      </div>
+      </Sec>
 
       {/* 2. Tenure & Title */}
-      <div className="card stack-sm" id="sec-tenure">
-        <div className="card-title">2 · {s.sec.tenure}</div>
+      <Sec id="tenure" title={`2 · ${s.sec.tenure}`} {...secProps('tenure')}>
         {Select({ k: 'tenure', options: TENURES, labels: s.tenure })}
         {d.tenure === 'leasehold' && (
           <>
@@ -306,11 +366,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Opt({ k: 'titleType', listKey: 'titleType', builtIns: TITLE_TYPES, labels: s.titleTypes })}
         {show('landUse') && Select({ k: 'landUse', options: LAND_USES, labels: s.landUse })}
         {Opt({ k: 'restriction', listKey: 'restriction', builtIns: RESTRICTIONS, labels: s.restrictions })}
-      </div>
+      </Sec>
 
       {/* 3. Photos */}
-      <div className="card stack-sm" id="sec-photos">
-        <div className="card-title">3 · {s.sec.photos}</div>
+      <Sec id="photos" title={`3 · ${s.sec.photos}`} {...secProps('photos')}>
         <small className="muted">{s.photosNote}</small>
         {d.photos.length > 0 && (
           <div className="photo-grid">
@@ -335,11 +394,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {s.addPhotos}
           <input data-testid="photo-input" className="file-input" type="file" accept="image/*" multiple onChange={e => { void addPhotos(e.target.files); e.currentTarget.value = ''; }} />
         </label>
-      </div>
+      </Sec>
 
       {/* 4. Remaining property information */}
-      <div className="card stack-sm" id="sec-location" data-testid="sec-location">
-        <div className="card-title">4 · {s.sec.location}</div>
+      <Sec id="location" title={`4 · ${s.sec.location}`} testId="sec-location" {...secProps('location')}>
         {Opt({ k: 'country', listKey: 'country', builtIns: COUNTRIES, labels: s.countries })}
         {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
         {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
@@ -347,7 +405,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Text({ k: 'lotNo' })}
         {Text({ k: 'street' })}
         {Text({ k: 'unitNo' })}
-        <button className="btn primary gmap-btn" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {mapStrings[lang].addFromMap}</button>
+        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {mapStrings[lang].addFromMap}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
         <p className="small muted" data-testid="pos-text">{hasPosition(d) ? `${s.l.lat}: ${s.position(d.lat!.toFixed(5), d.lng!.toFixed(5))}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.noPosition}</p>
         <div className="two">
           <button className="btn secondary" onClick={locate} disabled={locating}>{locating ? s.locating : s.useMyLocation}</button>
@@ -358,21 +416,19 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           <label className="ff">{s.lng}<input inputMode="decimal" data-field="lng" value={shownNum('pos_lng', d.lng) as string} onChange={e => manualPos('lng', e.target.value)} /></label>
         </div>
         {posErr && <p className="error" role="alert">{s.posError}</p>}
-      </div>
+      </Sec>
       {picker && <LocationPicker lang={lang} current={d} onCancel={() => setPicker(false)} onApply={applyLocation} />}
 
-      <div className="card stack-sm" id="sec-details" data-testid="sec-details">
-        <div className="card-title">{s.sec.details}</div>
+      <Sec id="details" title={s.sec.details} testId="sec-details" {...secProps('details')}>
         {pair(show('landSqft') && Text({ k: 'landSqft', numeric: true }), show('builtUpSqft') && Text({ k: 'builtUpSqft', numeric: true }))}
         {pair(show('frontageFt') && Text({ k: 'frontageFt', numeric: true }), show('depthFt') && Text({ k: 'depthFt', numeric: true }))}
         {pair(show('bedrooms') && Text({ k: 'bedrooms', numeric: true }), show('bathrooms') && Text({ k: 'bathrooms', numeric: true }))}
         {pair(show('floors') && Text({ k: 'floors', numeric: true }), show('parking') && Text({ k: 'parking', numeric: true }))}
         {pair(show('lotType') && Select({ k: 'lotType', options: LOT_TYPES, labels: s.lotType }), show('furnishing') && Select({ k: 'furnishing', options: FURNISHING, labels: s.furnishing }))}
-      </div>
+      </Sec>
 
       {(show('ceilingFt') || show('specs') || show('zoning') || show('currentUse') || show('roadAccess')) && (
-        <div className="card stack-sm" id="sec-specs" data-testid="sec-specs">
-          <div className="card-title">{show('ceilingFt') || (show('specs') && !show('roadAccess')) ? s.sec.building : s.sec.land}</div>
+        <Sec id="specs" title={show('ceilingFt') || (show('specs') && !show('roadAccess')) ? s.sec.building : s.sec.land} testId="sec-specs" {...secProps('specs')}>
           {pair(show('ceilingFt') && Text({ k: 'ceilingFt', numeric: true }), show('powerKva') && Text({ k: 'powerKva', numeric: true }))}
           {show('loadingBays') && Text({ k: 'loadingBays', numeric: true })}
           {show('zoning') && Text({ k: 'zoning' })}
@@ -380,11 +436,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {show('currentUse') && Text({ k: 'currentUse' })}
           {show('roadAccess') && Text({ k: 'roadAccess' })}
           {show('specs') && Text({ k: 'specs', area: true })}
-        </div>
+        </Sec>
       )}
 
-      <div className="card stack-sm" id="sec-money" data-testid="sec-money">
-        <div className="card-title">{s.sec.money}</div>
+      <Sec id="money" title={s.sec.money} testId="sec-money" {...secProps('money')}>
         {saleMode && <>
           {Text({ k: 'askingPrice', money: true })}
           <div className="two">
@@ -399,11 +454,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {depositRm ? <small className="muted" data-testid="form-deposit">{s.depositRm(rm(depositRm))}</small> : null}
         </>}
         {show('maintenanceFee') && Text({ k: 'maintenanceFee', money: true })}
-      </div>
+      </Sec>
 
       {(rentMode || d.availability === 'tenanted' || d.tenancy) && (
-        <div className="card stack-sm" id="sec-tenancy" data-testid="sec-tenancy">
-          <div className="card-title">{s.sec.tenancy}</div>
+        <Sec id="tenancy" title={s.sec.tenancy} testId="sec-tenancy" {...secProps('tenancy')}>
           <label className="ff">{s.l.tenant}<input data-field="tenancy.tenant" value={d.tenancy?.tenant ?? ''} onChange={e => setTen('tenant', e.target.value || undefined)} /></label>
           <div className="two">
             <label className="ff">{s.l.tStart}<input data-field="tenancy.start" type="month" value={d.tenancy?.start ?? ''} onChange={e => setTen('start', e.target.value || undefined)} /></label>
@@ -411,22 +465,20 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           </div>
           <label className="ff">{s.l.tRent}<MoneyInput data-field="tenancy.rent" value={d.tenancy?.rent} onChange={n => setTen('rent', n)} /></label>
           <label className="ff">{s.l.tNotes}<textarea data-field="tenancy.notes" rows={2} value={d.tenancy?.notes ?? ''} onChange={e => setTen('notes', e.target.value || undefined)} /></label>
-        </div>
+        </Sec>
       )}
 
-      <div className="card stack-sm" id="sec-availability">
-        <div className="card-title">{s.sec.availability}</div>
+      <Sec id="availability" title={s.sec.availability} {...secProps('availability')}>
         {Select({ k: 'availability', options: AVAILABILITY, labels: s.availability })}
         {d.availability === 'from_date' && (
           <label className="ff">{s.l.availableFrom}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
         )}
         {show('condition') && Select({ k: 'condition', options: CONDITIONS, labels: s.condition })}
         {Text({ k: 'features', area: true })}
-      </div>
+      </Sec>
 
-      <div className="card stack-sm" id="sec-owner" data-testid="sec-owner">
-        <div className="card-title">{s.sec.owner}</div>
-        <label className="ff">{s.l.vendorId}
+      <Sec id="owner" title={s.sec.owner} testId="sec-owner" {...secProps('owner')}>
+        <label className="ff"><span>{s.l.vendorId}<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} /></span>
           <select data-field="vendorId" value={d.vendorId ?? ''} onChange={e => set('vendorId', e.target.value || undefined)}>
             <option value="">{s.vendorNone}</option>
             {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -440,10 +492,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           </label>
           {d.ownerName && <small className="muted">{s.vendorNew}</small>}
         </>}
-      </div>
+      </Sec>
 
-      <div className="card stack-sm" id="sec-arrangement">
-        <div className="card-title">{s.sec.arrangement}</div>
+      <Sec id="arrangement" title={s.sec.arrangement} {...secProps('arrangement')}>
         {Select({ k: 'arrangement', options: ARRANGEMENTS, labels: s.arrangement })}
         {d.arrangement && d.arrangement !== 'direct' && Text({ k: 'arrangementNote' })}
         {Select({ k: 'status', options: STATUSES, labels: s.status })}
@@ -452,15 +503,13 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             <input data-field="handledBy" placeholder={s.handledByHint} value={d.handledBy ?? ''} onChange={e => set('handledBy', e.target.value || undefined)} />
           </label>
         )}
-      </div>
+      </Sec>
 
-      <div className="card stack-sm" id="sec-banner" data-testid="sec-banner-form">
-        <div className="card-title">{s.sec.banner}</div>
+      <Sec id="banner" title={s.sec.banner} testId="sec-banner-form" {...secProps('banner')}>
         {Select({ k: 'bannerStatus', options: BANNER_STATUSES, labels: s.banner })}
-      </div>
+      </Sec>
 
-      <div className="card stack-sm" id="sec-marketing" data-testid="sec-marketing">
-        <div className="card-title">{s.sec.marketing}</div>
+      <Sec id="marketing" title={s.sec.marketing} testId="sec-marketing" {...secProps('marketing')}>
         <label className="ff">{s.l.advertised}
           <select data-field="advertised" value={mk.advertised ?? ''} onChange={e => setMk({ advertised: (e.target.value || undefined) as 'yes' | 'no' | undefined })}>
             <option value="">{s.notSet}</option><option value="yes">{s.yesNo.yes}</option><option value="no">{s.yesNo.no}</option>
@@ -507,16 +556,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             : newField === null && <button className="btn ghost" onClick={() => setNewField('')}>+ {s.addField}</button>}
           {fieldDefs.length > 0 && <small className="muted">{s.customMax(fieldDefs.length)}</small>}
         </div>
-      </div>
+      </Sec>
 
-      <div className="card stack-sm" id="sec-notes">
-        <div className="card-title">{s.sec.notes}</div>
+      <Sec id="notes" title={s.sec.notes} {...secProps('notes')}>
         {Text({ k: 'notes', area: true })}
-      </div>
+      </Sec>
 
       {/* 5. Documents at the end */}
-      <div className="card stack-sm" id="sec-docs" data-testid="sec-docs">
-        <div className="card-title">5 · {s.sec.docs}</div>
+      <Sec id="docs" title={`5 · ${s.sec.docs}`} testId="sec-docs" {...secProps('docs')}>
         <small className="muted">{s.docsNote}</small>
         {DOC_CATEGORIES.map(cat => {
           const list = (d.documents ?? []).filter(x => x.category === cat);
@@ -538,11 +585,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             </div>
           );
         })}
-      </div>
+      </Sec>
 
       {initial && <button className="btn ghost danger-text" onClick={() => setConfirmDelete(true)}>{s.deleteProperty}</button>}
 
-      <div className="save-bar">
+      {/* Save from anywhere: this bar floats at the bottom of the screen while the long form scrolls under it. */}
+      <div className="save-bar floating" data-testid="save-floating">
         <div className="two">
           <button className="btn secondary" onClick={cancel}>{s.cancel}</button>
           <button className="btn primary" disabled={busy} onClick={save} data-testid="save-property">{s.save}</button>

@@ -1,17 +1,20 @@
 // Speak or type: the words appear in an editable box before anything is used. Shared by every voice feature.
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { strings, Lang } from '../i18n';
 import { VOICE_LANGS, VoiceError, listen, Listening, speechSupported } from '../voice/recognizer';
 
 // The notice about the speech service is shown once each time the app is opened.
 let acceptedThisSession = false;
 
-export function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
+/** Memoised: typing elsewhere in a big form (which redraws the form) does not redraw the speech box. */
+export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
   lang: Lang; value: string; onChange: (text: string) => void; label: string; rows?: number; testId?: string;
 }) {
   const v = strings[lang].voice;
   const [voiceLang, setVoiceLang] = useState(lang === 'bm' ? 'ms-MY' : lang === 'zh' ? 'zh-CN' : 'en-MY');
   const [listening, setListening] = useState(false);
+  // After End recording, until the phone's speech service has returned the words (or said it could not).
+  const [processing, setProcessing] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState<VoiceError | null>(null);
   const [asking, setAsking] = useState(false);
@@ -25,13 +28,18 @@ export function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
     if (!speechSupported()) { setError('unsupported'); return; }
     if (!acceptedThisSession && !force) { setAsking(true); return; }
     setListening(true);
+    setProcessing(false);
     live.current = listen(voiceLang, {
       interim: x => setInterim(x),
       final: x => onChange((textRef.current ? textRef.current + ' ' : '') + x),
       error: code => { if (code !== 'aborted') setError(code); },
-      end: () => { setListening(false); setInterim(''); live.current = null; },
+      end: () => { setListening(false); setProcessing(false); setInterim(''); live.current = null; },
     });
     if (!live.current) setListening(false);
+  }
+  function stop() {
+    setProcessing(true);
+    live.current?.stop();
   }
 
   return (
@@ -53,9 +61,11 @@ export function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
           </div>
         </div>
       )}
-      {!asking && (listening
-        ? <button type="button" className="mic on" onClick={() => live.current?.stop()}><span className="dot" aria-hidden="true" /> {v.stop}</button>
-        : <button type="button" className="mic" onClick={() => start()}>🎙 {v.mic}</button>)}
+      {!asking && (processing
+        ? <button type="button" className="mic busy" disabled aria-busy="true" data-testid="voice-processing"><span className="spinner" aria-hidden="true" /> {v.processing}</button>
+        : listening
+          ? <button type="button" className="mic on" onClick={stop} data-testid="voice-stop"><span className="dot" aria-hidden="true" /> {v.stop}</button>
+          : <button type="button" className="mic" onClick={() => start()} data-testid="voice-start">🎙 {v.mic}</button>)}
       {typeof navigator !== 'undefined' && navigator.onLine === false && <small className="warn-text">{v.offline}</small>}
       {error && <p className="error" role="alert" data-testid="voice-error">{v.errors[error]}</p>}
       <label className="ff">{label}
@@ -63,4 +73,4 @@ export function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
       </label>
     </div>
   );
-}
+});

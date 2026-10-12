@@ -44,6 +44,7 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<string | undefined>(propertyId);
   const [adding, setAdding] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Banner | null>(null);
   const [takeDown, setTakeDown] = useState<Banner | null>(null);
 
   const counts = bannerCounts(state.properties);
@@ -121,7 +122,7 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
                     {BANNER_STATUSES.map(v => <option key={v} value={v}>{s.banner[v]}</option>)}
                   </select>
                 </label>
-                {active.length === 0 ? <small className="muted">{b.none}</small> : active.map(x => <BannerRow key={x.id} x={x} lang={lang} onTakeDown={() => setTakeDown(x)} />)}
+                {active.length === 0 ? <small className="muted">{b.none}</small> : active.map(x => <BannerRow key={x.id} x={x} lang={lang} onTakeDown={() => setTakeDown(x)} onEdit={() => { setSel(p.id); setEditing(x); }} />)}
                 <div className="two">
                   <button className="btn primary" onClick={() => { setSel(p.id); setAdding(p.id); }} data-testid="banner-add">📍 {b.add}</button>
                   <button className="btn secondary" onClick={() => go({ name: 'listingDetail', id: p.id })}>{b.openProperty}</button>
@@ -139,12 +140,13 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
       )}
 
       {adding && <AddBannerSheet lang={lang} property={state.properties.find(p => p.id === adding)!} maps={maps} onClose={() => setAdding(null)} />}
+      {editing && state.properties.some(p => p.id === editing.propertyId) && <AddBannerSheet lang={lang} property={state.properties.find(p => p.id === editing.propertyId)!} existing={editing} maps={maps} onClose={() => setEditing(null)} />}
       {takeDown && <Confirm lang={lang} title={b.takeDownQ} body={b.takeDownBody} okLabel={b.takeDown} danger={false} onCancel={() => setTakeDown(null)} onOk={() => confirmTakeDown(takeDown)} />}
     </section>
   );
 }
 
-function BannerRow({ x, lang, onTakeDown }: { x: Banner; lang: Lang; onTakeDown?: () => void }) {
+function BannerRow({ x, lang, onTakeDown, onEdit }: { x: Banner; lang: Lang; onTakeDown?: () => void; onEdit?: () => void }) {
   const b = gpsStrings[lang].bn;
   const g = gpsStrings[lang];
   return (
@@ -157,6 +159,7 @@ function BannerRow({ x, lang, onTakeDown }: { x: Banner; lang: Lang; onTakeDown?
         {!x.removedOn && (
           <div className="row-wrap">
             <a className="btn small primary" href={navigationUrl({ lat: x.lat, lng: x.lng })} target="_blank" rel="noreferrer" data-testid="banner-navigate">{g.navigate}</a>
+            {onEdit && <button className="btn small secondary" onClick={onEdit} data-testid="banner-edit">✥ {b.edit}</button>}
             {onTakeDown && <button className="btn small secondary" onClick={onTakeDown} data-testid="banner-takedown">{b.takeDown}</button>}
           </div>
         )}
@@ -165,19 +168,20 @@ function BannerRow({ x, lang, onTakeDown }: { x: Banner; lang: Lang; onTakeDown?
   );
 }
 
-function AddBannerSheet({ lang, property, maps, onClose }: { lang: Lang; property: Listing; maps: unknown; onClose: () => void }) {
+/** Add a banner, or (with `existing`) change where an existing banner stands, its date, note or photo. */
+function AddBannerSheet({ lang, property, maps, onClose, existing }: { lang: Lang; property: Listing; maps: unknown; onClose: () => void; existing?: Banner }) {
   const { store } = useApp();
   const g = gpsStrings[lang];
   const b = g.bn;
   const s = listingStrings[lang];
   const c = strings[lang].c;
   const toast = useToast();
-  const [pos, setPos] = useState<{ lat: number; lng: number; acc?: number; source: Banner['source'] } | null>(null);
-  const [latText, setLatText] = useState('');
-  const [lngText, setLngText] = useState('');
-  const [placedOn, setPlacedOn] = useState(ymd(new Date()));
-  const [note, setNote] = useState('');
-  const [photo, setPhoto] = useState<string | undefined>();
+  const [pos, setPos] = useState<{ lat: number; lng: number; acc?: number; source: Banner['source'] } | null>(existing ? { lat: existing.lat, lng: existing.lng, acc: existing.acc, source: existing.source } : null);
+  const [latText, setLatText] = useState(existing ? existing.lat.toFixed(6) : '');
+  const [lngText, setLngText] = useState(existing ? existing.lng.toFixed(6) : '');
+  const [placedOn, setPlacedOn] = useState(existing?.placedOn ?? ymd(new Date()));
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [photo, setPhoto] = useState<string | undefined>(existing?.photoFileId);
   const [locating, setLocating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -189,7 +193,7 @@ function AddBannerSheet({ lang, property, maps, onClose }: { lang: Lang; propert
     navigator.geolocation.getCurrentPosition(
       p => { setLocating(false); const acc = Math.round(p.coords.accuracy); setPos({ lat: p.coords.latitude, lng: p.coords.longitude, acc, source: 'gps' }); setLatText(p.coords.latitude.toFixed(6)); setLngText(p.coords.longitude.toFixed(6)); },
       () => { setLocating(false); setErr(b.posErr); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
     );
   }
   function typed(lat: string, lng: string) {
@@ -203,25 +207,33 @@ function AddBannerSheet({ lang, property, maps, onClose }: { lang: Lang; propert
     setBusy(true);
     let blob: Blob = f;
     try { blob = (await compressImage(f)).blob; } catch { /* keep the original */ }
-    if (photo) store.removeFile(photo);
+    if (photo && photo !== existing?.photoFileId) store.removeFile(photo);
     setPhoto(await store.putFile(blob));
     setBusy(false);
   }
   function save() {
     if (!pos) { setErr(b.needPos); return; }
     const now = Date.now();
+    if (existing) {
+      // Same banner record, new position: the history keeps one entry per banner.
+      if (existing.photoFileId && photo !== existing.photoFileId) store.removeFile(existing.photoFileId);
+      store.upsert('banners', { ...existing, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source, placedOn: placedOn || existing.placedOn, note: note.trim() || undefined, photoFileId: photo });
+      toast(b.updated);
+      onClose();
+      return;
+    }
     store.upsert('banners', { id: newId(), created: now, updated: now, propertyId: property.id, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source, placedOn: placedOn || ymd(new Date()), note: note.trim() || undefined, photoFileId: photo });
     store.upsert('properties', { ...property, bannerStatus: statusAfterAdd() });
     toast(b.saved);
     onClose();
   }
-  function cancel() { if (photo) store.removeFile(photo); onClose(); }
+  function cancel() { if (photo && photo !== existing?.photoFileId) store.removeFile(photo); onClose(); }
 
   const start = pos ?? (hasPosition(property) ? { lat: property.lat!, lng: property.lng! } : undefined);
   return (
     <div className="sheet-scrim" role="presentation">
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="bn-t" data-testid="banner-sheet">
-        <div className="between"><h2 id="bn-t">{b.addTitle}</h2><button className="btn small secondary" onClick={cancel}>{c.close}</button></div>
+        <div className="between"><h2 id="bn-t">{existing ? b.editTitle : b.addTitle}</h2><button className="btn small secondary" onClick={cancel}>{c.close}</button></div>
         <small className="muted">{b.property}: <strong>{[property.ref, cardTitle(property) || s.untitled].filter(Boolean).join(' · ')}</strong></small>
         <button className="btn primary" onClick={useGps} disabled={locating} data-testid="banner-gps">{locating ? b.locating : `📍 ${b.useGps}`}</button>
         {maps ? (
