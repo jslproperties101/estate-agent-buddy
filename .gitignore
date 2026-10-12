@@ -1,3 +1,7 @@
+app/node_modules
+app/.test-out
+app/dist/*.map
+app/tests/fixtures/photo_large.png
 node_modules/
 dist/
 .DS_Store

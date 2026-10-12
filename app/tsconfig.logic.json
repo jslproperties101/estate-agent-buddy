@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": [
+      "node"
+    ],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/review.ts",
+    "src/deleted.ts",
+    "src/local/rules.ts",
+    "src/local/sensitive.ts",
+    "src/local/merge.ts",
+    "src/local/docx.ts",
+    "src/local/files.ts",
+    "src/local/pipeline.ts",
+    "src/local/pdf-core.ts",
+    "tests/logic.test.ts",
+    "tests/local.test.ts",
+    "src/voice/spoken.ts",
+    "src/voice/attach.ts",
+    "src/voice/places.ts",
+    "src/voice/recognizer.ts",
+    "tests/voice.test.ts",
+    "src/listing/model.ts",
+    "tests/listing.test.ts",
+    "src/listing/illustrations.ts",
+    "src/listing/commands.ts",
+    "src/contacts/model.ts",
+    "tests/commands.test.ts"
+  ]
+}

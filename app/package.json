@@ -1,0 +1,29 @@
+{
+  "name": "estate-agent-buddy",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.logic.json",
+    "build": "node scripts/build.mjs",
+    "test:logic": "node scripts/test-logic.mjs",
+    "test:ui": "node --test tests/ui.test.mjs",
+    "test": "npm run typecheck && npm run test:logic && npm run test:local && npm run test:voice && npm run test:listing && npm run test:commands && npm run build && npm run test:ui",
+    "test:local": "node scripts/test-local.mjs",
+    "test:voice": "node scripts/test-voice.mjs",
+    "measure": "node scripts/measure.mjs",
+    "test:listing": "node scripts/test-listing.mjs",
+    "test:commands": "node scripts/test-commands.mjs",
+    "single": "node scripts/single.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "pdfjs-dist": "6.2.108"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.56.0",
+    "typescript": "6.0.3"
+  }
+}
