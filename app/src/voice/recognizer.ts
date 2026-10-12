@@ -1,13 +1,14 @@
 // Speech to text through the browser's speech service (Web Speech API), where the browser offers it.
 // In Chrome on Android this normally sends the audio to Google's speech service to turn it into text.
-// Property Explorer itself does not record, keep or upload audio.
+// Estate Agent Buddy itself does not record, keep or upload audio.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface VoiceLang { code: string; label: string; short: string }
-/** Languages offered. More can be added here (for example zh-MY, ta-IN) without changing the screens. */
+/** Languages offered for speaking. More can be added here (for example ta-IN) without changing the screens. */
 export const VOICE_LANGS: VoiceLang[] = [
-  { code: 'en-MY', label: 'English (Malaysia)', short: 'EN' },
+  { code: 'en-MY', label: 'English', short: 'EN' },
   { code: 'ms-MY', label: 'Bahasa Malaysia', short: 'BM' },
+  { code: 'zh-CN', label: '中文', short: '中文' },
 ];
 
 export type VoiceError =

@@ -7,9 +7,6 @@ const svg = (d: string) => ({ size = 22 }: P) => (
 
 export const IconBack = svg('M15 5l-7 7 7 7');
 export const IconNews = svg('M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2M7 9h7M7 13h7M7 16h4');
-export const IconCamera = svg('M4 8h3l2-3h6l2 3h3v11H4zM12 17a4 4 0 100-8 4 4 0 000 8z');
-export const IconTrash = svg('M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13');
-export const IconCheck = svg('M5 12l5 5 9-10');
 export const IconTodo = svg('M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2');
 export const IconCalendar = svg('M4 6h16v14H4zM4 10h16M8 3v4M16 3v4');
 export const IconTrend = svg('M3 17l6-6 4 4 8-8M15 7h6v6');
@@ -18,9 +15,9 @@ export const IconVendor = svg('M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0
 export const IconBuyer = svg('M8 11a3 3 0 100-6 3 3 0 000 6zM16 11a3 3 0 100-6 3 3 0 000 6zM2 20a6 6 0 0112 0M12 20a6 6 0 0110 0');
 export const IconGps = svg('M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 12a2 2 0 100-4 2 2 0 000 4z');
 export const IconExpert = svg('M12 3a7 7 0 00-4 12.7V19h8v-3.3A7 7 0 0012 3zM9 22h6');
-export const IconLock = svg('M6 11h12v10H6zM8 11V8a4 4 0 018 0v3');
-export const IconRestore = svg('M4 12a8 8 0 108-8H7M7 1L4 4l3 3');
-export const IconNote = svg('M6 3h9l4 4v14H6zM9 12h7M9 16h7');
+export const IconMoney = svg('M3 7h18v10H3zM12 15a3 3 0 100-6 3 3 0 000 6zM6 10v4M18 10v4');
+export const IconCalc = svg('M6 3h12v18H6zM9 7h6M9 11h1M12 11h1M15 11h0M9 14h1M12 14h1M9 17h1M12 17h1M15 14v3');
+export const IconCard = svg('M3 6h18v12H3zM8 13a2 2 0 100-4 2 2 0 000 4zM5 16a3 3 0 016 0M14 10h4M14 13h4');
 export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3M8 21h8');
 /** Estate Agent Buddy mark: a roof over a key-shaped door. */
 export const IconLogo = ({ size = 28 }: P) => (

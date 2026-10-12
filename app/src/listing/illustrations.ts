@@ -3,7 +3,7 @@
 
 export type Scene =
   | 'terrace' | 'semid_house' | 'bungalow' | 'condo' | 'shoplot' | 'office'
-  | 'semid_factory' | 'detached_factory' | 'warehouse' | 'agri' | 'devland';
+  | 'semid_factory' | 'detached_factory' | 'warehouse' | 'agri' | 'devland' | 'generic';
 
 type Sky = 'golden' | 'day' | 'dusk';
 const SKIES: Record<Sky, [string, string, string, string]> = {
@@ -191,9 +191,19 @@ ${shrubs(240, 640, GROUND - 36)}`;
   return frame('day', `${city}${land}`, 520);
 }
 
+/** No type chosen yet: a plain gold house outline, so every card still has the same picture area. */
+function generic(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
+<defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1A1A1E"/><stop offset="1" stop-color="#0B0B0D"/></linearGradient>
+<linearGradient id="au" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F7E7A6"/><stop offset=".5" stop-color="#D4AF37"/><stop offset="1" stop-color="#9C7A22"/></linearGradient></defs>
+<rect width="${W}" height="${H}" fill="url(#b)"/>
+<path d="M220 210 L320 130 L420 210 M240 196 V290 H400 V196" fill="none" stroke="url(#au)" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="300" y="230" width="40" height="60" fill="none" stroke="url(#au)" stroke-width="8"/></svg>`;
+}
+
 const BUILDERS: Record<Scene, () => string> = {
   terrace, semid_house: semidHouse, bungalow, condo, shoplot, office,
-  semid_factory: semidFactory, detached_factory: detachedFactory, warehouse, agri, devland,
+  semid_factory: semidFactory, detached_factory: detachedFactory, warehouse, agri, devland, generic,
 };
 
 const cache = new Map<Scene, string>();

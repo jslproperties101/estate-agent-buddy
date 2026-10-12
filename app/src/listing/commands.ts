@@ -1,15 +1,16 @@
-// Property voice / text commands (Version 1L). Runs on the phone with simple rules: no AI, no internet, no cost.
-// A command becomes a list of PROPOSED changes that the agent reviews before anything is saved.
-// Only what was actually said is used: nothing is guessed or invented. Gemini can replace this reader later,
-// after the owner approves the integration; the review step stays the same.
+// Property voice / text commands. Voice is how property information is captured: the words are read on the phone
+// with simple rules (no AI, no internet, no cost) and become a list of PROPOSED values that the agent reviews
+// before anything is saved. Only what was actually said is used: nothing is guessed or invented.
+// An AI reader (for example Gemini) could replace these rules later as an optional layer; the review step stays.
 
 import { normaliseSpoken } from '../voice/spoken';
-import { Listing, Tenure, Purpose, Status, TYPES } from './model';
+import { Listing, Tenure, Purpose, Status, TYPES, normalisePhone } from './model';
+import { allBuiltInCities } from '../domain/places';
 
 export type ChangeKey =
-  | 'type' | 'area' | 'landSqft' | 'builtUpSqft' | 'askingPrice' | 'monthlyRent' | 'tenure' | 'leaseExpiryYear'
-  | 'bedrooms' | 'bathrooms' | 'parking' | 'floors' | 'purpose' | 'ceilingFt' | 'powerKva' | 'status'
-  | 'notes' | 'tenancy.tenant' | 'tenancy.rent' | 'tenancy.start' | 'tenancy.end';
+  | 'type' | 'city' | 'township' | 'street' | 'unitNo' | 'lotNo' | 'landSqft' | 'builtUpSqft' | 'askingPrice' | 'monthlyRent'
+  | 'tenure' | 'leaseExpiryYear' | 'bedrooms' | 'bathrooms' | 'parking' | 'floors' | 'purpose' | 'ceilingFt' | 'powerKva' | 'status'
+  | 'ownerName' | 'ownerPhone' | 'notes' | 'tenancy.tenant' | 'tenancy.rent' | 'tenancy.start' | 'tenancy.end';
 
 export interface Change { key: ChangeKey; value: string | number; note?: 'unitAssumed' | 'added' | 'appended' }
 
@@ -70,16 +71,22 @@ function monthYear(s: string): string | undefined {
   return i >= 0 ? `${m[2]}-${String(i + 1).padStart(2, '0')}` : undefined;
 }
 
-function findArea(original: string): string | undefined {
+function findArea(original: string, extra: string[] = []): string | undefined {
   const low = original.toLowerCase();
-  const known = KNOWN_AREAS.find(a => new RegExp(`\\b${a.toLowerCase()}\\b`).test(low));
+  const all = [...extra, ...KNOWN_AREAS].sort((a, b) => b.length - a.length);
+  const known = all.find(a => new RegExp(`\\b${a.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(low));
   if (known) return known;
-  const m = /\b(?:in|at|di)\s+([A-Z][\w']*(?:\s+[A-Z][\w']*){0,3})/.exec(original);
+  const m = /\b(?:in|at|di)\s+((?!Jalan\b|Jln\b|Lorong\b)[A-Z][\w']*(?:\s+[A-Z][\w']*){0,3})/.exec(original);
   return m?.[1];
 }
 
+/** A place said in a command goes to City when it is a known town, otherwise to Township. */
+export function placeKey(place: string): 'city' | 'township' {
+  return allBuiltInCities().some(c => c.toLowerCase() === place.toLowerCase()) ? 'city' : 'township';
+}
+
 /** Every property detail stated in the text. Nothing that was not said is returned. */
-export function readDetails(original: string): { changes: Change[]; unclear: string[] } {
+export function readDetails(original: string, places: string[] = []): { changes: Change[]; unclear: string[] } {
   const t = prepare(original);
   const low = t.toLowerCase();
   const out: Change[] = [];
@@ -93,7 +100,18 @@ export function readDetails(original: string): { changes: Change[]; unclear: str
   if (type && (TYPES as readonly string[]).includes(type)) add('type', type);
   else if (/\bfactor(?:y|ies)\b|\bkilang\b/i.test(t)) unclear.push('factory');
 
-  add('area', findArea(original));
+  const place = findArea(original, places);
+  if (place) add(placeKey(place), place);
+  const street = /\b((?:jalan|jln\.?|lorong|lrg\.?|persiaran)\s+[A-Za-z0-9][\w/ ]*?)(?=\s*(?:,|\.(?:\s|$)|$|\bin\b|\bdi\b|\bnear\b))/i.exec(original);
+  if (street) add('street', street[1].replace(/^jln\.?/i, 'Jalan').replace(/^lrg\.?/i, 'Lorong').replace(/\s+/g, ' ').replace(/^\w/, c => c.toUpperCase()));
+  const unit = /\bunit\s+(?:no\.?\s*|number\s+)?([A-Z]?-?\d[\w-]*)/i.exec(t);
+  if (unit) add('unitNo', unit[1].toUpperCase());
+  const lot = /\blot\s+(?:no\.?\s*|number\s+)?([A-Z]?\d[\w/-]*)/i.exec(t);
+  if (lot) add('lotNo', lot[1].toUpperCase());
+  const owner = /\b(?:owner|pemilik|tuan\s+rumah)\s+(?:is\s+|ialah\s+|named\s+|bernama\s+)?((?:(?:Mr|Mrs|Ms|Madam|Encik|En|Puan|Pn|Cik|Dato'?|Datuk|Dr)\.?\s+)?[A-Z][\w'.-]*(?:\s+(?:bin|binti|a\/l|a\/p|[A-Z][\w'.-]*)){0,4})/.exec(original);
+  if (owner && !/^(?:Wants|Says|Is)\b/.test(owner[1])) add('ownerName', owner[1].trim());
+  const phone = /(?:\+?6?0)1\d[\s-]?\d{3,4}[\s-]?\d{4}\b|\b0[3-9][\s-]?\d{3,4}[\s-]?\d{4}\b/.exec(t);
+  if (phone) add('ownerPhone', normalisePhone(phone[0]) ?? phone[0]);
 
   const area = (label: string) => {
     const m = new RegExp(String.raw`(?:${label})\s*(?:area|size|of|is|:)?\s*(?:of|is|to)?\s*([\d.]+)\s*(square\s*feet|sq\.?\s*ft|sqft|kaki\s+persegi|kps|acres?|ekar)?`, 'i').exec(low);
@@ -144,26 +162,26 @@ export function readDetails(original: string): { changes: Change[]; unclear: str
  * Reads one command. `current` is the open property, if any: then changes are proposed for that property.
  * In the list, "create a new …" proposes a new property and "find …" searches.
  */
-export function parseCommand(text: string, current?: Listing): Command {
+export function parseCommand(text: string, current?: Listing, places: string[] = []): Command {
   const original = text.trim();
   if (!original) return { kind: 'unknown' };
   const t = prepare(original);
   const low = t.toLowerCase();
 
   // Find / show (list or central voice screen)
-  if (!current && /^(?:please\s+)?(?:find|show|search|look\s+for|cari|tunjuk)\b/i.test(low) && !/\b(?:buyers?|vendors?|appointments?|pembeli|penjual|temujanji)\b/.test(low)) {
-    const r = readDetails(original);
+  if (!current && /^(?:please\s+)?(?:find|show|search|look\s+for|cari|tunjuk)\b/i.test(low) && !/\b(?:buyers?|vendors?|appointments?|tasks?|to-?dos?|viewings?|pembeli|penjual|temujanji|tugasan|lawatan)\b/.test(low)) {
+    const r = readDetails(original, places);
     const pick = (k: ChangeKey) => r.changes.find(c => c.key === k)?.value as string | undefined;
     const purpose = pick('purpose');
     return {
       kind: 'find', type: pick('type'), ...(r.unclear.includes('factory') ? { typeWord: 'factory' as const } : {}),
-      area: pick('area'), purpose: purpose === 'rent' ? 'rent' : purpose === 'sale' ? 'sale' : undefined,
+      area: pick('township') ?? pick('city'), purpose: purpose === 'rent' ? 'rent' : purpose === 'sale' ? 'sale' : undefined,
     };
   }
 
   const isCreate = /^(?:please\s+)?(?:create|new|add\s+(?:a\s+)?new|register|cipta|daftar)\b|\b(?:tambah|buat)\b.*\bbaharu\b/i.test(low);
   if (isCreate && !current) {
-    const r = readDetails(original);
+    const r = readDetails(original, places);
     return { kind: 'create', changes: r.changes.filter(c => !c.key.startsWith('tenancy') && c.key !== 'status'), unclear: r.unclear };
   }
   if (!current) return { kind: 'unknown' };
@@ -215,9 +233,12 @@ export function parseCommand(text: string, current?: Listing): Command {
   const st = /\b(?:mark(?:ed)?\s+(?:it\s+)?as|status\s+(?:to|is)|now)\s+(available|sold|rented|off\s+market|in\s+progress)/i.exec(low);
   if (st) changes.push({ key: 'status', value: ({ available: 'available', sold: 'sold', rented: 'rented', 'off market': 'off_market', 'in progress': 'in_progress' } as Record<string, Status>)[st[1].replace(/\s+/, ' ')] });
 
-  for (const c of readDetails(original).changes) if (!changes.some(x => x.key === c.key) && !(c.key === 'parking')) changes.push(c);
-  // A place mentioned in an edit is only used when the agent says to change the location.
-  const filtered = changes.filter(c => c.key !== 'area' || /\b(?:location|area|kawasan|lokasi)\b/i.test(low));
+  for (const c of readDetails(original, places).changes) if (!changes.some(x => x.key === c.key) && !(c.key === 'parking')) changes.push(c);
+  // A place, street, unit, lot or owner mentioned in an edit is only used when the agent says to change it.
+  const LOCATION_KEYS: ChangeKey[] = ['city', 'township', 'street', 'unitNo', 'lotNo'];
+  const filtered = changes.filter(c =>
+    (!LOCATION_KEYS.includes(c.key) || /\b(?:location|area|address|street|jalan|unit|lot|township|city|kawasan|lokasi|alamat)\b/i.test(low))
+    && (!['ownerName', 'ownerPhone'].includes(c.key) || /\b(?:owner|pemilik|phone|telefon|number|nombor)\b/i.test(low)));
   return filtered.length ? { kind: 'update', changes: filtered, unclear: [] } : { kind: 'unknown' };
 }
 

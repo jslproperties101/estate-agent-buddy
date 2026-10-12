@@ -1,0 +1,44 @@
+// Every screen in the app and what it needs to open. App.tsx draws the current screen; others call go(...).
+import type { Filters, Listing } from './listing/model';
+import type { ApptKind, ExpertKey, Task } from './data/types';
+
+export type FormSection =
+  | 'basics' | 'tenure' | 'photos' | 'location' | 'details' | 'specs' | 'money' | 'tenancy' | 'availability'
+  | 'owner' | 'arrangement' | 'marketing' | 'notes' | 'docs';
+
+export type Screen =
+  | { name: 'home' }
+  | { name: 'news' }
+  | { name: 'opportunities' }
+  | { name: 'listing'; filters?: Filters }
+  | { name: 'listingDetail'; id: string }
+  | { name: 'listingForm'; id?: string; prefill?: Partial<Listing>; section?: FormSection }
+  | { name: 'contacts'; role: 'vendor' | 'buyer' }
+  | { name: 'contactDetail'; id: string }
+  | { name: 'contactForm'; id?: string; role?: 'vendor' | 'buyer' | 'professional'; prefill?: { name?: string; phone?: string } }
+  | { name: 'activity'; propertyId?: string; contactId?: string; tab?: 'inquiries' | 'viewings' }
+  | { name: 'inquiryForm'; id?: string; propertyId?: string; contactId?: string }
+  | { name: 'apptForm'; id?: string; kind?: ApptKind; propertyId?: string; contactId?: string; date?: string; time?: string; title?: string }
+  | { name: 'todo' }
+  | { name: 'taskForm'; id?: string; prefill?: Partial<Task> }
+  | { name: 'calendar'; date?: string }
+  | { name: 'gps' }
+  | { name: 'houseShopping' }
+  | { name: 'journey'; id: string }
+  | { name: 'propertyMap'; id?: string }
+  | { name: 'finance' }
+  | { name: 'dealForm'; id?: string; propertyId?: string }
+  | { name: 'expenseForm'; id?: string }
+  | { name: 'incomeForm'; id?: string }
+  | { name: 'calculator'; propertyId?: string }
+  | { name: 'profile' }
+  | { name: 'profileEdit' }
+  | { name: 'nameCard' }
+  | { name: 'settings' }
+  | { name: 'expert' }
+  | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
+  | { name: 'expertThread'; id: string }
+  | { name: 'voice' };
+
+/** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */
+export type Go = (s: Screen, opts?: { replace?: boolean }) => void;

@@ -1,6 +1,0 @@
-{
-  "brochure_en.pdf": { "lang": "en", "price": "RM 3,400,000", "land": "8,000 sq ft", "builtup": "6,500 sq ft", "tenure": "Freehold", "titleType": "Individual title", "ceiling": "28 ft", "power": "150 kVA", "lot": "2/14", "type": "Semi-D factory" },
-  "brochure_bm.docx": { "lang": "bm", "price": "RM 3,200,000", "land": "8,000 sq ft", "builtup": "6,500 sq ft", "tenure": "Freehold", "titleType": "Individual title", "power": "150 kVA", "type": "Semi-D factory" },
-  "brochure_zh.docx": { "lang": "zh", "price": "RM 3,200,000", "land": "8,000 sq ft", "tenure": "Freehold", "type": "Semi-D factory" },
-  "brochure_ta.docx": { "lang": "ta", "price": "RM 3,200,000", "land": "8,000 sq ft", "type": "Factory" }
-}
