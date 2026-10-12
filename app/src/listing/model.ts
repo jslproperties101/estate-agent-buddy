@@ -152,16 +152,9 @@ export function yearsRemaining(l: Pick<Listing, 'tenure' | 'leaseExpiryYear'>, y
   return Math.max(0, l.leaseExpiryYear - year);
 }
 
-export const rm = (n?: number) => (n === undefined || !Number.isFinite(n) ? '' : (n < 0 ? '-RM ' : 'RM ') + Math.round(Math.abs(n)).toLocaleString('en-US'));
-export const rm2 = (n?: number) => (n === undefined || !Number.isFinite(n) ? '' : (n < 0 ? '-RM ' : 'RM ') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+export { rm, rm2, rmShort } from '../lib/money';
 export const sqft = (n?: number) => (n === undefined ? '' : Math.round(n).toLocaleString('en-US') + ' sq ft');
 export const landText = (n?: number) => (n === undefined ? '' : n >= 43560 ? `${(n / 43560).toFixed(2)} acres (${sqft(n)})` : sqft(n));
-export function rmShort(n?: number): string {
-  if (n === undefined) return '';
-  if (n >= 1_000_000) return `RM ${+(n / 1_000_000).toFixed(2)}m`;
-  if (n >= 100_000) return `RM ${Math.round(n / 1000)}k`;
-  return rm(n);
-}
 
 export const commissionRm = (l: Listing) =>
   l.askingPrice !== undefined && l.commissionPct !== undefined ? (l.askingPrice * l.commissionPct) / 100 : undefined;
@@ -251,6 +244,8 @@ export interface Filters {
   tenure?: Tenure;
   lotType?: LotType;
   status?: Status;
+  /** e.g. 'cobroke' for the Co-broke card. */
+  arrangement?: Arrangement;
 }
 
 export function activeCount(f: Filters): number {
@@ -275,6 +270,7 @@ export function applyFilters(list: Listing[], f: Filters): Listing[] {
     if (f.tenure && l.tenure !== f.tenure) return false;
     if (f.lotType && l.lotType !== f.lotType) return false;
     if (f.status && l.status !== f.status) return false;
+    if (f.arrangement && l.arrangement !== f.arrangement) return false;
     return true;
   });
 }

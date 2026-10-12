@@ -2,6 +2,7 @@
 // Cards hide the reference number; the detail page shows it. Every detail section has its own Edit button that
 // opens the form straight at that section.
 import { useMemo, useState } from 'react';
+import { MoneyInput } from '../ui/MoneyInput';
 import { Lang } from '../i18n';
 import { listingStrings, ListingStrings, typeLabel } from './strings';
 import {
@@ -84,7 +85,6 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const shown = useMemo(() => applyFilters(listings, f), [listings, f]);
   const n = activeCount(f);
   const set = (patch: Partial<Filters>) => setF(prev => ({ ...prev, ...patch }));
-  const numOrUndef = (v: string) => { const x = parseFloat(v.replace(/[^\d.]/g, '')); return Number.isFinite(x) ? x : undefined; };
   const ownerName = (l: Listing) => state.contacts.find(c => c.id === l.vendorId)?.name ?? l.ownerName;
 
   function onFind(c: Extract<Command, { kind: 'find' }>): number {
@@ -163,8 +163,8 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
           </div>
           <div className="small muted">{f.purpose === 'rent' ? s.priceRent : s.f.price}</div>
           <div className="two">
-            <input aria-label={`${s.f.price} ${s.min}`} inputMode="numeric" placeholder={s.min} value={f.priceMin ?? ''} onChange={e => set({ priceMin: numOrUndef(e.target.value) })} />
-            <input aria-label={`${s.f.price} ${s.max}`} inputMode="numeric" placeholder={s.max} value={f.priceMax ?? ''} onChange={e => set({ priceMax: numOrUndef(e.target.value) })} />
+            <label className="ff">{s.min}<MoneyInput aria-label={`${s.f.price} ${s.min}`} value={f.priceMin} onChange={n => set({ priceMin: n })} /></label>
+            <label className="ff">{s.max}<MoneyInput aria-label={`${s.f.price} ${s.max}`} value={f.priceMax} onChange={n => set({ priceMax: n })} /></label>
           </div>
           <div className="two">
             <button className="btn secondary" onClick={() => setF({})} disabled={!n}>{s.clear}</button>

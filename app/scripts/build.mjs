@@ -4,7 +4,7 @@
 //   EAB_SUPABASE_URL          Supabase project URL (optional cloud sync)
 //   EAB_SUPABASE_ANON_KEY     Supabase anon (public) key
 //   EAB_EXPERT_API_URL        URL of the Ask Expert AI server function (optional)
-// All of them can instead be typed on the phone in Profile & Name Card → Settings.
+// All of them can instead be typed on the phone in Agent Profile → Settings.
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'node:fs';
 

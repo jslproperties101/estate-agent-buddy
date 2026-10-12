@@ -77,7 +77,7 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
   return (
     <section className="stack" data-testid="inquiry-form">
       <div className="card stack-sm">
-        <ContactSelect lang={lang} label={a.inq.who} roles={BUYER_ROLES.slice(0, 1)} value={d.contactId || undefined} required
+        <ContactSelect lang={lang} label={a.inq.who} roles={BUYER_ROLES.slice(0, 1)} value={d.contactId || undefined} required invalid={err}
           onChange={v => { setD(x => ({ ...x, contactId: v ?? '' })); setErr(false); }} />
         {err && <p className="error" role="alert">{a.inq.contactRequired}</p>}
         {contact && <LeadPicker lang={lang} value={contact.leadStatus} onChange={(v: LeadStatus | undefined) => store.upsert('contacts', { ...contact, leadStatus: v })} />}
@@ -260,7 +260,7 @@ export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => 
   return (
     <section className="stack" data-testid="task-form">
       <div className="card stack-sm">
-        <label className="ff">{a.todo.fields.title}<input data-field="title" value={d.title} onChange={e => { setD(x => ({ ...x, title: e.target.value })); setErr(false); }} /></label>
+        <label className="ff">{a.todo.fields.title}<input data-field="title" aria-invalid={err} value={d.title} onChange={e => { setD(x => ({ ...x, title: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{a.todo.titleRequired}</p>}
         <div className="two">
           <label className="ff">{a.todo.fields.due}<input type="date" data-field="due" value={dDate} onChange={e => setDDate(e.target.value)} /></label>

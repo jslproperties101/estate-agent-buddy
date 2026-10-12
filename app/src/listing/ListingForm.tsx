@@ -18,6 +18,7 @@ import { Go, FormSection } from '../nav';
 import { OptionSelect } from '../ui/OptionSelect';
 import { StoredImage, Confirm } from '../ui/common';
 import { SpeechBox } from '../ui/SpeechBox';
+import { MoneyInput } from '../ui/MoneyInput';
 import { readDetails, ChangeKey } from './commands';
 import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix } from '../domain/refs';
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
@@ -67,10 +68,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const fromWords = (k: keyof Listing) => d.filledFrom?.[k] === 'words' ? <span className="chip stated small-chip">{s.fromWords}</span> : null;
 
   // Called as functions (not components) so inputs keep focus while typing.
-  const Text = ({ k, numeric, area, hint }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string }) => (
+  const Text = ({ k, numeric, area, hint, money }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string; money?: boolean }) => (
     <label className="ff" key={k}>
       <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
-      {area
+      {money ? <MoneyInput data-field={k as string} value={d[k] as number | undefined} onChange={n => set(k, n as never)} /> : area
         ? <textarea data-field={k} rows={3} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)} />
         : <input data-field={k} inputMode={numeric ? 'decimal' : undefined} placeholder={hint}
             value={numeric ? (shownNum(k as string, d[k]) as string) : ((d[k] as string | undefined) ?? '')}
@@ -243,7 +244,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             normalise={v => v.trim().toUpperCase()} validate={v => (checkPrefix(v) ? s.refProblem.invalidPrefix : null)}
             onChange={v => { if (v) { setD(p => ({ ...p, refPrefix: v.toUpperCase() })); setRefErr(null); } }} />
           <label className="ff">{s.l.refNo}
-            <input data-field="refNo" inputMode="numeric" value={refNoText} onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
+            <input data-field="refNo" inputMode="numeric" aria-invalid={!!(refErr || refProblem)} value={refNoText} onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
           </label>
         </div>
         <small className="muted">{s.refHint}</small>
@@ -353,7 +354,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       <div className="card stack-sm" id="sec-money" data-testid="sec-money">
         <div className="card-title">{s.sec.money}</div>
         {saleMode && <>
-          {Text({ k: 'askingPrice', numeric: true })}
+          {Text({ k: 'askingPrice', money: true })}
           <div className="two">
             {Select({ k: 'negotiable', options: ['yes', 'no'], labels: s.negotiable })}
             {Text({ k: 'commissionPct', numeric: true })}
@@ -361,11 +362,11 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {comm !== undefined && <small className="muted" data-testid="form-commission">{s.commission(rm(comm))}</small>}
         </>}
         {rentMode && <>
-          {Text({ k: 'monthlyRent', numeric: true })}
+          {Text({ k: 'monthlyRent', money: true })}
           {pair(Text({ k: 'securityDepositMonths', numeric: true }), Text({ k: 'utilityDepositMonths', numeric: true }))}
           {depositRm ? <small className="muted" data-testid="form-deposit">{s.depositRm(rm(depositRm))}</small> : null}
         </>}
-        {show('maintenanceFee') && Text({ k: 'maintenanceFee', numeric: true })}
+        {show('maintenanceFee') && Text({ k: 'maintenanceFee', money: true })}
       </div>
 
       {(rentMode || d.availability === 'tenanted' || d.tenancy) && (
@@ -376,8 +377,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             <label className="ff">{s.l.tStart}<input data-field="tenancy.start" type="month" value={d.tenancy?.start ?? ''} onChange={e => setTen('start', e.target.value || undefined)} /></label>
             <label className="ff">{s.l.tEnd}<input data-field="tenancy.end" type="month" value={d.tenancy?.end ?? ''} onChange={e => setTen('end', e.target.value || undefined)} /></label>
           </div>
-          <label className="ff">{s.l.tRent}<input data-field="tenancy.rent" inputMode="decimal" value={shownNum('tRent', d.tenancy?.rent) as string}
-            onChange={e => { setRaw(r => ({ ...r, tRent: e.target.value })); setTen('rent', num(e.target.value)); }} /></label>
+          <label className="ff">{s.l.tRent}<MoneyInput data-field="tenancy.rent" value={d.tenancy?.rent} onChange={n => setTen('rent', n)} /></label>
           <label className="ff">{s.l.tNotes}<textarea data-field="tenancy.notes" rows={2} value={d.tenancy?.notes ?? ''} onChange={e => setTen('notes', e.target.value || undefined)} /></label>
         </div>
       )}

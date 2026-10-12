@@ -13,6 +13,7 @@ import { ym, ymd, fmtDate, localeOf } from '../lib/dates';
 import { ContactSelect, PropertySelect, Empty, Confirm, Tabs } from '../ui/common';
 import { OptionSelect } from '../ui/OptionSelect';
 import { useToast } from '../ui/toast';
+import { MoneyInput } from '../ui/MoneyInput';
 
 const num = (v: string) => { const x = parseFloat(v.replace(/[^\d.]/g, '')); return Number.isFinite(x) ? x : undefined; };
 
@@ -21,7 +22,7 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
   const f = financeStrings[lang];
   const [kind, setKind] = useState<'month' | 'year'>('month');
   const [anchor, setAnchor] = useState(new Date());
-  const [editTarget, setEditTarget] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<{ amount: number | undefined } | null>(null);
   const p: Period = kind === 'month' ? { kind, key: ym(anchor) } : { kind, key: String(anchor.getFullYear()) };
   const s = summarise(p, state.deals, state.incomes, state.expenses, state.targets);
   const label = kind === 'month' ? anchor.toLocaleDateString(localeOf(lang), { month: 'long', year: 'numeric' }) : String(anchor.getFullYear());
@@ -51,13 +52,13 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
           <span>{f.target}</span>
           {s.target ? <><strong>{rm(s.target)}</strong><div className="bar"><i style={{ width: `${Math.min(100, Math.round((s.targetProgress ?? 0) * 100))}%` }} /></div><small>{f.progress(Math.round((s.targetProgress ?? 0) * 100))}</small></> : <small className="muted">{f.noTarget}</small>}
           {editTarget === null
-            ? <button className="btn small secondary" onClick={() => setEditTarget(String(target?.amount ?? ''))}>{f.setTarget}</button>
+            ? <button className="btn small secondary" onClick={() => setEditTarget({ amount: target?.amount })}>{f.setTarget}</button>
             : <div className="stack-sm">
-              <label className="ff">{f.targetFor(label)}<input inputMode="numeric" autoFocus value={editTarget} onChange={e => setEditTarget(e.target.value)} /></label>
+              <label className="ff">{f.targetFor(label)}<MoneyInput autoFocus value={editTarget.amount} onChange={n => setEditTarget({ amount: n })} /></label>
               <div className="two">
                 <button className="btn small secondary" onClick={() => setEditTarget(null)}>{strings[lang].c.cancel}</button>
                 <button className="btn small primary" onClick={() => {
-                  const amt = num(editTarget);
+                  const amt = editTarget.amount;
                   if (amt) store.upsert('targets', { id: target?.id ?? newId(), created: target?.created ?? Date.now(), updated: Date.now(), period: p.kind, key: p.key, amount: amt });
                   else if (target) store.remove('targets', target.id);
                   setEditTarget(null);
@@ -133,17 +134,16 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
   });
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [del, setDel] = useState(false);
+  const update = (k: 'value' | 'commissionPct' | 'commission' | 'sharePct' | 'receivedAmount', v: number | undefined) => setD(x => {
+    const next = { ...x, [k]: v } as Deal;
+    if ((k === 'value' || k === 'commissionPct') && next.value && next.commissionPct !== undefined) { next.commission = commissionFrom(next.value, next.commissionPct); setRaw(r => { const y = { ...r }; delete y.commission; return y; }); }
+    return next;
+  });
   const field = (k: 'value' | 'commissionPct' | 'commission' | 'sharePct' | 'receivedAmount', label: string) => (
     <label className="ff">{label}
-      <input inputMode="decimal" data-field={k} value={raw[k] ?? (d[k] ?? '')} onChange={e => {
-        const v = num(e.target.value);
-        setRaw(r => ({ ...r, [k]: e.target.value }));
-        setD(x => {
-          const next = { ...x, [k]: v } as Deal;
-          if ((k === 'value' || k === 'commissionPct') && next.value && next.commissionPct !== undefined) { next.commission = commissionFrom(next.value, next.commissionPct); setRaw(r => { const y = { ...r }; delete y.commission; return y; }); }
-          return next;
-        });
-      }} />
+      {k === 'value' || k === 'commission' || k === 'receivedAmount'
+        ? <MoneyInput data-field={k} value={d[k]} onChange={v => update(k, v)} />
+        : <input inputMode="decimal" data-field={k} value={raw[k] ?? (d[k] ?? '')} onChange={e => { setRaw(r => ({ ...r, [k]: e.target.value })); update(k, num(e.target.value)); }} />}
     </label>
   );
   return (
@@ -194,7 +194,7 @@ export function MoneyForm({ lang, back, id, kind }: { lang: Lang; back: () => vo
   const existing = id ? (state[coll] as (Expense | Income)[]).find(x => x.id === id) : undefined;
   const [date, setDate] = useState(existing?.date ?? ymd(new Date()));
   const [cat, setCat] = useState<string | undefined>(existing ? ('category' in existing ? existing.category : existing.source) : undefined);
-  const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
+  const [amount, setAmount] = useState<number | undefined>(existing?.amount);
   const [note, setNote] = useState(existing?.note ?? '');
   const [propertyId, setPropertyId] = useState(existing && 'propertyId' in existing ? existing.propertyId : undefined);
   const [err, setErr] = useState(false);
@@ -205,7 +205,7 @@ export function MoneyForm({ lang, back, id, kind }: { lang: Lang; back: () => vo
       <div className="card stack-sm">
         <label className="ff">{strings[lang].c.date}<input type="date" value={date} onChange={e => setDate(e.target.value || date)} /></label>
         <OptionSelect lang={lang} label={kind === 'expense' ? f.f.category : f.f.source} listKey={kind === 'expense' ? 'expenseCategory' : 'incomeSource'} builtIns={builtIns} value={cat} onChange={setCat} />
-        <label className="ff">{f.f.amount}<input inputMode="decimal" data-field="amount" value={amount} onChange={e => { setAmount(e.target.value); setErr(false); }} /></label>
+        <label className="ff">{f.f.amount}<MoneyInput data-field="amount" aria-invalid={err} value={amount} onChange={n => { setAmount(n); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{f.required}</p>}
         <label className="ff">{f.f.note}<input value={note} onChange={e => setNote(e.target.value)} /></label>
         {kind === 'expense' && <PropertySelect lang={lang} value={propertyId} onChange={setPropertyId} />}
@@ -214,7 +214,7 @@ export function MoneyForm({ lang, back, id, kind }: { lang: Lang; back: () => vo
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
         <button className="btn primary" data-testid={`save-${kind}`} onClick={() => {
-          const amt = num(amount);
+          const amt = amount;
           if (!amt) { setErr(true); return; }
           const base = { id: existing?.id ?? newId(), created: existing?.created ?? Date.now(), updated: Date.now(), date, amount: amt, note: note.trim() || undefined };
           if (kind === 'expense') store.upsert('expenses', { ...base, category: cat ?? EXPENSE_CATEGORIES[0], propertyId });

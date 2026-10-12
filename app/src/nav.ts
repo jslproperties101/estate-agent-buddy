@@ -38,7 +38,9 @@ export type Screen =
   | { name: 'expert' }
   | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
   | { name: 'expertThread'; id: string }
-  | { name: 'voice' };
+  | { name: 'voice' }
+  | { name: 'comingSoon'; key: 'subsale' | 'project' }
+  | { name: 'cobroke' };
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */
 export type Go = (s: Screen, opts?: { replace?: boolean }) => void;

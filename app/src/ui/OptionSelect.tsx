@@ -69,7 +69,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
             ? <button type="button" className="opt-item others" onClick={() => setTyping('')}>{c.others}</button>
             : (
               <div className="opt-new">
-                <input autoFocus aria-label={c.othersHint} placeholder={c.othersHint} value={typing}
+                <input autoFocus aria-invalid={!!err} aria-label={c.othersHint} placeholder={c.othersHint} value={typing}
                   onChange={e => { setTyping(e.target.value); setErr(null); }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTyped(); } }} />
                 <button type="button" className="btn small primary" disabled={!typing.trim()} onClick={addTyped}>{c.addValue}</button>
                 {err && <p className="error" role="alert">{err}</p>}

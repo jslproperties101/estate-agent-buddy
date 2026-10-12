@@ -2,7 +2,7 @@
 import type { Lang } from '../i18n';
 
 const en = {
-  title: 'Profile & Name Card',
+  title: 'Agent Profile',
   empty: 'Add your details to make your digital name card.',
   edit: 'Edit profile', send: 'Send name card', settings: 'Settings',
   f: { fullName: 'Full name', regType: 'Registration type', regNo: 'Registration / agent number', agency: 'Agency / company', phone: 'Contact number', email: 'Email', photo: 'Profile photo', front: 'Name card – front', back: 'Name card – back' },
@@ -51,7 +51,7 @@ const en = {
 export type ProfileStrings = typeof en;
 
 const bm: ProfileStrings = {
-  title: 'Profil & Kad Nama',
+  title: 'Profil Ejen',
   empty: 'Tambah butiran anda untuk membuat kad nama digital.',
   edit: 'Ubah profil', send: 'Hantar kad nama', settings: 'Tetapan',
   f: { fullName: 'Nama penuh', regType: 'Jenis pendaftaran', regNo: 'Nombor pendaftaran / ejen', agency: 'Agensi / syarikat', phone: 'Nombor telefon', email: 'E-mel', photo: 'Foto profil', front: 'Kad nama – depan', back: 'Kad nama – belakang' },
@@ -97,7 +97,7 @@ const bm: ProfileStrings = {
 };
 
 const zh: ProfileStrings = {
-  title: '个人资料与名片',
+  title: '经纪人资料',
   empty: '添加您的资料以制作电子名片。',
   edit: '编辑资料', send: '发送名片', settings: '设置',
   f: { fullName: '全名', regType: '注册类型', regNo: '注册 / 代理编号', agency: '代理公司', phone: '联系电话', email: '电邮', photo: '头像', front: '名片正面', back: '名片背面' },

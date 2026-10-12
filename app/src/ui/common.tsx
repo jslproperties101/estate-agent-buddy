@@ -125,8 +125,8 @@ export function PropertySelect({ lang, value, onChange, label }: { lang: Lang; v
 }
 
 /** Choose a contact, or add one on the spot (name and phone; the rest can be filled later). */
-export function ContactSelect({ lang, value, onChange, label, roles, filter, required }: {
-  lang: Lang; value?: string; onChange: (id: string | undefined) => void; label?: string; roles: ContactRole[]; filter?: (c: Contact) => boolean; required?: boolean;
+export function ContactSelect({ lang, value, onChange, label, roles, filter, required, invalid }: {
+  lang: Lang; value?: string; onChange: (id: string | undefined) => void; label?: string; roles: ContactRole[]; filter?: (c: Contact) => boolean; required?: boolean; invalid?: boolean;
 }) {
   const { state, store } = useApp();
   const c = strings[lang].c;
@@ -137,15 +137,15 @@ export function ContactSelect({ lang, value, onChange, label, roles, filter, req
   return (
     <div className="ff">
       <label className="ff">{label ?? c.contact}
-        <select data-field="contactId" value={value ?? ''} onChange={e => onChange(e.target.value || undefined)}>
+        <select data-field="contactId" aria-invalid={invalid || undefined} value={value ?? ''} onChange={e => onChange(e.target.value || undefined)}>
           <option value="">{required ? c.choose : c.noContact}</option>
           {list.map(x => <option key={x.id} value={x.id}>{x.name}{x.phone ? ` · ${x.phone}` : ''}</option>)}
         </select>
       </label>
       {!adding ? <button type="button" className="btn small ghost" onClick={() => setAdding(true)}>{c.newContact}</button> : (
         <div className="sub-card stack-sm">
-          <input aria-label={c.name} placeholder={c.name} value={name} onChange={e => setName(e.target.value)} />
-          <input aria-label={c.phone} type="tel" inputMode="tel" placeholder="+60" value={phone} onChange={e => setPhone(e.target.value)} />
+          <label className="ff">{c.name}<input value={name} onChange={e => setName(e.target.value)} /></label>
+          <label className="ff">{c.phone}<input type="tel" inputMode="tel" placeholder="+60" value={phone} onChange={e => setPhone(e.target.value)} /></label>
           <div className="two">
             <button type="button" className="btn small secondary" onClick={() => { setAdding(false); setName(''); setPhone(''); }}>{c.cancel}</button>
             <button type="button" className="btn small primary" disabled={!name.trim()} onClick={() => {

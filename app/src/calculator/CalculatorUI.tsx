@@ -9,6 +9,7 @@ import {
   Assumptions, DEFAULT_ASSUMPTIONS, purchase, rental, sale, agentCommission, PurchaseInput, RentalInput, SaleInput, TierPart,
 } from '../domain/calculator';
 import { rm, rm2, cardTitle } from '../listing/model';
+import { MoneyInput } from '../ui/MoneyInput';
 
 type Tab = 'purchase' | 'rental' | 'sale' | 'commission' | 'assumptions';
 
@@ -39,7 +40,11 @@ function fromFlat(f: Record<string, number> | undefined): Assumptions {
 const numOf = (v: string) => { const x = parseFloat(v.replace(/[^\d.-]/g, '')); return Number.isFinite(x) ? x : 0; };
 
 /** A number box that keeps what the agent types (e.g. "4." or "") while giving the calculation a number. */
-function Num({ label, value, onChange, testId }: { label: string; value: number; onChange: (n: number) => void; testId?: string }) {
+function Num({ label, value, onChange, testId, money }: { label: string; value: number; onChange: (n: number) => void; testId?: string; money?: boolean }) {
+  if (money) return <label className="ff">{label}<MoneyInput data-field={testId} value={value} onChange={n => onChange(n ?? 0)} /></label>;
+  return <PlainNum label={label} value={value} onChange={onChange} testId={testId} />;
+}
+function PlainNum({ label, value, onChange, testId }: { label: string; value: number; onChange: (n: number) => void; testId?: string }) {
   const [text, setText] = useState(String(value));
   const shown = numOf(text) === value ? text : String(value);
   return <label className="ff">{label}<input inputMode="decimal" data-field={testId} value={shown} onChange={e => { setText(e.target.value); onChange(numOf(e.target.value)); }} /></label>;
@@ -76,7 +81,7 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
 
       {(tab === 'purchase' || tab === 'rental') && (
         <div className="card stack-sm">
-          <Num label={t.in.price} value={p.price} onChange={n => setP(x => ({ ...x, price: n }))} testId="price" />
+          <Num money label={t.in.price} value={p.price} onChange={n => setP(x => ({ ...x, price: n }))} testId="price" />
           <div className="two">
             <Num label={t.in.downPct} value={p.downPct} onChange={n => setP(x => ({ ...x, downPct: n }))} testId="downPct" />
             <Num label={t.in.tenure} value={p.tenureYears} onChange={n => setP(x => ({ ...x, tenureYears: n }))} testId="tenure" />
@@ -90,8 +95,8 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
             </label>
             {p.buyer === 'citizen' && <label className="check"><input type="checkbox" checked={p.firstHome} onChange={e => setP(x => ({ ...x, firstHome: e.target.checked }))} /> {t.in.firstHome} (≤ {rm(a.firstHomeCap)})</label>}
             <div className="two">
-              <Num label={t.in.valuation} value={p.valuationFee} onChange={n => setP(x => ({ ...x, valuationFee: n }))} />
-              <Num label={t.in.other} value={p.otherCosts} onChange={n => setP(x => ({ ...x, otherCosts: n }))} />
+              <Num money label={t.in.valuation} value={p.valuationFee} onChange={n => setP(x => ({ ...x, valuationFee: n }))} />
+              <Num money label={t.in.other} value={p.otherCosts} onChange={n => setP(x => ({ ...x, otherCosts: n }))} />
             </div>
           </>}
         </div>
@@ -125,16 +130,16 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
       {tab === 'rental' && (
         <>
           <div className="card stack-sm">
-            <Num label={t.in.rent} value={r.monthlyRent} onChange={n => setR(x => ({ ...x, monthlyRent: n }))} testId="rent" />
+            <Num money label={t.in.rent} value={r.monthlyRent} onChange={n => setR(x => ({ ...x, monthlyRent: n }))} testId="rent" />
             <div className="two">
-              <Num label={t.in.maint} value={r.maintenanceMonthly} onChange={n => setR(x => ({ ...x, maintenanceMonthly: n }))} />
+              <Num money label={t.in.maint} value={r.maintenanceMonthly} onChange={n => setR(x => ({ ...x, maintenanceMonthly: n }))} />
               <Num label={t.in.vacancy} value={r.vacancyMonths} onChange={n => setR(x => ({ ...x, vacancyMonths: n }))} />
             </div>
             <div className="two">
-              <Num label={t.in.quit} value={r.quitRentAssessmentYearly} onChange={n => setR(x => ({ ...x, quitRentAssessmentYearly: n }))} />
-              <Num label={t.in.insurance} value={r.insuranceYearly} onChange={n => setR(x => ({ ...x, insuranceYearly: n }))} />
+              <Num money label={t.in.quit} value={r.quitRentAssessmentYearly} onChange={n => setR(x => ({ ...x, quitRentAssessmentYearly: n }))} />
+              <Num money label={t.in.insurance} value={r.insuranceYearly} onChange={n => setR(x => ({ ...x, insuranceYearly: n }))} />
             </div>
-            <Num label={t.in.otherMonthly} value={r.otherMonthly} onChange={n => setR(x => ({ ...x, otherMonthly: n }))} />
+            <Num money label={t.in.otherMonthly} value={r.otherMonthly} onChange={n => setR(x => ({ ...x, otherMonthly: n }))} />
           </div>
           <div className="card stack-sm calc-out" data-testid="rental-result">
             <Row k={t.out.grossYearly} v={rm2(rr.grossYearly)} />
@@ -158,10 +163,10 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
       {tab === 'sale' && (
         <>
           <div className="card stack-sm">
-            <Num label={t.in.salePrice} value={s.salePrice} onChange={n => setS(x => ({ ...x, salePrice: n }))} testId="salePrice" />
+            <Num money label={t.in.salePrice} value={s.salePrice} onChange={n => setS(x => ({ ...x, salePrice: n }))} testId="salePrice" />
             <div className="two">
-              <Num label={t.in.purchasePrice} value={s.purchasePrice} onChange={n => setS(x => ({ ...x, purchasePrice: n }))} testId="purchasePrice" />
-              <Num label={t.in.purchaseCosts} value={s.purchaseCosts} onChange={n => setS(x => ({ ...x, purchaseCosts: n }))} />
+              <Num money label={t.in.purchasePrice} value={s.purchasePrice} onChange={n => setS(x => ({ ...x, purchasePrice: n }))} testId="purchasePrice" />
+              <Num money label={t.in.purchaseCosts} value={s.purchaseCosts} onChange={n => setS(x => ({ ...x, purchaseCosts: n }))} />
             </div>
             <div className="two">
               <Num label={t.in.years} value={s.holdingYears} onChange={n => setS(x => ({ ...x, holdingYears: n }))} testId="years" />
@@ -169,10 +174,10 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
             </div>
             <label className="check"><input type="checkbox" checked={s.commissionSst} onChange={e => setS(x => ({ ...x, commissionSst: e.target.checked }))} /> {t.in.commSst}</label>
             <div className="two">
-              <Num label={t.in.loanLeft} value={s.outstandingLoan} onChange={n => setS(x => ({ ...x, outstandingLoan: n }))} />
-              <Num label={t.in.penalty} value={s.earlySettlementPenalty} onChange={n => setS(x => ({ ...x, earlySettlementPenalty: n }))} />
+              <Num money label={t.in.loanLeft} value={s.outstandingLoan} onChange={n => setS(x => ({ ...x, outstandingLoan: n }))} />
+              <Num money label={t.in.penalty} value={s.earlySettlementPenalty} onChange={n => setS(x => ({ ...x, earlySettlementPenalty: n }))} />
             </div>
-            <Num label={t.in.otherSale} value={s.otherSaleCosts} onChange={n => setS(x => ({ ...x, otherSaleCosts: n }))} />
+            <Num money label={t.in.otherSale} value={s.otherSaleCosts} onChange={n => setS(x => ({ ...x, otherSaleCosts: n }))} />
           </div>
           <div className="card stack-sm calc-out" data-testid="sale-result">
             <Row k={`${t.out.commission} (${s.commissionPct}%)`} v={rm2(sr.commission)} />
@@ -196,7 +201,7 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
       {tab === 'commission' && (
         <>
           <div className="card stack-sm">
-            <Num label={t.in.dealValue} value={cv.value} onChange={n => setCv(x => ({ ...x, value: n }))} testId="dealValue" />
+            <Num money label={t.in.dealValue} value={cv.value} onChange={n => setCv(x => ({ ...x, value: n }))} testId="dealValue" />
             <Num label={t.in.commPct} value={cv.pct} onChange={n => setCv(x => ({ ...x, pct: n }))} testId="commPct" />
             <label className="check"><input type="checkbox" checked={cv.sst} onChange={e => setCv(x => ({ ...x, sst: e.target.checked }))} /> {t.in.commSst}</label>
           </div>
@@ -214,20 +219,20 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
           {a.motTiers.map((_, i) => <Num key={`m${i}`} label={t.as.motTier(i)} value={flat[`mot${i}`]} onChange={n => setA({ [`mot${i}`]: n })} />)}
           <Num label={t.as.nonCitizen} value={flat.nonCitizen} onChange={n => setA({ nonCitizen: n })} />
           <Num label={t.as.loanStamp} value={flat.loanStamp} onChange={n => setA({ loanStamp: n })} />
-          <Num label={t.as.firstHomeCap} value={flat.firstHomeCap} onChange={n => setA({ firstHomeCap: n })} />
+          <Num money label={t.as.firstHomeCap} value={flat.firstHomeCap} onChange={n => setA({ firstHomeCap: n })} />
           <strong>{t.as.legal}</strong>
           {a.legalTiers.map((_, i) => <Num key={`l${i}`} label={t.as.legalTier(i)} value={flat[`legal${i}`]} onChange={n => setA({ [`legal${i}`]: n })} />)}
-          <Num label={t.as.legalMin} value={flat.legalMin} onChange={n => setA({ legalMin: n })} />
+          <Num money label={t.as.legalMin} value={flat.legalMin} onChange={n => setA({ legalMin: n })} />
           <Num label={t.as.sst} value={flat.sst} onChange={n => setA({ sst: n })} />
           <div className="two">
-            <Num label={t.as.spaDisb} value={flat.spaDisb} onChange={n => setA({ spaDisb: n })} />
-            <Num label={t.as.loanDisb} value={flat.loanDisb} onChange={n => setA({ loanDisb: n })} />
+            <Num money label={t.as.spaDisb} value={flat.spaDisb} onChange={n => setA({ spaDisb: n })} />
+            <Num money label={t.as.loanDisb} value={flat.loanDisb} onChange={n => setA({ loanDisb: n })} />
           </div>
           <strong>{t.as.rpgt}</strong>
           {a.rpgtByYear.map((_, i) => <Num key={`r${i}`} label={t.as.rpgtYear(i)} value={flat[`rpgt${i}`]} onChange={n => setA({ [`rpgt${i}`]: n })} />)}
           <div className="two">
             <Num label={t.as.rpgtExemptPct} value={flat.rpgtExemptPct} onChange={n => setA({ rpgtExemptPct: n })} />
-            <Num label={t.as.rpgtExemptMin} value={flat.rpgtExemptMin} onChange={n => setA({ rpgtExemptMin: n })} />
+            <Num money label={t.as.rpgtExemptMin} value={flat.rpgtExemptMin} onChange={n => setA({ rpgtExemptMin: n })} />
           </div>
           <small className="muted">{t.as.saved}</small>
           <small className="muted">{t.as.sources}</small>

@@ -32,11 +32,13 @@ import { VoiceCommand } from './voice/VoiceCommandUI';
 import { StoredImage } from './ui/common';
 import {
   IconBack, IconNews, IconTodo, IconCalendar, IconTrend, IconHome, IconVendor, IconBuyer, IconGps, IconExpert,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard,
+  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconSubsale, IconProject, IconCobroke,
 } from './icons';
+import { explorerProgress } from './domain/explorer';
 
-/** The 12 home buttons, in the agreed order. */
-const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] = [
+/** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone). `soon` marks a card whose screen says
+ *  plainly that the feature is not built yet. */
+const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
   { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
   { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
@@ -49,6 +51,9 @@ const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] = [
   { key: 'profile', icon: () => <IconCard />, target: { name: 'profile' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
   { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
+  { key: 'subsale', icon: () => <IconSubsale />, target: { name: 'comingSoon', key: 'subsale' }, soon: true },
+  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' }, soon: true },
+  { key: 'cobroke', icon: () => <IconCobroke />, target: { name: 'cobroke' } },
 ];
 
 export default function App() {
@@ -207,6 +212,8 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'expertAsk': return expertStrings[lang].experts[s.expert];
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
     case 'voice': return t.tiles.voice;
+    case 'comingSoon': return t.tiles[s.key];
+    case 'cobroke': return t.tiles.cobroke;
   }
 }
 
@@ -246,6 +253,14 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'expertAsk': return <ExpertAsk lang={lang} go={(next, o) => go(next, { replace: true, ...o })} expert={s.expert} propertyId={s.propertyId} />;
     case 'expertThread': return <ExpertThreadScreen key={s.id} lang={lang} go={go} id={s.id} />;
     case 'voice': return <VoiceCommand lang={lang} go={go} />;
+    case 'comingSoon': return (
+      <section className="card stack-sm coming-soon" data-testid={`soon-${s.key}`}>
+        <span className="badge soon-badge fit">{t.comingSoon}</span>
+        <p>{t.soon[s.key]}</p>
+        <small className="muted">{t.soon.note}</small>
+      </section>
+    );
+    case 'cobroke': return <Cobroke lang={lang} go={go} />;
   }
 }
 
@@ -255,12 +270,25 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const ls = listingStrings[lang];
   const today = todayCounts(state.tasks, state.appointments, new Date());
   const recent = [...state.properties].sort((a, b) => b.updated - a.updated).slice(0, 3);
+  const xp = explorerProgress(state.journeys, state.properties);
   return (
     <section className="stack home">
+      <button className="explorer" onClick={() => go({ name: 'gps' })} data-testid="explorer-progress" aria-label={`${t.explorer.title}: ${xp.kmWeek} ${t.explorer.km}, ${xp.mapped} / ${xp.total} ${t.explorer.mapped}, ${xp.trips} ${t.explorer.trips}`}>
+        <span className="explorer-title"><IconGps size={18} /> {t.explorer.title}</span>
+        <span className="explorer-stats">
+          <span><strong data-testid="xp-km">{xp.kmWeek}</strong><small>{t.explorer.km}</small></span>
+          <span><strong data-testid="xp-mapped">{xp.mapped}<em>/{xp.total}</em></strong><small>{t.explorer.mapped}</small></span>
+          <span><strong data-testid="xp-trips">{xp.trips}</strong><small>{t.explorer.trips}</small></span>
+        </span>
+        {xp.total > 0 && <span className="explorer-bar" aria-hidden="true"><i style={{ width: `${Math.round((xp.mapped / xp.total) * 100)}%` }} /></span>}
+        {xp.trips === 0 && <small className="muted">{t.explorer.empty}</small>}
+      </button>
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
-          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} onClick={() => go(tile.target)} aria-label={t.tiles[tile.key]}>
+          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''} ${tile.soon ? 'soon' : ''}`} data-tile={i + 1} onClick={() => go(tile.target)}
+            aria-label={tile.soon ? `${t.tiles[tile.key]} (${t.comingSoon})` : t.tiles[tile.key]}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{t.tiles[tile.key]}</span>
+            {tile.soon && <span className="tile-soon" aria-hidden="true">{t.comingSoon}</span>}
           </button>
         ))}
       </nav>
@@ -311,6 +339,27 @@ function News({ lang }: { lang: Lang }) {
         </article>
       ))}
       <p className="notice">{n.rule}</p>
+    </section>
+  );
+}
+
+function Cobroke({ lang, go }: { lang: Lang; go: Go }) {
+  const { state } = useApp();
+  const t = strings[lang].cobrokePage;
+  const n = state.properties.filter(p => p.arrangement === 'cobroke').length;
+  return (
+    <section className="stack" data-testid="cobroke">
+      <div className="card stack-sm">
+        <p>{t.intro}</p>
+        <strong data-testid="cobroke-count">{t.count(n)}</strong>
+        {n > 0
+          ? <button className="btn primary" onClick={() => go({ name: 'listing', filters: { arrangement: 'cobroke' } })}>{t.show}</button>
+          : <small className="muted">{t.none}</small>}
+      </div>
+      <div className="card stack-sm coming-soon">
+        <span className="badge soon-badge fit">{t.soonTitle}</span>
+        <p>{t.soonBody}</p>
+      </div>
     </section>
   );
 }

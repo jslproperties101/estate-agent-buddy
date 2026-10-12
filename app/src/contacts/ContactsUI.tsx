@@ -139,7 +139,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
   return (
     <section className="stack" data-testid="contact-form">
       <div className="card stack-sm">
-        <label className="ff">{s.f.name}<input data-field="name" value={d.name} onChange={e => { setD(x => ({ ...x, name: e.target.value })); setErr(false); }} /></label>
+        <label className="ff">{s.f.name}<input data-field="name" aria-invalid={err} value={d.name} onChange={e => { setD(x => ({ ...x, name: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{t.c.nameRequired}</p>}
         <label className="ff">{s.f.phone}<input data-field="phone" type="tel" inputMode="tel" value={d.phone ?? ''} onChange={e => setD(x => ({ ...x, phone: e.target.value || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
         {dup && <p className="warn-text" role="status">{s.duplicate(dup.name)} <button className="link-btn" onClick={() => go({ name: 'contactDetail', id: dup.id })}>{s.openExisting}</button></p>}

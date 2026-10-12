@@ -73,7 +73,7 @@ const shot = (page, name, fullPage = true) => page.screenshot({ path: `${SHOTS}$
 const tile = (page, name) => page.locator('nav.grid > button', { hasText: name }).first().click();
 async function home(page) { while (await page.locator('header button[aria-label="Back"], header button[aria-label="Kembali"], header button[aria-label="返回"]').count()) await page.locator('header .icon-btn').first().click(); }
 async function loadSample(page) {
-  await tile(page, 'Profile & Name Card');
+  await tile(page, 'Agent Profile');
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByTestId('load-sample').click();
   await home(page);
@@ -98,14 +98,22 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard: Estate Agent Buddy, 12 tiles in the agreed order, removed cards gone, no sideways scroll', async () => {
+test('U1 dashboard: Estate Agent Buddy, explorer progress, 15 cards in 3 × 5, Agent Profile, no sideways scroll', async () => {
   const page = await phone();
   assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent Buddy');
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
   assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Property List', 'Vendor List', 'Buyer List', 'GPS Assistance',
-    'Agent Financial', 'Property Calculator', 'Profile & Name Card', 'Ask Expert', 'Voice Command']);
-  assert.equal(await page.evaluate(() => document.querySelector('main.content > section > *')?.tagName), 'NAV', 'the page starts with the 12 tiles');
-  for (const gone of [/Explorer progress/i, /GPS map/i, /Smart Capture/i, /Coming soon/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
+    'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'Voice Command',
+    'Subsale (Coming Soon)', 'Project (Coming Soon)', 'Co-broke']);
+  // Master instruction (12 Oct 2026): explorer progress near the top, then all 15 cards together in one grid.
+  assert.deepEqual(await page.evaluate(() => [...document.querySelector('main.content > section').children].slice(0, 2).map(e => e.getAttribute('data-testid') ?? e.tagName)),
+    ['explorer-progress', 'NAV']);
+  // 3 columns × 5 rows on a phone.
+  const boxes = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
+  assert.equal(new Set(boxes.map(b => b[0])).size, 3, 'three columns');
+  assert.equal(new Set(boxes.map(b => b[1])).size, 5, 'five rows');
+  assert.equal(await page.getByText(/Profile & Name Card/).count(), 0, 'renamed to Agent Profile');
+  for (const gone of [/GPS map/i, /Smart Capture/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(8, 8, 10)', 'black theme');
   assert.deepEqual(await layoutProblems(page), []);
   await shot(page, '01-home-en', false);
@@ -510,7 +518,7 @@ test('U16 Property Calculator: pre-filled from the property, full breakdown, edi
   await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
   await page.getByRole('button', { name: 'Calculate' }).click();
   assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
-  assert.equal(await page.locator('[data-field="price"]').inputValue(), '580000');
+  assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000');
   for (const id of ['out-down', 'out-loan', 'out-monthly', 'out-interest', 'out-repay', 'out-mot', 'out-loanstamp', 'out-spa-legal', 'out-loan-legal', 'out-cash'])
     assert.match(await page.getByTestId(id).innerText(), /^RM [\d,]+\.\d\d$/, id);
   assert.equal(await page.getByTestId('out-mot').innerText(), 'RM 11,400.00', 'MOT on RM580,000: 1,000 + 8,000 + 2,400');
@@ -525,10 +533,10 @@ test('U16 Property Calculator: pre-filled from the property, full breakdown, edi
   await page.context().close();
 });
 
-test('U17 Profile & Name Card: details, REN/PEA/REA/Others, remembered check boxes, WhatsApp opened for review only', async () => {
+test('U17 Agent Profile (was Profile & Name Card): details, REN/PEA/REA/Others, remembered check boxes, WhatsApp opened for review only', async () => {
   const page = await phone();
   await loadSample(page);
-  await tile(page, 'Profile & Name Card');
+  await tile(page, 'Agent Profile');
   await page.getByRole('button', { name: 'Edit profile' }).click();
   await page.locator('[data-field="fullName"]').fill('Lee Ah Kow');
   const reg = page.getByTestId('opt-regType');
@@ -556,7 +564,7 @@ test('U17 Profile & Name Card: details, REN/PEA/REA/Others, remembered check box
   await (await popup).close();
   await shot(page, '13-namecard-send');
   await page.reload(); await page.waitForSelector('nav.grid');
-  await tile(page, 'Profile & Name Card');
+  await tile(page, 'Agent Profile');
   await page.getByRole('button', { name: 'Send name card' }).click();
   assert.equal(await page.locator('[data-choice="email"]').isChecked(), false, 'previous choices preselected');
   assert.equal(await page.locator('[data-choice="back"]').isChecked(), true);
@@ -600,7 +608,7 @@ test('U19 Voice Command: property, to-do, calendar and contact commands open the
   assert.match(await page.getByTestId('proposal').innerText(), /Encik Ahmad/);
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await page.waitForSelector('[data-testid="listing-form"]');
-  assert.equal(await page.locator('[data-field="askingPrice"]').inputValue(), '580000');
+  assert.equal(await page.locator('[data-field="askingPrice"]').inputValue(), '580,000', 'RM shown with thousands separators');
   assert.match(await page.getByTestId('opt-township').innerText(), /Putra Nilai/);
   assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), 'Encik Ahmad');
   assert.ok(await page.locator('.small-chip', { hasText: 'from your words' }).first().isVisible());
@@ -624,6 +632,9 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
     ['profile', async () => { await page.locator('nav.grid > button').nth(9).click(); }],
     ['expert', async () => { await page.locator('nav.grid > button').nth(10).click(); }],
     ['voice', async () => { await page.locator('nav.grid > button').nth(11).click(); }],
+    ['subsale', async () => { await page.locator('nav.grid > button').nth(12).click(); }],
+    ['project', async () => { await page.locator('nav.grid > button').nth(13).click(); }],
+    ['cobroke', async () => { await page.locator('nav.grid > button').nth(14).click(); }],
   ];
   const report = [];
   for (const lang of ['EN', 'BM', '中文']) {
@@ -669,6 +680,120 @@ test('U21 readability: no text under 14 px and no button under 44 px on the main
     assert.deepEqual(r.small, [], 'small text');
     assert.deepEqual(r.short, [], 'small buttons');
   }
+  await page.context().close();
+});
+
+test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear labels — on every form', async () => {
+  const page = await phone();
+  await loadSample(page);
+  // Contrast of a colour against the field background, as WCAG computes it.
+  const fieldLook = (sel) => page.locator(sel).first().evaluate(el => {
+    const lum = c => { const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map(v => v / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const cs = getComputedStyle(el);
+    const label = el.closest('.ff');
+    return { border: cs.borderTopColor, width: parseFloat(cs.borderTopWidth) + (/inset 0px 0px 0px 1px/.test(cs.boxShadow) || /0px 0px 0px 1px inset/.test(cs.boxShadow) ? 1 : 0), contrast: ratio(cs.borderTopColor, cs.backgroundColor),
+      labelColour: label ? getComputedStyle(label).color : null, labelSize: label ? parseFloat(getComputedStyle(label).fontSize) : null };
+  });
+  const forms = [
+    ['property form', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="street"]'],
+    ['property form dropdown', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="purpose"]'],
+    ['property form custom dropdown', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '.opt-btn'],
+    ['property form money', async () => { await tile(page, 'Property List'); await page.locator('.add-property').click(); }, '[data-field="askingPrice"]'],
+    ['contact form', async () => { await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click(); }, '[data-field="name"]'],
+    ['calculator', async () => { await tile(page, 'Property Calculator'); }, '[data-field="price"]'],
+    ['to-do form', async () => { await tile(page, 'To-Do'); await page.getByRole('button', { name: /New to-do|Add/ }).first().click(); }, '[data-field="title"]'],
+    ['agent profile', async () => { await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click(); }, '[data-field="fullName"]'],
+  ];
+  for (const [name, open, sel] of forms) {
+    await home(page); await open();
+    const f = await fieldLook(sel);
+    assert.ok(f.contrast >= 3, `${name}: border contrast ${f.contrast.toFixed(2)} should be at least 3:1`);
+    assert.ok(f.width >= 2, `${name}: border + inner line ${f.width}px`);
+    if (f.labelColour) {
+      assert.equal(f.labelColour, 'rgb(218, 211, 195)', `${name}: label uses the clearer label colour`);
+      assert.ok(f.labelSize >= 15, `${name}: label size ${f.labelSize}`);
+    }
+  }
+  // Focus: gold border. Error: red border on the field that has the problem.
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').focus();
+  await page.waitForTimeout(250); // let the colour transition finish
+  assert.equal((await fieldLook('[data-field="name"]')).border, 'rgb(212, 175, 55)', 'focused field is gold');
+  await page.getByTestId('save-contact').click();
+  assert.equal(await page.locator('[data-field="name"]').getAttribute('aria-invalid'), 'true');
+  await page.locator('input[type="email"]').focus();
+  await page.waitForTimeout(250);
+  assert.equal((await fieldLook('[data-field="name"]')).border, 'rgb(255, 138, 122)', 'field with an error is red');
+  await shot(page, '23-contact-error', false);
+  // Open custom dropdown: gold border on the box and the list.
+  await home(page); await tile(page, 'Property List'); await page.locator('.add-property').click();
+  await page.getByTestId('opt-type').locator('.opt-btn').click();
+  await page.mouse.move(0, 0); await page.waitForTimeout(250);
+  assert.equal(await page.getByTestId('opt-type').locator('.opt-btn').evaluate(el => getComputedStyle(el).borderTopColor), 'rgb(212, 175, 55)');
+  await shot(page, '23-form-fields', false);
+  await page.context().close();
+});
+
+test('U24 RM money boxes: separators while typing, plain number saved, paste understood, same everywhere', async () => {
+  const page = await phone();
+  await tile(page, 'Property List');
+  await page.locator('.add-property').click();
+  const price = page.locator('[data-field="askingPrice"]');
+  await price.click();
+  await price.pressSequentially('1500000');
+  assert.equal(await price.inputValue(), '1,500,000');
+  // Edit in the middle: put the cursor after "1," and delete the "5".
+  await price.evaluate(el => el.setSelectionRange(3, 3));
+  await page.keyboard.press('Backspace');
+  assert.equal(await price.inputValue(), '100,000');
+  await page.keyboard.type('2');
+  assert.equal(await price.inputValue(), '1,200,000', 'cursor stays in place while commas move');
+  await price.fill('');
+  assert.equal(await price.inputValue(), '');
+  await price.fill('RM 580,000.50');
+  assert.equal(await price.inputValue(), '580,000.50');
+  await price.fill('588000');
+  await page.locator('[data-field="street"]').fill('Jalan Wang 1');
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  const saved = await page.evaluate(() => new Promise(res => {
+    const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => res(q.result.filter(x => x && x.street === 'Jalan Wang 1').map(x => x.askingPrice)); };
+  }));
+  assert.deepEqual(saved, [588000], 'stored as a plain number');
+  assert.match(await page.locator('main').innerText(), /RM 588,000/);
+  // Same box in Agent Financial and the calculator.
+  await home(page); await tile(page, 'Agent Financial');
+  await page.getByRole('button', { name: /expense/i }).first().click();
+  const amt = page.locator('[data-field="amount"]');
+  await amt.pressSequentially('12345.6');
+  assert.equal(await amt.inputValue(), '12,345.6');
+  await home(page); await tile(page, 'Property Calculator');
+  const cp = page.locator('[data-field="price"]');
+  await cp.fill('750000');
+  assert.equal(await cp.inputValue(), '750,000');
+  await page.context().close();
+});
+
+test('U25 new cards: Subsale and Project say Coming Soon; Co-broke lists real co-broke properties only', async () => {
+  const page = await phone();
+  await tile(page, 'Subsale');
+  assert.ok(await page.getByTestId('soon-subsale').isVisible());
+  assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/);
+  await home(page); await tile(page, 'Project');
+  assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/);
+  await home(page); await tile(page, 'Co-broke');
+  assert.match(await page.getByTestId('cobroke-count').innerText(), /^0 co-broke/);
+  await home(page); await loadSample(page);
+  await tile(page, 'Co-broke');
+  const count = Number((await page.getByTestId('cobroke-count').innerText()).match(/\d+/)[0]);
+  assert.ok(count >= 1, 'sample data has co-broke properties');
+  await page.getByRole('button', { name: 'Show co-broke properties' }).click();
+  assert.equal(await page.getByTestId('listing-card').count(), count, 'only co-broke properties are listed');
+  // Explorer progress counts real records only (sample data is left out).
+  await home(page);
+  assert.equal(await page.getByTestId('xp-trips').innerText(), '0');
+  assert.match(await page.getByTestId('xp-mapped').innerText(), /^0\/0$/);
   await page.context().close();
 });
 

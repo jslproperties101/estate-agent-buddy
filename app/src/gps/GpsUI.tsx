@@ -1,6 +1,7 @@
 // GPS Assistance: two large cards — House Shopping (route tracker that saves properties found on the way) and
 // Map (saved properties on Google Maps, move between them, navigate). Only real saved positions are shown.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { MoneyInput } from '../ui/MoneyInput';
 import { Lang, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
 import { newId } from '../data/store';
@@ -207,7 +208,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
   const near = nearby(at, state.properties, 100);
   const [type, setType] = useState<string | undefined>();
   const [note, setNote] = useState('');
-  const [price, setPrice] = useState('');
+  const [price, setPrice] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const mark = (propertyId?: string, n?: string) => onMark({ id: newId(), lat: at.lat, lng: at.lng, at: Date.now(), propertyId, note: n });
 
@@ -218,7 +219,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
     const p: Listing = {
       id: newId(), created: Date.now(), updated: Date.now(), photos: [], ref: makeRef(prefix, no), refPrefix: prefix, refNo: no,
       type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), status: 'needs_check', country: DEFAULT_COUNTRY,
-      lat: at.lat, lng: at.lng, geoSource: 'gps', geoAccuracy: acc, askingPrice: Number(price.replace(/\D/g, '')) || undefined,
+      lat: at.lat, lng: at.lng, geoSource: 'gps', geoAccuracy: acc, askingPrice: price || undefined,
       history: [{ at: Date.now(), source: 'map', summary: 'House Shopping' }],
     };
     // Address parts from Google Maps are used only when they match the saved dropdown values; anything new is
@@ -261,7 +262,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
           <div className="card-title">{g.newHere}</div>
           <OptionSelect lang={lang} label={g.quickType} listKey="type" builtIns={TYPES.map(v => ({ value: v, label: ls.types[v] }))} value={type} onChange={setType} />
           <label className="ff">{g.quickNote}<input value={note} onChange={e => setNote(e.target.value)} /></label>
-          <label className="ff">{g.quickPrice}<input inputMode="numeric" value={price} onChange={e => setPrice(e.target.value)} /></label>
+          <label className="ff">{g.quickPrice}<MoneyInput value={price} onChange={setPrice} /></label>
           <button className="btn primary" disabled={busy} onClick={() => void saveNew()} data-testid="save-found">{g.saveProperty}</button>
         </div>
         <button className="btn secondary" onClick={() => mark(undefined, note.trim() || undefined)}>{g.markOnly}</button>

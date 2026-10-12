@@ -128,20 +128,58 @@ small, .small { font-size: 14px; }
 .chip-btn[aria-pressed="true"], .chip-btn.on, .chip-btn[aria-checked="true"] { background: var(--gold-grad); color: var(--on-gold); border-color: #B8902B; }
 .check { display: flex; gap: 10px; align-items: center; min-height: 44px; font-size: 15px; }
 
-/* Forms */
-textarea, input:not([type]), input[type="text"], input[type="tel"], input[type="email"], input[type="url"], input[type="password"], input[type="date"],
-input[type="month"], input[type="time"], input[type="datetime-local"], input[type="search"], input[type="number"] {
-  width: 100%; border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; font-size: 16px; background: #0E0E10; color: var(--ink); min-height: 48px;
+/* Forms — one shared look for every control a person can type into or choose from.
+   Field borders are measured against the black field background (WCAG 1.4.11 asks 3:1 for control borders):
+   normal #7A7262 = 4.0:1 (the old #4A4231 was 1.9:1), hover #A39883 = 6.8:1, focus = gold.
+   A field's border is deliberately lighter than the card border (--line) around it, so the two never blur together. */
+:root {
+  --field-bg: #0E0E10;
+  --field-line: #7A7262;
+  --field-line-hover: #A39883;
+  --field-focus: var(--gold);
+  --field-disabled-bg: #17171A;
+  --field-disabled-line: #4A4231;
+  --field-disabled-ink: #A39883;
+  --label-ink: #DAD3C3;
+  --placeholder: #7E786C;
+  /* Second, softer 1px line inside the border: browsers round 1.5px borders down to 1px, so the extra
+     thickness is drawn as an inset shadow instead. */
+  --field-inner: inset 0 0 0 1px rgba(122, 114, 98, .45);
 }
-textarea::placeholder, input::placeholder { color: #8F897C; }
-select { width: 100%; min-height: 48px; border: 1px solid var(--line-2); border-radius: 10px; padding: 0 10px; font-size: 16px; color: var(--ink); background: #0E0E10; }
+textarea, input:not([type]), input[type="text"], input[type="tel"], input[type="email"], input[type="url"], input[type="password"], input[type="date"],
+input[type="month"], input[type="time"], input[type="datetime-local"], input[type="search"], input[type="number"], select, .opt-btn {
+  width: 100%; border: 1px solid var(--field-line); box-shadow: var(--field-inner); border-radius: 10px; padding: 10px 12px; font-size: 16px; background-color: var(--field-bg); color: var(--ink); min-height: 48px;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+textarea::placeholder, input::placeholder { color: var(--placeholder); opacity: 1; }
+:is(textarea, input, select, .opt-btn):hover:not(:disabled):not(:focus) { border-color: var(--field-line-hover); box-shadow: inset 0 0 0 1px rgba(163, 152, 131, .5); }
+:is(textarea, input, select, .opt-btn):focus { outline: none; border-color: var(--field-focus); box-shadow: inset 0 0 0 1px var(--field-focus), 0 0 0 3px rgba(212,175,55,.28); }
+:is(textarea, input, select, .opt-btn):focus-visible { outline: none; }
+:is(textarea, input, select, .opt-btn):disabled { background-color: var(--field-disabled-bg); border-color: var(--field-disabled-line); border-style: dashed; box-shadow: none; color: var(--field-disabled-ink); cursor: not-allowed; }
+:is(textarea, input):read-only:not([type="checkbox"]):not([type="radio"]):not(:disabled) { background-color: transparent; border-style: dashed; }
+:is(textarea, input, select, .opt-btn)[aria-invalid="true"] { border-color: var(--red); box-shadow: inset 0 0 0 1px var(--red), 0 0 0 3px rgba(255,138,122,.18); }
+/* Native dropdowns: a gold caret instead of the browser's dim one, and readable options when the list is open. */
+select { appearance: none; -webkit-appearance: none; padding: 0 40px 0 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%23F6E3A1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; }
+select option { background: var(--card); color: var(--ink); }
+select option:checked { background: #2A2312; color: var(--gold-hi); }
+/* Money box: "RM" shown inside the field, the number grouped with commas while typing. */
+.money { position: relative; display: block; width: 100%; min-width: 0; }
+.money-rm { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--gold-hi); font-weight: 700; font-size: 15px; pointer-events: none; }
+.money input { padding-left: 46px; font-variant-numeric: tabular-nums; }
+.row-wrap .money, .filter-grid .money { flex: 1 1 120px; }
 input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--gold); flex: none; }
 input, select, textarea { max-width: 100%; min-width: 0; }
-.ff, .filter-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; color: var(--muted); min-width: 0; }
+/* Labels: brighter than helper text and placeholders, smaller and lighter than headings, never gold. */
+.ff, .filter-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 600; color: var(--label-ink); min-width: 0; letter-spacing: .01em; }
 .ff .between { justify-content: flex-start; column-gap: 8px; row-gap: 2px; }
-.ff input, .ff textarea, .ff select { color: var(--ink); font-weight: 400; }
+.ff input, .ff textarea, .ff select { color: var(--ink); font-weight: 400; letter-spacing: normal; }
+.ff small, .ff .muted { font-weight: 400; color: var(--muted); }
+.ff:focus-within { color: var(--gold-hi); }
+.ff:focus-within .ff:not(:focus-within) { color: var(--label-ink); }
 fieldset.ff { border: 0; padding: 0; margin: 0; }
-fieldset.ff legend { padding: 0; margin-bottom: 4px; }
+fieldset.ff legend { padding: 0; margin-bottom: 6px; }
 .num-sm { width: 80px !important; flex: none; }
 .row-wrap select { width: auto; flex: 1 1 100px; }
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -150,11 +188,13 @@ label.btn { position: relative; cursor: pointer; }
 .save-bar { position: sticky; bottom: 0; z-index: 3; background: rgba(19,19,22,.97); border: 1px solid var(--line-2); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -6px 20px rgba(0,0,0,.5); }
 
 /* Dropdown with remembered values */
-.opt-btn { width: 100%; min-height: 48px; border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 12px; background: #0E0E10; color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; font-weight: 400; }
+.opt-btn { padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; font-weight: 400; }
+.opt-btn[aria-expanded="true"] { border-color: var(--field-focus); border-radius: 10px 10px 4px 4px; }
 .opt-caret { color: var(--gold-hi); flex: none; }
-.opt-list { border: 1px solid var(--gold-lo); border-radius: 12px; background: var(--card-2); padding: 4px; display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.opt-list { border: 1px solid var(--field-focus); box-shadow: inset 0 0 0 1px rgba(212,175,55,.5); border-radius: 12px; background: var(--card-2); padding: 4px; display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
 .opt-item { min-height: 44px; border: 0; background: transparent; color: var(--ink); text-align: left; padding: 6px 10px; border-radius: 8px; font-weight: 600; width: 100%; }
-.opt-item[aria-selected="true"] { background: #2A2312; color: var(--gold-hi); }
+.opt-item[aria-selected="true"] { background: #2A2312; color: var(--gold-hi); box-shadow: inset 3px 0 0 var(--gold); }
+.opt-item:hover { background: #1F1D18; }
 .opt-item.others { color: var(--gold-hi); border-top: 1px solid var(--line); border-radius: 0 0 8px 8px; }
 .opt-row { display: flex; align-items: stretch; gap: 4px; }
 .opt-row .opt-item { flex: 1; min-width: 0; }
@@ -189,6 +229,23 @@ label.btn { position: relative; cursor: pointer; }
 .tile.voice-tile { background: var(--gold-grad); color: var(--on-gold); border-color: #B8902B; }
 .tile.voice-tile .tile-icon { color: var(--on-gold); border-color: rgba(17,17,17,.4); background: rgba(255,255,255,.25); }
 .today-card { display: flex; flex-direction: column; gap: 8px; }
+/* Explorer progress strip above the 15 cards (real figures only: km this week, mapped properties, routes). */
+.explorer { width: 100%; text-align: left; color: var(--ink); border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid transparent; background: linear-gradient(160deg, #1D1A12, #0E0E10 70%) padding-box, var(--gold-edge) border-box; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.explorer-title { display: flex; align-items: center; gap: 6px; font-weight: 800; color: var(--gold-hi); font-size: 15px; letter-spacing: .02em; }
+.explorer-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.explorer-stats > span { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.explorer-stats strong { font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.explorer-stats strong em { font-style: normal; font-size: 15px; }
+.explorer-stats small { color: var(--muted); line-height: 1.25; overflow-wrap: anywhere; }
+.explorer-bar { height: 6px; border-radius: 3px; background: #2A2A2E; overflow: hidden; display: block; }
+.explorer-bar i { display: block; height: 100%; background: var(--gold-grad); }
+/* Cards that are not built yet: still gold-edged, visibly marked "Coming Soon". */
+.tile.soon .tile-icon { opacity: .75; }
+.tile-soon { font-size: 14px; line-height: 1.15; font-weight: 700; padding: 2px 6px; border-radius: 8px; margin-top: auto;
+  background: #2A2312; color: var(--gold-hi); border: 1px solid var(--gold-lo); max-width: 100%; overflow-wrap: anywhere; }
+.soon-badge { background: #2A2312; }
+.coming-soon { border-color: var(--gold-lo); border-style: dashed; }
 
 .photo-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .photo-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; text-align: left; color: var(--ink); min-width: 0; }
@@ -342,7 +399,7 @@ label.btn { position: relative; cursor: pointer; }
 /* Google Maps */
 .gmap { width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--line-2); background: #1a1a1e; }
 .search-box { display: flex; flex-direction: column; gap: 4px; }
-.sugs { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--gold-lo); border-radius: 12px; background: var(--card-2); display: flex; flex-direction: column; gap: 2px; }
+.sugs { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--field-focus); box-shadow: inset 0 0 0 1px rgba(212,175,55,.5); border-radius: 12px; background: var(--card-2); display: flex; flex-direction: column; gap: 2px; }
 .sugs button { width: 100%; text-align: left; background: transparent; border: 0; padding: 8px; min-height: 44px; color: var(--ink); border-radius: 8px; }
 .diff-card { border-color: var(--gold-lo); }
 .diff-row { display: flex; flex-wrap: wrap; gap: 6px; font-size: 15px; }

@@ -27,7 +27,7 @@ npm run single    # one self-contained HTML file for opening on a phone (after b
 
 All are optional; the app works without them and says clearly what is missing. Set them as environment variables
 when building (copy `.env.example` to `.env`, which Git ignores, or use GitHub Actions secrets), or type them on the
-phone in **Profile & Name Card → Settings**.
+phone in **Agent Profile → Settings**.
 
 | Variable | Needed for | Set up |
 | --- | --- | --- |

@@ -20,7 +20,8 @@ const en = {
   tiles: {
     todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Property List',
     vendor: 'Vendor List', buyer: 'Buyer List', gps: 'GPS Assistance', finance: 'Agent Financial',
-    calculator: 'Property Calculator', profile: 'Profile & Name Card', expert: 'Ask Expert', voice: 'Voice Command',
+    calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'Voice Command',
+    subsale: 'Subsale', project: 'Project', cobroke: 'Co-broke',
   } as Record<string, string>,
   c: {
     save: 'Save', cancel: 'Cancel', edit: 'Edit', delete: 'Delete', add: 'Add', close: 'Close', search: 'Search', open: 'Open',
@@ -47,6 +48,27 @@ const en = {
     appts: (n: number) => `${n} appointment${n === 1 ? '' : 's'} today`,
     pending: (n: number) => `${n} pending viewing${n === 1 ? '' : 's'}`,
     clear: 'Nothing due today.',
+  },
+  comingSoon: 'Coming Soon',
+  explorer: {
+    title: 'Explorer progress',
+    km: 'km explored this week',
+    mapped: 'properties on the map',
+    trips: 'routes recorded',
+    empty: 'Start House Shopping in GPS Assistance to record your first route.',
+  },
+  soon: {
+    subsale: 'Subsale will gather secondary-market (resale) properties and their owners, enquiries and paperwork in one place. It is not built yet: your existing properties stay in the Property List.',
+    project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Property List for now.',
+    note: 'Nothing on this screen is pretending to work. Tell us what you need here and it will be built next.',
+  },
+  cobrokePage: {
+    intro: 'Properties you are selling together with another agency (arrangement “Co-broke”).',
+    count: (n: number) => `${n} co-broke propert${n === 1 ? 'y' : 'ies'}`,
+    show: 'Show co-broke properties',
+    none: 'No co-broke properties yet. Set “Arrangement” to Co-broke on a property to list it here.',
+    soonTitle: 'Coming Soon',
+    soonBody: 'Sharing listings with other agents, co-broke terms and splits, and the Co-broke Opportunity Map.',
   },
   recentProperties: 'Recent properties',
   reminders: {
@@ -110,7 +132,8 @@ const bm: Strings = {
   tiles: {
     todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Hartanah',
     vendor: 'Senarai Penjual', buyer: 'Senarai Pembeli', gps: 'Bantuan GPS', finance: 'Kewangan Ejen',
-    calculator: 'Kalkulator Hartanah', profile: 'Profil & Kad Nama', expert: 'Tanya Pakar', voice: 'Arahan Suara',
+    calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Suara',
+    subsale: 'Subsale', project: 'Projek', cobroke: 'Co-broke',
   },
   c: {
     save: 'Simpan', cancel: 'Batal', edit: 'Ubah', delete: 'Padam', add: 'Tambah', close: 'Tutup', search: 'Cari', open: 'Buka',
@@ -137,6 +160,27 @@ const bm: Strings = {
     appts: (n: number) => `${n} temujanji hari ini`,
     pending: (n: number) => `${n} lawatan belum disahkan`,
     clear: 'Tiada yang perlu dibuat hari ini.',
+  },
+  comingSoon: 'Akan Datang',
+  explorer: {
+    title: 'Kemajuan penjelajah',
+    km: 'km dijelajah minggu ini',
+    mapped: 'hartanah pada peta',
+    trips: 'laluan direkod',
+    empty: 'Mulakan Cari Rumah dalam Bantuan GPS untuk merekod laluan pertama anda.',
+  },
+  soon: {
+    subsale: 'Subsale akan menghimpunkan hartanah pasaran sekunder (jualan semula) bersama pemilik, pertanyaan dan dokumennya di satu tempat. Ia belum dibina: hartanah sedia ada kekal dalam Senarai Hartanah.',
+    project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Hartanah.',
+    note: 'Tiada apa-apa di skrin ini yang berpura-pura berfungsi. Beritahu kami apa yang anda perlukan di sini dan ia akan dibina seterusnya.',
+  },
+  cobrokePage: {
+    intro: 'Hartanah yang anda jual bersama agensi lain (susunan “Co-broke”).',
+    count: (n: number) => `${n} hartanah co-broke`,
+    show: 'Tunjuk hartanah co-broke',
+    none: 'Belum ada hartanah co-broke. Tetapkan “Susunan” kepada Co-broke pada hartanah untuk menyenaraikannya di sini.',
+    soonTitle: 'Akan Datang',
+    soonBody: 'Berkongsi senarai dengan ejen lain, terma dan pembahagian co-broke, serta Peta Peluang Co-broke.',
   },
   recentProperties: 'Hartanah terkini',
   reminders: {
@@ -198,7 +242,8 @@ const zh: Strings = {
   tiles: {
     todo: '待办事项', calendar: '日历', opportunities: '商机', property: '房产列表',
     vendor: '卖家列表', buyer: '买家列表', gps: 'GPS 助手', finance: '代理财务',
-    calculator: '房产计算器', profile: '个人资料与名片', expert: '咨询专家', voice: '语音指令',
+    calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: '语音指令',
+    subsale: '二手房', project: '新项目', cobroke: '联合代理',
   },
   c: {
     save: '保存', cancel: '取消', edit: '编辑', delete: '删除', add: '添加', close: '关闭', search: '搜索', open: '打开',
@@ -225,6 +270,27 @@ const zh: Strings = {
     appts: (n: number) => `今天 ${n} 个预约`,
     pending: (n: number) => `${n} 个待确认看房`,
     clear: '今天没有到期事项。',
+  },
+  comingSoon: '即将推出',
+  explorer: {
+    title: '探索进度',
+    km: '本周探索公里数',
+    mapped: '已上地图的房产',
+    trips: '已记录路线',
+    empty: '在 GPS 助手中开始“看房路线”，记录您的第一条路线。',
+  },
+  soon: {
+    subsale: '二手房功能将把二手（转售）房产及其业主、询问和文件集中在一处。尚未建立：您现有的房产仍在房产列表中。',
+    project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在房产列表中。',
+    note: '此页面没有任何假装可用的功能。告诉我们您需要什么，下一步就会建立。',
+  },
+  cobrokePage: {
+    intro: '您与其他代理公司联合出售的房产（安排为“联合代理”）。',
+    count: (n: number) => `${n} 个联合代理房产`,
+    show: '显示联合代理房产',
+    none: '暂无联合代理房产。在房产的“安排”中选择联合代理即可显示在此。',
+    soonTitle: '即将推出',
+    soonBody: '与其他经纪人共享房源、联合代理条款与分成，以及联合代理商机地图。',
   },
   recentProperties: '最近的房产',
   reminders: {
