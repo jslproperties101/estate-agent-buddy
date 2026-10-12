@@ -42,7 +42,15 @@ jobs:
       - name: Browser for screen tests
         run: npx playwright install --with-deps chromium
       - name: Tests
-        run: npm test
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee ../test.log
+      - name: Report failing tests
+        if: failure()
+        run: |
+          # Each failing test and its first error lines as an annotation (readable without the full log).
+          sed 's/\x1b\[[0-9;]*m//g' ../test.log | awk '/^not ok/{n=1; msg=$0; next} n && n<25 {msg=msg" | "$0; n++} n==25 || (n && /^  \.\.\./){print "::error::" substr(msg,1,1500); n=0}' || true
+          grep -E "error TS|problem\(s\)|Lint" ../test.log | head -20 | sed 's/^/::error::/' || true
       - name: Screenshots
         if: always()
         uses: actions/upload-artifact@v4
