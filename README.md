@@ -4,47 +4,70 @@ Field app for a Malaysian property negotiator working mainly in Nilai and Sepang
 Target: a native Android app (Capacitor) for the Samsung S23 Ultra, with Supabase (Singapore) as the backend,
 OpenFreeMap maps and GitHub Actions builds, as approved in the master document (Version 1D, decisions D5–D7).
 
-## Current state (12 Oct 2026) — honest summary
+## Current state (12 Oct 2026)
 
-This repository was created on 12 Oct 2026. Its first commit is a **checkpoint of what existed**, not a working app.
+The code in `app/` is the **Version 1L browser prototype**, imported unchanged from the owner's ZIP.
+It is not yet a working business app:
 
 | What | Status |
 | --- | --- |
 | Android app | Not built |
 | Supabase database, login, team access | Not created |
-| Saving data permanently | Not implemented — the prototype keeps data only while the page is open |
+| Saving data permanently | Not implemented: data lasts only while the page is open |
 | Background GPS | Not built, never tested on the phone |
-| Browser prototype | Version 1I build only (see below) |
+| Vendor List, Buyer List, matching | Not built (tiles only) |
+| Phone testing of any screen | Not done |
 
-### `prototype/property-explorer-prototype-v1I.html`
+### Automated tests: verified 12 Oct 2026
 
-The only build available to Claude at the time of this commit: the "Property Explorer Prototype" page last published
-11 Oct 2026. It is the **Version 1I** era build (green theme, title "Property Explorer"), with sample data,
-the Smart Capture review rules (DETECTED / STATED / INFERRED, Confirm / Edit / Reject), local PDF reading with a
-bundled pdf.js, Recently deleted, and English / Bahasa Malaysia switching. It does **not** contain the Version 1J–1L
-work (voice, Property List redesign, Estate Agent Buddy black-and-gold dashboard, Voice Command).
+The full suite (`npm test`) was re-run on the imported code, with the exact pinned package versions:
 
-**Missing from this repository:** the Version 1L file `estate-agent-buddy-prototype.html`, its source code, the
-73 automated tests and the Git history with tags v1I–v1L. If you still have that ZIP, it should be added here as
-the real starting point.
+| Stage | Result |
+| --- | --- |
+| Type check (logic files) | Passed |
+| Rule tests | 11 / 11 |
+| Local-reading tests | 12 / 12 |
+| Voice tests | 8 / 8 |
+| Property listing tests | 9 / 9 |
+| Command tests | 5 / 5 |
+| Build | Passed |
+| Screen tests (Chromium, 384 × 824) | 28 / 28 |
+| **Total** | **73 / 73** |
 
-Open the HTML file in Chrome to try it. Do not enter real client data.
+Notes:
+- On the first run, screen test U13 failed only because `tests/fixtures/photo_large.png` (15 MB) is excluded by
+  `.gitignore`. It is created by `tests/fixtures/make_fixtures.py`. With the file recreated, U13 passed.
+- These tests use sample data and a simulated speech service. They prove the prototype's rules and screens, not
+  phone behaviour, real speech recognition or permanent storage.
+
+## Layout
+
+| Path | What it is |
+| --- | --- |
+| `app/` | Version 1L prototype: React + TypeScript, built with esbuild; `npm test`, `npm run build`, `npm run single` |
+| `app/dist/` | Built page from the ZIP |
+| `schema.sql` | Database design (48 tables), tested on a PostgreSQL 16 test server only; not applied to Supabase |
+| `Property_Explorer.docx`, `build_doc.py`, `img/`, `img_small/` | Earlier document export and wireframe images |
+| `prototype/property-explorer-prototype-v1I.html` | Older Version 1I single-file build, kept for reference |
+
+## Checkpoints
+
+Git tags could not be pushed from Claude's workspace, so checkpoints are branches:
+`checkpoint/v1I` (first commit) and `checkpoint/v1L` (the v1L import, before any change).
+The ZIP had no Git history, so the earlier tags v1I–v1L from Claude's workspace are not here.
 
 ## Source of truth
 
-- Master document: Google Doc "Property Explorer" (owner's Google Drive), Versions 1A–1L, including the
-  database design in Appendix A. The full runnable `schema.sql` mentioned there was never committed anywhere
-  and is not in this repository yet.
+- Master document: Google Doc "Property Explorer" in the owner's Google Drive (Versions 1A–1L).
 - Requirements audit against the code (12 Oct 2026):
   https://claude.ai/code/artifact/14385105-6804-4bdd-ac48-abbbec8e9a9c
 
 ## Next milestone (waiting for the owner's choice)
 
 Either **M1 – GPS Test app** (Version 1D order) or **M1 – Core databases** (decision D32, 11 Oct 2026).
-See the "Conflicts" and "Recommended next milestone" sections of the audit.
 
 ## Rules for this project
 
 - No paid services, subscriptions or API keys without the owner's explicit approval.
 - Nothing is called working until it is tested, and nothing is called tested on the phone until the owner reports it.
-- A tagged Git checkpoint before every major change.
+- A Git checkpoint before every major change.
