@@ -1,59 +1,46 @@
-# Property Explorer: Smart Capture prototype (Version 1I)
+# Estate Agent Buddy — app (Version 2.0)
 
-This is a prototype only, using sample data. It has no login, no database, no AI and no live news. Everything is lost when the page is closed. Do not use it with real client data.
-
-## What changed from property-explorer-starter-news.zip
-
-- **Home screen:** the 3 × 4 home grid replaces the side menu. Explorer progress is at the top, the GPS map has a large card, and recent properties show as photo cards. Buttons 9–12 say "Coming soon".
-- **News & Big News:** opened from the news icon in the header, not from a home button. It shows sample content only.
-- **No invented DETECTED values:** a real photo or document starts with every field blank. A DETECTED label is refused unless the value carries text actually read from an image.
-- **Reviewing values:** each value has its own Confirm, Edit and Reject buttons. Blank fields have Enter value and Leave blank instead. There is no "confirm all".
-- **INFERRED values:** never confirmed automatically. Pressing Confirm on one asks "Confirm it anyway?" first. Labels never change.
-- **Saving:** Save stays locked until every value is reviewed. The save function also refuses on its own, not just the button. Only confirmed and edited values are saved.
-- **Deleting:**
-  - Delete asks first, then moves the capture to Recently deleted.
-  - You can Undo straight away, or Restore within 30 days.
-  - Permanent deletion needs DELETE typed (PADAM in Bahasa Malaysia).
-- **Languages:** English and Bahasa Malaysia switch. The Bahasa Malaysia wording is a draft and needs checking.
-- **Readability and offline use:** no text is smaller than 14 px, and buttons are at least 44 px tall. The app uses the phone's own fonts and makes no outside requests, so it works offline.
-- **Fixed versions:** every package version is pinned exactly (no "latest").
-
-## Version 1I: local reading (no AI, no account, no network)
-
-- PDF text is read with pdf.js (bundled, works offline). Pages with no text are reported as scanned (they need OCR in the Android app).
-- Word (.docx) text is read by our own small reader. Old .doc files are reported as unsupported.
-- Extraction rules: English and Bahasa Malaysia; a small draft set for Chinese and Tamil. Every value keeps its file, page and exact words (DETECTED); values from a typed note are STATED.
-- Sensitive-data check: IC, passport and account numbers and title/SPA wording. Those numbers are never used or shown; sensitive files would never go to cloud AI.
-- Conflicts between files are shown side by side; the app never chooses. Important fields that were not found are listed as missing.
-- Photos: made smaller on the phone (max 1600 px, JPEG), and exact duplicates are refused. Reading text from photos (OCR) is not in this prototype.
-
-Measure on your own non-confidential brochures:
-
-```
-npm run measure -- <folder with PDF/DOCX files> [expected.json]
-```
-
-See tests/fixtures/expected.json for the format. Results go to measurement.md in that folder.
+React + TypeScript, built with esbuild. Runs in Chrome on the phone today and is structured to be wrapped as the
+Android app (Capacitor) later. Screens are in English, Bahasa Malaysia and Chinese.
 
 ## Commands
 
 ```
-npm test          # type check + rule tests + local-pipeline tests + build + browser screen tests
-npm run measure   # measure the local pipeline on a folder of sample brochures
-npm run build     # builds into dist/
+npm test          # type check (all files) + lint + unit tests + build + browser screen tests
+npm run build     # builds into dist/ (reads EAB_* settings from the environment or app/.env)
+npm run single    # one self-contained HTML file for opening on a phone (after build)
 ```
 
-The build uses esbuild instead of Vite. The workspace where this was made could not download packages, because the npm registry was blocked there. All packages used were already on that machine.
+## Code layout
 
-## Not done yet (limitations)
+| Folder | What it holds |
+| --- | --- |
+| `src/data/` | Data layer: record types, IndexedDB storage (records + photo/document files), store, optional Supabase sync, sample data |
+| `src/domain/` | Application rules, no screen code: references, location matching, To-Do/Calendar/reminders, inquiry→viewing, finance, calculator, journeys, name card, Ask Expert |
+| `src/maps/` | Google Maps Platform: loader, geocoding, Places search, route preview, map view, location picker |
+| `src/listing/`, `src/contacts/`, `src/agenda/`, `src/gps/`, `src/finance/`, `src/calculator/`, `src/profile/`, `src/expert/`, `src/voice/` | Screens and their text (EN/BM/ZH) |
+| `src/ui/` | Shared pieces: dropdown with remembered values, section card with Edit, reminders picker, speech box |
+| `types/react-shim.d.ts` | Minimal React types so every screen is type-checked here (see below) |
+| `tests/` | Unit tests (`*.test.ts`) and browser screen tests (`ui.test.mjs`, screenshots in `tests/screens/`) |
 
-- **Screen type checks:** the screen files (`.tsx`) are built but not type-checked, because the React type package (`@types/react`) could not be downloaded. The logic files are type-checked.
-- **Packages:** `npm install` and `package-lock.json` have not been run or created yet. They need a normal internet connection, for example GitHub Actions.
-- **Not built yet:**
-  - matching against existing properties (needs a database);
-  - AI reading;
-  - voice recording;
-  - GPS;
-  - the Android app;
-  - the other home buttons.
-- **Phone testing:** tested in Chromium at S23 Ultra size (384 × 824), not on the real phone.
+## External services (no keys in the code)
+
+All are optional; the app works without them and says clearly what is missing. Set them as environment variables
+when building (copy `.env.example` to `.env`, which Git ignores, or use GitHub Actions secrets), or type them on the
+phone in **Agent Profile → Settings**.
+
+| Variable | Needed for | Set up |
+| --- | --- | --- |
+| `EAB_GOOGLE_MAPS_API_KEY` | Maps, Add from Google Map, address search, place names on House Shopping, route preview, Check Google Maps | Enable **Maps JavaScript API**, **Geocoding API**, **Places API (New)**, **Routes API**; billing on; restrict by website to `https://localhost/*` and `https://jslproperties101.github.io/*` (docs/SETUP.md). |
+| `EAB_SUPABASE_URL`, `EAB_SUPABASE_ANON_KEY` | Optional cloud copy ("Sync now") | Supabase project; run `../supabase/migrations/*.sql`; create a user (email + password) for the agent. |
+| `EAB_EXPERT_API_URL` | Optional AI answers in Ask Expert | Deploy `../supabase/functions/ask-expert` with the secret `ANTHROPIC_API_KEY` (pay-per-use; set a spending limit). |
+
+Navigation to a property ("Navigate") opens the Google Maps app with a universal link and needs no key.
+
+## Notes on the build environment
+
+The package registry could not be reached where this was built, so packages come from the machine's global
+install (linked into `node_modules`). `@types/react` and ESLint could not be installed: every file is instead
+type-checked with a small React type shim (`types/react-shim.d.ts`, strict mode, unused code reported), and
+`scripts/lint.mjs` runs the project checks. With normal internet, add `@types/react`, `@types/react-dom` and ESLint
+and delete the shim.

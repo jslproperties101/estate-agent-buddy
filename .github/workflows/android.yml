@@ -1,0 +1,186 @@
+# Estate Agent Buddy — build and check on every push.
+#  test     type check, lint, unit tests, browser screen tests (no keys needed)
+#  database Supabase migrations: roles and row-level security tested on PostgreSQL
+#  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
+#           with the Maps key secret set, also loads the real Google map in a browser and attaches a screenshot
+#  web      the same bundle as a website on GitHub Pages, plus updates/latest.json + the bundle zip that installed
+#           apps download by themselves (needs Pages source = GitHub Actions)
+#
+# Settings → Secrets and variables → Actions → Repository secrets (none are written in the code):
+#   EAB_GOOGLE_MAPS_API_KEY   Google Maps key (browser key, restricted by website)
+#   EAB_SUPABASE_URL          Supabase project URL (login and cloud sync)
+#   EAB_SUPABASE_ANON_KEY     Supabase anon (public) key
+#   EAB_EXPERT_API_URL        optional Ask Expert AI function URL
+name: Build
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - name: Install (without the Android packages)
+        run: npm install --omit=optional --no-audit --no-fund
+      - name: Browser for screen tests
+        run: npx playwright install --with-deps chromium
+      - name: Tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee ../test.log
+      - name: Report failing tests
+        if: failure()
+        run: |
+          # Each failing test and its first error lines as an annotation (readable without the full log).
+          sed 's/\x1b\[[0-9;]*m//g' ../test.log | awk '/^not ok/{n=1; msg=$0; next} n && n<25 {msg=msg" | "$0; n++} n==25 || (n && /^  \.\.\./){print "::error::" substr(msg,1,1500); n=0}' || true
+          grep -E "error TS|problem\(s\)|Lint" ../test.log | head -20 | sed 's/^/::error::/' || true
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: screens, path: app/tests/screens, if-no-files-found: ignore }
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Roles and row-level security (Supabase migrations)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/rls-test.sh
+
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    env:
+      EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
+      EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
+      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
+      EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - name: Install (Android packages as regular dependencies, so Capacitor bundles their native parts)
+        run: |
+          node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+          npm install --no-audit --no-fund
+      - name: Build for the Google Maps check (without sign-in, so the check reaches Settings)
+        if: env.EAB_GOOGLE_MAPS_API_KEY != ''
+        run: |
+          EAB_SUPABASE_URL= EAB_SUPABASE_ANON_KEY= npm run build
+          rm -rf ../dist-maps-check && cp -r dist ../dist-maps-check
+      - name: Build the app
+        run: npm run build && rm -f dist/*.map
+      - name: Update package for installed apps (no reinstall needed)
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
+          VERSION=$(node -p "require('./package.json').version")
+          mkdir -p ../site && cp -r dist/. ../site/ && mkdir -p ../site/updates
+          (cd dist && zip -qr "../../site/updates/bundle-${SHORT}.zip" .)
+          BASE="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-${SHORT}/EstateAgentBuddy-${SHORT}-debug.apk"
+          printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/updates/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
+            "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > ../site/updates/latest.json
+          cat ../site/updates/latest.json
+      - uses: actions/upload-artifact@v4
+        with: { name: site, path: site }
+      - name: Android project
+        run: |
+          npx cap add android
+          npx @capacitor/assets generate --android --iconBackgroundColor '#08080A' --iconBackgroundColorDark '#08080A' --splashBackgroundColor '#08080A' --splashBackgroundColorDark '#08080A'
+          npx cap sync android
+          node scripts/android-setup.mjs
+      - name: Build the APK
+        run: |
+          # Every phone feature must have its native part in the APK, or its button cannot work on the phone.
+          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"'; do
+            grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
+          done
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Check the APK signature (same debug key every build)
+        run: |
+          SHA1=$(keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA1:' | awk '{print $2}')
+          echo "APK SHA1 $SHA1"
+          test "$SHA1" = "1A:F9:28:D6:59:1C:90:C7:02:CD:67:D3:E9:54:3F:34:3C:DD:94:64"
+      - name: Name the APK
+        id: apk
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          OUT="EstateAgentBuddy-${SHORT}-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "../$OUT"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+          echo "tag=android-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "maps=$([ -n "$EAB_GOOGLE_MAPS_API_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+          echo "supabase=$([ -n "$EAB_SUPABASE_URL" ] && [ -n "$EAB_SUPABASE_ANON_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: '${{ steps.apk.outputs.file }}' }
+      - name: Real Google Maps check (only with the Maps key secret)
+        id: maps
+        if: steps.apk.outputs.maps == 'yes'
+        continue-on-error: true
+        run: |
+          npx playwright install --with-deps chromium
+          MAPS_CHECK_DIST=../dist-maps-check node scripts/maps-check.mjs ../maps-check.png ../maps-check.txt
+      - name: Release with the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd ..
+          TAG='${{ steps.apk.outputs.tag }}'
+          {
+            echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
+            echo
+            echo "Install: open this page on the Android phone, tap the .apk below, allow installing from this source, then Install."
+            echo
+            echo "- Google Maps key in this build: ${{ steps.apk.outputs.maps }}"
+            echo "- Google login (Supabase) in this build: ${{ steps.apk.outputs.supabase }}"
+            if [ -f maps-check.txt ]; then echo; echo "Google Maps check (browser, referrer https://localhost/):"; echo '```'; cat maps-check.txt; echo '```'; fi
+          } > notes.md
+          FILES="${{ steps.apk.outputs.file }}"
+          [ -f maps-check.png ] && FILES="$FILES maps-check.png"
+          [ -f maps-check.txt ] && FILES="$FILES maps-check.txt"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" $FILES --prerelease --target "$GITHUB_SHA" --title "Estate Agent Buddy ${TAG}" --notes-file notes.md
+
+  web:
+    # The web version and the update package for installed apps: exactly the bundle built (and tested) for the APK.
+    needs: android
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update'
+    environment: { name: github-pages, url: '${{ steps.deploy.outputs.page_url }}' }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: site, path: site }
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+      - id: deploy
+        uses: actions/deploy-pages@v4

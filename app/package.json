@@ -1,29 +1,40 @@
 {
   "name": "estate-agent-buddy",
   "private": true,
-  "version": "0.2.0",
+  "version": "2.1.0",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.logic.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "node scripts/lint.mjs",
+    "test:unit": "node scripts/test-unit.mjs",
     "build": "node scripts/build.mjs",
-    "test:logic": "node scripts/test-logic.mjs",
     "test:ui": "node --test tests/ui.test.mjs",
-    "test": "npm run typecheck && npm run test:logic && npm run test:local && npm run test:voice && npm run test:listing && npm run test:commands && npm run build && npm run test:ui",
-    "test:local": "node scripts/test-local.mjs",
-    "test:voice": "node scripts/test-voice.mjs",
-    "measure": "node scripts/measure.mjs",
-    "test:listing": "node scripts/test-listing.mjs",
-    "test:commands": "node scripts/test-commands.mjs",
-    "single": "node scripts/single.mjs"
+    "test": "npm run typecheck && npm run lint && npm run test:unit && node scripts/build.mjs --no-env && npm run test:ui",
+    "single": "node scripts/single.mjs",
+    "android:setup": "node scripts/android-setup.mjs"
   },
   "dependencies": {
     "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "pdfjs-dist": "6.2.108"
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
     "playwright": "1.56.0",
     "typescript": "6.0.3"
-  }
+  },
+  "optionalDependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/browser": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0",
+    "@capacitor/assets": "^3.0.5",
+    "@capgo/capacitor-updater": "^7.0.0",
+    "@capacitor-community/speech-recognition": "^7.0.0",
+    "@capacitor-community/contacts": "^7.0.0"
+  },
+  "nativeVersion": 3
 }

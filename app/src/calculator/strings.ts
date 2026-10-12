@@ -1,0 +1,122 @@
+// Property Calculator text, in three languages.
+import type { Lang } from '../i18n';
+
+const en = {
+  title: 'Property Calculator',
+  fromProperty: (x: string) => `Filled from: ${x}`,
+  estimateNote: 'Estimates for discussion only, using the rates under Assumptions. Confirm the final amounts with the lawyer, the bank and LHDN for each case.',
+  tabs: { purchase: 'Purchase & loan', rental: 'Rental & ROI', sale: 'Sale', commission: 'Agent commission', assumptions: 'Assumptions' } as Record<string, string>,
+  in: {
+    price: 'Property price (RM)', downPct: 'Down payment (%)', tenure: 'Loan tenure (years)', rate: 'Interest rate (% a year)',
+    buyer: 'Buyer', citizen: 'Malaysian citizen', nonCitizen: 'Foreigner / foreign company', firstHome: 'First home (exemption)',
+    valuation: 'Valuation fee (RM)', other: 'Other costs (RM)',
+    rent: 'Monthly rent (RM)', maint: 'Maintenance fee (RM a month)', quit: 'Quit rent and assessment (RM a year)', insurance: 'Insurance (RM a year)', otherMonthly: 'Other costs (RM a month)', vacancy: 'Empty months a year',
+    salePrice: 'Sale price (RM)', purchasePrice: 'Original purchase price (RM)', purchaseCosts: 'Purchase costs paid then (RM)', years: 'Year of sale (1 = within the first year)',
+    loanLeft: 'Outstanding loan (RM)', commPct: 'Agent commission (%)', commSst: 'Add SST on commission', penalty: 'Early settlement penalty (RM)', otherSale: 'Other sale costs (RM)',
+    dealValue: 'Price or rent (RM)',
+  },
+  out: {
+    downPayment: 'Down payment', loan: 'Loan amount', monthly: 'Monthly repayment', totalInterest: 'Total interest', totalRepayment: 'Total loan repayment',
+    mot: 'Stamp duty: Memorandum of Transfer (MOT)', motExempt: 'Exempt: first home up to the cap', motFlat: (p: number) => `Flat ${p}% for foreign buyers`,
+    loanStamp: 'Stamp duty: loan agreement', spaLegal: 'Legal fee: Sale and Purchase Agreement', loanLegal: 'Legal fee: loan agreement', sst: (p: number) => `SST ${p}%`,
+    disb: 'Disbursements (searches, registration, copies)', valuation: 'Valuation fee', other: 'Other costs',
+    entry: 'Costs on top of the down payment', cash: 'Estimated total cash required',
+    tier: (from: string, to: string, pct: number) => `${from} – ${to} at ${pct}%`,
+    grossYearly: 'Rent a year', effective: 'Rent a year after empty months', costs: 'Running costs a year', netYearly: 'Net rental income a year',
+    grossYield: 'Gross rental yield', netYield: 'Net rental yield', mortgageYearly: 'Loan repayments a year', cashFlow: 'Cash flow after loan', perMonth: 'a month', perYear: 'a year', roi: 'ROI (cash-on-cash)',
+    roiHelp: 'Yearly cash flow after loan repayments ÷ the cash required at purchase.',
+    commission: 'Agent commission', commissionSst: 'SST on commission', sellerLegal: 'Seller’s legal fee (estimate)', saleCosts: 'Total sale costs',
+    gain: 'Gain', rpgtRate: 'RPGT rate', exemption: 'Exemption', chargeable: 'Chargeable gain', rpgt: 'RPGT (estimate)', net: 'Net sale proceeds', afterLoan: 'Cash after paying off the loan',
+    fee: 'Commission', total: 'Total with SST',
+  },
+  as: {
+    mot: 'MOT stamp duty tiers (%)', motTier: (n: number) => ['First RM100,000', 'RM100,001 – RM500,000', 'RM500,001 – RM1,000,000', 'Above RM1,000,000'][n] ?? '',
+    nonCitizen: 'Foreign buyer flat rate (%)', loanStamp: 'Loan agreement stamp duty (%)',
+    legal: 'Legal fee scale (%)', legalTier: (n: number) => ['First RM500,000', 'Next RM7,000,000', 'Above RM7,500,000'][n] ?? '', legalMin: 'Minimum legal fee (RM)',
+    sst: 'SST (%)', spaDisb: 'SPA disbursements (RM)', loanDisb: 'Loan disbursements (RM)', firstHomeCap: 'First-home exemption cap (RM)',
+    rpgt: 'RPGT by year of sale (%)', rpgtYear: (n: number) => (n < 5 ? `Year ${n + 1}` : 'Year 6 onwards'), rpgtExemptPct: 'RPGT exemption (% of gain)', rpgtExemptMin: 'RPGT exemption minimum (RM)',
+    reset: 'Reset to default rates', saved: 'Rates are saved on this phone.',
+    sources: 'Defaults: Stamp Act 1949 (MOT 1%/2%/3%/4%, loan 0.5%); first-home exemption for SPAs signed 2021–2027 up to RM500,000; Solicitors’ Remuneration Order 2023; SST 8%; RPGT for citizens 30/30/30/20/15/0%. Check them before relying on a result.',
+  },
+};
+export type CalcStrings = typeof en;
+
+const bm: CalcStrings = {
+  title: 'Kalkulator Hartanah',
+  fromProperty: (x: string) => `Diisi daripada: ${x}`,
+  estimateNote: 'Anggaran untuk perbincangan sahaja, menggunakan kadar di bawah Andaian. Sahkan jumlah akhir dengan peguam, bank dan LHDN bagi setiap kes.',
+  tabs: { purchase: 'Pembelian & pinjaman', rental: 'Sewaan & ROI', sale: 'Jualan', commission: 'Komisen ejen', assumptions: 'Andaian' },
+  in: {
+    price: 'Harga hartanah (RM)', downPct: 'Bayaran pendahuluan (%)', tenure: 'Tempoh pinjaman (tahun)', rate: 'Kadar faedah (% setahun)',
+    buyer: 'Pembeli', citizen: 'Warganegara Malaysia', nonCitizen: 'Warga asing / syarikat asing', firstHome: 'Rumah pertama (pengecualian)',
+    valuation: 'Yuran penilaian (RM)', other: 'Kos lain (RM)',
+    rent: 'Sewa bulanan (RM)', maint: 'Yuran penyelenggaraan (RM sebulan)', quit: 'Cukai tanah dan taksiran (RM setahun)', insurance: 'Insurans (RM setahun)', otherMonthly: 'Kos lain (RM sebulan)', vacancy: 'Bulan kosong setahun',
+    salePrice: 'Harga jualan (RM)', purchasePrice: 'Harga belian asal (RM)', purchaseCosts: 'Kos pembelian yang dibayar dahulu (RM)', years: 'Tahun jualan (1 = dalam tahun pertama)',
+    loanLeft: 'Baki pinjaman (RM)', commPct: 'Komisen ejen (%)', commSst: 'Tambah SST pada komisen', penalty: 'Penalti penyelesaian awal (RM)', otherSale: 'Kos jualan lain (RM)',
+    dealValue: 'Harga atau sewa (RM)',
+  },
+  out: {
+    downPayment: 'Bayaran pendahuluan', loan: 'Jumlah pinjaman', monthly: 'Bayaran bulanan', totalInterest: 'Jumlah faedah', totalRepayment: 'Jumlah bayaran balik pinjaman',
+    mot: 'Duti setem: Memorandum Pindah Milik (MOT)', motExempt: 'Dikecualikan: rumah pertama hingga had', motFlat: (p: number) => `Kadar rata ${p}% untuk pembeli asing`,
+    loanStamp: 'Duti setem: perjanjian pinjaman', spaLegal: 'Yuran guaman: Perjanjian Jual Beli', loanLegal: 'Yuran guaman: perjanjian pinjaman', sst: (p: number) => `SST ${p}%`,
+    disb: 'Pembayaran luar (carian, pendaftaran, salinan)', valuation: 'Yuran penilaian', other: 'Kos lain',
+    entry: 'Kos selain bayaran pendahuluan', cash: 'Anggaran jumlah tunai diperlukan',
+    tier: (from: string, to: string, pct: number) => `${from} – ${to} pada ${pct}%`,
+    grossYearly: 'Sewa setahun', effective: 'Sewa setahun selepas bulan kosong', costs: 'Kos berjalan setahun', netYearly: 'Pendapatan sewa bersih setahun',
+    grossYield: 'Hasil sewa kasar', netYield: 'Hasil sewa bersih', mortgageYearly: 'Bayaran pinjaman setahun', cashFlow: 'Aliran tunai selepas pinjaman', perMonth: 'sebulan', perYear: 'setahun', roi: 'ROI (tunai-ke-tunai)',
+    roiHelp: 'Aliran tunai setahun selepas bayaran pinjaman ÷ tunai diperlukan semasa pembelian.',
+    commission: 'Komisen ejen', commissionSst: 'SST atas komisen', sellerLegal: 'Yuran guaman penjual (anggaran)', saleCosts: 'Jumlah kos jualan',
+    gain: 'Keuntungan', rpgtRate: 'Kadar CKHT', exemption: 'Pengecualian', chargeable: 'Keuntungan boleh dicukai', rpgt: 'CKHT (anggaran)', net: 'Hasil jualan bersih', afterLoan: 'Tunai selepas melunaskan pinjaman',
+    fee: 'Komisen', total: 'Jumlah dengan SST',
+  },
+  as: {
+    mot: 'Peringkat duti setem MOT (%)', motTier: (n: number) => ['RM100,000 pertama', 'RM100,001 – RM500,000', 'RM500,001 – RM1,000,000', 'Melebihi RM1,000,000'][n] ?? '',
+    nonCitizen: 'Kadar rata pembeli asing (%)', loanStamp: 'Duti setem perjanjian pinjaman (%)',
+    legal: 'Skala yuran guaman (%)', legalTier: (n: number) => ['RM500,000 pertama', 'RM7,000,000 berikutnya', 'Melebihi RM7,500,000'][n] ?? '', legalMin: 'Yuran guaman minimum (RM)',
+    sst: 'SST (%)', spaDisb: 'Pembayaran luar SPA (RM)', loanDisb: 'Pembayaran luar pinjaman (RM)', firstHomeCap: 'Had pengecualian rumah pertama (RM)',
+    rpgt: 'CKHT mengikut tahun jualan (%)', rpgtYear: (n: number) => (n < 5 ? `Tahun ${n + 1}` : 'Tahun 6 dan seterusnya'), rpgtExemptPct: 'Pengecualian CKHT (% keuntungan)', rpgtExemptMin: 'Pengecualian CKHT minimum (RM)',
+    reset: 'Kembali ke kadar asal', saved: 'Kadar disimpan dalam telefon ini.',
+    sources: 'Asal: Akta Setem 1949 (MOT 1%/2%/3%/4%, pinjaman 0.5%); pengecualian rumah pertama bagi SPA ditandatangani 2021–2027 hingga RM500,000; Perintah Saraan Peguamcara 2023; SST 8%; CKHT warganegara 30/30/30/20/15/0%. Semak sebelum bergantung pada hasil.',
+  },
+};
+
+const zh: CalcStrings = {
+  title: '房产计算器',
+  fromProperty: (x: string) => `资料来自：${x}`,
+  estimateNote: '仅供讨论的估算，使用“假设”中的费率。每个案例的最终金额请与律师、银行及内陆税收局确认。',
+  tabs: { purchase: '购买与贷款', rental: '租金与回报', sale: '出售', commission: '代理佣金', assumptions: '假设' },
+  in: {
+    price: '房产价格 (RM)', downPct: '首付 (%)', tenure: '贷款年限（年）', rate: '利率（年 %）',
+    buyer: '买家', citizen: '马来西亚公民', nonCitizen: '外国人 / 外国公司', firstHome: '首购屋（豁免）',
+    valuation: '估价费 (RM)', other: '其他费用 (RM)',
+    rent: '月租 (RM)', maint: '管理费（每月 RM）', quit: '地税与门牌税（每年 RM）', insurance: '保险（每年 RM）', otherMonthly: '其他费用（每月 RM）', vacancy: '每年空置月数',
+    salePrice: '售价 (RM)', purchasePrice: '原购买价 (RM)', purchaseCosts: '当时支付的购买费用 (RM)', years: '出售年份（1 = 第一年内）',
+    loanLeft: '贷款余额 (RM)', commPct: '代理佣金 (%)', commSst: '佣金加收 SST', penalty: '提前还款罚金 (RM)', otherSale: '其他出售费用 (RM)',
+    dealValue: '价格或租金 (RM)',
+  },
+  out: {
+    downPayment: '首付', loan: '贷款额', monthly: '每月供款', totalInterest: '总利息', totalRepayment: '贷款总还款',
+    mot: '印花税：产权转让书 (MOT)', motExempt: '豁免：首购屋（上限内）', motFlat: (p: number) => `外国买家统一 ${p}%`,
+    loanStamp: '印花税：贷款协议', spaLegal: '律师费：买卖合约', loanLegal: '律师费：贷款协议', sst: (p: number) => `SST ${p}%`,
+    disb: '杂费（查册、注册、复印）', valuation: '估价费', other: '其他费用',
+    entry: '首付以外的费用', cash: '估计所需现金总额',
+    tier: (from: string, to: string, pct: number) => `${from} – ${to}，${pct}%`,
+    grossYearly: '每年租金', effective: '扣除空置后的年租金', costs: '每年持有成本', netYearly: '每年净租金收入',
+    grossYield: '毛租金回报率', netYield: '净租金回报率', mortgageYearly: '每年贷款供款', cashFlow: '扣除供款后的现金流', perMonth: '每月', perYear: '每年', roi: '投资回报率（现金回报）',
+    roiHelp: '每年扣除供款后的现金流 ÷ 购买时所需现金。',
+    commission: '代理佣金', commissionSst: '佣金 SST', sellerLegal: '卖方律师费（估算）', saleCosts: '出售总费用',
+    gain: '收益', rpgtRate: '产业盈利税率', exemption: '豁免', chargeable: '应课税收益', rpgt: '产业盈利税（估算）', net: '出售净所得', afterLoan: '还清贷款后的现金',
+    fee: '佣金', total: '含 SST 总额',
+  },
+  as: {
+    mot: 'MOT 印花税分级 (%)', motTier: (n: number) => ['首 RM100,000', 'RM100,001 – RM500,000', 'RM500,001 – RM1,000,000', '超过 RM1,000,000'][n] ?? '',
+    nonCitizen: '外国买家统一税率 (%)', loanStamp: '贷款协议印花税 (%)',
+    legal: '律师费比例 (%)', legalTier: (n: number) => ['首 RM500,000', '其后 RM7,000,000', '超过 RM7,500,000'][n] ?? '', legalMin: '最低律师费 (RM)',
+    sst: 'SST (%)', spaDisb: '买卖合约杂费 (RM)', loanDisb: '贷款杂费 (RM)', firstHomeCap: '首购屋豁免上限 (RM)',
+    rpgt: '按出售年份的产业盈利税 (%)', rpgtYear: (n: number) => (n < 5 ? `第 ${n + 1} 年` : '第 6 年起'), rpgtExemptPct: '产业盈利税豁免（收益 %）', rpgtExemptMin: '产业盈利税最低豁免 (RM)',
+    reset: '恢复默认费率', saved: '费率已保存在此手机。',
+    sources: '默认值：1949 年印花税法（MOT 1%/2%/3%/4%，贷款 0.5%）；2021–2027 年签署、RM500,000 以内的首购屋豁免；2023 年律师酬金令；SST 8%；公民产业盈利税 30/30/30/20/15/0%。依赖结果前请先核实。',
+  },
+};
+
+export const calcStrings: Record<Lang, CalcStrings> = { en, bm, zh };

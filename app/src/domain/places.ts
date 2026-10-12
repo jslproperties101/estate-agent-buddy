@@ -1,0 +1,147 @@
+// Malaysian places for the location dropdowns, and the rules for comparing a place name from Google Maps with
+// the values the agent already saved. Google Maps is a source, not the master list: a name that differs only in
+// spelling, spacing, capital letters or abbreviation (Tmn / Taman, Jln / Jalan) is treated as the saved value,
+// and nothing new is saved without the agent's confirmation.
+
+export const COUNTRIES = ['Malaysia', 'Singapore', 'Brunei', 'Indonesia', 'Thailand'] as const;
+export const DEFAULT_COUNTRY = 'Malaysia';
+
+export const MY_STATES = [
+  'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis', 'Pulau Pinang',
+  'Sabah', 'Sarawak', 'Selangor', 'Terengganu', 'Kuala Lumpur', 'Labuan', 'Putrajaya',
+] as const;
+
+/** Towns and cities the agent works in most, grouped by state. Others are typed once and remembered. */
+export const MY_CITIES: Record<string, string[]> = {
+  'Negeri Sembilan': ['Seremban', 'Nilai', 'Mantin', 'Labu', 'Lenggeng', 'Pajam', 'Port Dickson', 'Rembau', 'Kuala Pilah', 'Bahau', 'Tampin'],
+  'Selangor': ['Sepang', 'Salak Tinggi', 'Cyberjaya', 'Dengkil', 'Banting', 'Kajang', 'Semenyih', 'Bangi', 'Shah Alam', 'Petaling Jaya', 'Subang Jaya', 'Puchong', 'Klang', 'Rawang'],
+  'Kuala Lumpur': ['Kuala Lumpur'],
+  'Putrajaya': ['Putrajaya'],
+};
+export const MY_TOWNSHIPS: Record<string, string[]> = {
+  'Nilai': ['Putra Nilai', 'Bandar Baru Nilai', 'Kota Seriemas', 'Bandar Enstek', 'Kawasan Perindustrian Nilai'],
+  'Salak Tinggi': ['Bandar Baru Salak Tinggi', 'Kota Warisan'],
+  'Sepang': ['Kota Warisan', 'Bandar Baru Salak Tinggi'],
+};
+
+export const allBuiltInCities = () => [...new Set(Object.values(MY_CITIES).flat())];
+export const allBuiltInTownships = () => [...new Set(Object.values(MY_TOWNSHIPS).flat())];
+export const citiesFor = (state?: string) => (state && MY_CITIES[state]) || allBuiltInCities();
+export const townshipsFor = (city?: string) => (city && MY_TOWNSHIPS[city]) || allBuiltInTownships();
+
+const ABBREVIATIONS: [RegExp, string][] = [
+  [/\bjln\b/g, 'jalan'], [/\btmn\b/g, 'taman'], [/\bbdr\b/g, 'bandar'], [/\bbndr\b/g, 'bandar'],
+  [/\bkg\b/g, 'kampung'], [/\bkpg\b/g, 'kampung'], [/\bkampong\b/g, 'kampung'], [/\bsek\b/g, 'seksyen'],
+  [/\bsg\b/g, 'sungai'], [/\bsungei\b/g, 'sungai'], [/\bbkt\b/g, 'bukit'], [/\blrg\b/g, 'lorong'],
+  [/\bpsn\b/g, 'persiaran'], [/\bkaw\b/g, 'kawasan'], [/\bind\b/g, 'industri'], [/\bindustrial\b/g, 'industri'],
+  [/\bperindustrian\b/g, 'industri'], [/\bbt\b/g, 'batu'], [/\bpt\b/g, 'parit'], [/\bspg\b/g, 'simpang'],
+  [/\bkl\b/g, 'kuala lumpur'], [/\bn\s*sembilan\b/g, 'negeri sembilan'], [/\bns\b/g, 'negeri sembilan'],
+  [/\bpenang\b/g, 'pulau pinang'], [/\bmalacca\b/g, 'melaka'], [/\bwilayah persekutuan\b/g, ''], [/\bfederal territory of\b/g, ''],
+  [/\bwp\b/g, ''], [/\bst\b/g, 'street'], [/\brd\b/g, 'road'], [/\bmt\b/g, 'mount'],
+];
+
+/** A place name reduced to its essentials: lower case, no accents or punctuation, abbreviations written out. */
+export function normalisePlace(s: string): string {
+  let t = s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[.,'’`()\-/]/g, ' ');
+  t = ` ${t} `.replace(/\s+/g, ' ');
+  for (const [re, w] of ABBREVIATIONS) t = t.replace(re, w);
+  return t.replace(/\s+/g, ' ').trim();
+}
+/** For comparing: spaces removed too, so "PutraNilai" and "Putra Nilai" are the same. */
+const compact = (s: string) => normalisePlace(s).replace(/\s/g, '');
+
+export function editDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+
+export type PlaceMatch =
+  /** Exactly a saved value. */
+  | { kind: 'exact'; value: string }
+  /** Same place written differently (capitals, spaces, abbreviations): use the saved value, save nothing new. */
+  | { kind: 'same'; value: string }
+  /** Close to a saved value (a small spelling difference): the agent chooses. */
+  | { kind: 'similar'; value: string }
+  /** Not in the saved values at all: the agent chooses. */
+  | { kind: 'none' };
+
+/** Compares a name from Google Maps with the saved values for one dropdown. */
+export function matchPlace(google: string, saved: readonly string[]): PlaceMatch {
+  const g = google.trim();
+  if (!g) return { kind: 'none' };
+  const exact = saved.find(v => v === g);
+  if (exact) return { kind: 'exact', value: exact };
+  const gc = compact(g);
+  const same = saved.find(v => compact(v) === gc);
+  if (same) return { kind: 'same', value: same };
+  let best: { v: string; d: number } | null = null;
+  for (const v of saved) {
+    const vc = compact(v);
+    const d = editDistance(gc, vc);
+    const allowed = Math.max(gc.length, vc.length) >= 12 ? 2 : Math.max(gc.length, vc.length) >= 5 ? 1 : 0;
+    if (d <= allowed && (!best || d < best.d)) best = { v, d };
+  }
+  return best ? { kind: 'similar', value: best.v } : { kind: 'none' };
+}
+
+/** The parts of an address the location form uses, read from Google's address components. */
+export interface AddressParts { country?: string; state?: string; city?: string; township?: string; street?: string; postcode?: string }
+export interface GoogleComponent { long_name: string; short_name: string; types: string[] }
+
+export function partsFromGoogle(components: GoogleComponent[]): AddressParts {
+  const get = (...types: string[]) => {
+    for (const t of types) { const c = components.find(x => x.types.includes(t)); if (c) return c.long_name; }
+    return undefined;
+  };
+  const route = get('route');
+  const number = get('street_number');
+  const state = get('administrative_area_level_1');
+  const city = get('locality', 'postal_town', 'administrative_area_level_2');
+  let township = get('sublocality_level_1', 'sublocality', 'neighborhood', 'administrative_area_level_3');
+  if (township && city && compact(township) === compact(city)) township = undefined;
+  return {
+    country: get('country'),
+    state: state ? cleanState(state) : undefined,
+    city,
+    township,
+    street: [number, route].filter(Boolean).join(' ') || undefined,
+    postcode: get('postal_code'),
+  };
+}
+
+/** Google writes federal territories as "Wilayah Persekutuan Kuala Lumpur"; the app uses the short name. */
+function cleanState(s: string): string {
+  const n = normalisePlace(s);
+  const hit = MY_STATES.find(x => normalisePlace(x) === n);
+  return hit ?? s;
+}
+
+export type FieldCheck =
+  /** Nothing from Google for this field: the current value stays. */
+  | { status: 'none' }
+  /** Google's value is (or is written like) a saved value and agrees with the property: use `value`, no question. */
+  | { status: 'ok'; value: string; google: string; rewritten: boolean }
+  /** Google differs from the saved values or from what the property has now: the agent chooses. */
+  | { status: 'diff'; google: string; closest?: string; current?: string };
+
+/**
+ * Compares Google's value for one location field with the saved dropdown values and the property's current value.
+ * Saved values win over Google's spelling. A new value is never chosen automatically.
+ */
+export function checkField(google: string | undefined, saved: readonly string[], current?: string): FieldCheck {
+  const g = (google ?? '').trim();
+  if (!g) return { status: 'none' };
+  const m = matchPlace(g, saved);
+  const cur = current?.trim() || undefined;
+  const sameAsCurrent = (v: string) => !cur || compact(cur) === compact(v);
+  if ((m.kind === 'exact' || m.kind === 'same') && sameAsCurrent(m.value)) return { status: 'ok', value: m.value, google: g, rewritten: m.kind === 'same' };
+  if (m.kind === 'none' && cur && compact(cur) === compact(g)) return { status: 'ok', value: cur, google: g, rewritten: cur !== g };
+  return { status: 'diff', google: g, closest: m.kind === 'none' ? undefined : m.value, current: cur };
+}

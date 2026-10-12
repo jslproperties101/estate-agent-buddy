@@ -1,37 +1,41 @@
-// Property List screens (Version 1L): list with two layouts and filters, and the full property record.
-// The add / edit form is in ListingForm.tsx; voice commands are in PropertyVoice.tsx.
+// Property List: Grid view (default, first) and Large cards, filters, and the property detail page.
+// Cards hide the reference number; the detail page shows it. Every detail section has its own Edit button that
+// opens the form straight at that section.
 import { useMemo, useState } from 'react';
+import { BannerDot } from '../gps/BannersUI';
+import { activeBanners } from '../domain/banners';
+import { MoneyInput } from '../ui/MoneyInput';
 import { Lang } from '../i18n';
-import { listingStrings, ListingStrings } from './strings';
+import { listingStrings, ListingStrings, typeLabel } from './strings';
 import {
   Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, STATUSES, CATEGORIES,
-  rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, categoryOf, forRent, forSale, fieldsFor,
-  missingDetails, MarketingFieldDef, CONFIDENTIAL_DOCS, DOC_CATEGORIES,
+  rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, forRent, forSale, fieldsFor,
+  missingDetails, CONFIDENTIAL_DOCS, DOC_CATEGORIES, placeName, hasPosition, phoneDigits, Doc,
 } from './model';
-import { Vendor, ownerLabel } from '../contacts/model';
-import { PropertyVoice, monthText } from './PropertyVoice';
+import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
 import { IconMic } from '../icons';
+import { useApp, useStore } from '../data/useStore';
+import { Go, FormSection } from '../nav';
+import { SectionCard, StoredImage } from '../ui/common';
+import { InquiryHistory, ViewingHistory } from '../agenda/History';
+import { monthText, fmtDate } from '../lib/dates';
+import { navigationUrl } from '../lib/geo';
 
-export { ListingForm } from './ListingForm';
+export type Layout = 'grid' | 'large';
 
-const isSample = (l: Listing) => /^s\d+$/.test(l.id);
-export type Layout = 'large' | 'grid';
-
-// ---------- small shared pieces ----------
 export function PriceLine({ l, s, short }: { l: Listing; s: ListingStrings; short?: boolean }) {
   const money = short ? rmShort : rm;
   const sale = forSale(l) && l.askingPrice !== undefined ? money(l.askingPrice) : '';
   const rent = forRent(l) && l.monthlyRent !== undefined ? `${money(l.monthlyRent)} ${s.perMonth}` : '';
   if (!sale && !rent) return <span className="muted no-price">{s.noPrice}</span>;
-  // Small cards show one figure (the sale price first); the full card and record show both.
   return <>{short ? sale || rent : [sale, rent].filter(Boolean).join(' · ')}</>;
 }
 
-function availabilityText(l: Listing, s: ListingStrings): string | undefined {
+function availabilityText(l: Listing, s: ListingStrings, lang: Lang): string | undefined {
   if (!l.availability) return undefined;
-  if (l.availability === 'from_date' && l.availableFrom) return s.availableFrom(monthText(l.availableFrom));
-  if (l.availability === 'tenanted' && l.tenancy?.end) return s.tenantedUntil(monthText(l.tenancy.end));
+  if (l.availability === 'from_date' && l.availableFrom) return s.availableFrom(monthText(l.availableFrom, lang));
+  if (l.availability === 'tenanted' && l.tenancy?.end) return s.tenantedUntil(monthText(l.tenancy.end, lang));
   return s.availability[l.availability];
 }
 
@@ -56,34 +60,34 @@ function Badges({ l, s }: { l: Listing; s: ListingStrings }) {
   );
 }
 
-function Hero({ l, s, tall }: { l: Listing; s: ListingStrings; tall?: boolean }) {
-  const p = mainPhoto(l);
+/** The same picture area on every card: the main photo, or the drawn picture for the type, labelled as a sample. */
+function CardPhoto({ l, s, className, tall }: { l: Listing; s: ListingStrings; className: string; tall?: boolean }) {
+  const p = mainPhoto(l)!;
   return (
-    <div className={`lc-photo ${tall ? 'tall' : ''}`}>
-      {p ? <img src={p.url} alt="" /> : <div className="lc-noimg" />}
-      <div className="lc-shade" />
-      <div className="lc-badges"><Badges l={l} s={s} /></div>
-      {p?.sample && <span className="lc-sample">{s.samplePic}</span>}
-      {!p?.sample && isSample(l) && <span className="lc-sample">{s.sample}</span>}
-    </div>
+    <span className={`${className} ${tall ? 'tall' : ''}`}>
+      <StoredImage fileId={p.fileId} url={p.url} />
+      {className === 'lc-photo' && <><span className="lc-shade" /><span className="lc-badges"><Badges l={l} s={s} /></span></>}
+      {(p.sample || l.sample) && <span className="lc-sample">{p.sample && className === 'lc-photo' ? s.samplePic : s.sample}</span>}
+    </span>
   );
 }
 
-const typeArea = (l: Listing) => [l.type, l.area].filter(Boolean).join(' · ');
+const typePlace = (l: Listing, s: ListingStrings) => [typeLabel(s, l.type), placeName(l)].filter(Boolean).join(' · ');
 
 // ---------- list ----------
-export function PropertyListing({ lang, listings, vendors, layout, setLayout, initial, onOpen, onAdd, onCapture, onVoiceCreate }: {
-  lang: Lang; listings: Listing[]; vendors: Vendor[]; layout: Layout; setLayout: (l: Layout) => void; initial?: Filters;
-  onOpen: (id: string) => void; onAdd: () => void; onCapture: () => void; onVoiceCreate: (changes: Change[]) => void;
-}) {
+export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; initial?: Filters }) {
+  const { state, store } = useApp();
   const s = listingStrings[lang];
+  const listings = state.properties;
+  const layout: Layout = state.settings.layout === 'large' ? 'large' : 'grid';
+  const setLayout = (x: Layout) => store.setSingleton('settings', { layout: x });
   const [f, setF] = useState<Filters>(initial ?? {});
   const [open, setOpen] = useState(false);
   const [voice, setVoice] = useState(false);
   const shown = useMemo(() => applyFilters(listings, f), [listings, f]);
   const n = activeCount(f);
   const set = (patch: Partial<Filters>) => setF(prev => ({ ...prev, ...patch }));
-  const numOrUndef = (v: string) => { const x = parseFloat(v.replace(/[^\d.]/g, '')); return Number.isFinite(x) ? x : undefined; };
+  const ownerName = (l: Listing) => state.contacts.find(c => c.id === l.vendorId)?.name ?? l.ownerName;
 
   function onFind(c: Extract<Command, { kind: 'find' }>): number {
     const next: Filters = { type: c.type, typeWord: c.typeWord, location: c.area, purpose: c.purpose };
@@ -93,26 +97,27 @@ export function PropertyListing({ lang, listings, vendors, layout, setLayout, in
 
   return (
     <section className="stack listing" data-testid="listing">
+      <button className="btn primary add-property" onClick={() => go({ name: 'listingForm' })}><span aria-hidden="true">＋</span> {s.add}</button>
       <div className="lc-toolbar">
         <input aria-label={s.f.location} placeholder={s.search} value={f.location ?? ''} onChange={e => set({ location: e.target.value || undefined })} />
         <button className="btn secondary" aria-expanded={open} onClick={() => setOpen(o => !o)}>{s.filters}{n ? ` · ${n}` : ''}</button>
       </div>
       <div className="lc-tools">
         <div className="seg" role="group" aria-label={s.layout}>
-          <button aria-pressed={layout === 'large'} onClick={() => setLayout('large')} aria-label={s.large}>
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="7" rx="1.5" fill="currentColor" /><rect x="2" y="11" width="16" height="7" rx="1.5" fill="currentColor" /></svg>
-            <span>{s.large}</span>
-          </button>
           <button aria-pressed={layout === 'grid'} onClick={() => setLayout('grid')} aria-label={s.grid}>
             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20">{[2, 8, 14].flatMap(x => [2, 8, 14].map(y => <rect key={`${x}${y}`} x={x} y={y} width="4.5" height="4.5" rx="1" fill="currentColor" />))}</svg>
             <span>{s.grid}</span>
           </button>
+          <button aria-pressed={layout === 'large'} onClick={() => setLayout('large')} aria-label={s.large}>
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="7" rx="1.5" fill="currentColor" /><rect x="2" y="11" width="16" height="7" rx="1.5" fill="currentColor" /></svg>
+            <span>{s.large}</span>
+          </button>
         </div>
         <button className="btn secondary voice-btn" aria-expanded={voice} onClick={() => setVoice(v => !v)}><IconMic size={20} /> {s.voice.open}</button>
-        <button className="btn secondary capture-link" onClick={onCapture} title={s.smartCaptureHint}>{s.smartCapture}</button>
       </div>
 
-      {voice && <PropertyVoice lang={lang} mode="list" onCreate={onVoiceCreate} onFind={onFind} />}
+      {voice && <PropertyVoice lang={lang} mode="list" onFind={onFind}
+        onCreate={changes => go({ name: 'listingForm', prefill: prefillFrom(changes) })} />}
 
       {open && (
         <div className="card stack-sm" data-testid="filter-panel">
@@ -129,7 +134,7 @@ export function PropertyListing({ lang, listings, vendors, layout, setLayout, in
             </label>
             <label>{s.f.type}
               <select aria-label={s.f.type} value={f.type ?? ''} onChange={e => set({ type: e.target.value || undefined, typeWord: undefined })}>
-                <option value="">{s.any}</option>{TYPES.map(x => <option key={x} value={x}>{x}</option>)}
+                <option value="">{s.any}</option>{TYPES.map(x => <option key={x} value={x}>{typeLabel(s, x)}</option>)}
               </select>
             </label>
             <label>{s.f.status}
@@ -160,8 +165,8 @@ export function PropertyListing({ lang, listings, vendors, layout, setLayout, in
           </div>
           <div className="small muted">{f.purpose === 'rent' ? s.priceRent : s.f.price}</div>
           <div className="two">
-            <input aria-label={`${s.f.price} ${s.min}`} inputMode="numeric" placeholder={s.min} value={f.priceMin ?? ''} onChange={e => set({ priceMin: numOrUndef(e.target.value) })} />
-            <input aria-label={`${s.f.price} ${s.max}`} inputMode="numeric" placeholder={s.max} value={f.priceMax ?? ''} onChange={e => set({ priceMax: numOrUndef(e.target.value) })} />
+            <label className="ff">{s.min}<MoneyInput aria-label={`${s.f.price} ${s.min}`} value={f.priceMin} onChange={n => set({ priceMin: n })} /></label>
+            <label className="ff">{s.max}<MoneyInput aria-label={`${s.f.price} ${s.max}`} value={f.priceMax} onChange={n => set({ priceMax: n })} /></label>
           </div>
           <div className="two">
             <button className="btn secondary" onClick={() => setF({})} disabled={!n}>{s.clear}</button>
@@ -171,85 +176,101 @@ export function PropertyListing({ lang, listings, vendors, layout, setLayout, in
       )}
 
       <div className="small muted" data-testid="listing-count">{s.results(shown.length, listings.length)}</div>
-      {shown.length === 0 && <p className="muted">{s.none}</p>}
+      {listings.length === 0 ? <p className="muted empty" data-testid="listing-empty">{s.empty}</p> : shown.length === 0 && <p className="muted">{s.none}</p>}
 
-      {layout === 'large' ? (
-        <ul className="lc-list">
+      {layout === 'grid' ? (
+        <ul className="lc-grid" data-layout="grid">
+          {shown.map(l => (
+            <li key={l.id} data-testid="listing-card">
+              <button className="gc" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
+                <CardPhoto l={l} s={s} className="gc-photo" />
+                <span className="gc-price"><PriceLine l={l} s={s} short /></span>
+                <span className="gc-title">{cardTitle(l) || s.untitled}</span>
+                <span className="gc-meta">{placeName(l) || typeLabel(s, l.type) || '—'}</span>
+                <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="lc-list" data-layout="large">
           {shown.map(l => (
             <li key={l.id} className="lc-card" data-testid="listing-card">
-              <Hero l={l} s={s} />
+              <CardPhoto l={l} s={s} className="lc-photo" />
               <div className="lc-body">
-                <div className="lc-ref">{[l.ref, categoryOf(l) && s.category[categoryOf(l)!]].filter(Boolean).join(' · ')}</div>
                 <div className="lc-title">{cardTitle(l) || s.untitled}</div>
-                {typeArea(l) && <div className="lc-type">{typeArea(l)}</div>}
+                <div className="lc-type">{typePlace(l, s) || '—'}</div>
                 <strong className="lc-price"><PriceLine l={l} s={s} /></strong>
                 <Facts l={l} s={s} />
                 <div className="lc-meta">
-                  {[availabilityText(l, s), l.tenure && s.tenure[l.tenure] + (yearsRemaining(l) !== undefined ? ` · ${s.yearsLeft(yearsRemaining(l)!)}` : '')].filter(Boolean).join(' · ')}
+                  {[availabilityText(l, s, lang), l.tenure && s.tenure[l.tenure] + (yearsRemaining(l) !== undefined ? ` · ${s.yearsLeft(yearsRemaining(l)!)}` : '')].filter(Boolean).join(' · ') || '—'}
                 </div>
                 <div className="between lc-foot">
-                  <span className="lc-owner">{ownerLabel(l, vendors) ? `${s.owner}: ${ownerLabel(l, vendors)}` : ''}</span>
-                  <button className="btn small primary" onClick={() => onOpen(l.id)} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
+                  <span className="lc-owner">{ownerName(l) ? `${s.owner}: ${ownerName(l)}` : ''}</span>
+                  <button className="btn small primary" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
                 </div>
               </div>
             </li>
           ))}
         </ul>
-      ) : (
-        <ul className="lc-grid">
-          {shown.map(l => {
-            const p = mainPhoto(l);
-            return (
-              <li key={l.id} data-testid="listing-card">
-                <button className="gc" onClick={() => onOpen(l.id)} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
-                  <span className="gc-photo">{p ? <img src={p.url} alt="" /> : null}{l.status && <span className={`gc-dot st-${l.status}`} aria-hidden="true" />}</span>
-                  <span className="gc-price"><PriceLine l={l} s={s} short /></span>
-                  <span className="gc-title">{cardTitle(l) || s.untitled}</span>
-                  <span className="gc-meta">{l.ref}</span>
-                  <span className="gc-meta">{l.status ? s.status[l.status] : ''}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
       )}
-      <button className="fab" onClick={onAdd} aria-label={s.add}><span aria-hidden="true">+</span> {s.add}</button>
+      <button className="fab" onClick={() => go({ name: 'listingForm' })} aria-label={s.add}><span aria-hidden="true">+</span> {s.add}</button>
     </section>
   );
 }
 
-// ---------- full property record ----------
-export function ListingDetails({ lang, l, vendors, fieldDefs, onEdit, onUpdate }: {
-  lang: Lang; l: Listing; vendors: Vendor[]; fieldDefs: MarketingFieldDef[]; onEdit: () => void; onUpdate: (l: Listing, source: 'voice', summary: string) => void;
-}) {
+/** Turns reviewed voice details into starting values for the property form, marked "from your words". */
+export function prefillFrom(changes: Change[]): Partial<Listing> {
+  const p: Record<string, unknown> = { filledFrom: {} };
+  for (const c of changes) {
+    if (c.key.startsWith('tenancy.')) { p.tenancy = { ...(p.tenancy as object ?? {}), [c.key.slice(8)]: c.value }; continue; }
+    p[c.key] = c.value;
+    (p.filledFrom as Record<string, string>)[c.key] = 'words';
+  }
+  return p as Partial<Listing>;
+}
+
+// ---------- property detail page ----------
+export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: Go }) {
+  const { state, store } = useApp();
   const s = listingStrings[lang];
+  const l = state.properties.find(x => x.id === id);
   const [photoId, setPhotoId] = useState<string | undefined>(undefined);
   const [voice, setVoice] = useState(false);
-  const shownPhoto = l.photos.find(p => p.id === photoId);
+  if (!l) return <p className="muted">{s.none}</p>;
+  const shownPhoto = l.photos.find(p => p.id === photoId) ?? mainPhoto(l)!;
   const yrs = yearsRemaining(l);
   const comm = commissionRm(l);
   const vf = fieldsFor(l.type);
-  const vendor = vendors.find(v => v.id === l.vendorId);
-  const owner = ownerLabel(l, vendors);
+  const vendor = state.contacts.find(v => v.id === l.vendorId);
+  const owner = vendor?.name ?? l.ownerName;
   const phone = vendor?.phone ?? l.ownerPhone;
   const missing = missingDetails(l);
+  const edit = (section: FormSection) => () => go({ name: 'listingForm', id: l.id, section });
   const row = (k: string, v?: string | number) => (v === undefined || v === '' ? null : <div key={k} className="dl-row"><dt>{s.l[k] ?? k}</dt><dd>{v}</dd></div>);
   const numRow = (k: keyof Listing, fmt: (n: number) => string = String) => (l[k] === undefined ? null : row(k, fmt(l[k] as number)));
   const depositRm = l.monthlyRent !== undefined ? l.monthlyRent * ((l.securityDepositMonths ?? 0) + (l.utilityDepositMonths ?? 0)) : undefined;
   const docs = l.documents ?? [];
+  const fieldDefs = (state.options['marketingFields'] ?? []).map(o => ({ id: o.value, label: o.value }));
   const custom = fieldDefs.filter(d => l.marketing?.custom?.[d.id]);
+  const EL = s.edit;
+  const empty = <small className="muted">{s.notSet}</small>;
+  const hasAny = (...xs: unknown[]) => xs.some(x => x !== undefined && x !== '');
 
   return (
     <section className="stack listing" data-testid="listing-details">
       <div className="lc-card">
-        {shownPhoto ? <div className="lc-photo tall"><img src={shownPhoto.url} alt="" /><div className="lc-shade" /><div className="lc-badges"><Badges l={l} s={s} /></div></div> : <Hero l={l} s={s} tall />}
+        <span className="lc-photo tall">
+          <StoredImage fileId={shownPhoto.fileId} url={shownPhoto.url} />
+          <span className="lc-shade" /><span className="lc-badges"><Badges l={l} s={s} /></span>
+          {shownPhoto.sample && <span className="lc-sample">{s.samplePic}</span>}
+        </span>
         {l.photos.length > 1 && (
-          <div className="thumbs">{l.photos.map(p => <button key={p.id} className={p.id === (shownPhoto ?? mainPhoto(l))?.id ? 'on' : ''} onClick={() => setPhotoId(p.id)} aria-label={p.name}><img src={p.url} alt="" /></button>)}</div>
+          <div className="thumbs">{l.photos.map(p => <button key={p.id} className={p.id === shownPhoto.id ? 'on' : ''} onClick={() => setPhotoId(p.id)} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div>
         )}
         <div className="lc-body">
-          <div className="lc-ref">{[l.ref, categoryOf(l) && s.category[categoryOf(l)!]].filter(Boolean).join(' · ')}</div>
           <div className="lc-title big">{cardTitle(l) || s.untitled}</div>
-          {typeArea(l) && <div className="lc-type">{typeArea(l)}</div>}
+          <div className="lc-type">{typePlace(l, s)}</div>
           <strong className="lc-price big"><PriceLine l={l} s={s} /></strong>
           {l.negotiable && forSale(l) && <span className="badge fit">{s.negotiable[l.negotiable]}</span>}
           <div className="key-facts">
@@ -266,56 +287,78 @@ export function ListingDetails({ lang, l, vendors, fieldDefs, onEdit, onUpdate }
       </div>
 
       <div className="rec-actions">
-        <button className="btn primary" onClick={onEdit}>{s.edit}</button>
+        <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>
         <button className="btn secondary" aria-expanded={voice} onClick={() => setVoice(v => !v)}><IconMic size={20} /> {s.voice.open}</button>
-        {phone && <a className="btn secondary" href={`tel:${phone.replace(/[^\d+]/g, '')}`}>{s.call}</a>}
-        {phone && <a className="btn secondary" href={`https://wa.me/${phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
+        {phone && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
+        {phone && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>
 
       {voice && <PropertyVoice lang={lang} mode="record" listing={l}
-        onApply={changes => onUpdate(applyChanges(l, changes), 'voice', changes.map(c => c.key).join(', '))} />}
+        onApply={changes => {
+          const next = applyChanges(l, changes);
+          store.upsert('properties', { ...next, history: [{ at: Date.now(), source: 'voice', summary: changes.map(x => x.key).join(', ') }, ...(l.history ?? [])] });
+        }} />}
 
-      <div className={`card stack-sm ${missing.length ? 'missing' : ''}`} data-testid="missing">
-        <div className="card-title">{s.sec.missing}</div>
+      <SectionCard title={s.sec.missing} className={missing.length ? 'missing' : ''} testId="missing" onEdit={edit(missing.includes('lat') && missing.length === 1 ? 'location' : 'basics')} editLabel={EL}>
         {missing.length ? <div className="lc-facts">{missing.map(k => <span key={k}>{s.l[k] ?? k}</span>)}</div> : <small className="ok-text">{s.missingNone}</small>}
-      </div>
+      </SectionCard>
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.status}</div>
+      <SectionCard title={s.sec.basics} onEdit={edit('basics')} editLabel={EL} testId="sec-basics">
         <dl className="dl">
-          {row('status', l.status && s.status[l.status])}{l.status === 'in_progress' ? row('handledBy', l.handledBy) : null}
-          {row('purpose', l.purpose && s.purpose[l.purpose])}
-          {row('availability', availabilityText(l, s))}
-          {row('condition', l.condition && s.condition[l.condition])}
-          {row('features', l.features)}
+          <div className="dl-row" data-testid="ref-row"><dt>{s.l.ref}</dt><dd className="ref-text">{l.ref || <span className="muted">{s.notSet}</span>}</dd></div>
+          {row('type', typeLabel(s, l.type))}{row('headline', l.headline)}{row('purpose', l.purpose && s.purpose[l.purpose])}
         </dl>
-      </div>
+      </SectionCard>
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.details}</div>
+      <SectionCard title={s.sec.tenure} onEdit={edit('tenure')} editLabel={EL} testId="sec-tenure-view">
+        {hasAny(l.tenure, l.titleType, l.landUse, l.restriction) ? (
+          <dl className="dl">{row('tenure', l.tenure && s.tenure[l.tenure])}{row('leaseExpiryYear', l.leaseExpiryYear)}
+            {yrs !== undefined && <div className="dl-row"><dt /><dd className="ok-text">{s.yearsLeft(yrs)}</dd></div>}
+            {row('titleType', l.titleType && (s.titleTypes[l.titleType] ?? l.titleType))}{row('landUse', l.landUse && s.landUse[l.landUse])}{row('restriction', l.restriction && (s.restrictions[l.restriction] ?? l.restriction))}</dl>
+        ) : empty}
+      </SectionCard>
+
+      <SectionCard title={s.sec.photos} onEdit={edit('photos')} editLabel={EL} testId="sec-photos-view">
+        {l.photos.length ? <div className="photo-strip">{l.photos.map(p => <button key={p.id} onClick={() => setPhotoId(p.id)} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div> : empty}
+      </SectionCard>
+
+      <SectionCard title={s.sec.location} onEdit={edit('location')} editLabel={EL} testId="sec-location-view">
         <dl className="dl">
-          {row('type', l.type)}{row('unitNo', l.unitNo)}{row('lotNo', l.lotNo)}
-          {numRow('landSqft', landText)}{numRow('builtUpSqft', sqft)}
-          {l.frontageFt !== undefined || l.depthFt !== undefined ? row('frontageFt', `${l.frontageFt ?? '?'} ft × ${l.depthFt ?? '?'} ft`) : null}
-          {numRow('bedrooms')}{numRow('bathrooms')}{numRow('floors')}{numRow('parking')}
-          {row('lotType', l.lotType && s.lotType[l.lotType])}{row('furnishing', l.furnishing && s.furnishing[l.furnishing])}
+          {row('country', l.country && (s.countries[l.country] ?? l.country))}{row('state', l.state)}{row('city', l.city)}{row('township', l.township)}
+          {row('lotNo', l.lotNo)}{row('street', l.street)}{row('unitNo', l.unitNo)}
+          {hasPosition(l) && row('lat', `${s.position(l.lat!.toFixed(5), l.lng!.toFixed(5))}${l.geoSource ? ` (${s.geoSource[l.geoSource]})` : ''}`)}
         </dl>
-      </div>
+        {hasPosition(l) ? (
+          <div className="two">
+            <a className="btn secondary" href={navigationUrl({ lat: l.lat!, lng: l.lng! })} target="_blank" rel="noreferrer">{s.navigate}</a>
+            <button className="btn secondary" onClick={() => go({ name: 'propertyMap', id: l.id })}>{s.onMap}</button>
+          </div>
+        ) : <small className="muted">{s.noPosition}</small>}
+      </SectionCard>
 
-      {(vf.has('ceilingFt') || vf.has('zoning') || vf.has('currentUse')) && (l.ceilingFt ?? l.powerKva ?? l.loadingBays ?? l.specs ?? l.zoning ?? l.approvals ?? l.currentUse ?? l.roadAccess) !== undefined && (
-        <div className="card stack-sm"><div className="card-title">{vf.has('ceilingFt') ? s.sec.building : s.sec.land}</div>
+      <SectionCard title={s.sec.details} onEdit={edit('details')} editLabel={EL}>
+        {hasAny(l.unitNo, l.landSqft, l.builtUpSqft, l.frontageFt, l.depthFt, l.bedrooms, l.bathrooms, l.floors, l.parking, l.lotType, l.furnishing) ? (
           <dl className="dl">
-            {numRow('ceilingFt', x => `${x} ft`)}{numRow('powerKva', x => `${x} kVA`)}{numRow('loadingBays')}{row('specs', l.specs)}
-            {row('zoning', l.zoning)}{row('approvals', l.approvals)}{row('currentUse', l.currentUse)}{row('roadAccess', l.roadAccess)}
+            {numRow('landSqft', landText)}{numRow('builtUpSqft', sqft)}
+            {l.frontageFt !== undefined || l.depthFt !== undefined ? row('frontageFt', `${l.frontageFt ?? '?'} ft × ${l.depthFt ?? '?'} ft`) : null}
+            {numRow('bedrooms')}{numRow('bathrooms')}{numRow('floors')}{numRow('parking')}
+            {row('lotType', l.lotType && s.lotType[l.lotType])}{row('furnishing', l.furnishing && s.furnishing[l.furnishing])}
           </dl>
-        </div>
+        ) : empty}
+      </SectionCard>
+
+      {(vf.has('ceilingFt') || vf.has('zoning') || vf.has('currentUse') || vf.has('specs')) && (
+        <SectionCard title={vf.has('ceilingFt') ? s.sec.building : vf.has('specs') ? s.sec.building : s.sec.land} onEdit={edit('specs')} editLabel={EL}>
+          {hasAny(l.ceilingFt, l.powerKva, l.loadingBays, l.specs, l.zoning, l.approvals, l.currentUse, l.roadAccess) ? (
+            <dl className="dl">
+              {numRow('ceilingFt', x => `${x} ft`)}{numRow('powerKva', x => `${x} kVA`)}{numRow('loadingBays')}{row('specs', l.specs)}
+              {row('zoning', l.zoning)}{row('approvals', l.approvals)}{row('currentUse', l.currentUse)}{row('roadAccess', l.roadAccess)}
+            </dl>
+          ) : empty}
+        </SectionCard>
       )}
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.tenure}</div>
-        <dl className="dl">{row('tenure', l.tenure && s.tenure[l.tenure])}{row('leaseExpiryYear', l.leaseExpiryYear)}
-          {yrs !== undefined && <div className="dl-row"><dt /><dd className="ok-text">{s.yearsLeft(yrs)}</dd></div>}
-          {row('titleType', l.titleType)}{row('landUse', l.landUse && s.landUse[l.landUse])}{row('restriction', l.restriction && s.restriction[l.restriction])}</dl>
-      </div>
-
-      <div className="card stack-sm"><div className="card-title">{s.sec.money}</div>
+      <SectionCard title={s.sec.money} onEdit={edit('money')} editLabel={EL}>
         <dl className="dl">
           {forSale(l) && <>{numRow('askingPrice', rm)}{row('negotiable', l.negotiable && s.negotiable[l.negotiable])}{row('commissionPct', l.commissionPct !== undefined ? `${l.commissionPct}%` : undefined)}</>}
           {forRent(l) && <>{numRow('monthlyRent', rm)}{numRow('securityDepositMonths', s.months)}{numRow('utilityDepositMonths', s.months)}</>}
@@ -323,28 +366,52 @@ export function ListingDetails({ lang, l, vendors, fieldDefs, onEdit, onUpdate }
         </dl>
         {comm !== undefined && forSale(l) && <small className="muted">{s.commission(rm(comm))}</small>}
         {forRent(l) && depositRm ? <small className="muted">{s.depositRm(rm(depositRm))}</small> : null}
-      </div>
+        {(l.askingPrice !== undefined || l.monthlyRent !== undefined) && <button className="btn small secondary" onClick={() => go({ name: 'calculator', propertyId: l.id })}>{s.calculate}</button>}
+      </SectionCard>
 
-      {l.tenancy && Object.keys(l.tenancy).length > 0 && (
-        <div className="card stack-sm" data-testid="tenancy"><div className="card-title">{s.sec.tenancy}</div>
-          <dl className="dl">{row('tenant', l.tenancy.tenant)}{row('tStart', monthText(l.tenancy.start))}{row('tEnd', monthText(l.tenancy.end))}
-            {row('tRent', l.tenancy.rent !== undefined ? rm(l.tenancy.rent) : undefined)}{row('tNotes', l.tenancy.notes)}</dl>
-        </div>
+      {(forRent(l) || l.availability === 'tenanted' || l.tenancy) && (
+        <SectionCard title={s.sec.tenancy} onEdit={edit('tenancy')} editLabel={EL} testId="tenancy">
+          {l.tenancy && Object.keys(l.tenancy).length ? (
+            <dl className="dl">{row('tenant', l.tenancy.tenant)}{row('tStart', monthText(l.tenancy.start, lang))}{row('tEnd', monthText(l.tenancy.end, lang))}
+              {row('tRent', l.tenancy.rent !== undefined ? rm(l.tenancy.rent) : undefined)}{row('tNotes', l.tenancy.notes)}</dl>
+          ) : empty}
+        </SectionCard>
       )}
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.owner}</div>
-        {owner ? <dl className="dl">{row('ownerName', owner)}{row('ownerPhone', phone)}</dl> : <small className="muted">{s.notSet}</small>}
-        {vendor && <small className="muted">{s.vendorLinked}</small>}
-      </div>
+      <SectionCard title={s.sec.availability} onEdit={edit('availability')} editLabel={EL}>
+        {hasAny(l.availability, l.condition, l.features) ? (
+          <dl className="dl">{row('availability', availabilityText(l, s, lang))}{row('condition', l.condition && s.condition[l.condition])}{row('features', l.features)}</dl>
+        ) : empty}
+      </SectionCard>
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.location}</div>
-        <p className="small">{[l.unitNo && `Unit ${l.unitNo}`, l.lotNo && `Lot ${l.lotNo}`, l.address, l.area].filter(Boolean).join(', ') || s.notSet}</p>
-        <p className="small muted">{l.pin ? s.pinSet(l.pin.lat.toFixed(5), l.pin.lon.toFixed(5), l.pin.accuracy) : s.pinNone}</p>
-      </div>
+      <SectionCard title={s.sec.owner} onEdit={edit('owner')} editLabel={EL}>
+        {owner ? <dl className="dl">{row('ownerName', owner)}{row('ownerPhone', phone)}</dl> : empty}
+        {vendor && <button className="btn small ghost" onClick={() => go({ name: 'contactDetail', id: vendor.id })}>{s.vendorLinked} →</button>}
+      </SectionCard>
 
-      <div className="card stack-sm" data-testid="marketing"><div className="card-title">{s.sec.marketing}</div>
+      <SectionCard title={s.sec.arrangement} onEdit={edit('arrangement')} editLabel={EL}>
         <dl className="dl">
+          {row('status', l.status && s.status[l.status])}{l.status === 'in_progress' ? row('handledBy', l.handledBy) : null}
           {row('arrangement', l.arrangement && s.arrangement[l.arrangement])}{row('arrangementNote', l.arrangementNote)}
+        </dl>
+        {!hasAny(l.status, l.arrangement) && empty}
+      </SectionCard>
+
+      <SectionCard title={s.sec.banner} onEdit={edit('banner')} editLabel={EL} testId="sec-banner-view">
+        {(() => {
+          const up = activeBanners(state.banners, l.id);
+          return (
+            <>
+              <div className="between"><span>{s.bannerQ}</span><BannerDot status={l.bannerStatus} lang={lang} /></div>
+              {up.length > 0 && <small className="muted" data-testid="banner-summary">{s.bannerUp(up.length)} · {s.bannerLast(fmtDate(up[0].placedOn, lang))}</small>}
+              <button className="btn small secondary" onClick={() => go({ name: 'banners', propertyId: l.id })} data-testid="open-banners">🪧 {s.bannerOpen}</button>
+            </>
+          );
+        })()}
+      </SectionCard>
+
+      <SectionCard title={s.sec.marketing} onEdit={edit('marketing')} editLabel={EL} testId="marketing">
+        <dl className="dl">
           {row('advertised', l.marketing?.advertised && s.yesNo[l.marketing.advertised])}
           {custom.map(d => <div key={d.id} className="dl-row"><dt>{d.label}</dt><dd>{l.marketing!.custom[d.id]}</dd></div>)}
         </dl>
@@ -355,34 +422,39 @@ export function ListingDetails({ lang, l, vendors, fieldDefs, onEdit, onUpdate }
             {a.notes && <small>{a.notes}</small>}
           </div>
         ))}
-      </div>
+        {!l.marketing?.advertised && !(l.marketing?.ads ?? []).length && empty}
+      </SectionCard>
 
-      <div className="card stack-sm" data-testid="docs"><div className="card-title">{s.sec.docs}</div>
+      <SectionCard title={s.sec.notes} onEdit={edit('notes')} editLabel={EL}>
+        {l.notes ? <p className="pre">{l.notes}</p> : empty}
+      </SectionCard>
+
+      <SectionCard title={s.sec.docs} onEdit={edit('docs')} editLabel={EL} testId="docs">
         <div className="doc-sum">
-          <div><span>{s.sec.photos}</span><strong>{l.photos.length}</strong></div>
-          {DOC_CATEGORIES.map(c => <div key={c}><span>{s.docCat[c]}{CONFIDENTIAL_DOCS.includes(c) ? ' 🔒' : ''}</span><strong>{docs.filter(d => d.category === c).length}</strong></div>)}
+          {DOC_CATEGORIES.map(cat => <div key={cat}><span>{s.docCat[cat]}{CONFIDENTIAL_DOCS.includes(cat) ? ' 🔒' : ''}</span><strong>{docs.filter(d => d.category === cat).length}</strong></div>)}
         </div>
-        {docs.map(d => <div key={d.id} className="doc-row"><span>{d.name}</span>{d.url ? <a className="btn small secondary" href={d.url} target="_blank" rel="noreferrer">{s.open1}</a> : <small className="muted">{s.sample}</small>}</div>)}
-      </div>
+        {docs.map(d => <DocRow key={d.id} d={d} s={s} />)}
+      </SectionCard>
 
-      <div className="card stack-sm"><div className="card-title">{s.sec.viewings}</div>
-        {(l.viewings ?? []).length === 0 ? <small className="muted">{s.noViewings}</small> : (l.viewings ?? []).map(w => (
-          <div key={w.id} className="ad-row">
-            <div className="between"><strong>{w.date}</strong>{w.attended && <span className={`ad-st ${w.attended === 'yes' ? 'ad-live' : 'ad-expired'}`}>{s.attended[w.attended]}</span>}</div>
-            {w.viewer && <small>{w.viewer}</small>}
-            {w.note && <small className="muted">{w.note}</small>}
-          </div>
-        ))}
-      </div>
-
-      {l.notes && <div className="card stack-sm"><div className="card-title">{s.sec.notes}</div><p className="pre">{l.notes}</p></div>}
+      <InquiryHistory lang={lang} go={go} propertyId={l.id} />
+      <ViewingHistory lang={lang} go={go} propertyId={l.id} />
 
       {(l.history ?? []).length > 0 && (
         <div className="card stack-sm" data-testid="history"><div className="card-title">{s.sec.history}</div>
-          {l.history!.map((h, i) => <small key={i} className="muted">{new Date(h.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · {s.historyItem[h.source]}{h.summary ? ` (${h.summary})` : ''}</small>)}
+          {l.history!.slice(0, 20).map((h, i) => <small key={i} className="muted">{new Date(h.at).toLocaleString(lang === 'zh' ? 'zh-CN' : lang === 'bm' ? 'ms-MY' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · {s.historyItem[h.source] ?? h.source}{h.summary ? ` (${h.summary})` : ''}</small>)}
         </div>
       )}
-      <small className="muted">{s.editedNote}</small>
     </section>
+  );
+}
+
+function DocRow({ d, s }: { d: Doc; s: ListingStrings }) {
+  const store = useStore();
+  return (
+    <div className="doc-row"><span>{d.name}</span>
+      {d.fileId
+        ? <button className="btn small secondary" onClick={() => void store.fileUrl(d.fileId!).then(u => { if (u) window.open(u, '_blank'); })}>{s.open1}</button>
+        : <small className="muted">{s.sample}</small>}
+    </div>
   );
 }

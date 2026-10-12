@@ -1,0 +1,41 @@
+{
+  "appId": "com.jslproperties.estateagentbuddy",
+  "appName": "Estate Agent AI Buddy",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": true,
+      "backgroundColor": "#08080A",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#08080A",
+      "overlaysWebView": false
+    },
+    "LocalNotifications": {
+      "iconColor": "#D4AF37"
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 15000,
+      "responseTimeout": 30,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true,
+      "statsUrl": "",
+      "channelUrl": "",
+      "updateUrl": ""
+    }
+  }
+}
