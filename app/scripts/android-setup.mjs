@@ -63,9 +63,22 @@ if (existsSync(styles)) edit(styles, s => (s.includes('android:windowBackground'
   : s.replace(/(<style name="AppTheme.NoActionBar"[^>]*>)/, '$1\n        <item name="android:windowBackground">@android:color/black</item>')));
 
 // 4. Version: build number from GitHub Actions, name from package.json.
+//    Debug signing: always the committed android-config/debug.keystore, so each new APK installs over the last one.
 const run = Number(process.env.GITHUB_RUN_NUMBER || 1);
-edit('android/app/build.gradle', s => s
-  .replace(/versionCode\s+\d+/, `versionCode ${run}`)
-  .replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`));
+edit('android/app/build.gradle', s => {
+  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`);
+  if (!s.includes('android-config/debug.keystore')) {
+    s = s.replace(/android\s*\{/, `android {
+    signingConfigs {
+        debug {
+            storeFile file('../../android-config/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }`);
+  }
+  return s;
+});
 
 console.log(`Android project configured: ${cfg.appName} (${cfg.appId}), version ${pkg.version} (${run}).`);

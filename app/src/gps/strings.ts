@@ -61,7 +61,7 @@ const en = {
   mapNone: 'No property has a saved map position yet. Open a property, edit its location and use Add from Google Map or your current location.',
   selected: (i: number, n: number) => `${i} of ${n}`,
   prev: 'Previous property', next: 'Next property', details: 'Details', navigate: 'Navigate',
-  routeShow: 'Show route from here', routeInfo: (km: string, min: number) => `${km} · about ${min} min by car`, routeNone: 'No route preview (the Directions or Routes API is not enabled for this key). Navigate still works.',
+  routeShow: 'Show route from here', routeInfo: (km: string, min: number) => `${km} · about ${min} min by car`, routeNone: 'No route preview (the Routes API is not enabled for this key). Navigate still works.',
   listMode: 'Properties with a saved position',
   needLocation: 'Your current location is needed for the route preview.',
 };
@@ -127,7 +127,7 @@ const bm: GpsStrings = {
   mapNone: 'Belum ada hartanah dengan kedudukan peta. Buka hartanah, ubah lokasinya dan guna Tambah dari Google Map atau lokasi semasa anda.',
   selected: (i: number, n: number) => `${i} daripada ${n}`,
   prev: 'Hartanah sebelumnya', next: 'Hartanah seterusnya', details: 'Butiran', navigate: 'Navigasi',
-  routeShow: 'Tunjuk laluan dari sini', routeInfo: (km: string, min: number) => `${km} · lebih kurang ${min} minit dengan kereta`, routeNone: 'Tiada pratonton laluan (Directions atau Routes API belum diaktifkan untuk kunci ini). Navigasi masih berfungsi.',
+  routeShow: 'Tunjuk laluan dari sini', routeInfo: (km: string, min: number) => `${km} · lebih kurang ${min} minit dengan kereta`, routeNone: 'Tiada pratonton laluan (Routes API belum diaktifkan untuk kunci ini). Navigasi masih berfungsi.',
   listMode: 'Hartanah dengan kedudukan disimpan',
   needLocation: 'Lokasi semasa anda diperlukan untuk pratonton laluan.',
 };
@@ -192,7 +192,7 @@ const zh: GpsStrings = {
   mapNone: '还没有房产保存了地图位置。打开房产，编辑地点并使用“从 Google 地图添加”或您当前的位置。',
   selected: (i: number, n: number) => `${n} 个中的第 ${i} 个`,
   prev: '上一个房产', next: '下一个房产', details: '详情', navigate: '导航',
-  routeShow: '显示从这里出发的路线', routeInfo: (km: string, min: number) => `${km} · 开车约 ${min} 分钟`, routeNone: '无法预览路线（此密钥未启用 Directions 或 Routes API）。导航仍可使用。',
+  routeShow: '显示从这里出发的路线', routeInfo: (km: string, min: number) => `${km} · 开车约 ${min} 分钟`, routeNone: '无法预览路线（此密钥未启用 Routes API）。导航仍可使用。',
   listMode: '已保存位置的房产',
   needLocation: '预览路线需要您当前的位置。',
 };

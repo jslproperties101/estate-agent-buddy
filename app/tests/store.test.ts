@@ -40,6 +40,7 @@ test('S2 sync: sign in, push local changes, pull newer cloud records, apply dele
   const fetchFn = (async (url: string, init: RequestInit = {}) => {
     calls.push({ url, init });
     if (url.includes('/auth/v1/token')) return new Response(JSON.stringify({ access_token: 'tok', refresh_token: 'r', expires_in: 3600, user: { id: 'u1', email: 'a@b.c' } }), { status: 200 });
+    if (url.includes('/rpc/eab_my_membership')) return new Response(JSON.stringify([{ workspace_id: 'w1', workspace_name: 'A team', role: 'owner' }]), { status: 200 });
     if (init.method === 'POST') return new Response('', { status: 201 });
     return new Response(JSON.stringify(cloud), { status: 200 });
   }) as typeof fetch;
@@ -51,10 +52,38 @@ test('S2 sync: sign in, push local changes, pull newer cloud records, apply dele
   assert.deepEqual(r, { pushed: 1, pulled: 1, removed: 1 });
   const names = s.getState().contacts.map(c => c.name).sort();
   assert.deepEqual(names, ['From phone 2', 'Made here']);
-  const push = calls.find(c => c.init.method === 'POST' && c.url.includes('/rest/v1/'))!;
+  const push = calls.find(c => c.init.method === 'POST' && c.url.includes('/rest/v1/eab_records'))!;
   const body = JSON.parse(String(push.init.body));
-  assert.equal(body[0].id, 'c1'); assert.equal(body[0].user_id, 'u1');
+  assert.equal(body[0].id, 'c1'); assert.equal(body[0].user_id, 'u1'); assert.equal(body[0].workspace_id, 'w1');
+  assert.ok(push.url.includes('on_conflict=workspace_id,collection,id'));
+  assert.ok(calls.some(c => c.url.includes('workspace_id=eq.w1')), 'only the team workspace is read');
+  assert.equal(s.getState().meta.syncSession?.role, 'owner');
   assert.equal((push.init.headers as Record<string, string>).authorization, 'Bearer tok');
   assert.deepEqual(s.getState().meta.dirty, []);
   assert.ok(s.getState().meta.lastSync);
+});
+
+test('S3 sync: a limited (read-only) user receives changes but sends nothing; their edits stay on the phone', async () => {
+  const s = await Store.open(new MemoryBackend());
+  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
+  const posts: string[] = [];
+  const fetchFn = (async (url: string, init: RequestInit = {}) => {
+    if (init.method === 'POST' && url.includes('/rest/v1/eab_records')) posts.push(url);
+    return new Response(JSON.stringify([]), { status: 200 });
+  }) as typeof fetch;
+  s.upsert('contacts', contact('c1', 'Mine'));
+  s.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000, email: 'l@x.c', userId: 'u2', workspaceId: 'w1', role: 'limited' } });
+  const r = await syncNow(s, cfg, fetchFn);
+  assert.equal(r.pushed, 0);
+  assert.deepEqual(posts, []);
+  assert.deepEqual(s.getState().meta.dirty, ['contacts:c1'], 'kept for later');
+});
+
+test('S4 sync: switched-off access is reported, never treated as success', async () => {
+  const s = await Store.open(new MemoryBackend());
+  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
+  const fetchFn = (async () => new Response('[]', { status: 200 })) as typeof fetch;
+  s.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000, email: 'x@x.c', userId: 'u3' } });
+  await assert.rejects(syncNow(s, cfg, fetchFn), (e: Error & { code?: string }) => e.code === 'no-access');
+  assert.equal(s.getState().meta.lastSync, undefined);
 });

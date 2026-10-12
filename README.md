@@ -15,6 +15,11 @@ RM formatter and money box for every money field.
 **Owner requests (12 Oct, done):** reference-number dropdown (used numbers red, free ones selectable); **My Banner
 Location** in GPS Assistance (four cards now) with a **Banner placed?** status on every property.
 
+**Android app, Google Maps, Google sign-in (12 Oct, built):** installable Android app (Capacitor), built on every
+push by GitHub Actions and attached to a GitHub Release; real Google Maps with "Check Google Maps" diagnostics and your
+GPS position on the maps; Google sign-in through Supabase with team roles enforced by the database (tested on
+PostgreSQL). What you still need to set up is in [`docs/SETUP.md`](docs/SETUP.md).
+
 ## Current state (Version 2.0, 12 Oct 2026)
 
 Version 2.0 turns the v1L prototype into a working app that keeps its data. Smart Capture has been removed
@@ -34,8 +39,8 @@ completely; property information is captured by voice.
 | GPS Assistance: House Shopping tracker and property Map | Done; Google map display needs a key; background tracking needs the Android app |
 | Agent Financial, Property Calculator, Agent Profile, Ask Expert, Voice Command | Done in the browser (voice not tested with a real microphone) |
 | Opportunities (matching, stages) | Not built (screen says so) |
-| Cloud sync to Supabase | Code and table ready; not tested against a live project |
-| Android app | Not built |
+| Google sign-in and cloud sync (Supabase) | Built; roles and security tested on PostgreSQL; needs your Supabase project (docs/SETUP.md) |
+| Android app | Built by GitHub Actions on every push (debug APK in Releases); not yet tested on a phone by the owner |
 | Phone testing | Not done |
 
 ### Automated checks (12 Oct 2026, after Stage 1, Claude’s workspace, Chromium at 384 × 824)

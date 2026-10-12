@@ -31,7 +31,7 @@ phone in **Agent Profile → Settings**.
 
 | Variable | Needed for | Set up |
 | --- | --- | --- |
-| `EAB_GOOGLE_MAPS_API_KEY` | Maps, Add from Google Map, address search, place names on House Shopping, route preview | Google Cloud project with billing; enable **Maps JavaScript API**, **Places API (New)**, **Geocoding API**, and **Directions API** (or **Routes API**). Restrict the key to the app's web address / Android package. |
+| `EAB_GOOGLE_MAPS_API_KEY` | Maps, Add from Google Map, address search, place names on House Shopping, route preview, Check Google Maps | Enable **Maps JavaScript API**, **Geocoding API**, **Places API (New)**, **Routes API**; billing on; restrict by website to `https://localhost/*` and `https://jslproperties101.github.io/*` (docs/SETUP.md). |
 | `EAB_SUPABASE_URL`, `EAB_SUPABASE_ANON_KEY` | Optional cloud copy ("Sync now") | Supabase project; run `../supabase/migrations/*.sql`; create a user (email + password) for the agent. |
 | `EAB_EXPERT_API_URL` | Optional AI answers in Ask Expert | Deploy `../supabase/functions/ask-expert` with the secret `ANTHROPIC_API_KEY` (pay-per-use; set a spending limit). |
 

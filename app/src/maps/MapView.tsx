@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
-import { loadMaps, Maps, MapsError, mapsAuthFailed } from './google';
+import { loadMaps, Maps, MapsError, mapsAuthFailed, lastMapsError } from './google';
 import { mapStrings } from './strings';
 import type { Lang } from '../i18n';
 
@@ -29,12 +29,27 @@ export function useGoogleMaps(lang: Lang): { maps: Maps | null; status: MapsStat
   return res;
 }
 
+/** The Google error code (for example RefererNotAllowedMapError) once Google reports one. */
+export function useMapsErrorCode(): string | null {
+  const [code, setCode] = useState<string | null>(lastMapsError());
+  useEffect(() => {
+    const on = (e: Event) => setCode((e as CustomEvent<string>).detail);
+    window.addEventListener('eab-maps-error', on);
+    return () => window.removeEventListener('eab-maps-error', on);
+  }, []);
+  return code;
+}
+
 export function MapsNotice({ lang, status }: { lang: Lang; status: MapsStatus }) {
   const m = mapStrings[lang];
-  if (status === 'ready') return null;
+  const code = useMapsErrorCode();
+  // Google can refuse the key after the map has started (for example a website restriction): show the fix then too.
+  if (status === 'ready' && !code) return null;
   if (status === 'loading') return <p className="muted small">…</p>;
-  const text = status === 'no-key' ? m.notConfigured : status === 'auth' ? m.authFail : m.loadFail;
-  return <p className="notice warn" role="status" data-testid={`maps-${status}`}>{text}</p>;
+  const text = status === 'no-key' ? m.notConfigured
+    : code ? (m.fix[code] ?? m.authFail)
+      : status === 'auth' ? m.authFail : m.loadFail;
+  return <p className="notice warn" role="status" data-testid={`maps-${code ? 'error' : status}`} data-code={code ?? undefined}>{text}{code ? ` (${code})` : ''}</p>;
 }
 
 export interface MapMarker { id: string; lat: number; lng: number; title?: string; label?: string; selected?: boolean; kind?: 'property' | 'mark' | 'me' | 'pick' | 'banner'; /** Pin colour for banners (status colour). */ colour?: string }
@@ -78,6 +93,14 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
       return marker;
     });
   }, [maps, markers]);
+
+  // Leaving the screen removes this map's pins and lines.
+  useEffect(() => () => {
+    for (const x of drawn.current.markers) x.setMap(null);
+    drawn.current.line?.setMap(null);
+    drawn.current.route?.setMap(null);
+    drawn.current = { markers: [] };
+  }, []);
 
   useEffect(() => {
     const m = map.current;

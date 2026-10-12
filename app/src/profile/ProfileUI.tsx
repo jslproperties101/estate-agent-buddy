@@ -2,6 +2,7 @@
 // Sending: the app prepares the message and opens WhatsApp (or the phone's share sheet for the card images).
 // The agent reviews it there and presses Send; nothing is ever sent automatically.
 import { useState } from 'react';
+import { MapsCheck } from '../maps/MapsCheck';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
 import { Go } from '../nav';
@@ -15,8 +16,7 @@ import { normalisePhone, phoneDigits } from '../listing/model';
 import { compressImage } from '../lib/images';
 import { pickPhoneContacts } from '../lib/phonebook';
 import { config } from '../config';
-import { signIn, syncNow, SyncError } from '../data/sync';
-import { fmtDateTime } from '../lib/dates';
+import { AccountCard } from '../auth/AccountUI';
 import { permission, requestPermission } from '../lib/notify';
 import { sampleData } from '../data/sample';
 
@@ -200,14 +200,7 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
   const s = state.settings;
   const built = config({});
   const [form, setForm] = useState({ mapsApiKey: s.mapsApiKey ?? '', supabaseUrl: s.supabaseUrl ?? '', supabaseAnonKey: s.supabaseAnonKey ?? '', expertApiUrl: s.expertApiUrl ?? '' });
-  const [email, setEmail] = useState(state.meta.syncSession?.email ?? '');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
   const [perm, setPerm] = useState(permission());
-  const cfg = config(s);
-  const session = state.meta.syncSession;
-  const errText = (e: unknown) => (e instanceof SyncError ? t.syncErr[e.code] : String(e));
   const hint = (k: keyof typeof built.source) => (built.source[k] === 'build' ? t.fromBuild : t.notSetYet);
 
   return (
@@ -222,6 +215,7 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
         <div className="card-title">{t.maps}</div>
         <label className="ff">{t.mapsKey}<input data-field="mapsApiKey" type="password" autoComplete="off" placeholder={hint('googleMapsApiKey')} value={form.mapsApiKey} onChange={e => setForm(f => ({ ...f, mapsApiKey: e.target.value }))} /></label>
         <small className="muted">{t.mapsHelp}</small>
+        <MapsCheck lang={lang} />
       </div>
       <div className="card stack-sm">
         <div className="card-title">{t.expert}</div>
@@ -237,32 +231,8 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
           store.setSingleton('settings', { mapsApiKey: form.mapsApiKey.trim() || undefined, supabaseUrl: form.supabaseUrl.trim() || undefined, supabaseAnonKey: form.supabaseAnonKey.trim() || undefined, expertApiUrl: form.expertApiUrl.trim() || undefined });
           toast(t.settingsSaved);
         }}>{t.saveSettings}</button>
-        {session ? (
-          <>
-            <small className="ok-text">{t.signedIn(session.email)}</small>
-            <small className="muted">{state.meta.lastSync ? t.lastSync(fmtDateTime(state.meta.lastSync, lang)) : t.neverSynced} · {t.pending(state.meta.dirty.length)}</small>
-            <div className="two">
-              <button className="btn primary" disabled={busy} onClick={async () => {
-                setBusy(true); setMsg('');
-                try { const r = await syncNow(store, cfg); setMsg(t.syncDone(r.pushed, r.pulled + r.removed)); } catch (e) { setMsg(errText(e)); }
-                setBusy(false);
-              }}>{busy ? t.syncing : t.syncNow}</button>
-              <button className="btn secondary" onClick={() => store.setSingleton('meta', { syncSession: undefined })}>{t.signOut}</button>
-            </div>
-          </>
-        ) : (
-          <>
-            <label className="ff">{t.email}<input type="email" value={email} onChange={e => setEmail(e.target.value)} /></label>
-            <label className="ff">{t.password}<input type="password" value={password} onChange={e => setPassword(e.target.value)} /></label>
-            <button className="btn secondary" disabled={busy || !email || !password} onClick={async () => {
-              setBusy(true); setMsg('');
-              try { const sess = await signIn(cfg, email.trim(), password); store.setSingleton('meta', { syncSession: sess }); setPassword(''); } catch (e) { setMsg(errText(e)); }
-              setBusy(false);
-            }}>{t.signIn}</button>
-          </>
-        )}
-        {msg && <p className="small" role="status">{msg}</p>}
       </div>
+      <AccountCard lang={lang} />
       <div className="card stack-sm">
         <div className="card-title">{t.notif}</div>
         <small className="muted">{strings[lang].reminders.note}</small>

@@ -1,6 +1,6 @@
 // Builds the app into dist/ with esbuild (no network needed).
 // External service settings come from environment variables (or app/.env, which Git ignores), never from the code:
-//   EAB_GOOGLE_MAPS_API_KEY   Google Maps Platform browser key (Maps JavaScript, Places (New), Geocoding, Directions/Routes)
+//   EAB_GOOGLE_MAPS_API_KEY   Google Maps Platform browser key (Maps JavaScript, Geocoding, Places (New), Routes)
 //   EAB_SUPABASE_URL          Supabase project URL (optional cloud sync)
 //   EAB_SUPABASE_ANON_KEY     Supabase anon (public) key
 //   EAB_EXPERT_API_URL        URL of the Ask Expert AI server function (optional)

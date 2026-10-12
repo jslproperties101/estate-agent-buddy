@@ -37,6 +37,9 @@ import {
 } from './icons';
 import { explorerProgress } from './domain/explorer';
 import { nativeLook } from './native/native';
+import { LoginScreen } from './auth/LoginScreen';
+import { config } from './config';
+import { configured, syncNow, SyncError } from './data/sync';
 
 /** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone). `soon` marks a card whose screen says
  *  plainly that the feature is not built yet. */
@@ -63,7 +66,45 @@ export default function App() {
   useEffect(() => { void openBackend().then(Store.open).then(setStore); }, []);
   useEffect(() => { if (store) void nativeLook(); }, [store]);
   if (!store) return <div className="shell"><p className="loading" role="status">Estate Agent Buddy…</p></div>;
-  return <StoreContext.Provider value={store}><Shell /></StoreContext.Provider>;
+  return <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>;
+}
+
+/** Sign-in first when Google sign-in is set up and nobody is signed in on this phone; otherwise the app. */
+function Gate() {
+  const { state } = useApp();
+  const lang: Lang = state.settings.lang ?? 'en';
+  if (configured(config(state.settings)) && !state.meta.syncSession) return <LoginScreen lang={lang} />;
+  return <Shell />;
+}
+
+/** Keeps the cloud copy up to date while signed in: on opening, every minute when something changed, and when the
+ *  connection comes back. Problems are shown in Settings; a refused or switched-off account goes back to sign-in. */
+function useAutoSync() {
+  const { state, store } = useApp();
+  const busy = useRef(false);
+  const signedIn = !!state.meta.syncSession;
+  useEffect(() => {
+    if (!signedIn) return;
+    const run = async (force = false) => {
+      const s = store.getState();
+      const cfg = config(s.settings);
+      if (busy.current || !configured(cfg) || !s.meta.syncSession) return;
+      if (!force && !s.meta.dirty.length && s.meta.lastSync && Date.now() - s.meta.lastSync < 5 * 60_000) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      busy.current = true;
+      try { await syncNow(store, cfg); }
+      catch (e) {
+        const code = e instanceof SyncError ? e.code : 'network';
+        if (code === 'auth' || code === 'no-access') store.setSingleton('meta', { syncSession: undefined, syncError: code === 'auth' ? 'expired' : code });
+        else store.setSingleton('meta', { syncError: code });
+      } finally { busy.current = false; }
+    };
+    void run(true);
+    const t = setInterval(() => void run(), 60_000);
+    const online = () => void run(true);
+    window.addEventListener('online', online);
+    return () => { clearInterval(t); window.removeEventListener('online', online); };
+  }, [signedIn, store]);
 }
 
 function Shell() {
@@ -74,6 +115,7 @@ function Shell() {
   const stack = useRef<Screen[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<DueReminder[]>([]);
+  useAutoSync();
 
   const showToast = useCallback((text: string) => { setToast(text); }, []);
   useEffect(() => { if (!toast) return; const x = setTimeout(() => setToast(null), 4000); return () => clearTimeout(x); }, [toast]);

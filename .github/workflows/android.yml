@@ -1,5 +1,6 @@
 # Estate Agent Buddy — build and check on every push.
 #  test     type check, lint, unit tests, browser screen tests (no keys needed)
+#  database Supabase migrations: roles and row-level security tested on PostgreSQL
 #  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
 #           with the Maps key secret set, also loads the real Google map in a browser and attaches a screenshot
 #  web      the same app as a website on GitHub Pages (needs Pages source = GitHub Actions)
@@ -47,6 +48,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: screens, path: app/tests/screens, if-no-files-found: ignore }
 
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Roles and row-level security (Supabase migrations)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/rls-test.sh
+
   android:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app } }
@@ -62,10 +77,12 @@ jobs:
         with: { node-version: '${{ env.NODE_VERSION }}' }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21' }
-      - name: Install
-        run: npm install --no-audit --no-fund
+      - name: Install (Android packages as regular dependencies, so Capacitor bundles their native parts)
+        run: |
+          node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+          npm install --no-audit --no-fund
       - name: Build the app
-        run: npm run build
+        run: npm run build && rm -f dist/*.map
       - name: Android project
         run: |
           npx cap add android
@@ -74,8 +91,13 @@ jobs:
           node scripts/android-setup.mjs
       - name: Build the APK
         run: |
-          mkdir -p ~/.android && cp android-config/debug.keystore ~/.android/debug.keystore
+          grep -q '"@capacitor/app"' android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugins missing"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Check the APK signature (same debug key every build)
+        run: |
+          SHA1=$(keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA1:' | awk '{print $2}')
+          echo "APK SHA1 $SHA1"
+          test "$SHA1" = "1A:F9:28:D6:59:1C:90:C7:02:CD:67:D3:E9:54:3F:34:3C:DD:94:64"
       - name: Name the APK
         id: apk
         run: |

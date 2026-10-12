@@ -3,6 +3,8 @@
 // navigate; shows each property's banner status) and Co-broke Opportunity Map (Coming Soon).
 // Only real saved positions are shown.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useMyPosition } from '../maps/position';
+import { MyPositionButton } from '../maps/MyPositionButton';
 import { MoneyInput } from '../ui/MoneyInput';
 import { Lang, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
@@ -149,6 +151,8 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
         )}
         {recording && <button className="btn primary" disabled={!here} onClick={() => setMarking(true)} data-testid="mark-here">📍 {g.markHere}</button>}
       </div>
+
+      {!recording && <IdleMap lang={lang} go={go} maps={maps} status={status} />}
 
       {recording && (
         <>
@@ -325,13 +329,22 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
   const list = useMemo(() => state.properties.filter(hasPosition).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || '')), [state.properties]);
   const [sel, setSel] = useState<string | undefined>(id ?? list[0]?.id);
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+  const mine = useMyPosition();
+  useEffect(() => { if (mine.pos) setMe({ lat: mine.pos.lat, lng: mine.pos.lng }); }, [mine.pos]);
   const [route, setRoute] = useState<{ path: { lat: number; lng: number }[]; info?: string } | null>(null);
   const [routeMsg, setRouteMsg] = useState('');
   const idx = Math.max(0, list.findIndex(p => p.id === sel));
   const p = list[idx];
   useEffect(() => { setRoute(null); setRouteMsg(''); }, [sel]);
 
-  if (!list.length) return <section className="stack"><MapsNotice lang={lang} status={status} /><Empty>{g.mapNone}</Empty></section>;
+  if (!list.length) return (
+    <section className="stack" data-testid="property-map">
+      <MapsNotice lang={lang} status={status} />
+      {maps && mine.pos && <MapView maps={maps} height={300} center={mine.pos} zoom={15} markers={[{ id: 'me', lat: mine.pos.lat, lng: mine.pos.lng, kind: 'me' }]} />}
+      <MyPositionButton lang={lang} mine={mine} />
+      <Empty>{g.mapNone}</Empty>
+    </section>
+  );
   const move = (n: number) => setSel(list[(idx + n + list.length) % list.length].id);
 
   function showRoute() {
@@ -355,6 +368,7 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
           markers={[...list.map(x => ({ id: x.id, lat: x.lat!, lng: x.lng!, title: cardTitle(x), selected: x.id === p?.id, kind: 'property' as const })), ...(me ? [{ id: 'me', lat: me.lat, lng: me.lng, kind: 'me' as const }] : [])]}
           onMarkerClick={x => { if (x !== 'me') setSel(x); }} />
       )}
+      <MyPositionButton lang={lang} mine={mine} />
       {!maps && <div className="card stack-sm"><div className="card-title">{g.listMode}</div>
         {list.map(x => <button key={x.id} className={`link-row ${x.id === p?.id ? 'on' : ''}`} onClick={() => setSel(x.id)}>{cardTitle(x) || ls.untitled} <small className="muted">{x.lat!.toFixed(4)}, {x.lng!.toFixed(4)}</small></button>)}
       </div>}
@@ -388,5 +402,23 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
         </div>
       )}
     </section>
+  );
+}
+
+/** House Shopping before recording: the real map around you with saved properties nearby. */
+function IdleMap({ lang, go, maps, status }: { lang: Lang; go: Go; maps: unknown; status: Parameters<typeof MapsNotice>[0]['status'] }) {
+  const { state } = useApp();
+  const mine = useMyPosition();
+  const near = mine.pos ? state.properties.filter(hasPosition).filter(p => metres(mine.pos!, { lat: p.lat!, lng: p.lng! }) < 5000) : [];
+  return (
+    <div className="card stack-sm" data-testid="house-shopping-map">
+      <MapsNotice lang={lang} status={status} />
+      {maps && mine.pos ? (
+        <MapView maps={maps} height={260} center={mine.pos} zoom={15}
+          markers={[{ id: 'me', lat: mine.pos.lat, lng: mine.pos.lng, kind: 'me' as const }, ...near.map(p => ({ id: p.id, lat: p.lat!, lng: p.lng!, title: cardTitle(p), kind: 'property' as const }))]}
+          onMarkerClick={id => { if (id !== 'me') go({ name: 'listingDetail', id }); }} />
+      ) : null}
+      <MyPositionButton lang={lang} mine={mine} />
+    </div>
   );
 }

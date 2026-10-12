@@ -1,7 +1,6 @@
 // Google Maps Platform: loads the Maps JavaScript API with the configured key and wraps the parts the app uses —
 // map display, markers and routes (Maps JavaScript API), reverse and forward geocoding (Geocoding API),
-// place search (Places API, new), and route previews (Directions API, or the Routes API where Directions is not
-// enabled). Turn-by-turn navigation opens the Google Maps app through its universal link (lib/geo.ts), which needs
+// place search (Places API, new), and route previews (Routes API; the older Directions API only as a fallback). Turn-by-turn navigation opens the Google Maps app through its universal link (lib/geo.ts), which needs
 // no key. Gemini is not used for any map function.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { partsFromGoogle, AddressParts, GoogleComponent } from '../domain/places';
@@ -24,6 +23,7 @@ export function loadMaps(key: string, lang: 'en' | 'bm' | 'zh' = 'en'): Promise<
   if (authFailed) return Promise.reject(new MapsError('auth'));
   if (loading && loadedKey === key) return loading;
   loadedKey = key;
+  sniff();
   loading = new Promise<Maps>((resolve, reject) => {
     const timer = setTimeout(() => { loading = null; reject(new MapsError('timeout')); }, 20000);
     // Google calls this when the key is wrong, restricted, or billing is not enabled.
@@ -40,6 +40,28 @@ export function loadMaps(key: string, lang: 'en' | 'bm' | 'zh' = 'en'): Promise<
 }
 
 export const mapsAuthFailed = () => authFailed;
+
+// Google reports why a key was refused only in the browser console ("Google Maps JavaScript API error:
+// RefererNotAllowedMapError"). The loader listens for those messages so the app can say exactly which Google Cloud
+// setting to change (see maps/strings.ts → fix). The key itself is never logged by the app.
+let lastError: string | null = null;
+let sniffing = false;
+export const lastMapsError = () => lastError;
+export function noteMapsMessage(text: string): string | null {
+  const m = /Google Maps JavaScript API (?:error|warning): (\w+)/.exec(text);
+  if (!m || !/MapError$/.test(m[1])) return null;
+  lastError = m[1];
+  window.dispatchEvent(new CustomEvent('eab-maps-error', { detail: m[1] }));
+  return m[1];
+}
+function sniff() {
+  if (sniffing) return;
+  sniffing = true;
+  for (const level of ['error', 'warn'] as const) {
+    const orig = console[level].bind(console);
+    console[level] = (...args: unknown[]) => { try { noteMapsMessage(args.map(String).join(' ')); } catch { /* ignore */ } orig(...args); };
+  }
+}
 
 export interface GeocodeResult { parts: AddressParts; formatted: string; placeId?: string; lat: number; lng: number }
 
@@ -101,26 +123,23 @@ export async function searchPlaces(maps: Maps, input: string, near?: { lat: numb
 
 export interface RoutePreview { path: { lat: number; lng: number }[]; distanceM?: number; durationS?: number }
 
-/** Driving route between two points, for showing on the map before navigating. */
+/** Driving route between two points, for showing on the map before navigating. Uses the Routes API (the current
+ *  Google API); keys from older projects that only have the Directions API still work through the fallback. */
 export async function routePreview(maps: Maps, from: { lat: number; lng: number }, to: { lat: number; lng: number }): Promise<RoutePreview | null> {
+  try {
+    const { Route } = await maps.importLibrary('routes');
+    if (Route?.computeRoutes) {
+      const { routes } = await Route.computeRoutes({ origin: from, destination: to, travelMode: 'DRIVING', fields: ['path', 'distanceMeters', 'durationMillis'] });
+      const r = routes?.[0];
+      if (r) return { path: (r.path ?? []).map((p: any) => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng })), distanceM: r.distanceMeters, durationS: r.durationMillis ? r.durationMillis / 1000 : undefined };
+    }
+  } catch { /* Routes API not enabled for this key: try the older Directions API */ }
   try {
     const svc = new maps.DirectionsService();
     const res = await svc.route({ origin: from, destination: to, travelMode: maps.TravelMode?.DRIVING ?? 'DRIVING' });
     const route = res?.routes?.[0];
-    if (route) {
-      const leg = route.legs?.[0];
-      return {
-        path: (route.overview_path ?? []).map((p: any) => ({ lat: p.lat(), lng: p.lng() })),
-        distanceM: leg?.distance?.value, durationS: leg?.duration?.value,
-      };
-    }
-  } catch { /* Directions API not enabled for this key: try the Routes API */ }
-  try {
-    const { Route } = await maps.importLibrary('routes');
-    if (!Route?.computeRoutes) return null;
-    const { routes } = await Route.computeRoutes({ origin: from, destination: to, travelMode: 'DRIVING', fields: ['path', 'distanceMeters', 'durationMillis'] });
-    const r = routes?.[0];
-    if (!r) return null;
-    return { path: (r.path ?? []).map((p: any) => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng })), distanceM: r.distanceMeters, durationS: r.durationMillis ? r.durationMillis / 1000 : undefined };
+    if (!route) return null;
+    const leg = route.legs?.[0];
+    return { path: (route.overview_path ?? []).map((p: any) => ({ lat: p.lat(), lng: p.lng() })), distanceM: leg?.distance?.value, durationS: leg?.duration?.value };
   } catch { return null; }
 }

@@ -214,7 +214,17 @@ export interface Meta {
   /** Deleted records not yet removed from the cloud copy: "collection:id". */
   tombstones: string[];
   lastSync?: number;
-  syncSession?: { accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string };
+  syncSession?: {
+    accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string;
+    /** From the Google account (via Supabase). */
+    name?: string;
+    /** Team workspace and role, from the database (eab_my_membership). */
+    workspaceId?: string; workspaceName?: string; role?: 'owner' | 'admin' | 'team_leader' | 'agent' | 'limited';
+  };
+  /** The last automatic sync problem, shown in Settings (cleared after a good sync). */
+  syncError?: string;
+  /** The person chose to use the app on this phone only, without signing in (only when sign-in is not set up). */
+  offlineOnly?: boolean;
 }
 
 export interface Collections {

@@ -21,7 +21,8 @@ before(async () => {
   await rm(SHOTS, { recursive: true, force: true });
   await mkdir(SHOTS, { recursive: true });
   server = createServer(async (req, res) => {
-    const path = join(DIST, req.url === '/' ? 'index.html' : req.url.split('?')[0]);
+    const clean = req.url.split('?')[0];
+    const path = join(DIST, clean === '/' ? 'index.html' : clean);
     try { res.writeHead(200, { 'content-type': types[extname(path)] ?? 'application/octet-stream' }); res.end(await readFile(path)); }
     catch { res.writeHead(404); res.end(); }
   });
@@ -466,7 +467,9 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await page.getByTestId('card-map').click();
   assert.match(await page.getByTestId('map-title').innerText(), /For sale sign, corner lot/);
   assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/);
-  assert.equal(await page.evaluate(() => window.__markers.length), 1, 'only real saved positions are shown');
+  const pins = await page.evaluate(() => window.__markers.map(m => (m.o.icon?.fillColor === '#4285F4' ? 'me' : 'property')));
+  assert.equal(pins.filter(x => x === 'property').length, 1, 'only real saved positions are shown');
+  assert.equal(pins.filter(x => x === 'me').length, 1, 'your GPS position is shown');
   await shot(page, '10c-property-map');
   await page.context().close();
 });
@@ -907,6 +910,84 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   }));
   assert.equal(kept, 2, 'banner records survive a restart');
   await page.context().close();
+});
+
+test('U28 Google sign-in: login screen when set up, return from Google, role shown, team managed, sign out, cancel', async () => {
+  // Supabase is answered here (a stand-in); Google itself is not contacted. Real sign-in is checked on the phone.
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const SB = 'https://demo-project.supabase.co';
+  let mode = 'ok';
+  const seen = [];
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request();
+    const u = new URL(req.url());
+    seen.push(`${req.method()} ${u.pathname}`);
+    if (u.pathname === '/auth/v1/authorize') {
+      assert.equal(u.searchParams.get('provider'), 'google');
+      assert.equal(u.searchParams.get('code_challenge_method'), 's256');
+      const back = u.searchParams.get('redirect_to');
+      return route.fulfill({ status: 302, headers: { location: mode === 'ok' ? `${back}?code=CODE-1` : `${back}?error=access_denied&error_description=cancelled` } });
+    }
+    const json = b => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(b) });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (u.pathname === '/auth/v1/token') {
+      assert.equal(u.searchParams.get('grant_type'), 'pkce');
+      const body = JSON.parse(req.postData());
+      assert.equal(body.auth_code, 'CODE-1');
+      assert.match(body.code_verifier, /^[A-Za-z0-9_-]{43,}$/);
+      return json({ access_token: 'AT', refresh_token: 'RT', expires_in: 3600, user: { id: 'u-owner', email: 'agent.j@gmail.com', user_metadata: { full_name: 'Agent J' } } });
+    }
+    if (u.pathname === '/rest/v1/rpc/eab_my_membership') return json([{ workspace_id: 'ws-1', workspace_name: 'Agent J team', role: 'owner' }]);
+    if (u.pathname === '/rest/v1/eab_members') return json([{ user_id: 'u-owner', email: 'agent.j@gmail.com', role: 'owner', active: true, created_at: '2026-10-12' }, { user_id: 'u-b', email: 'nego.b@gmail.com', role: 'agent', active: true, created_at: '2026-10-12' }]);
+    if (u.pathname === '/rest/v1/eab_invites' || u.pathname === '/rest/v1/eab_audit' || u.pathname === '/rest/v1/eab_records') return req.method() === 'POST' ? route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' }) : json([]);
+    if (u.pathname.startsWith('/rest/v1/rpc/')) return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    if (u.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    return route.fulfill({ status: 404, body: '' });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid');
+  // Without sign-in set up, the app opens straight away and Settings says what is missing.
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  assert.ok(await page.getByTestId('account-not-set-up').isVisible());
+  await page.getByLabel('Supabase project URL').fill(SB);
+  await page.getByLabel('Supabase anon (public) key').fill('anon-public-key');
+  await page.getByTestId('save-settings').click();
+  // Set up and nobody signed in: the sign-in screen comes first.
+  await page.getByTestId('login').waitFor();
+  await shot(page, '28a-login', false);
+  assert.match(await page.getByTestId('google-sign-in').innerText(), /Continue with Google/);
+  // Cancelled at Google: nothing changes, clear message.
+  mode = 'cancel';
+  await page.getByTestId('google-sign-in').click();
+  await page.getByTestId('login-error').waitFor();
+  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/);
+  assert.equal(new URL(page.url()).search, '', 'the address is cleaned');
+  // Signed in at Google: back in the app, with the team role from the database.
+  mode = 'ok';
+  await page.getByTestId('google-sign-in').click();
+  await page.waitForSelector('nav.grid');
+  assert.equal(new URL(page.url()).search, '', 'the code is not left in the address');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  assert.match(await page.getByTestId('signed-in-as').innerText(), /Agent J \(agent\.j@gmail\.com\)/);
+  assert.match(await page.getByTestId('workspace-role').innerText(), /Agent J team · Owner/);
+  await page.getByTestId('team').getByTestId('member').nth(1).waitFor();
+  assert.equal(await page.getByTestId('member').count(), 2);
+  await page.locator('[data-field="inviteEmail"]').fill('new.agent@gmail.com');
+  await page.locator('[data-field="inviteRole"]').selectOption('team_leader');
+  await page.getByRole('button', { name: 'Add invitation' }).click();
+  await page.getByText('Saved.').first().waitFor();
+  assert.ok(seen.includes('POST /rest/v1/rpc/eab_invite'));
+  assert.ok(seen.some(x => x === 'GET /rest/v1/eab_records'), 'synced after sign-in');
+  await shot(page, '28b-account-team', false);
+  // Still signed in after closing and reopening.
+  await page.reload(); await page.waitForSelector('nav.grid');
+  // Sign out: back to the sign-in screen; records stay on the phone.
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByTestId('sign-out').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Sign out' }).click();
+  await page.getByTestId('login').waitFor();
+  assert.ok(seen.includes('POST /auth/v1/logout'));
+  await ctx.close();
 });
 
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
