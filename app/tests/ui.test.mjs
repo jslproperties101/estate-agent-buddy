@@ -2077,6 +2077,7 @@ test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync
   await p2.goto(base); await p2.waitForSelector('nav.grid'); await chooseStart(p2, 'empty');       // first start: empty database
   await tile(p2, 'Buyer List'); await p2.getByRole('button', { name: 'New buyer' }).click();
   await p2.locator('[data-field="name"]').fill('Entered Offline'); await p2.getByTestId('save-contact').click(); await p2.getByTestId('contact-detail').waitFor();
+  await waitStored(p2, 'records', "all.some(v => v && Array.isArray(v.dirty) && v.dirty.length > 0)");   // the unsent-changes list is written a moment after the record; the next step copies it
   await p2.evaluate(async SBURL => {
     const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
     const get = (k) => new Promise(res => { const g = db.transaction('records').objectStore('records').get(k); g.onsuccess = () => res(g.result); });
