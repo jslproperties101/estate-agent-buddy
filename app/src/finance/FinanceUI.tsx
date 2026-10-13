@@ -12,7 +12,7 @@ import { DEAL_STATUSES, Deal, Expense, Income } from '../data/types';
 import { summarise, monthlyIncome, myCommission, commissionFrom, EXPENSE_CATEGORIES, INCOME_SOURCES, Period } from '../domain/finance';
 import { rm, cardTitle } from '../listing/model';
 import { ym, ymd, fmtDate, localeOf } from '../lib/dates';
-import { ContactSelect, PropertySelect, Empty, Confirm, Tabs } from '../ui/common';
+import { ContactSelect, PropertySelect, Empty, Confirm, Tabs, SampleTag } from '../ui/common';
 import { OptionSelect } from '../ui/OptionSelect';
 import { useToast } from '../ui/toast';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -93,7 +93,7 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
           const prop = state.properties.find(x => x.id === d.propertyId);
           return (
             <button key={d.id} className="link-row deal-row" onClick={() => go({ name: 'dealForm', id: d.id })}>
-              <span className="between"><strong>{d.title || (prop && cardTitle(prop)) || f.side[d.side]}</strong><span className={`deal-st deal-${d.status}`}>{f.dealStatus[d.status]}</span></span>
+              <span className="between"><strong>{d.title || (prop && cardTitle(prop)) || f.side[d.side]}</strong>{d.sample && <SampleTag lang={lang} />}<span className={`deal-st deal-${d.status}`}>{f.dealStatus[d.status]}</span></span>
               <small className="muted">{fmtDate(d.date, lang)} · {f.side[d.side]} · {rm(d.value)} · {f.f.mine(rm(myCommission(d)))}</small>
             </button>
           );
@@ -104,7 +104,7 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
         <div className="between"><div className="card-title">{f.expenseList}</div><button className="btn small primary" onClick={() => go({ name: 'expenseForm' })}>{f.addExpense}</button></div>
         {exp.length === 0 ? <Empty>{f.noExpenses}</Empty> : exp.map(e => (
           <button key={e.id} className="link-row" onClick={() => go({ name: 'expenseForm', id: e.id })}>
-            <span className="between"><span>{f.expenseCats[e.category] ?? e.category}{e.note ? ` · ${e.note}` : ''}</span><strong>{rm(e.amount)}</strong></span>
+            <span className="between"><span>{f.expenseCats[e.category] ?? e.category}{e.note ? ` · ${e.note}` : ''}{e.sample && <> <SampleTag lang={lang} /></>}</span><strong>{rm(e.amount)}</strong></span>
             <small className="muted">{fmtDate(e.date, lang)}</small>
           </button>
         ))}
@@ -114,7 +114,7 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
         <div className="between"><div className="card-title">{f.incomeList}</div><button className="btn small primary" onClick={() => go({ name: 'incomeForm' })}>{f.addIncome}</button></div>
         {inc.length === 0 ? <Empty>{f.noIncome}</Empty> : inc.map(e => (
           <button key={e.id} className="link-row" onClick={() => go({ name: 'incomeForm', id: e.id })}>
-            <span className="between"><span>{f.incomeSources[e.source] ?? e.source}{e.note ? ` · ${e.note}` : ''}</span><strong>{rm(e.amount)}</strong></span>
+            <span className="between"><span>{f.incomeSources[e.source] ?? e.source}{e.note ? ` · ${e.note}` : ''}{e.sample && <> <SampleTag lang={lang} /></>}</span><strong>{rm(e.amount)}</strong></span>
             <small className="muted">{fmtDate(e.date, lang)}</small>
           </button>
         ))}

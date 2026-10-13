@@ -5,7 +5,7 @@ import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { agendaStrings } from './strings';
 import { Go } from '../nav';
-import { SectionCard, LeadDot, Empty } from '../ui/common';
+import { SectionCard, LeadDot, Empty, SampleTag } from '../ui/common';
 import { useToast } from '../ui/toast';
 import { convertToViewing, setApptStatus, touchContact } from '../domain/workflow';
 import { newId } from '../data/store';
@@ -57,7 +57,7 @@ function InquiryItem({ lang, i, go, showProperty, onConvert }: { lang: Lang; i: 
   return (
     <li className="act-item" data-testid="inquiry-item">
       <div className="between">
-        <button className="link-btn" onClick={() => go({ name: 'inquiryForm', id: i.id })}><strong>{contact?.name ?? '—'}</strong></button>
+        <button className="link-btn" onClick={() => go({ name: 'inquiryForm', id: i.id })}><strong>{contact?.name ?? '—'}</strong></button>{i.sample && <SampleTag lang={lang} />}
         <LeadDot lang={lang} status={contact?.leadStatus} />
       </div>
       <small className="muted">{fmtDateTime(i.at, lang)} · {a.inq.channels[i.channel]}</small>

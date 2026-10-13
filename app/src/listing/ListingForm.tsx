@@ -1,4 +1,4 @@
-// Add / edit property form. Sections in the agreed order: 1 Type & Headline, 2 Tenure & Title, 3 Photos,
+// Add / edit property form. Sections in the agreed order: 1 Type & Purpose (the headline is the advert title and sits in Marketing), 2 Tenure & Title, 3 Photos,
 // 4 the remaining property information, 5 Documents at the end. Every section can be opened and closed (closed at
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
@@ -28,11 +28,17 @@ import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPr
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
 import { FieldHelp } from '../ui/FieldHelp';
+import { PhoneInput } from '../ui/PhonebookButton';
+import type { PickedContact } from '../lib/phonebook';
+import { contactStrings } from '../contacts/strings';
+import { VERIFY_STATES, VerifyState, isVerifiable, verifyStateOf, withVerification } from './verify';
+import { deleteListing } from './deleteListing';
+import { IconMic } from '../icons';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
 const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'specs', 'money', 'tenancy', 'availability', 'owner', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
 const SECTION_KEYS: Record<string, string[]> = {
-  basics: ['type', 'headline', 'purpose'],
+  basics: ['type', 'purpose'],
   tenure: ['tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
   location: ['country', 'state', 'city', 'township', 'lotNo', 'street', 'unitNo', 'lat'],
   details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing'],
@@ -42,6 +48,7 @@ const SECTION_KEYS: Record<string, string[]> = {
   owner: ['vendorId', 'ownerName', 'ownerPhone'],
   arrangement: ['arrangement', 'arrangementNote', 'status', 'handledBy'],
   banner: ['bannerStatus'],
+  marketing: ['headline'],
   notes: ['notes'],
 };
 
@@ -83,6 +90,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [posErr, setPosErr] = useState(false);
   const [words, setWords] = useState('');
   const [wordsMsg, setWordsMsg] = useState('');
+  const [voiceOpen, setVoiceOpen] = useState(false);
+  const [checked, setChecked] = useState(false);       // the agent pressed "I have checked them" for the voice-filled fields
+  const [askUnchecked, setAskUnchecked] = useState(false);
+  const [ownerPick, setOwnerPick] = useState<PickedContact | null>(null);
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [newField, setNewField] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
@@ -128,8 +139,25 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     setD(prev => ({ ...prev, [k]: v, filledFrom: { ...(prev.filledFrom ?? {}), [k]: 'typed' } }));
   const fromWords = (k: keyof Listing) => d.filledFrom?.[k] === 'words' ? <span className="chip stated small-chip">{s.fromWords}</span> : null;
 
+  // Per-field verification: a small status picker under a field (Confirmed / Owner stated / Need to check / Unknown).
+  // The state is kept on the record (Listing.verification) and shown on the detail screen. Colour is never the only signal.
+  const vsel = (k: string, label: string) => {
+    const cur = verifyStateOf(d, k);
+    return (
+      <label className={`vp ${cur ? `vp-${cur}` : ''}`}>
+        <span className="vp-label">{s.verify.label}</span>
+        <select data-verify={k} aria-label={s.verify.aria(label)} value={cur ?? ''}
+          onChange={e => setD(prev => withVerification(prev, k, (e.target.value || undefined) as VerifyState | undefined))}>
+          <option value="">{s.verify.none}</option>
+          {VERIFY_STATES.map(v => <option key={v} value={v}>{s.verify[v]}</option>)}
+        </select>
+      </label>
+    );
+  };
+  const withVp = (k: string, el: JSX.Element) => isVerifiable(k) ? <div className="fv" key={k}>{el}{vsel(k, s.l[k] ?? k)}</div> : el;
+
   // Called as functions (not components) so inputs keep focus while typing.
-  const Text = ({ k, numeric, area, hint, money }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string; money?: boolean }) => (
+  const Text = ({ k, numeric, area, hint, money }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string; money?: boolean }) => withVp(k as string, (
     <label className="ff" key={k}>
       <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
       {money ? <MoneyInput data-field={k as string} value={d[k] as number | undefined} onChange={n => set(k, n as never)} /> : area
@@ -138,8 +166,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             value={numeric ? (shownNum(k as string, d[k]) as string) : ((d[k] as string | undefined) ?? '')}
             onChange={e => { if (numeric) setRaw(r => ({ ...r, [k]: e.target.value })); set(k, (numeric ? num(e.target.value) : e.target.value || undefined) as never); }} />}
     </label>
-  );
-  const Select = ({ k, options, labels }: { k: keyof Listing; options: readonly string[]; labels?: Record<string, string> }) => (
+  ));
+  const Select = ({ k, options, labels }: { k: keyof Listing; options: readonly string[]; labels?: Record<string, string> }) => withVp(k as string, (
     <label className="ff" key={k}>
       <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
       <select data-field={k} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)}>
@@ -147,12 +175,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {options.map(o => <option key={o} value={o}>{labels ? labels[o] : o}</option>)}
       </select>
     </label>
-  );
-  const Opt = ({ k, listKey, builtIns, labels }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string> }) => (
+  ));
+  const Opt = ({ k, listKey, builtIns, labels }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string> }) => withVp(k as string, (
     <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
       builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined}
       onChange={v => set(k, v as never)} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
-  );
+  ));
   const pair = (...els: (JSX.Element | null | false)[]) => {
     const xs = els.filter(Boolean) as JSX.Element[];
     if (!xs.length) return null;
@@ -216,6 +244,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     const places = [...(state.options.township ?? []), ...(state.options.city ?? [])].map(o => o.value);
     const { changes } = readDetails(words.trim(), places);
     const filled: ChangeKey[] = [];
+    setChecked(false);
     setD(prev => {
       const next: Listing = { ...prev, filledFrom: { ...(prev.filledFrom ?? {}) } };
       const rec = next as unknown as Record<string, unknown>;
@@ -245,6 +274,11 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const setMk = (patch: Partial<NonNullable<Listing['marketing']>>) => setD(prev => ({ ...prev, marketing: { ads: [], custom: {}, ...(prev.marketing ?? {}), ...patch } }));
   const setAd = (adId: string, patch: Partial<Advert>) => setMk({ ads: mk.ads.map(a => (a.id === adId ? { ...a, ...patch } : a)) });
 
+  // Voice-filled fields the agent has not looked at yet: marked "from words" now but not in the saved record. Derived from the
+  // data itself, so it still applies after a restored draft or when the form was opened pre-filled by a voice command.
+  const unchecked = Object.entries(d.filledFrom ?? {}).filter(([k, v]) => v === 'words' && initial?.filledFrom?.[k as keyof Listing] !== 'words').map(([k]) => k);
+  const needsReview = unchecked.length > 0 && !checked;
+
   const yrs = yearsRemaining(d);
   const comm = commissionRm(d);
   const rentMode = forRent(d);
@@ -265,13 +299,24 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       case 'photos': return d.photos.length;
       case 'docs': return (d.documents ?? []).length;
       case 'tenancy': return Object.keys(d.tenancy ?? {}).length;
-      case 'marketing': return (d.marketing?.ads.length ?? 0) + Object.values(d.marketing?.custom ?? {}).filter(Boolean).length + (d.marketing?.advertised ? 1 : 0);
+      case 'marketing': return (d.headline ? 1 : 0) + (d.marketing?.ads.length ?? 0) + Object.values(d.marketing?.custom ?? {}).filter(Boolean).length + (d.marketing?.advertised ? 1 : 0);
       default: return (SECTION_KEYS[sid] ?? []).filter(has).length;
     }
   };
   const secProps = (sid: string) => { const n = filled(sid); return { open: open.has(sid), onToggle: () => toggle(sid), summary: n ? s.secFilled(n) : s.secEmpty }; };
 
-  function save() {
+  /** Owner chosen from the phone book: fills name and number; if something different is already typed, ask before replacing it. */
+  function pickOwner(p: PickedContact) {
+    const differs = (d.ownerName && p.name && d.ownerName !== p.name) || (d.ownerPhone && p.tel && normalisePhone(p.tel) !== normalisePhone(d.ownerPhone));
+    if (differs) setOwnerPick(p); else applyOwner(p);
+  }
+  const applyOwner = (p: PickedContact) => setD(prev => ({
+    ...prev, ownerName: p.name || prev.ownerName, ownerPhone: normalisePhone(p.tel) ?? prev.ownerPhone,
+    filledFrom: { ...(prev.filledFrom ?? {}), ownerName: 'typed', ownerPhone: 'typed' },
+  }));
+
+  function save(skipReview = false) {
+    if (needsReview && !skipReview) { setAskUnchecked(true); return; }
     if (refProblem) { setRefErr(refText(refProblem)); setOpen(o => new Set([...o, 'basics'])); setTimeout(() => document.getElementById('sec-basics')?.scrollIntoView({ block: 'start' }), 0); return; }
     const clean: Listing = { ...d, refNo, ref: makeRef(d.refPrefix!, refNo!), refPrefix: d.refPrefix!.toUpperCase() };
     for (const k of ALL_FORM_FIELDS) if (!vf.has(k)) delete clean[k];
@@ -284,6 +329,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       availableFrom: d.availability === 'from_date' ? d.availableFrom : undefined,
       arrangementNote: d.arrangement && d.arrangement !== 'direct' ? d.arrangementNote : undefined,
     };
+    // Marks that no longer apply go with the field they described (an empty field keeps its mark: "Unknown" is meaningful).
+    if (next.verification) {
+      const dropped = (k: string) => (ALL_FORM_FIELDS as readonly string[]).includes(k) && !vf.has(k as FormField)
+        || (['askingPrice', 'commissionPct'].includes(k) && !forSale(clean)) || (k === 'monthlyRent' && !forRent(clean))
+        || (k === 'leaseExpiryYear' && d.tenure !== 'leasehold') || ((k === 'ownerName' || k === 'ownerPhone') && !!linked);
+      let v = next;
+      for (const k of Object.keys(next.verification)) if (dropped(k)) v = withVerification(v, k, undefined);
+      next = v;
+    }
     // A typed owner becomes a vendor record in the Vendor List, so there is one record per person.
     if (!next.vendorId && next.ownerName) {
       const now = Date.now();
@@ -315,15 +369,30 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         <button type="button" className="btn small ghost" data-testid="toggle-all" onClick={() => setOpen(allOpen ? new Set() : new Set(SECTION_IDS))}>{allOpen ? s.collapseAll : s.expandAll}</button>
       </div>
 
-      <details className="card stack-sm words" data-testid="voice-fill">
-        <summary className="card-title">🎙 {s.voiceFill}</summary>
-        <small className="muted">{s.voiceFillHint}</small>
-        <SpeechBox lang={lang} value={words} onChange={setWords} label={s.voice.textLabel} />
-        <button className="btn secondary" disabled={!words.trim()} onClick={fillFromWords}>{s.voiceFillBtn}</button>
-        {wordsMsg && <small role="status" className="ok-text">{wordsMsg}</small>}
-      </details>
+      <div className="voice-hero" data-testid="voice-fill">
+        <button type="button" className="btn primary big voice-hero-btn" aria-expanded={voiceOpen} aria-controls="voice-panel" data-testid="voice-fill-btn" onClick={() => setVoiceOpen(o => !o)}>
+          <IconMic /> {s.voiceBig}
+        </button>
+        <small className="muted voice-hero-hint">{s.voiceBigHint}</small>
+        {voiceOpen && (
+          <div id="voice-panel" className="card stack-sm words" data-testid="voice-panel">
+            <small className="muted">{s.voiceFillHint}</small>
+            <SpeechBox lang={lang} value={words} onChange={setWords} label={s.voice.textLabel} />
+            <button className="btn secondary" disabled={!words.trim()} onClick={fillFromWords} data-testid="voice-fill-apply">{s.voiceFillBtn}</button>
+            {wordsMsg && <small role="status" className="ok-text">{wordsMsg}</small>}
+          </div>
+        )}
+      </div>
+      {unchecked.length > 0 && (
+        <div className="notice review-banner" role="status" data-testid="review-banner" data-checked={checked ? 'yes' : 'no'}>
+          {checked ? <span>✓ {s.reviewDone}</span> : <>
+            <span>{s.reviewBanner(unchecked.length)}</span>
+            <button type="button" className="btn small secondary" data-testid="review-done" onClick={() => setChecked(true)}>{s.reviewDone}</button>
+          </>}
+        </div>
+      )}
 
-      {/* 1. Type & Headline (with the reference) */}
+      {/* 1. Type & Purpose (with the reference) */}
       <Sec id="basics" title={`1 · ${s.sec.basics}`} testId="sec-basics-form" {...secProps('basics')}>
         <div className="ref-row">
           <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false} help={<FieldHelp lang={lang} topic="refPrefix" label={s.l.refPrefix} />}
@@ -367,7 +436,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         )}
         {Opt({ k: 'type', listKey: 'type', builtIns: TYPES, labels: s.types })}
         {!d.type && <small className="muted">{s.chooseTypeFirst}</small>}
-        {Text({ k: 'headline' })}
         {Select({ k: 'purpose', options: PURPOSES, labels: s.purpose })}
       </Sec>
 
@@ -503,10 +571,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </label>
         {linked ? <small className="muted">{s.vendorLinked}{linked.phone ? ` ${linked.phone}` : ''}</small> : <>
           {Text({ k: 'ownerName' })}
-          <label className="ff"><span className="between"><span>{s.l.ownerPhone}</span>{fromWords('ownerPhone')}</span>
-            <input data-field="ownerPhone" type="tel" inputMode="tel" value={d.ownerPhone ?? ''} onChange={e => set('ownerPhone', e.target.value || undefined)}
-              onBlur={() => set('ownerPhone', normalisePhone(d.ownerPhone))} />
-          </label>
+          {withVp('ownerPhone', <PhoneInput lang={lang} id="owner-phone" dataField="ownerPhone" testId="pick-owner" pickLabel={s.pickOwner}
+            label={<span className="between"><span>{s.l.ownerPhone}</span>{fromWords('ownerPhone')}</span>}
+            value={d.ownerPhone ?? ''} onChange={v => set('ownerPhone', v || undefined)} onBlur={() => set('ownerPhone', normalisePhone(d.ownerPhone))}
+            onPicked={pickOwner} />)}
           {d.ownerName && <small className="muted">{s.vendorNew}</small>}
         </>}
       </Sec>
@@ -527,6 +595,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </Sec>
 
       <Sec id="marketing" title={s.sec.marketing} testId="sec-marketing" {...secProps('marketing')}>
+        {Text({ k: 'headline' })}
         <label className="ff">{s.l.advertised}
           <select data-field="advertised" value={mk.advertised ?? ''} onChange={e => setMk({ advertised: (e.target.value || undefined) as 'yes' | 'no' | undefined })}>
             <option value="">{s.notSet}</option><option value="yes">{s.yesNo.yes}</option><option value="no">{s.yesNo.no}</option>
@@ -610,20 +679,20 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       <div className="save-bar floating" data-testid="save-floating">
         <div className="two">
           <button className="btn secondary" onClick={cancel}>{s.cancel}</button>
-          <button className="btn primary" disabled={busy} onClick={save} data-testid="save-property">{s.save}</button>
+          <button className="btn primary" disabled={busy} onClick={() => save()} data-testid="save-property">{s.save}</button>
         </div>
       </div>
 
       {confirmDelete && initial && (
         <Confirm lang={lang} title={`${s.deleteProperty}?`} body={s.deleteBody} okLabel={c.delete} onCancel={() => setConfirmDelete(false)}
-          onOk={() => {
-            for (const p of initial.photos) if (p.fileId) store.removeFile(p.fileId);
-            for (const x of initial.documents ?? []) if (x.fileId) store.removeFile(x.fileId);
-            for (const b of state.banners.filter(x => x.propertyId === initial.id)) { if (b.photoFileId) store.removeFile(b.photoFileId); store.remove('banners', b.id); }
-            store.remove('properties', initial.id);
-            go({ name: 'listing' });
-          }} />
+          onOk={() => { deleteListing(store, state, initial); go({ name: 'listing' }); }} />
       )}
+      {askUnchecked && <Confirm lang={lang} title={s.reviewQ} body={s.reviewBody(unchecked.length)} danger={false} okLabel={s.reviewSave}
+        onCancel={() => { setAskUnchecked(false); setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}
+        onOk={() => { setAskUnchecked(false); save(true); }} />}
+      {ownerPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
+        body={contactStrings[lang].replaceBody([d.ownerName, d.ownerPhone].filter(Boolean).join(' · '), [ownerPick.name, ownerPick.tel].filter(Boolean).join(' · '))}
+        onCancel={() => setOwnerPick(null)} onOk={() => { applyOwner(ownerPick); setOwnerPick(null); }} />}
     </section>
   );
 }

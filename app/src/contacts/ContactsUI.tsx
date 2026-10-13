@@ -15,11 +15,12 @@ import { OptionSelect } from '../ui/OptionSelect';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
 import { TaskRow } from '../agenda/AgendaUI';
 import { completeTask, sortTasks } from '../domain/workflow';
-import { cardTitle, normalisePhone, phoneDigits } from '../listing/model';
+import { cardTitle, normalisePhone, phoneDigits, usablePhone } from '../listing/model';
 import { fmtDate } from '../lib/dates';
 import { pickPhoneContacts, phonebookSupported, phonebookProblem, PickedContact } from '../lib/phonebook';
 import { useToast } from '../ui/toast';
-import { PhonebookButton } from '../ui/PhonebookButton';
+import { PhoneInput } from '../ui/PhonebookButton';
+import { listingStrings } from '../listing/strings';
 import { leadReviewStrings } from '../data/leadReviewStrings';
 import { RecordStatus } from '../sync/SyncUI';
 import { useDraft } from '../ui/useDraft';
@@ -136,7 +137,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
                   <small className="muted">{[c.phone, c.company, props ? `${s.properties}: ${props}` : ''].filter(Boolean).join(' · ') || s.phoneMissing}</small>
                   <span className="row-wrap small">{c.roles.map(r => <span key={r} className="chip-tag">{s.roles[r]}</span>)}{role === 'vendor' ? <VendorDot lang={lang} status={c.vendorStatus} /> : <LeadDot lang={lang} status={c.leadStatus} />}{c.sample && <span className="chip-tag sample-tag">{t.sampleTag}</span>}</span>
                 </button>
-                {c.phone && <a className="btn small secondary" href={`tel:+${phoneDigits(c.phone)}`} aria-label={`${t.c.call}: ${c.name}`}>{t.c.call}</a>}
+                {usablePhone(c.phone) && <a className="btn small secondary" href={`tel:+${phoneDigits(c.phone)}`} aria-label={`${t.c.call}: ${c.name}`}>{t.c.call}</a>}
               </li>
             );
           })}
@@ -174,9 +175,10 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         <small className="muted">{c.lastInteraction ? s.lastInteraction(fmtDate(c.lastInteraction, lang)) : s.never}</small>
         <div className="rec-actions">
           <button className="btn primary" onClick={() => go({ name: 'contactForm', id: c.id })}>{t.c.edit}</button>
-          {c.phone && <a className="btn secondary" href={`tel:+${phoneDigits(c.phone)}`}>{t.c.call}</a>}
-          {c.phone && <a className="btn secondary" href={`https://wa.me/${phoneDigits(c.phone)}`} target="_blank" rel="noreferrer">{t.c.whatsapp}</a>}
+          {usablePhone(c.phone) && <a className="btn secondary" href={`tel:+${phoneDigits(c.phone)}`}>{t.c.call}</a>}
+          {usablePhone(c.phone) && <a className="btn secondary" href={`https://wa.me/${phoneDigits(c.phone)}`} target="_blank" rel="noreferrer">{t.c.whatsapp}</a>}
         </div>
+        {c.phone && !usablePhone(c.phone) && <small className="warn-text" role="status" data-testid="phone-invalid">{listingStrings[lang].phoneInvalid}</small>}
         {!c.phone && c.whatsapp && <small className="muted">{s.aliasOnly(c.whatsapp)}</small>}
       </div>
       <div className="card stack-sm">
@@ -228,11 +230,8 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
       <div className="card stack-sm">
         <label className="ff">{s.f.name}<input data-field="name" aria-invalid={err} value={d.name} onChange={e => { setD(x => ({ ...x, name: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{t.c.nameRequired}</p>}
-        <div className="ff">
-          <label htmlFor="contact-phone">{s.f.phone}</label>
-          <input id="contact-phone" data-field="phone" type="tel" inputMode="tel" value={d.phone ?? ''} onChange={e => setD(x => ({ ...x, phone: e.target.value || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} />
-        </div>
-        <PhonebookButton lang={lang} onPicked={picked} />
+        <PhoneInput lang={lang} id="contact-phone" dataField="phone" label={<label htmlFor="contact-phone">{s.f.phone}</label>} value={d.phone ?? ''}
+          onChange={v => setD(x => ({ ...x, phone: v || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} onPicked={picked} />
         <label className="ff"><span>{s.whatsapp}<FieldHelp lang={lang} topic="whatsapp" label={s.whatsapp} /></span><input data-field="whatsapp" autoComplete="off" autoCapitalize="none" placeholder="@" value={d.whatsapp ?? ''} onChange={e => setD(x => ({ ...x, whatsapp: e.target.value || undefined }))} />
           <small className="muted">{s.whatsappHint}</small></label>
         {dup && <p className="warn-text" role="status">{s.duplicate(dup.name)} <button className="link-btn" onClick={() => go({ name: 'contactDetail', id: dup.id })}>{s.openExisting}</button></p>}

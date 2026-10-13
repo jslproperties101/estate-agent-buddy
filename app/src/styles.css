@@ -720,3 +720,30 @@ label.btn { position: relative; cursor: pointer; }
 .img-missing { background: repeating-linear-gradient(45deg, #2a2720, #2a2720 6px, #332f26 6px, #332f26 12px); display: inline-block; }
 .file-badge { font-size: 12px; color: var(--muted, #BEB7A6); display: inline-flex; gap: 6px; align-items: center; }
 .file-badge.failed, .file-badge.denied { color: var(--red); }
+
+/* ---- Stage 3: Fill by Voice button, voice review, verification, card preview ---- */
+.voice-hero { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.voice-hero-btn { width: 100%; max-width: 420px; justify-content: center; gap: 10px; }
+.voice-hero-hint { max-width: 420px; }
+.voice-hero .words { width: 100%; text-align: left; }
+.review-banner { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; border-color: var(--amber); }
+.fv { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vp { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.vp-label { flex: none; }
+.vp select { flex: 1 1 auto; min-width: 0; min-height: 44px; font-size: 15px; }
+.vp-confirmed select { border-color: var(--ok); }
+.vp-owner select { border-color: var(--blue); }
+.vp-check select, .vp-unknown select { border-color: var(--amber); }
+.vchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; vertical-align: middle; }
+.vchip-confirmed { color: var(--ok); }
+.vchip-owner { color: var(--blue); }
+.vchip-check { color: var(--amber); }
+.vchip-unknown { color: var(--muted); border-style: dashed; }
+.kf .vchip { margin-top: 2px; }
+li.has-preview { position: relative; }
+.preview-btn { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--line-2); background: rgba(0,0,0,.65); color: #F2EEE3; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+.gc, .lc-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.row-gap { display: inline-flex; gap: 8px; }
+.preview-sheet { max-height: 92vh; overflow-y: auto; }
+.preview-sheet .lc-photo { border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 10; }
+.pb-msg { margin: 4px 0 0; }

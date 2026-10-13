@@ -1,7 +1,7 @@
 // Property List: Grid view (default, first) and Large cards, filters, and the property detail page.
 // Cards hide the reference number; the detail page shows it. Every detail section has its own Edit button that
 // opens the form straight at that section.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RecordStatus, FileBadge } from '../sync/SyncUI';
 import { BannerDot } from '../gps/BannersUI';
 import { activeBanners } from '../domain/banners';
@@ -11,19 +11,28 @@ import { listingStrings, ListingStrings, typeLabel } from './strings';
 import {
   Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, STATUSES, CATEGORIES,
   rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, forRent, forSale, fieldsFor,
-  missingDetails, CONFIDENTIAL_DOCS, DOC_CATEGORIES, placeName, hasPosition, phoneDigits, Doc,
+  missingDetails, CONFIDENTIAL_DOCS, DOC_CATEGORIES, placeName, hasPosition, phoneDigits, usablePhone, Doc,
 } from './model';
+import { verifyStateOf, toCheck, VerifyState } from './verify';
 import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
 import { IconMic } from '../icons';
 import { useApp, useStore } from '../data/useStore';
 import { Go, FormSection } from '../nav';
-import { SectionCard, StoredImage } from '../ui/common';
+import { SectionCard, StoredImage, Confirm } from '../ui/common';
+import { deleteListing } from './deleteListing';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
 import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
 
 export type Layout = 'grid' | 'large';
+
+const VGLYPH: Record<VerifyState, string> = { confirmed: '✓', owner: '☎', check: '⚠', unknown: '?' };
+/** The verification state of one detail, as a word plus a symbol (never colour alone). */
+export function VerifyChip({ state, s }: { state?: VerifyState; s: ListingStrings }) {
+  if (!state) return null;
+  return <span className={`vchip vchip-${state}`} data-verify-state={state}><span aria-hidden="true">{VGLYPH[state]}</span> {s.verify[state]}</span>;
+}
 
 export function PriceLine({ l, s, short }: { l: Listing; s: ListingStrings; short?: boolean }) {
   const money = short ? rmShort : rm;
@@ -73,6 +82,44 @@ function CardPhoto({ l, s, className, tall }: { l: Listing; s: ListingStrings; c
   );
 }
 
+/** Quick look at one property without leaving the list: opened by a long press on the card or by its Preview button. */
+function PreviewSheet({ lang, l, onClose, onOpen, onDelete }: { lang: Lang; l: Listing; onClose: () => void; onOpen: () => void; onDelete: () => void }) {
+  const s = listingStrings[lang];
+  const openRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    openRef.current?.focus();
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const unsure = toCheck(l);
+  return (
+    <div className="scrim" role="presentation" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dialog preview-sheet" role="dialog" aria-modal="true" aria-label={`${s.preview.title}: ${cardTitle(l) || s.untitled}`} data-testid="preview-sheet">
+        <CardPhoto l={l} s={s} className="lc-photo" />
+        <div className="stack-sm">
+          <div className="lc-title">{cardTitle(l) || s.untitled}</div>
+          <div className="lc-type">{typePlace(l, s) || '—'}</div>
+          <strong className="lc-price"><PriceLine l={l} s={s} /></strong>
+          <Facts l={l} s={s} />
+          {unsure.length > 0 && <small className="warn-text">⚠ {s.verify.summary(unsure.length)}</small>}
+        </div>
+        <div className="stack-sm">
+          <button ref={openRef} className="btn primary" data-testid="preview-open" onClick={onOpen}>{s.preview.open}</button>
+          <div className="two">
+            <button className="btn secondary" data-testid="preview-close" onClick={onClose}>{s.preview.cancel}</button>
+            <button className="btn secondary danger-text" data-testid="preview-delete" onClick={onDelete}>{s.preview.del}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const LONG_PRESS_MS = 500;
+type PointerLike = { clientX: number; clientY: number; pointerType?: string; button?: number };
+type EventLike = { preventDefault(): void; stopPropagation(): void };
+
 const typePlace = (l: Listing, s: ListingStrings) => [typeLabel(s, l.type), placeName(l)].filter(Boolean).join(' · ');
 
 // ---------- list ----------
@@ -85,6 +132,24 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const [f, setF] = useState<Filters>(initial ?? {});
   const [open, setOpen] = useState(false);
   const [voice, setVoice] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [askDelete, setAskDelete] = useState(false);
+  // Long press: hold a card ~half a second. After a long press the click that follows is swallowed, so it does not also open
+  // the detail screen; a normal tap is untouched. The Preview button on each card does the same for people who cannot long-press.
+  const press = useRef<{ t?: number; fired: boolean; x: number; y: number }>({ fired: false, x: 0, y: 0 });
+  const stopPress = () => { if (press.current.t) window.clearTimeout(press.current.t); press.current.t = undefined; };
+  const pressProps = (l: Listing) => ({
+    onPointerDown: (e: PointerLike) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      press.current.fired = false; press.current.x = e.clientX; press.current.y = e.clientY; stopPress();
+      press.current.t = window.setTimeout(() => { press.current.fired = true; setPreview(l.id); }, LONG_PRESS_MS);
+    },
+    onPointerMove: (e: PointerLike) => { if (press.current.t && Math.hypot(e.clientX - press.current.x, e.clientY - press.current.y) > 12) stopPress(); },
+    onPointerUp: stopPress, onPointerCancel: stopPress, onPointerLeave: stopPress,
+    onContextMenu: (e: EventLike) => { e.preventDefault(); stopPress(); if (!press.current.fired) { press.current.fired = true; setPreview(l.id); } },
+    onClickCapture: (e: EventLike) => { if (press.current.fired) { e.preventDefault(); e.stopPropagation(); press.current.fired = false; } },
+  });
+  const previewing = preview ? listings.find(x => x.id === preview) : undefined;
   const shown = useMemo(() => applyFilters(listings, f), [listings, f]);
   const n = activeCount(f);
   const set = (patch: Partial<Filters>) => setF(prev => ({ ...prev, ...patch }));
@@ -182,21 +247,23 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
       {layout === 'grid' ? (
         <ul className="lc-grid" data-layout="grid">
           {shown.map(l => (
-            <li key={l.id} data-testid="listing-card">
-              <button className="gc" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
+            <li key={l.id} data-testid="listing-card" className="has-preview">
+              <button className="gc" {...pressProps(l)} onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
                 <CardPhoto l={l} s={s} className="gc-photo" />
                 <span className="gc-price"><PriceLine l={l} s={s} short /></span>
                 <span className="gc-title">{cardTitle(l) || s.untitled}</span>
                 <span className="gc-meta">{placeName(l) || typeLabel(s, l.type) || '—'}</span>
                 <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
               </button>
+              <button type="button" className="preview-btn" data-testid="preview-btn" onClick={() => { press.current.fired = false; setPreview(l.id); }}
+                aria-label={`${s.preview.button}: ${cardTitle(l) || s.untitled}`} title={s.preview.button}><span aria-hidden="true">👁</span></button>
             </li>
           ))}
         </ul>
       ) : (
         <ul className="lc-list" data-layout="large">
           {shown.map(l => (
-            <li key={l.id} className="lc-card" data-testid="listing-card">
+            <li key={l.id} className="lc-card" data-testid="listing-card" {...pressProps(l)}>
               <CardPhoto l={l} s={s} className="lc-photo" />
               <div className="lc-body">
                 <div className="lc-title">{cardTitle(l) || s.untitled}</div>
@@ -208,13 +275,21 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
                 </div>
                 <div className="between lc-foot">
                   <span className="lc-owner">{ownerName(l) ? `${s.owner}: ${ownerName(l)}` : ''}</span>
-                  <button className="btn small primary" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
+                  <span className="row-gap">
+                    <button className="btn small secondary" data-testid="preview-btn" onClick={() => { press.current.fired = false; setPreview(l.id); }} aria-label={`${s.preview.button}: ${cardTitle(l) || s.untitled}`}>{s.preview.button}</button>
+                    <button className="btn small primary" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
+                  </span>
                 </div>
               </div>
             </li>
           ))}
         </ul>
       )}
+      {listings.length > 0 && <small className="muted" data-testid="preview-hint">{s.preview.hint}</small>}
+      {previewing && !askDelete && <PreviewSheet lang={lang} l={previewing} onClose={() => setPreview(null)}
+        onOpen={() => { setPreview(null); go({ name: 'listingDetail', id: previewing.id }); }} onDelete={() => setAskDelete(true)} />}
+      {previewing && askDelete && <Confirm lang={lang} title={s.preview.deleteQ} body={cardTitle(previewing) || s.untitled}
+        onCancel={() => setAskDelete(false)} onOk={() => { deleteListing(store, state, previewing); setAskDelete(false); setPreview(null); }} />}
       <button className="fab" onClick={() => go({ name: 'listingForm' })} aria-label={s.add}><span aria-hidden="true">+</span> {s.add}</button>
     </section>
   );
@@ -248,7 +323,10 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const phone = vendor?.phone ?? l.ownerPhone;
   const missing = missingDetails(l);
   const edit = (section: FormSection) => () => go({ name: 'listingForm', id: l.id, section });
-  const row = (k: string, v?: string | number) => (v === undefined || v === '' ? null : <div key={k} className="dl-row"><dt>{s.l[k] ?? k}</dt><dd>{v}</dd></div>);
+  const vs = (k: string) => verifyStateOf(l, k);
+  const row = (k: string, v?: string | number) => (v === undefined || v === '' ? null : <div key={k} className="dl-row" data-row={k}><dt>{s.l[k] ?? k}</dt><dd>{v}{vs(k) && <> <VerifyChip state={vs(k)} s={s} /></>}</dd></div>);
+  const unsure = toCheck(l);
+  const callable = usablePhone(phone);
   const numRow = (k: keyof Listing, fmt: (n: number) => string = String) => (l[k] === undefined ? null : row(k, fmt(l[k] as number)));
   const depositRm = l.monthlyRent !== undefined ? l.monthlyRent * ((l.securityDepositMonths ?? 0) + (l.utilityDepositMonths ?? 0)) : undefined;
   const docs = l.documents ?? [];
@@ -282,7 +360,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
               ['bedrooms', l.bedrooms], ['bathrooms', l.bathrooms], ['parking', l.parking],
               ['tenure', l.tenure && s.tenure[l.tenure] + (yrs !== undefined ? ` · ${s.yearsLeft(yrs)}` : '')],
             ].filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => (
-              <div key={k as string} className="kf"><span>{s.kf[k as string]}</span><strong data-testid={k === 'tenure' && yrs !== undefined ? 'years-left' : undefined}>{v}</strong></div>
+              <div key={k as string} className="kf"><span>{s.kf[k as string]}</span><strong data-testid={k === 'tenure' && yrs !== undefined ? 'years-left' : undefined}>{v}</strong>{vs(k as string) && <VerifyChip state={vs(k as string)} s={s} />}</div>
             ))}
           </div>
         </div>
@@ -291,9 +369,10 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       <div className="rec-actions">
         <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>
         <button className="btn secondary" aria-expanded={voice} onClick={() => setVoice(v => !v)}><IconMic size={20} /> {s.voice.open}</button>
-        {phone && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
-        {phone && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
+        {callable && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
+        {callable && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>
+      {phone && !callable && <p className="small warn-text" role="status" data-testid="phone-invalid">{s.phoneInvalid}</p>}
 
       {voice && <PropertyVoice lang={lang} mode="record" listing={l}
         onApply={changes => {
@@ -302,13 +381,14 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         }} />}
 
       <SectionCard title={s.sec.missing} className={missing.length ? 'missing' : ''} testId="missing" onEdit={edit(missing.includes('lat') && missing.length === 1 ? 'location' : 'basics')} editLabel={EL}>
+        {unsure.length > 0 && <p className="small" data-testid="verify-summary"><strong>⚠ {s.verify.summary(unsure.length)}:</strong> {unsure.map(k => s.l[k] ?? k).join(', ')}</p>}
         {missing.length ? <div className="lc-facts">{missing.map(k => <span key={k}>{s.l[k] ?? k}</span>)}</div> : <small className="ok-text">{s.missingNone}</small>}
       </SectionCard>
 
       <SectionCard title={s.sec.basics} onEdit={edit('basics')} editLabel={EL} testId="sec-basics">
         <dl className="dl">
           <div className="dl-row" data-testid="ref-row"><dt>{s.l.ref}</dt><dd className="ref-text">{l.ref || <span className="muted">{s.notSet}</span>}</dd></div>
-          {row('type', typeLabel(s, l.type))}{row('headline', l.headline)}{row('purpose', l.purpose && s.purpose[l.purpose])}
+          {row('type', typeLabel(s, l.type))}{row('purpose', l.purpose && s.purpose[l.purpose])}
         </dl>
       </SectionCard>
 
@@ -414,6 +494,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
       <SectionCard title={s.sec.marketing} onEdit={edit('marketing')} editLabel={EL} testId="marketing">
         <dl className="dl">
+          {row('headline', l.headline)}
           {row('advertised', l.marketing?.advertised && s.yesNo[l.marketing.advertised])}
           {custom.map(d => <div key={d.id} className="dl-row"><dt>{d.label}</dt><dd>{l.marketing!.custom[d.id]}</dd></div>)}
         </dl>
@@ -424,7 +505,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
             {a.notes && <small>{a.notes}</small>}
           </div>
         ))}
-        {!l.marketing?.advertised && !(l.marketing?.ads ?? []).length && empty}
+        {!l.headline && !l.marketing?.advertised && !(l.marketing?.ads ?? []).length && empty}
       </SectionCard>
 
       <SectionCard title={s.sec.notes} onEdit={edit('notes')} editLabel={EL}>

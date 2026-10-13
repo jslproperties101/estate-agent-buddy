@@ -84,19 +84,19 @@ Missing: advertising records per section 17, saved calculations, a clear "demo d
 | 8.1 "Available" label | DONE (not shown) | |
 | 8.1 Offline duplicate protection across devices | NOT DONE | Needs a server-side unique constraint once team sync exists. |
 | 8.2 Fields | PARTIAL | All listed fields exist except **number of storeys** is stored as `floors` (label check), and **facilities** is a free-text "features" field. |
-| 8.2 Headline lower in the form | NOT DONE (headline is 2nd field) → Stage 3 |
-| 8.2 "Fill by Voice" centred and larger | NOT DONE (it is a collapsed `<details>` row) → Stage 3 |
-| 8.3 Per-field verification (Confirmed / Owner stated / Need to check / Unknown) | NOT DONE | Only a "from your words" source marker per field. → Stage 3 |
+| 8.2 Headline lower in the form | DONE (Stage 3, branch `feature/v2-stage3-property-contacts`) | Moved to the top of Marketing (see Stage 3 status below; the master copy in the repo has no field-order list, so this placement needs your confirmation). |
+| 8.2 "Fill by Voice" centred and larger | DONE (Stage 3) | Big centred button; voice-filled fields must be reviewed before saving. |
+| 8.3 Per-field verification (Confirmed / Owner stated / Need to check / Unknown) | DONE (Stage 3) | Stored on the record (`verification`), so it syncs, merges and appears in history. |
 
 ### 9. Card tap / long-press preview — PARTIAL
-Tap opens details (DONE). Long-press preview, accessible preview control: NOT DONE → Stage 3.
+Tap opens details (DONE). Long-press preview and a visible Preview button: DONE in Stage 3 (browser-tested; real-phone touch feel not yet checked).
 
 ### 10. Contacts
 | Item | Status |
 | --- | --- |
-| Phonebook icon beside the phone field | NOT DONE (an "Import from phone" button exists on the list, using the browser Contact Picker; Android Chrome only) |
+| Phonebook icon beside the phone field | DONE (13 Oct picker; Stage 3 puts an icon beside the contact phone box and the property owner phone box, with clear messages for refused / cancelled / unsupported) |
 | Native contact picker on Android/iOS app | NOT PROVEN / BLOCKED (no native shell) |
-| WhatsApp ID / Alias field | NOT DONE |
+| WhatsApp ID / Alias field | DONE (13 Oct) and re-checked in Stage 3: kept separate from the phone, never turned into a number, searchable; Call/WhatsApp links need a usable number (9+ digits) |
 
 ### 11. GPS Assistance
 | Item | Status | Notes |
@@ -246,3 +246,28 @@ build. Everything else also arrives by the automatic update, but install the new
 5. New Property: sections open/close, Save from the middle of the form, "?" help.
 6. Typing and Backspace speed in long fields (headline, notes) with the Samsung keyboard.
 7. Startup: logo spin, then sign-in / dashboard. First start on a clean install: the sample-data choice.
+
+## Stage 3 status — Property & Contacts (branch `feature/v2-stage3-property-contacts`, from `feature/v2-phase2` @ `586d6a5`)
+
+Awaiting your review. Not merged, not deployed, no live Supabase change, Stage 4 not started.
+
+| Item | Result |
+| --- | --- |
+| Headline lower | Headline now first in **Marketing** (the advert title). Section 1 is retitled **Type & Purpose**. The detail screen shows it under Marketing. **Decision needed:** the repo's `Property_Explorer.docx` is master v1A and has no field-order list, so this placement is my reading of "lower"; tell me the exact order if different. |
+| Fill by Voice | Large centred button at the top of the form (opens the same voice box; the existing speech fixes are untouched). Fields filled from words are marked "from your words". A notice asks you to check them; **I have checked them** clears it; pressing Save first asks "Save without checking?". Works for the voice-command prefill too, and still applies after a restored draft. Only empty fields are ever filled, as before. |
+| Verification | Four states (Confirmed, Owner stated, Need to check, Unknown) on 20 facts (prices, fees, commission, tenure/title/land use/restriction, sizes, rooms, parking, furnishing, condition, availability, owner name/phone). A word + symbol is shown beside the value (not colour alone) on the detail screen and key facts; "n to check" is listed in the Still-missing card. An empty field may be marked Unknown. Marks of fields that no longer apply (e.g. sale price after switching to rent) are removed on save. Stored on the record, so they sync, merge field by field (a clash is a normal conflict) and appear in history. |
+| Card preview | Long-press (about 0.5 s) on a grid or large card opens a preview sheet; a visible **Preview** button does the same (no long-press needed); Esc closes; the sheet offers Open details / Delete (asks first) / Cancel. A normal tap still opens details. |
+| Phonebook | Icon beside the contact phone box and a new one beside the property owner phone box (fills name + number; asks before replacing different typed values). Refused permission, picker closed without a choice, contact without a number, unsupported browser and missing plugin each show a message under the box. |
+| WhatsApp alias | Re-checked, no change needed. |
+| Phone links | Call / WhatsApp links appear only for a number of 9+ digits; shorter ones explain why. (Master §6.3.) |
+| Demo data | All sample records already carried a Sample mark in the list views; now also the to-do, appointment, inquiry, deal, expense and income rows. Example verification marks (all four states) on sample properties; example WhatsApp aliases (one alias-only). Still `sample: true`, never synced, removed only from Settings. |
+
+Tests added: `tests/stage3.test.ts` (12 unit) and U60–U69 in `tests/ui.test.mjs` (10 screen). Browser simulations only: real Android touch,
+the real contact permission prompt, and the real speech service are **not** covered.
+
+### Still to test on the S23 Ultra (Stage 3)
+1. Long-press a property card: preview opens, releasing does not open details; Samsung keyboard/TalkBack still reach the Preview button.
+2. Fill by Voice: tap the big button, speak, check the review notice and the Save question.
+3. Phonebook icon on a contact and on the property owner: permission prompt, Don't allow, back-button cancel.
+4. Verification pickers with the Samsung keyboard; reading of the chips on the detail screen outdoors.
+

@@ -94,6 +94,11 @@ export function StoredImage({ fileId, url, alt = '', className }: { fileId?: str
   return <span className={`img-wait ${gone ? 'img-missing' : ''} ${className ?? ''}`} data-testid={gone ? 'img-missing' : undefined} data-state={status} aria-hidden={gone ? undefined : 'true'} role={gone ? 'img' : undefined} aria-label={gone ? alt || 'Picture not available' : undefined} />;
 }
 
+/** The "Sample" mark on example records, so they can never be mistaken for real ones. */
+export function SampleTag({ lang }: { lang: Lang }) {
+  return <span className="chip-tag sample-tag" data-testid="sample-tag">{strings[lang].sampleTag}</span>;
+}
+
 export function Confirm({ lang, title, body, okLabel, danger = true, onOk, onCancel }: {
   lang: Lang; title: string; body?: string; okLabel?: string; danger?: boolean; onOk: () => void; onCancel: () => void;
 }) {

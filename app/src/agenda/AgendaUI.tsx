@@ -8,7 +8,7 @@ import { newId } from '../data/store';
 import { agendaStrings } from './strings';
 import { Go } from '../nav';
 import { InquiryHistory, ViewingHistory, ViewingItem } from './History';
-import { ContactSelect, PropertySelect, ReminderPicker, LeadPicker, LeadDot, Tabs, Empty, Confirm } from '../ui/common';
+import { ContactSelect, PropertySelect, ReminderPicker, LeadPicker, LeadDot, Tabs, Empty, Confirm, SampleTag } from '../ui/common';
 import { useToast } from '../ui/toast';
 import {
   APPT_KINDS, APPT_STATUSES, INQUIRY_CHANNELS, PRIORITIES, BUYER_ROLES, Appointment, ApptKind, Inquiry, InquiryChannel, Task, Priority, LeadStatus,
@@ -248,6 +248,7 @@ export function TaskRow({ lang, t, go, onToggle }: { lang: Lang; t: Task; go: Go
           <span className={`prio prio-${t.priority}`}>{a.todo.priority[t.priority]}</span>
           {t.kind === 'follow_up' && <span className="chip-tag">{a.todo.followUp}</span>}
           {t.due && <span className={overdue ? 'warn-text' : 'muted'}>{fmtDateTime(t.due, lang)}</span>}
+          {t.sample && <SampleTag lang={lang} />}
           {t.done && t.completedAt && <span className="muted">{a.todo.completedOn(fmtDate(t.completedAt, lang))}</span>}
         </span>
         {(prop || contact) && <span className="small muted">{[prop && (cardTitle(prop) || prop.ref), contact?.name].filter(Boolean).join(' · ')}</span>}
@@ -403,7 +404,7 @@ function ApptItem({ lang, ap, go, onStatus }: { lang: Lang; ap: Appointment; go:
   return (
     <li className={`act-item st-${ap.status}`} data-testid="appt-item">
       <div className="between">
-        <button className="link-btn" onClick={() => go({ name: 'apptForm', id: ap.id })}><strong>{ap.title || a.appt.kinds[ap.kind]}</strong></button>
+        <button className="link-btn" onClick={() => go({ name: 'apptForm', id: ap.id })}><strong>{ap.title || a.appt.kinds[ap.kind]}</strong></button>{ap.sample && <SampleTag lang={lang} />}
         <span className={`appt-st appt-${ap.status}`}>{a.appt.status[ap.status]}</span>
       </div>
       <small className="muted">{[fmtTime(ap.start, lang), a.appt.kinds[ap.kind], contact?.name, prop && cardTitle(prop)].filter(Boolean).join(' · ')}</small>

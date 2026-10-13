@@ -147,6 +147,8 @@ export interface Listing {
   history?: ChangeEntry[];
   /** Where each value came from: typed by hand, or taken from what the agent said (voice). */
   filledFrom?: Partial<Record<keyof Listing, 'typed' | 'words'>>;
+  /** How far each important fact can be trusted (listing/verify.ts). A field with no entry has not been marked yet. */
+  verification?: Partial<Record<string, 'confirmed' | 'owner' | 'check' | 'unknown'>>;
 }
 
 export const thisYear = () => new Date().getFullYear();
@@ -181,6 +183,9 @@ export function phoneDigits(raw?: string): string {
   const d = (raw ?? '').replace(/\D/g, '');
   return d.startsWith('0') ? '6' + d : d;
 }
+/** A number worth calling or opening in WhatsApp: at least 9 digits (the same rule as the name card). Anything shorter is
+ *  kept as typed but gets no call / WhatsApp link, so a broken link is never opened. */
+export const usablePhone = (raw?: string): boolean => phoneDigits(raw).length >= 9;
 
 /** The place name shown on cards: township, else city. */
 export const placeName = (l: Pick<Listing, 'township' | 'city'>) => l.township || l.city || '';
