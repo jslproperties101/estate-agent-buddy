@@ -18,6 +18,7 @@ import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
 import { adStrings } from '../adverts/strings';
 import { photoStrings } from '../photos/strings';
+import { marketingStrings } from '../marketing/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { buyerStrings } from './buyerPdf';
 import { IconMic } from '../icons';
@@ -374,6 +375,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>
         <button className="btn secondary" aria-expanded={voice} onClick={() => setVoice(v => !v)}><IconMic size={20} /> {s.voice.open}</button>
         <button className="btn secondary" onClick={() => go({ name: 'buyerPdf', propertyId: l.id })} data-testid="open-buyer-pdf">📄 {buyerStrings[lang].open}</button>
+        <button className="btn secondary" onClick={() => go({ name: 'marketingStudio', propertyId: l.id })} data-testid="open-marketing-studio">🎨 {marketingStrings[lang].open}</button>
         {callable && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
         {callable && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>

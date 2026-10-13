@@ -778,3 +778,4 @@ li.has-preview { position: relative; }
 .photo-strip button .chip-tag { position: absolute; left: 2px; bottom: 2px; font-size: .62rem; }
 .photo-strip button { position: relative; }
 .photo-strip button.on { outline: 2px solid var(--gold, #c9a227); }
+.ms-preview { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }

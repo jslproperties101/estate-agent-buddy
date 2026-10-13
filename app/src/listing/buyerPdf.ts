@@ -5,7 +5,7 @@
 // check / Unknown / Not marked), and anything not confirmed is marked, so unverified facts cannot pass as confirmed.
 import type { Lang } from '../i18n';
 import type { Profile } from '../data/types';
-import { Listing, rm, landText, sqft, cardTitle, yearsRemaining, thisYear } from './model';
+import { Listing, rm, landText, sqft, placeName, yearsRemaining, thisYear } from './model';
 import { listingStrings, ListingStrings, typeLabel } from './strings';
 import { isVerifiable, verifyStateOf } from './verify';
 import { fmtDate, monthText } from '../lib/dates';
@@ -97,6 +97,16 @@ export const agentLines = (p: Pick<Profile, 'fullName' | 'agency' | 'regNo' | 'p
 /** The most photos one PDF takes (keeps the file small enough to send by WhatsApp or email). */
 export const MAX_PDF_PHOTOS = 12;
 
+/** A title that is safe to print or use as a file name: the advert title, else the property type (and the area when the agent allows the location), else a plain word.
+ *  It is NEVER built from the street, unit or lot number: those are only shown when the agent ticks them. (Stage 6 fix: the Stage 5 buyer PDF used the address-style card title.) */
+export function publicTitle(l: Listing, s: ListingStrings, withPlace: boolean, fallback: string): string {
+  const own = l.headline?.trim();
+  if (own) return own;
+  const kind = l.type ? typeLabel(s, l.type) : '';
+  const area = withPlace ? placeName(l) : '';
+  return [kind, area].filter(Boolean).join(', ') || fallback;
+}
+
 export interface BuyerDocInput {
   lang: Lang;
   listing: Listing;
@@ -115,7 +125,7 @@ export function buildBuyerDoc(i: BuyerDocInput): Doc {
   const l = i.listing;
   const blocks: Block[] = [];
   const place = [l.township, l.city, l.state].filter(has).join(', ');
-  const heading = l.headline?.trim() || cardTitle(l) || typeLabel(s, l.type) || b.untitled;
+  const heading = publicTitle(l, s, !!(i.selected['township'] || i.selected['city']), b.untitled);
   const sub = [l.purpose ? s.purpose[l.purpose] : '', i.selected['township'] || i.selected['city'] ? place : ''].filter(Boolean).join(' · ');
   blocks.push({ t: 'title', text: l.sample ? `${heading} (${b.sample})` : heading, sub: sub || undefined });
   const photos = i.photos.slice(0, MAX_PDF_PHOTOS);

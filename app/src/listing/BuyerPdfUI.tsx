@@ -6,8 +6,9 @@ import { useApp } from '../data/useStore';
 import { StoredImage } from '../ui/common';
 import { PdfPreview } from '../ui/PdfPreview';
 import { cardTitle } from './model';
+import { listingStrings } from './strings';
 import {
-  AgentChoice, BUYER_GROUPS, MAX_PDF_PHOTOS, buildBuyerDoc, buyerFields, buyerStrings, defaultAgentChoice, defaultSelection,
+  AgentChoice, BUYER_GROUPS, MAX_PDF_PHOTOS, buildBuyerDoc, buyerFields, buyerStrings, defaultAgentChoice, defaultSelection, publicTitle,
 } from './buyerPdf';
 import { VOICE_LANGS } from '../voice/recognizer';
 import type { Doc } from '../lib/pdf';
@@ -69,7 +70,7 @@ export function BuyerPdfScreen({ lang, propertyId }: { lang: Lang; propertyId: s
     lang: pdfLang, listing: l, fields, selected, photos: ready?.photos ?? [], agent: profile, agentChoice, now: Date.now(),
   });
   const bp = buyerStrings[pdfLang];
-  const title = `${bp.title} – ${[l.ref, cardTitle(l)].filter(Boolean).join(' ') || bp.untitled}`;
+  const title = `${bp.title} – ${[l.ref, publicTitle(l, listingStrings[pdfLang], !!(selected['township'] || selected['city']), bp.untitled)].filter(Boolean).join(' ')}`;
   const hasAgent = !!(profile.fullName || profile.phone || profile.agency || profile.email);
 
   return (

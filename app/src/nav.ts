@@ -37,6 +37,7 @@ export type Screen =
   | { name: 'adTracker'; propertyId: string }
   | { name: 'adSummary' }
   | { name: 'photoStudio'; propertyId: string; photoId?: string }
+  | { name: 'marketingStudio'; propertyId: string }
   | { name: 'profile' }
   | { name: 'profileEdit' }
   | { name: 'nameCard' }

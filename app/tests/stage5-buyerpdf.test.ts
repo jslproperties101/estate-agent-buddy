@@ -135,3 +135,17 @@ test('BP10 a long, fully ticked document lays out on A4 pages without losing a r
   const printed = pages.flatMap(p => p.items.filter(i => i.k === 'text')).map(i => (i as { text: string }).text).join(' ');
   assert.ok(printed.includes('RM 3,200,000') && printed.includes('Salak Tinggi'));
 });
+
+test('BP11 (Stage 6 fix) with no advert title, the buyer PDF heading and file title use the type and area — never the street or unit number, which are only shown when ticked', async () => {
+  const { publicTitle } = await import('../src/listing/buyerPdf');
+  const l = full({ headline: undefined, type: 'Terrace house' });
+  const fields = buyerFields(l, 'en', 2026);
+  const selected = { ...defaultSelection(fields) };
+  assert.ok(!selected['street'] && !selected['unitNo'], 'exact address starts unticked');
+  const doc = buildBuyerDoc({ lang: 'en', listing: l, fields, selected, photos: [], now: Date.UTC(2026, 9, 14) });
+  const title = (doc.blocks[0] as { text: string }).text;
+  assert.equal(title, 'Terrace house, Salak Tinggi');
+  assert.ok(!/Jalan Industri|A-12/.test(JSON.stringify(doc)), 'no street or unit in the unticked PDF');
+  assert.equal(publicTitle(l, listingStrings.en, false, 'Property'), 'Terrace house');
+  assert.equal(publicTitle(full({ headline: undefined, type: undefined, township: undefined, city: undefined }), listingStrings.en, true, 'Property'), 'Property');
+});

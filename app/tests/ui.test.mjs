@@ -3197,6 +3197,190 @@ test('U83 Photo Studio: a property without photos explains itself; Bahasa Malays
   }
 });
 
+/** For looking at the finished designs by eye: set SAVE_DESIGNS=/some/folder when running this file. */
+const keepDesign = async f => { if (process.env.SAVE_DESIGNS) { const fs = await import('node:fs/promises'); await fs.mkdir(process.env.SAVE_DESIGNS, { recursive: true }); await fs.writeFile(`${process.env.SAVE_DESIGNS}/${f.name}`, f.bytes); } };
+const pngSize = b => ({ sig: b.subarray(0, 8).toString('hex'), w: b.readUInt32BE(16), h: b.readUInt32BE(20) });
+async function marketingProperty(page, { photos = [] } = {}) {
+  await bareProperty(page, 'Corner house, quick sale');
+  await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="askingPrice"]').fill('580000');
+  if (photos.length) {
+    await page.getByTestId('photo-input').setInputFiles(photos);
+    await page.waitForFunction(n => document.querySelectorAll('[data-testid="listing-form"] img').length >= n, photos.length);
+  }
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  await waitStored(page, 'records', `all.some(v => v && v.headline === 'Corner house, quick sale' && v.askingPrice === 580000 && v.photos.length === ${photos.length})`);
+}
+/** Colour of the preview picture at a point (0..1). */
+const previewColour = (page, fx, fy) => page.getByTestId('ms-preview').evaluate(async (img, [fx, fy]) => {
+  const im = new Image(); im.src = img.src; await im.decode();
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  return { w: im.naturalWidth, h: im.naturalHeight, rgb: Array.from(x.getImageData(Math.floor(fx * im.naturalWidth), Math.floor(fy * im.naturalHeight), 1, 1).data.slice(0, 3)) };
+}, [fx, fy]);
+
+test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/WebP, A4 PDF — each a real file of the right size, made only when asked; changing a choice marks the file out of date', async () => {
+  const page = await phone();
+  await marketingProperty(page, { photos: [{ name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') }, { name: 'back.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#a53') }] });
+  await page.getByTestId('open-marketing-studio').click();
+  await page.getByTestId('marketing-studio').waitFor();
+  assert.match(await page.getByTestId('ms-notpublished').innerText(), /does not publish an advert/);
+  assert.equal(await page.getByTestId('ms-result').count(), 0, 'nothing is made until asked');
+  // square post, PNG (the default)
+  assert.equal(await page.getByTestId('ms-format-square').isChecked(), true);
+  await page.getByTestId('ms-make').click();
+  await page.getByTestId('ms-result').waitFor();
+  assert.match(await page.getByTestId('ms-made').innerText(), /Made: Square post · PNG · 1080 × 1080 px/);
+  const sq = await previewColour(page, 0.92, 0.08);
+  assert.deepEqual([sq.w, sq.h], [1080, 1080]);
+  assert.ok(sq.rgb[1] > sq.rgb[0] + 40 && sq.rgb[1] > 120, `main photo (green) fills the post: ${sq.rgb}`);
+  await shot(page, '84a-marketing-square', false);
+  const png = await pdfFrom(page, 'ms-download');
+  assert.equal(png.name, 'P1001-square.png');
+  assert.deepEqual(pngSize(png.bytes), { sig: '89504e470d0a1a0a', w: 1080, h: 1080 });
+  await keepDesign(png);
+  assert.equal(await page.getByTestId('ms-result').getAttribute('data-format'), 'square');
+  // change a choice: the file on screen is marked out of date, and nothing is remade by itself
+  await page.getByTestId('ms-headline').fill('Last unit this month');
+  assert.match(await page.getByTestId('ms-stale').innerText(), /Make the preview again/);
+  assert.match(await page.getByTestId('ms-made').innerText(), /Square post/);
+  // portrait, WebP
+  await page.getByTestId('ms-format-portrait').check();
+  await page.getByTestId('ms-output').selectOption('webp');
+  await page.getByTestId('ms-make').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === 'portrait');
+  assert.match(await page.getByTestId('ms-made').innerText(), /Portrait post · WebP · 1080 × 1350 px/);
+  assert.equal(await page.getByTestId('ms-stale').count(), 0, 'fresh again');
+  const webp = await pdfFrom(page, 'ms-download');
+  assert.equal(webp.name, 'P1001-portrait.webp');
+  await keepDesign(webp);
+  assert.equal(webp.bytes.subarray(0, 4).toString('latin1'), 'RIFF'); assert.equal(webp.bytes.subarray(8, 12).toString('latin1'), 'WEBP');
+  await shot(page, '84b-marketing-portrait', false);
+  // A4 flyer as a one-page PDF; the post-only WebP choice is not offered for it
+  await page.getByTestId('ms-format-a4').check();
+  assert.deepEqual(await page.getByTestId('ms-output').locator('option').allInnerTexts(), ['PDF', 'PNG', 'JPG']);
+  await page.getByTestId('ms-output').selectOption('pdf');
+  await page.getByTestId('ms-theme').selectOption('light');
+  await page.getByTestId('ms-make').click();
+  await page.waitForFunction(() => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === 'a4');
+  assert.match(await page.getByTestId('ms-made').innerText(), /A4 flyer · PDF · 1240 × 1754 px/);
+  const pdf = await pdfFrom(page, 'ms-download');
+  assert.equal(pdf.name, 'P1001-a4.pdf');
+  await keepDesign(pdf);
+  const info = pdfInfo(pdf.bytes);
+  assert.deepEqual([info.header, info.pages, info.images, info.eof], ['%PDF-1.4', 1, 1, true]);
+  const a4 = await previewColour(page, 0.5, 0.05);
+  assert.deepEqual([a4.w, a4.h], [1240, 1754]);
+  await shot(page, '84c-marketing-a4', false);
+  // JPG
+  await page.getByTestId('ms-output').selectOption('jpg');
+  await page.getByTestId('ms-make').click();
+  await page.waitForFunction(() => /JPG/.test(document.querySelector('[data-testid="ms-made"]')?.textContent ?? ''));
+  const jpg = await pdfFrom(page, 'ms-download');
+  assert.equal(jpg.bytes.subarray(0, 3).toString('hex'), 'ffd8ff');
+  await page.context().close();
+});
+
+test('U85 Marketing Studio: missing price/photos do not break it or invent anything; unconfirmed facts are flagged; a sample property is marked SAMPLE; the exact address is never offered; Bahasa Malaysia and Chinese work', async () => {
+  const page = await phone();
+  await bareProperty(page, 'Plain house');
+  await page.getByTestId('open-marketing-studio').click();
+  await page.getByTestId('marketing-studio').waitFor();
+  assert.match(await page.getByTestId('ms-no-photos').innerText(), /plain gold panel/);
+  assert.match(await page.getByTestId('ms-warn-price').innerText(), /No price shown/);
+  const text = await page.getByTestId('marketing-studio').innerText();
+  for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Street', 'Unit', 'Lot no', 'Current tenant']) assert.ok(!text.includes(never), `${never} must not be offered`);
+  await page.getByTestId('ms-make').click();
+  await page.getByTestId('ms-result').waitFor();           // no photo, no price: still a file
+  assert.match(await page.getByTestId('ms-made').innerText(), /1080 × 1080/);
+  const plain = await previewColour(page, 0.5, 0.2);
+  assert.ok(plain.rgb.every(v => v < 40), `a plain dark panel, not an invented picture: ${plain.rgb}`);
+  await home(page);
+  // sample data: unconfirmed facts flagged, SAMPLE warning
+  await loadSample(page);
+  await tile(page, 'Property List');
+  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByTestId('open-marketing-studio').click();
+  assert.match(await page.getByTestId('ms-warn-sample').innerText(), /says SAMPLE/);
+  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /Owner stated/);
+  assert.match(await page.getByTestId('ms-warn-unverified').innerText(), /Not confirmed yet, marked \* on the design: .*Asking price/);
+  await page.getByTestId('ms-make').click();
+  await page.getByTestId('ms-result').waitFor();
+  await shot(page, '85a-marketing-sample', false);
+  // a full design in each format (facts, ribbon, photo, SAMPLE band) draws without error and at the exact size
+  for (const [f, size] of [['a4', [1240, 1754]], ['square', [1080, 1080]], ['portrait', [1080, 1350]]]) {
+    await page.getByTestId(`ms-format-${f}`).check();
+    await page.getByTestId('ms-output').selectOption('png');
+    await page.getByTestId('ms-make').click();
+    await page.waitForFunction(g => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === g && document.querySelector('[data-testid="ms-stale"]') === null, f);
+    const dl = await pdfFrom(page, 'ms-download');
+    assert.deepEqual([pngSize(dl.bytes).w, pngSize(dl.bytes).h], size);
+    await keepDesign({ name: `sample-${f}.png`, bytes: dl.bytes });
+  }
+  // a ticked detail with no value is left off and reported
+  await page.getByTestId('ms-missing').locator('summary').click();
+  await page.getByTestId('mf-monthlyRent').locator('input').check();
+  assert.match(await page.getByTestId('ms-warn-empty').innerText(), /left off the design: .*Monthly rent/);
+  // Bahasa Malaysia and Chinese
+  await page.getByTestId('ms-lang').selectOption('zh');
+  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /开价|要价|售价|价格/);
+  await page.context().close();
+  for (const [aria, re] of [['Bahasa Malaysia', /Studio Pemasaran|Tiada apa disiarkan/], ['中文', /营销工作室|不会发布到任何地方/]]) {
+    const p = await phone();
+    await marketingProperty(p);
+    await home(p); await tile(p, 'Agent Profile'); await p.getByRole('button', { name: /Settings/ }).click();
+    await p.locator(`.lang button[aria-label="${aria}"]`).click(); await home(p);
+    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/ }).first().click();
+    await p.getByText('Corner house, quick sale').first().click();
+    await p.getByTestId('open-marketing-studio').click();
+    assert.match(await p.getByTestId('marketing-studio').innerText(), re);
+    await p.getByTestId('ms-make').click();
+    await p.getByTestId('ms-result').waitFor();
+    await shot(p, `85-${aria === '中文' ? 'zh' : 'bm'}-marketing`, false);
+    await p.context().close();
+  }
+});
+
+test('U86 Marketing Studio: a full property (photos, facts, long headline, agent contact, reference) draws cleanly in all three formats and the A4 PDF stays one page', async () => {
+  const page = await phone();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click();
+  await page.locator('[data-field="fullName"]').fill('Lee Ah Kow'); await page.locator('[data-field="agency"]').fill('JSL Properties Sdn Bhd'); await page.locator('[data-field="phone"]').fill('012-345 6789');
+  await page.getByTestId('save-profile').click();
+  await home(page);
+  await bareProperty(page, 'Spacious corner terrace with extra land, walking distance to the LRT, school and wet market');
+  await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="askingPrice"]').fill('780000');
+  for (const [k, v] of [['bedrooms', '4'], ['bathrooms', '3'], ['parking', '2'], ['builtUpSqft', '1800'], ['landSqft', '2400']]) await page.locator(`[data-field="${k}"]`).first().fill(v);
+  await page.locator('[data-field="features"]').first().fill('Corner lot with side land, renovated kitchen, new roof, 5 minutes to the highway and shopping centre.');
+  await page.getByTestId('photo-input').setInputFiles(await Promise.all(['#3a7', '#a53', '#37a', '#aa3'].map(async (c, i) => ({ name: `p${i}.jpg`, mimeType: 'image/jpeg', buffer: await makePhoto(page, c) }))));
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="listing-form"] img').length >= 4);
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  await waitStored(page, 'records', "all.some(v => v && v.photos && v.photos.length === 4 && v.bedrooms === 4)");
+  await page.getByTestId('open-marketing-studio').click();
+  await page.getByTestId('marketing-studio').waitFor();
+  await page.getByTestId('ms-showref').check();
+  assert.match(await page.getByTestId('ms-warn-long').innerText(), /headline is long/);
+  for (const [f, size, photos] of [['a4', [1240, 1754], 4], ['square', [1080, 1080], 1], ['portrait', [1080, 1350], 3]]) {
+    await page.getByTestId(`ms-format-${f}`).check();
+    assert.equal(await page.getByTestId('ms-photo').locator('input:checked').count(), photos, `${f}: ${photos} photo(s) ticked at first`);
+    await page.getByTestId('ms-output').selectOption('png');
+    await page.getByTestId('ms-make').click();
+    await page.waitForFunction(g => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === g && document.querySelector('[data-testid="ms-stale"]') === null, f);
+    const dl = await pdfFrom(page, 'ms-download');
+    assert.deepEqual([pngSize(dl.bytes).w, pngSize(dl.bytes).h], size);
+    await keepDesign({ name: `full-${f}.png`, bytes: dl.bytes });
+  }
+  await page.getByTestId('ms-format-a4').check();
+  await page.getByTestId('ms-output').selectOption('pdf');
+  await page.getByTestId('ms-make').click();
+  await page.waitForFunction(() => /PDF/.test(document.querySelector('[data-testid="ms-made"]')?.textContent ?? '') && document.querySelector('[data-testid="ms-stale"]') === null);
+  const pdf = await pdfFrom(page, 'ms-download');
+  assert.equal(pdfInfo(pdf.bytes).pages, 1);
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
