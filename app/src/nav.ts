@@ -33,6 +33,7 @@ export type Screen =
   | { name: 'expenseForm'; id?: string }
   | { name: 'incomeForm'; id?: string }
   | { name: 'calculator'; propertyId?: string }
+  | { name: 'buyerPdf'; propertyId: string }
   | { name: 'profile' }
   | { name: 'profileEdit' }
   | { name: 'nameCard' }

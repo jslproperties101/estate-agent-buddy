@@ -32,6 +32,8 @@ import { GpsHome, HouseShopping, JourneyDetail, PropertyMap } from './gps/GpsUI'
 import { BannerScreen } from './gps/BannersUI';
 import { FinanceScreen, DealForm, MoneyForm } from './finance/FinanceUI';
 import { CalculatorScreen } from './calculator/CalculatorUI';
+import { BuyerPdfScreen } from './listing/BuyerPdfUI';
+import { buyerStrings } from './listing/buyerPdf';
 import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './profile/ProfileUI';
 import { ExpertHome, ExpertAsk, ExpertThreadScreen } from './expert/ExpertUI';
 import { VoiceCommand } from './voice/VoiceCommandUI';
@@ -332,6 +334,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'expenseForm': return s.id ? financeStrings[lang].editExpense : financeStrings[lang].newExpense;
     case 'incomeForm': return s.id ? financeStrings[lang].editIncome : financeStrings[lang].newIncome;
     case 'calculator': return calcStrings[lang].title;
+    case 'buyerPdf': return buyerStrings[lang].title;
     case 'profile': return profileStrings[lang].title;
     case 'profileEdit': return profileStrings[lang].edit;
     case 'nameCard': return profileStrings[lang].sendTitle;
@@ -379,6 +382,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'expenseForm': return <MoneyForm key={s.id ?? 'new-e'} lang={lang} back={back} id={s.id} kind="expense" />;
     case 'incomeForm': return <MoneyForm key={s.id ?? 'new-i'} lang={lang} back={back} id={s.id} kind="income" />;
     case 'calculator': return <CalculatorScreen key={s.propertyId ?? ''} lang={lang} propertyId={s.propertyId} />;
+    case 'buyerPdf': return <BuyerPdfScreen key={s.propertyId} lang={lang} propertyId={s.propertyId} />;
     case 'profile': return <ProfileScreen lang={lang} go={go} />;
     case 'profileEdit': return <ProfileEdit lang={lang} back={back} />;
     case 'nameCard': return <NameCardSend lang={lang} />;

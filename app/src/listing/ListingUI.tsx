@@ -16,6 +16,7 @@ import {
 import { verifyStateOf, toCheck, VerifyState } from './verify';
 import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
+import { buyerStrings } from './buyerPdf';
 import { IconMic } from '../icons';
 import { useApp, useStore } from '../data/useStore';
 import { Go, FormSection } from '../nav';
@@ -369,6 +370,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       <div className="rec-actions">
         <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>
         <button className="btn secondary" aria-expanded={voice} onClick={() => setVoice(v => !v)}><IconMic size={20} /> {s.voice.open}</button>
+        <button className="btn secondary" onClick={() => go({ name: 'buyerPdf', propertyId: l.id })} data-testid="open-buyer-pdf">📄 {buyerStrings[lang].open}</button>
         {callable && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
         {callable && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>

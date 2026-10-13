@@ -29,7 +29,7 @@ export function recordTitle(lang: Lang, collection: CollectionName, r: Rec | und
   const s = syncStrings[lang];
   if (!r) return s.unknownRecord;
   if (collection === 'properties') return [r.ref, cardTitle(r as never)].filter(Boolean).join(' · ') || s.untitled;
-  return String(r.name ?? r.title ?? r.headline ?? r.message ?? '').trim().slice(0, 60) || s.untitled;
+  return String(r.name ?? r.title ?? r.headline ?? r.message ?? r.kind ?? '').trim().slice(0, 60) || s.untitled;
 }
 
 function fieldLabel(lang: Lang, collection: CollectionName, field: string): string {

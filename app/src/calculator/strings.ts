@@ -1,7 +1,7 @@
 // Property Calculator text, in three languages.
 import type { Lang } from '../i18n';
 
-const en = {
+const enBase = {
   title: 'Property Calculator',
   fromProperty: (x: string) => `Filled from: ${x}`,
   estimateNote: 'Estimates for discussion only, using the rates under Assumptions. Confirm the final amounts with the lawyer, the bank and LHDN for each case.',
@@ -39,9 +39,34 @@ const en = {
     sources: 'Defaults: Stamp Act 1949 (MOT 1%/2%/3%/4%, loan 0.5%); first-home exemption for SPAs signed 2021–2027 up to RM500,000; Solicitors’ Remuneration Order 2023; SST 8%; RPGT for citizens 30/30/30/20/15/0%. Check them before relying on a result.',
   },
 };
-export type CalcStrings = typeof en;
 
-const bm: CalcStrings = {
+const enX = {
+  tab: 'History',
+  prop: { label: 'Property', search: 'Search properties (reference, type, place, owner)', none: 'No property selected', clear: 'Clear property', noMatch: 'No property matches.', pick: 'Choose', chosen: (x: string) => `Property: ${x}`, filled: 'Price, rent, maintenance and commission were filled in from the property. Your edits here do not change the property.', many: (n: number) => `${n} properties` },
+  client: { label: 'Client', none: 'No client', pick: 'Choose a buyer, tenant or owner' },
+  save: { name: 'Name (optional)', button: 'Save calculation', again: 'Save as a new calculation', saved: 'Saved on this phone.', update: 'Save changes', updated: 'Changes saved.', editing: (x: string) => `Editing the saved calculation: ${x}`, newCalc: 'Start a new one' },
+  hist: {
+    title: 'Saved calculations', empty: 'No saved calculations yet. Fill in a calculation and press Save calculation.', open: 'Open', pdf: 'PDF', del: 'Delete',
+    delTitle: 'Delete this saved calculation?', delBody: 'It moves to Recently Deleted and can be restored for 30 days.', filter: 'Show', all: 'All', thisProperty: 'This property', untitled: 'Calculation',
+    forProp: (x: string) => `Property: ${x}`, forClient: (x: string) => `Client: ${x}`, noProp: 'No property linked', kind: { purchase: 'Purchase & loan', rental: 'Rental & ROI', sale: 'Sale', commission: 'Agent commission' } as Record<string, string>,
+    rates: 'Using the rates saved with this calculation.', useToday: "Use today's rates", savedOn: (x: string) => `Saved ${x}`,
+  },
+  upd: {
+    button: 'Update property record…', title: 'Update the property record?', intro: 'These values from the calculation differ from the property record. Tick the ones to change. Nothing changes until you press Update property.',
+    now: 'Now', next: 'New', nothing: 'The property record already has the same values, or this calculation has nothing to update.', apply: 'Update property', cancel: 'Cancel', applied: (n: number) => `Property updated (${n}).`,
+    noProp: 'Choose a property first.', summary: 'Updated from a saved calculation', gone: 'The linked property no longer exists.',
+    price: 'Asking price', rent: 'Monthly rent', maint: 'Maintenance fee', comm: 'Commission (%)',
+  },
+  pdf: {
+    button: 'Export PDF', title: 'Property calculation', doc: (k: string) => `${k} calculation`, preparedFor: (x: string) => `Prepared for ${x}`, property: 'Property', date: 'Date', inputs: 'Inputs', results: 'Results',
+    rates: 'Rates used', ratesNote: 'Malaysian stamp duty, legal fee, SST and RPGT rates as set under Assumptions on the day.', footer: 'Estimate only. Confirm the final amounts with the lawyer, the bank and LHDN.',
+    agent: 'Prepared by', file: 'calculation',
+  },
+};
+export type CalcX = typeof enX;
+export type CalcStrings = typeof enBase & { x: CalcX };
+
+const bmBase: Omit<CalcStrings, 'x'> = {
   title: 'Kalkulator Hartanah',
   fromProperty: (x: string) => `Diisi daripada: ${x}`,
   estimateNote: 'Anggaran untuk perbincangan sahaja, menggunakan kadar di bawah Andaian. Sahkan jumlah akhir dengan peguam, bank dan LHDN bagi setiap kes.',
@@ -80,7 +105,7 @@ const bm: CalcStrings = {
   },
 };
 
-const zh: CalcStrings = {
+const zhBase: Omit<CalcStrings, 'x'> = {
   title: '房产计算器',
   fromProperty: (x: string) => `资料来自：${x}`,
   estimateNote: '仅供讨论的估算，使用“假设”中的费率。每个案例的最终金额请与律师、银行及内陆税收局确认。',
@@ -119,4 +144,55 @@ const zh: CalcStrings = {
   },
 };
 
+
+const bmX: CalcX = {
+  tab: 'Sejarah',
+  prop: { label: 'Hartanah', search: 'Cari hartanah (rujukan, jenis, tempat, pemilik)', none: 'Tiada hartanah dipilih', clear: 'Kosongkan hartanah', noMatch: 'Tiada hartanah sepadan.', pick: 'Pilih', chosen: (x: string) => `Hartanah: ${x}`, filled: 'Harga, sewa, penyelenggaraan dan komisen diisi daripada hartanah. Suntingan anda di sini tidak mengubah hartanah.', many: (n: number) => `${n} hartanah` },
+  client: { label: 'Pelanggan', none: 'Tiada pelanggan', pick: 'Pilih pembeli, penyewa atau pemilik' },
+  save: { name: 'Nama (pilihan)', button: 'Simpan pengiraan', again: 'Simpan sebagai pengiraan baharu', saved: 'Disimpan pada telefon ini.', update: 'Simpan perubahan', updated: 'Perubahan disimpan.', editing: (x: string) => `Menyunting pengiraan tersimpan: ${x}`, newCalc: 'Mulakan yang baharu' },
+  hist: {
+    title: 'Pengiraan tersimpan', empty: 'Belum ada pengiraan tersimpan. Isi satu pengiraan dan tekan Simpan pengiraan.', open: 'Buka', pdf: 'PDF', del: 'Padam',
+    delTitle: 'Padam pengiraan tersimpan ini?', delBody: 'Ia dipindahkan ke Baru Dipadam dan boleh dipulihkan selama 30 hari.', filter: 'Papar', all: 'Semua', thisProperty: 'Hartanah ini', untitled: 'Pengiraan',
+    forProp: (x: string) => `Hartanah: ${x}`, forClient: (x: string) => `Pelanggan: ${x}`, noProp: 'Tiada hartanah dipautkan', kind: { purchase: 'Pembelian & pinjaman', rental: 'Sewaan & ROI', sale: 'Jualan', commission: 'Komisen ejen' },
+    rates: 'Menggunakan kadar yang disimpan bersama pengiraan ini.', useToday: 'Guna kadar semasa', savedOn: (x: string) => `Disimpan ${x}`,
+  },
+  upd: {
+    button: 'Kemas kini rekod hartanah…', title: 'Kemas kini rekod hartanah?', intro: 'Nilai daripada pengiraan ini berbeza daripada rekod hartanah. Tanda yang hendak diubah. Tiada apa berubah sehingga anda tekan Kemas kini hartanah.',
+    now: 'Sekarang', next: 'Baharu', nothing: 'Rekod hartanah sudah mempunyai nilai yang sama, atau pengiraan ini tiada apa untuk dikemas kini.', apply: 'Kemas kini hartanah', cancel: 'Batal', applied: (n: number) => `Hartanah dikemas kini (${n}).`,
+    noProp: 'Pilih hartanah dahulu.', summary: 'Dikemas kini daripada pengiraan tersimpan', gone: 'Hartanah yang dipautkan sudah tiada.',
+    price: 'Harga diminta', rent: 'Sewa bulanan', maint: 'Yuran penyelenggaraan', comm: 'Komisen (%)',
+  },
+  pdf: {
+    button: 'Eksport PDF', title: 'Pengiraan hartanah', doc: (k: string) => `Pengiraan ${k}`, preparedFor: (x: string) => `Disediakan untuk ${x}`, property: 'Hartanah', date: 'Tarikh', inputs: 'Input', results: 'Keputusan',
+    rates: 'Kadar digunakan', ratesNote: 'Kadar duti setem, yuran guaman, SST dan RPGT Malaysia seperti ditetapkan di bawah Andaian pada hari itu.', footer: 'Anggaran sahaja. Sahkan jumlah akhir dengan peguam, bank dan LHDN.',
+    agent: 'Disediakan oleh', file: 'pengiraan',
+  },
+};
+
+const zhX: CalcX = {
+  tab: '记录',
+  prop: { label: '房产', search: '搜索房产（编号、类型、地点、业主）', none: '未选择房产', clear: '清除房产', noMatch: '没有匹配的房产。', pick: '选择', chosen: (x: string) => `房产：${x}`, filled: '价格、租金、管理费和佣金已从房产带入。您在此处的修改不会更改房产。', many: (n: number) => `${n} 个房产` },
+  client: { label: '客户', none: '无客户', pick: '选择买家、租客或业主' },
+  save: { name: '名称（可选）', button: '保存计算', again: '另存为新计算', saved: '已保存在这部手机上。', update: '保存更改', updated: '更改已保存。', editing: (x: string) => `正在编辑已保存的计算：${x}`, newCalc: '开始新的计算' },
+  hist: {
+    title: '已保存的计算', empty: '还没有已保存的计算。填写计算后按“保存计算”。', open: '打开', pdf: 'PDF', del: '删除',
+    delTitle: '删除这个已保存的计算？', delBody: '它会移到“最近删除”，30 天内可恢复。', filter: '显示', all: '全部', thisProperty: '此房产', untitled: '计算',
+    forProp: (x: string) => `房产：${x}`, forClient: (x: string) => `客户：${x}`, noProp: '未关联房产', kind: { purchase: '购买与贷款', rental: '租金与回报', sale: '出售', commission: '代理佣金' },
+    rates: '正在使用随此计算保存的税率。', useToday: '使用当前税率', savedOn: (x: string) => `保存于 ${x}`,
+  },
+  upd: {
+    button: '更新房产记录…', title: '更新房产记录？', intro: '计算中的这些数值与房产记录不同。勾选要更改的项目。按“更新房产”之前不会有任何更改。',
+    now: '现在', next: '新值', nothing: '房产记录已是相同的数值，或此计算没有可更新的内容。', apply: '更新房产', cancel: '取消', applied: (n: number) => `房产已更新（${n}）。`,
+    noProp: '请先选择房产。', summary: '根据已保存的计算更新', gone: '关联的房产已不存在。',
+    price: '开价', rent: '月租', maint: '管理费', comm: '佣金（%）',
+  },
+  pdf: {
+    button: '导出 PDF', title: '房产计算', doc: (k: string) => `${k}计算`, preparedFor: (x: string) => `为 ${x} 准备`, property: '房产', date: '日期', inputs: '输入', results: '结果',
+    rates: '所用税率', ratesNote: '马来西亚印花税、律师费、SST 和 RPGT 税率，按当天“假设”中的设置。', footer: '仅为估算。请与律师、银行和 LHDN 确认最终金额。',
+    agent: '制备人', file: '计算',
+  },
+};
+const en: CalcStrings = { ...enBase, x: enX };
+const bm: CalcStrings = { ...bmBase, x: bmX };
+const zh: CalcStrings = { ...zhBase, x: zhX };
 export const calcStrings: Record<Lang, CalcStrings> = { en, bm, zh };

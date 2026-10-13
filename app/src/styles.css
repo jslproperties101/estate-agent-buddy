@@ -747,3 +747,20 @@ li.has-preview { position: relative; }
 .preview-sheet { max-height: 92vh; overflow-y: auto; }
 .preview-sheet .lc-photo { border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 10; }
 .pb-msg { margin: 4px 0 0; }
+
+/* ---- Stage 5: PDF preview, calculator picker and history, voice diagnostics ---- */
+.pdf-dialog { max-height: 94vh; overflow: auto; }
+.pdf-title { margin: 0; font-size: 1.05rem; }
+.pdf-pages { display: flex; flex-direction: column; gap: 10px; overflow: auto; max-height: 52vh; padding: 4px; background: var(--bg-2, #00000022); border-radius: 12px; }
+.pdf-page { width: 100%; height: auto; background: #fff; border-radius: 4px; box-shadow: 0 1px 6px #0006; }
+.pick-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.pick-item { text-align: left; border: 1px solid var(--line-2); background: var(--card); color: inherit; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.pick-item[aria-pressed="true"] { border-color: var(--gold, #d4af37); }
+.hist-item { display: flex; flex-direction: column; gap: 4px; }
+.upd-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; }
+.diag-row { display: grid; grid-template-columns: 1.4rem 1fr; gap: 8px; align-items: start; }
+.diag-ok { color: #6FD49B; } .diag-bad { color: #EF6B5B; } .diag-warn { color: #F0C060; }
+.buyer-pdf-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.buyer-pdf-photos label { position: relative; display: block; }
+.buyer-pdf-photos img, .buyer-pdf-photos .img-wait { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+.buyer-pdf-photos input { position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; }

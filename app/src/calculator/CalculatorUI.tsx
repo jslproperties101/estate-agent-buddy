@@ -3,39 +3,21 @@
 import { useMemo, useState } from 'react';
 import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
+import { newId } from '../data/store';
 import { calcStrings } from './strings';
-import { Tabs } from '../ui/common';
+import { Confirm, Tabs } from '../ui/common';
 import {
-  Assumptions, DEFAULT_ASSUMPTIONS, purchase, rental, sale, agentCommission, PurchaseInput, RentalInput, SaleInput, TierPart,
+  purchase, rental, sale, agentCommission, PurchaseInput, RentalInput, SaleInput, TierPart,
 } from '../domain/calculator';
-import { rm, rm2, cardTitle } from '../listing/model';
+import { rm, rm2, cardTitle, Listing } from '../listing/model';
 import { MoneyInput } from '../ui/MoneyInput';
+import type { CalcKind, Calculation } from '../data/types';
+import { applyPropertyUpdates, buildCalculation, fromFlat, headline, proposeUpdates, PropertyUpdate, searchProperties, toFlat } from './saved';
+import { PdfPreview } from '../ui/PdfPreview';
+import { buildCalculationDoc } from './pdfDoc';
+import { fmtDate } from '../lib/dates';
 
-type Tab = 'purchase' | 'rental' | 'sale' | 'commission' | 'assumptions';
-
-/** Rates are kept on the phone as plain numbers. */
-function toFlat(a: Assumptions): Record<string, number> {
-  const f: Record<string, number> = {
-    nonCitizen: a.nonCitizenMotPct, loanStamp: a.loanStampPct, legalMin: a.legalMin, sst: a.sstPct, spaDisb: a.spaDisbursements,
-    loanDisb: a.loanDisbursements, firstHomeCap: a.firstHomeCap, rpgtExemptPct: a.rpgtExemptPct, rpgtExemptMin: a.rpgtExemptMin,
-  };
-  a.motTiers.forEach((t, i) => { f[`mot${i}`] = t.pct; });
-  a.legalTiers.forEach((t, i) => { f[`legal${i}`] = t.pct; });
-  a.rpgtByYear.forEach((p, i) => { f[`rpgt${i}`] = p; });
-  return f;
-}
-function fromFlat(f: Record<string, number> | undefined): Assumptions {
-  const d = DEFAULT_ASSUMPTIONS;
-  const g = (k: string, dv: number) => (f && Number.isFinite(f[k]) ? f[k] : dv);
-  return {
-    motTiers: d.motTiers.map((t, i) => ({ ...t, pct: g(`mot${i}`, t.pct) })),
-    nonCitizenMotPct: g('nonCitizen', d.nonCitizenMotPct), loanStampPct: g('loanStamp', d.loanStampPct),
-    legalTiers: d.legalTiers.map((t, i) => ({ ...t, pct: g(`legal${i}`, t.pct) })), legalMin: g('legalMin', d.legalMin),
-    sstPct: g('sst', d.sstPct), spaDisbursements: g('spaDisb', d.spaDisbursements), loanDisbursements: g('loanDisb', d.loanDisbursements),
-    firstHomeCap: g('firstHomeCap', d.firstHomeCap), rpgtByYear: d.rpgtByYear.map((p, i) => g(`rpgt${i}`, p)),
-    rpgtExemptPct: g('rpgtExemptPct', d.rpgtExemptPct), rpgtExemptMin: g('rpgtExemptMin', d.rpgtExemptMin),
-  };
-}
+type Tab = CalcKind | 'assumptions' | 'history';
 
 const numOf = (v: string) => { const x = parseFloat(v.replace(/[^\d.-]/g, '')); return Number.isFinite(x) ? x : 0; };
 
@@ -57,27 +39,116 @@ function Row({ k, v, strong, sub, testId }: { k: string; v: string; strong?: boo
 export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?: string }) {
   const { state, store } = useApp();
   const t = calcStrings[lang];
-  const prop = state.properties.find(p => p.id === propertyId);
-  const a = useMemo(() => fromFlat(state.settings.calc), [state.settings.calc]);
+  const cx = t.x;
+  const [propId, setPropId] = useState<string | undefined>(propertyId);
+  const [contactId, setContactId] = useState<string | undefined>(undefined);
+  const [editingId, setEditingId] = useState<string | undefined>(undefined);
+  const [name, setName] = useState('');
+  const [savedMsg, setSavedMsg] = useState('');
+  const [query, setQuery] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [updFor, setUpdFor] = useState<Calculation | null>(null);
+  const [pdfFor, setPdfFor] = useState<Calculation | null>(null);
+  const [delId, setDelId] = useState<string | null>(null);
+  const [histFilter, setHistFilter] = useState<'all' | 'property'>('all');
+  const prop = state.properties.find(pp => pp.id === propId);
+  /** Rates saved with a calculation that was opened from History; until the agent chooses today's rates. */
+  const [override, setOverride] = useState<Record<string, number> | undefined>(undefined);
+  const phoneA = useMemo(() => fromFlat(state.settings.calc), [state.settings.calc]);
+  const a = useMemo(() => (override ? fromFlat(override) : phoneA), [override, phoneA]);
   const [tab, setTab] = useState<Tab>(prop?.purpose === 'rent' ? 'rental' : 'purchase');
   const price0 = prop?.askingPrice ?? 0;
   const [p, setP] = useState<PurchaseInput>({ price: price0, downPct: 10, tenureYears: 35, ratePct: 4.2, buyer: 'citizen', firstHome: false, valuationFee: 0, otherCosts: 0 });
   const [r, setR] = useState<RentalInput>({ monthlyRent: prop?.monthlyRent ?? 0, maintenanceMonthly: prop?.maintenanceFee ?? 0, quitRentAssessmentYearly: 0, insuranceYearly: 0, otherMonthly: 0, vacancyMonths: 1 });
   const [s, setS] = useState<SaleInput>({ salePrice: price0, purchasePrice: 0, purchaseCosts: 0, holdingYears: 6, outstandingLoan: 0, commissionPct: prop?.commissionPct ?? 2, commissionSst: true, earlySettlementPenalty: 0, otherSaleCosts: 0 });
   const [cv, setCv] = useState({ value: prop?.askingPrice ?? prop?.monthlyRent ?? 0, pct: prop?.commissionPct ?? 2, sst: true });
+  /** Choosing a property fills the price, rent, maintenance fee and commission from it (the agent can still edit them). */
+  function chooseProperty(l: Listing | undefined) {
+    setPropId(l?.id); setPicking(false); setQuery('');
+    if (!l) return;
+    setP(v => ({ ...v, price: l.askingPrice ?? v.price }));
+    setR(v => ({ ...v, monthlyRent: l.monthlyRent ?? v.monthlyRent, maintenanceMonthly: l.maintenanceFee ?? v.maintenanceMonthly }));
+    setS(v => ({ ...v, salePrice: l.askingPrice ?? v.salePrice, commissionPct: l.commissionPct ?? v.commissionPct }));
+    setCv(v => ({ value: l.askingPrice ?? l.monthlyRent ?? v.value, pct: l.commissionPct ?? v.pct, sst: v.sst }));
+    if (l.purpose === 'rent') setTab(tb => (tb === 'purchase' ? 'rental' : tb));
+  }
+  const kindOfTab = (tb: Tab): CalcKind => (tb === 'rental' || tb === 'sale' || tb === 'commission' ? tb : 'purchase');
+  function save(asNew: boolean) {
+    const now = Date.now();
+    const inputs = { purchase: p, rental: r, sale: s, commission: cv };
+    const rates = toFlat(a);
+    const old = !asNew && editingId ? state.calculations.find(c => c.id === editingId) : undefined;
+    const rec = old
+      ? { ...buildCalculation(old.id, old.created, kindOfTab(tab), inputs, rates, { propertyId: propId, contactId, title: name }), updated: now }
+      : buildCalculation(newId(), now, kindOfTab(tab), inputs, rates, { propertyId: propId, contactId, title: name });
+    store.upsert('calculations', rec);
+    setEditingId(rec.id); setSavedMsg(old ? cx.save.updated : cx.save.saved);
+  }
+  function openSaved(c: Calculation) {
+    setP(c.purchase); setR(c.rental); setS(c.sale); setCv(c.commission);
+    setPropId(c.propertyId); setContactId(c.contactId); setName(c.title ?? ''); setEditingId(c.id); setSavedMsg(''); setOverride(c.rates);
+    // The rates saved with it are used on this screen only; the phone's own Assumptions are not changed.
+    setTab(c.kind);
+  }
+  function startNew() { setEditingId(undefined); setName(''); setSavedMsg(''); setOverride(undefined); }
   const pr = purchase(p, a);
   const rr = rental(r, p.price, pr);
   const sr = sale(s, a);
   const cr = agentCommission(cv.value, cv.pct, cv.sst, a);
-  const tiers = (parts: TierPart[]) => parts.map((x, i) => <Row key={i} sub k={t.out.tier(rm(x.from), rm(x.to), x.pct)} v={rm2(x.amount)} />);
-  const setA = (patch: Record<string, number>) => store.setSingleton('settings', { calc: { ...toFlat(a), ...patch } });
-  const flat = toFlat(a);
+  const tiers = (parts: TierPart[]) => parts.map((tp, i) => <Row key={i} sub k={t.out.tier(rm(tp.from), rm(tp.to), tp.pct)} v={rm2(tp.amount)} />);
+  const setA = (patch: Record<string, number>) => store.setSingleton('settings', { calc: { ...toFlat(phoneA), ...patch } });
+  const flat = toFlat(phoneA);
+
+  const history = [...state.calculations]
+    .filter(c => histFilter === 'all' || !propId || c.propertyId === propId)
+    .sort((c1, c2) => c2.updated - c1.updated);
+  function currentCalc(): Calculation {
+    return buildCalculation(editingId ?? 'preview', Date.now(), kindOfTab(tab), { purchase: p, rental: r, sale: s, commission: cv }, toFlat(a), { propertyId: propId, contactId, title: name });
+  }
 
   return (
     <section className="stack calc" data-testid="calculator">
-      {prop && <p className="small muted" data-testid="calc-from">{t.fromProperty([prop.ref, cardTitle(prop)].filter(Boolean).join(' · '))}</p>}
       <p className="notice">{t.estimateNote}</p>
-      <Tabs label={t.title} value={tab} onChange={setTab} options={(['purchase', 'rental', 'sale', 'commission', 'assumptions'] as Tab[]).map(x => ({ value: x, label: t.tabs[x] }))} />
+      <div className="card stack-sm" data-testid="calc-link">
+        <strong>{cx.prop.label}</strong>
+        {prop ? (
+          <div className="stack-sm">
+            <p className="small" data-testid="calc-from">{cx.prop.chosen([prop.ref, cardTitle(prop)].filter(Boolean).join(' · '))}</p>
+            <small className="muted">{cx.prop.filled}</small>
+            <div className="two">
+              <button type="button" className="btn small secondary" onClick={() => setPicking(true)} data-testid="calc-change-property">{cx.prop.pick}</button>
+              <button type="button" className="btn small ghost" onClick={() => { setPropId(undefined); }} data-testid="calc-clear-property">{cx.prop.clear}</button>
+            </div>
+          </div>
+        ) : <button type="button" className="btn small secondary" onClick={() => setPicking(true)} data-testid="calc-pick-property">{cx.prop.none} · {cx.prop.pick}</button>}
+        {picking && (
+          <div className="stack-sm" data-testid="calc-picker">
+            <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={cx.prop.search} aria-label={cx.prop.search} data-testid="calc-search" autoFocus />
+            <div className="pick-list" role="listbox" aria-label={cx.prop.label}>
+              {searchProperties(state.properties, query).map(l => (
+                <button key={l.id} type="button" role="option" aria-selected={l.id === propId} className="pick-item" onClick={() => chooseProperty(l)} data-testid="calc-pick-item">
+                  <strong>{[l.ref, cardTitle(l)].filter(Boolean).join(' · ')}</strong>
+                  <small className="muted">{[l.askingPrice ? rm(l.askingPrice) : '', l.monthlyRent ? `${rm(l.monthlyRent)}/m` : ''].filter(Boolean).join(' · ')}</small>
+                </button>
+              ))}
+              {!searchProperties(state.properties, query).length && <small className="muted" data-testid="calc-no-match">{cx.prop.noMatch}</small>}
+            </div>
+            <button type="button" className="btn small ghost" onClick={() => { setPicking(false); setQuery(''); }}>{t.x.upd.cancel}</button>
+          </div>
+        )}
+        <label className="ff">{cx.client.label}
+          <select value={contactId ?? ''} onChange={e => setContactId(e.target.value || undefined)} data-testid="calc-client">
+            <option value="">{cx.client.none}</option>
+            {[...state.contacts].sort((c1, c2) => c1.name.localeCompare(c2.name)).map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
+          </select>
+        </label>
+      </div>
+      {override && (
+        <p className="notice" role="status" data-testid="calc-rates-saved">
+          {cx.hist.rates} <button type="button" className="btn small ghost" onClick={() => setOverride(undefined)} data-testid="calc-use-today">{cx.hist.useToday}</button>
+        </p>
+      )}
+      <Tabs label={t.title} value={tab} onChange={setTab} options={(['purchase', 'rental', 'sale', 'commission', 'history', 'assumptions'] as Tab[]).map(k => ({ value: k, label: k === 'history' ? cx.tab : t.tabs[k], ...(k === 'history' ? { count: state.calculations.length } : {}) }))} />
 
       {(tab === 'purchase' || tab === 'rental') && (
         <div className="card stack-sm">
@@ -213,6 +284,57 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
         </>
       )}
 
+      {kindOfTab(tab) === tab && (
+        <div className="card stack-sm" data-testid="calc-save-bar">
+          {editingId && <small className="muted" data-testid="calc-editing">{cx.save.editing(state.calculations.find(c => c.id === editingId)?.title || cx.hist.kind[tab])}</small>}
+          <label className="ff">{cx.save.name}<input value={name} onChange={e => setName(e.target.value)} data-testid="calc-name" /></label>
+          <div className="two">
+            <button className="btn primary" onClick={() => save(false)} data-testid="calc-save">{editingId ? cx.save.update : cx.save.button}</button>
+            {editingId ? <button className="btn secondary" onClick={() => save(true)} data-testid="calc-save-new">{cx.save.again}</button> : <button className="btn secondary" onClick={() => setPdfFor(currentCalc())} data-testid="calc-pdf">{cx.pdf.button}</button>}
+          </div>
+          {editingId && (
+            <div className="two">
+              <button className="btn secondary" onClick={() => setPdfFor(currentCalc())} data-testid="calc-pdf">{cx.pdf.button}</button>
+              <button className="btn secondary" onClick={startNew} data-testid="calc-new">{cx.save.newCalc}</button>
+            </div>
+          )}
+          {editingId && propId && <button className="btn secondary" onClick={() => { const c = state.calculations.find(z => z.id === editingId); if (c) setUpdFor(c); }} data-testid="calc-update-property">{cx.upd.button}</button>}
+          {savedMsg && <p className="voice-msg" role="status" data-testid="calc-saved">{savedMsg}</p>}
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div className="stack" data-testid="calc-history">
+          <strong>{cx.hist.title}</strong>
+          {propId && (
+            <Tabs label={cx.hist.filter} value={histFilter} onChange={setHistFilter} options={[{ value: 'all', label: cx.hist.all }, { value: 'property', label: cx.hist.thisProperty }]} />
+          )}
+          {!history.length && <p className="muted" data-testid="calc-history-empty">{cx.hist.empty}</p>}
+          {history.map(c => {
+            const hp = state.properties.find(z => z.id === c.propertyId);
+            const hc = state.contacts.find(z => z.id === c.contactId);
+            const h = headline(c, t);
+            return (
+              <div key={c.id} className="card hist-item" data-testid="calc-history-item">
+                <strong>{c.title || `${cx.hist.untitled} · ${cx.hist.kind[c.kind]}`}</strong>
+                <small className="muted">{cx.hist.kind[c.kind]} · {cx.hist.savedOn(fmtDate(c.updated, lang))}</small>
+                <small>{h.label}: <strong>{h.value}</strong></small>
+                <small className="muted">{hp ? cx.hist.forProp([hp.ref, cardTitle(hp)].filter(Boolean).join(' · ')) : cx.hist.noProp}</small>
+                {hc && <small className="muted">{cx.hist.forClient(hc.name)}</small>}
+                <div className="two">
+                  <button className="btn small secondary" onClick={() => openSaved(c)} data-testid="calc-open">{cx.hist.open}</button>
+                  <button className="btn small secondary" onClick={() => setPdfFor(c)} data-testid="calc-history-pdf">{cx.hist.pdf}</button>
+                </div>
+                <div className="two">
+                  {hp ? <button className="btn small secondary" onClick={() => setUpdFor(c)} data-testid="calc-history-update">{cx.upd.button}</button> : <span />}
+                  <button className="btn small ghost danger" onClick={() => setDelId(c.id)} data-testid="calc-delete">{cx.hist.del}</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {tab === 'assumptions' && (
         <div className="card stack-sm" data-testid="assumptions">
           <strong>{t.as.mot}</strong>
@@ -239,6 +361,62 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
           <button className="btn secondary" onClick={() => store.setSingleton('settings', { calc: undefined })}>{t.as.reset}</button>
         </div>
       )}
+      {updFor && <UpdateSheet lang={lang} calc={updFor} onClose={() => setUpdFor(null)} />}
+      {pdfFor && (
+        <PdfPreview lang={lang} title={pdfFor.title || `${cx.pdf.title} – ${cx.hist.kind[pdfFor.kind]}`} onClose={() => setPdfFor(null)}
+          build={async () => buildCalculationDoc(pdfFor, { lang, property: state.properties.find(z => z.id === pdfFor.propertyId), contact: state.contacts.find(z => z.id === pdfFor.contactId), agent: state.profile, now: Date.now() })} />
+      )}
+      {delId && (
+        <Confirm lang={lang} title={cx.hist.delTitle} body={cx.hist.delBody} okLabel={cx.hist.del}
+          onOk={() => { store.remove('calculations', delId); if (delId === editingId) startNew(); setDelId(null); }} onCancel={() => setDelId(null)} />
+      )}
     </section>
   );
 }
+
+/** Reviewable update of the property record: shows now → new for each value, nothing changes until the agent confirms. */
+function UpdateSheet({ lang, calc, onClose }: { lang: Lang; calc: Calculation; onClose: () => void }) {
+  const { state, store } = useApp();
+  const u = calcStrings[lang].x.upd;
+  const prop = state.properties.find(z => z.id === calc.propertyId);
+  const updates = useMemo(() => (prop ? proposeUpdates(calc, prop) : []), [calc, prop]);
+  const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(updates.map(z => [z.key, true])));
+  const label = (k: PropertyUpdate['key']) => (k === 'askingPrice' ? u.price : k === 'monthlyRent' ? u.rent : k === 'maintenanceFee' ? u.maint : u.comm);
+  const show = (k: PropertyUpdate['key'], v: number | undefined) => (v === undefined ? '—' : k === 'commissionPct' ? `${v}%` : rm2(v));
+  const chosen = updates.filter(z => on[z.key]);
+  return (
+    <div className="scrim" role="presentation">
+      <div className="dialog" role="dialog" aria-modal="true" aria-label={u.title} data-testid="calc-update-sheet">
+        <h2>{u.title}</h2>
+        {!prop && <p className="warn-text" data-testid="calc-update-gone">{u.gone}</p>}
+        {prop && <small className="muted">{[prop.ref, cardTitle(prop)].filter(Boolean).join(' · ')}</small>}
+        {prop && !updates.length && <p data-testid="calc-update-nothing">{u.nothing}</p>}
+        {prop && updates.length > 0 && (
+          <>
+            <p>{u.intro}</p>
+            <ul className="prop-list">
+              {updates.map(z => (
+                <li key={z.key} className={on[z.key] ? 'on' : ''}>
+                  <label className="upd-row">
+                    <input type="checkbox" checked={!!on[z.key]} onChange={e => setOn(v => ({ ...v, [z.key]: e.target.checked }))} aria-label={label(z.key)} data-testid={`upd-${z.key}`} />
+                    <span className="prop-main">
+                      <span className="prop-label">{label(z.key)}</span>
+                      <span className="prop-before">{u.now}: {show(z.key, z.current)}</span>
+                      <span className="prop-after">{u.next}: {show(z.key, z.proposed)}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        <div className="two">
+          <button className="btn secondary" onClick={onClose} data-testid="calc-update-cancel">{u.cancel}</button>
+          <button className="btn primary" disabled={!prop || !chosen.length} data-testid="calc-update-apply"
+            onClick={() => { if (!prop) return; store.upsert('properties', applyPropertyUpdates(prop, chosen, Date.now(), `${u.summary}: ${chosen.map(z => label(z.key)).join(', ')}`)); onClose(); }}>{u.apply}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

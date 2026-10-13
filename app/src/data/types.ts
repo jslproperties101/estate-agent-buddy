@@ -2,6 +2,7 @@
 // Every record has an id made on the device, so records created offline never collide when synced later.
 import type { Listing } from '../listing/model';
 import type { Lang } from '../i18n';
+import type { PurchaseInput, RentalInput, SaleInput } from '../domain/calculator';
 
 export interface Base { id: string; created: number; updated: number; sample?: boolean }
 
@@ -152,6 +153,25 @@ export interface Banner extends Base {
   moves?: BannerMove[];
 }
 export interface BannerMove { id: string; /** when the position was changed (ms) */ at: number; lat: number; lng: number; acc?: number; source: Banner['source'] }
+
+// ---------- Property Calculator: saved calculations ----------
+export type CalcKind = 'purchase' | 'rental' | 'sale' | 'commission';
+export const CALC_KINDS: CalcKind[] = ['purchase', 'rental', 'sale', 'commission'];
+export interface CommissionInput { value: number; pct: number; sst: boolean }
+/** One saved calculation: every input as the agent had it, and the rates used at that time (so an old result never
+ *  changes when the rates under Assumptions are edited later). Results are always recalculated from these. */
+export interface Calculation extends Base {
+  kind: CalcKind;
+  title?: string;
+  propertyId?: string;
+  contactId?: string;
+  purchase: PurchaseInput;
+  rental: RentalInput;
+  sale: SaleInput;
+  commission: CommissionInput;
+  /** The rates under Assumptions at the time (flat numbers, see calculator/saved.ts). */
+  rates: Record<string, number>;
+}
 
 // ---------- Agent Financial ----------
 export type DealStatus = 'estimated' | 'confirmed' | 'received';
@@ -304,10 +324,11 @@ export interface Collections {
   targets: Target;
   expertThreads: ExpertThread;
   banners: Banner;
+  calculations: Calculation;
 }
 export type CollectionName = keyof Collections;
 export const COLLECTIONS: CollectionName[] = [
-  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners',
+  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners', 'calculations',
 ];
 
 export interface Singletons { profile: Profile; settings: Settings; options: OptionLists; meta: Meta }

@@ -13,7 +13,7 @@ export const newId = () =>
 export function emptyState(): AppState {
   return {
     properties: [], contacts: [], inquiries: [], appointments: [], tasks: [], journeys: [],
-    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [],
+    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [], calculations: [],
     profile: {},
     settings: { lang: 'en', layout: 'grid' },
     options: {},
