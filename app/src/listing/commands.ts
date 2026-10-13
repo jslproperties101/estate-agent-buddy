@@ -63,6 +63,41 @@ const n = (x: string) => parseFloat(x.replace(/,/g, ''));
 const MONEY = String.raw`(?:rm|ringgit)\s*([\d.]+)|([\d.]+)\s*(?:rm|ringgit)`;
 const money = (m: RegExpMatchArray | null, at = 1) => (m ? n(m[at] ?? m[at + 1]) : undefined);
 
+const STATUS_WORD = String.raw`(available|sold|rented|off[-\s]?market|in[-\s]?progress|tersedia|terjual|disewa|tersewa|dalam\s+proses|tarik\s+balik)`;
+const STATUS_MAP: Record<string, Status> = {
+  available: 'available', tersedia: 'available', sold: 'sold', terjual: 'sold', rented: 'rented', disewa: 'rented', tersewa: 'rented',
+  'off market': 'off_market', 'tarik balik': 'off_market', 'in progress': 'in_progress', 'dalam proses': 'in_progress',
+};
+/** "mark as sold", "change the status to Sold", "it has been rented", "tandakan sebagai terjual", "status kepada disewa". */
+export function readStatus(text: string): Status | undefined {
+  const low = prepare(text).toLowerCase();
+  const patterns = [
+    String.raw`\b(?:status|keadaan)\b.*?\b(?:to|as|is|kepada|ialah|sebagai|jadi)\s+${STATUS_WORD}\b`,
+    String.raw`\b(?:mark(?:ed)?|tandakan|tanda)\b.*?\b(?:as|sebagai)\s+${STATUS_WORD}\b`,
+    String.raw`\b(?:change|set|update|make|tukar|ubah|tetapkan)\b.*?\b(?:to|kepada)\s+${STATUS_WORD}\b`,
+    String.raw`\b(?:is|has\s+been|been|now|already|sudah|telah|kini)\s+${STATUS_WORD}\b`,
+  ];
+  for (const re of patterns) {
+    const m = new RegExp(re, 'i').exec(low);
+    if (m) return STATUS_MAP[m[1].replace(/[-\s]+/, ' ')];
+  }
+  return undefined;
+}
+
+/** "set the asking price to RM3 million", "change the rent to 1800", "tukar harga kepada RM2 juta": the number after "to" is used,
+ *  with or without "RM". Rent is chosen when the words say rent / sewa, otherwise the asking price. */
+export function readSetMoney(text: string): { key: 'askingPrice' | 'monthlyRent'; value: number } | undefined {
+  const low = prepare(text).toLowerCase();
+  /** An optional property reference right after the words, e.g. "price of P1001 to …". */
+  const REF_OPT = String.raw`(?:\s+(?:(?:of|for|untuk|bagi)\s+)?(?:the\s+)?(?!rm\d)[a-z]{1,6}-?\d{3,9})?`;
+  const num = String.raw`(?:rm|ringgit)?\s*([\d]+(?:\.\d+)?)\s*(?:rm|ringgit)?`;
+  const rent = new RegExp(String.raw`\b(?:monthly\s+rent(?:al)?|rent(?:al)?|sewa(?:an)?(?:\s+bulanan)?)\b${REF_OPT}[^\d]{0,80}?\b(?:to|kepada|at|is|ialah|jadi|menjadi)\s*${num}`, 'i').exec(low);
+  if (rent && Number.isFinite(parseFloat(rent[1]))) return { key: 'monthlyRent', value: parseFloat(rent[1]) };
+  const price = new RegExp(String.raw`\b(?:asking\s+price|selling\s+price|price|harga(?:\s+diminta|\s+jualan)?)\b${REF_OPT}[^\d]{0,80}?\b(?:to|kepada|at|is|ialah|jadi|menjadi)\s*${num}`, 'i').exec(low);
+  if (price && Number.isFinite(parseFloat(price[1]))) return { key: 'askingPrice', value: parseFloat(price[1]) };
+  return undefined;
+}
+
 function monthYear(s: string): string | undefined {
   const m = /\b([a-z]{3})[a-z]*\s+(\d{4})\b/i.exec(s);
   if (!m) return undefined;
@@ -229,9 +264,13 @@ export function parseCommand(text: string, current?: Listing, places: string[] =
   const setParking = /\b(?:parking|car\s*parks?)\s*(?:bays?|lots?|spaces?)?\s*(?:to|is|=)\s*(\d+)/i.exec(low);
   if (setParking && !addParking) changes.push({ key: 'parking', value: Number(setParking[1]) });
 
-  // Status: "mark as sold", "it's been rented"
-  const st = /\b(?:mark(?:ed)?\s+(?:it\s+)?as|status\s+(?:to|is)|now)\s+(available|sold|rented|off\s+market|in\s+progress)/i.exec(low);
-  if (st) changes.push({ key: 'status', value: ({ available: 'available', sold: 'sold', rented: 'rented', 'off market': 'off_market', 'in progress': 'in_progress' } as Record<string, Status>)[st[1].replace(/\s+/, ' ')] });
+  // Status: "mark as sold", "change the status to Sold", "it has been rented", "tandakan sebagai terjual"
+  const status = readStatus(original);
+  if (status) changes.push({ key: 'status', value: status });
+
+  // "set the asking price to RM3 million" (RM optional), "change the rent to 1800"
+  const setMoney = readSetMoney(original);
+  if (setMoney) changes.push({ key: setMoney.key, value: setMoney.value });
 
   for (const c of readDetails(original, places).changes) if (!changes.some(x => x.key === c.key) && !(c.key === 'parking')) changes.push(c);
   // A place, street, unit, lot or owner mentioned in an edit is only used when the agent says to change it.

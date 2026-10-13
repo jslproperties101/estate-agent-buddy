@@ -46,6 +46,7 @@ export type Screen =
   | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
   | { name: 'expertThread'; id: string }
   | { name: 'voice' }
+  | { name: 'voiceDiag' }
   | { name: 'comingSoon'; key: 'subsale' | 'project' | 'market' | 'cobrokeMap' }
   | { name: 'cobroke' };
 

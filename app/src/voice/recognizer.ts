@@ -37,7 +37,21 @@ export interface Listening { stop(): void; abort(): void }
 
 const KNOWN: VoiceError[] = ['not-allowed', 'service-not-allowed', 'network', 'no-speech', 'audio-capture', 'language-not-supported', 'aborted'];
 
+/** The last thing that went wrong (or right) with speech recognition in this session, for the Voice diagnostics screen. */
+export const lastVoice: { error?: VoiceError; errorAt?: number; okAt?: number; engine?: 'native' | 'web' } = {};
+export const resetLastVoice = () => { delete lastVoice.error; delete lastVoice.errorAt; delete lastVoice.okAt; delete lastVoice.engine; };
+
+/** Starts listening. Wraps the real recogniser only to remember the last error / success for the diagnostics screen. */
 export function listen(lang: string, h: Handlers, maxMs = 60000): Listening | null {
+  const engine: 'native' | 'web' = nativeSpeech() ? 'native' : 'web';
+  return listenInner(lang, {
+    ...h,
+    final: x => { lastVoice.okAt = Date.now(); lastVoice.engine = engine; delete lastVoice.error; h.final(x); },
+    error: code => { if (code !== 'aborted') { lastVoice.error = code; lastVoice.errorAt = Date.now(); lastVoice.engine = engine; } h.error(code); },
+  }, maxMs);
+}
+
+function listenInner(lang: string, h: Handlers, maxMs: number): Listening | null {
   if (pluginMissing('SpeechRecognition')) { h.error('plugin-missing'); return null; }
   const n = nativeSpeech();
   if (n) return listenNative(n, lang, h, maxMs);

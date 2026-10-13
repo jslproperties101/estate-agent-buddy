@@ -28,6 +28,8 @@ export const SAMPLE_COMMANDS: Record<VoiceMode, string[]> = {
     'Find the factory in Salak Tinggi',
     'Create a new semi-detached factory in Salak Tinggi, land area 20,000 square feet, built-up 12,000 square feet, asking price RM3.2 million, leasehold.',
     'Show condos for rent in Putra Nilai',
+    'Change the status of P1001 to Sold',
+    'Find buyers looking for a factory in Salak Tinggi',
   ],
 };
 

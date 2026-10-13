@@ -37,6 +37,8 @@ import { buyerStrings } from './listing/buyerPdf';
 import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './profile/ProfileUI';
 import { ExpertHome, ExpertAsk, ExpertThreadScreen } from './expert/ExpertUI';
 import { VoiceCommand } from './voice/VoiceCommandUI';
+import { VoiceDiagnostics } from './voice/VoiceDiagUI';
+import { diagStrings } from './voice/diagStrings';
 import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
 import { StoredImage } from './ui/common';
@@ -347,6 +349,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'expertAsk': return expertStrings[lang].experts[s.expert];
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
     case 'voice': return t.tiles.voice;
+    case 'voiceDiag': return diagStrings[lang].title;
     case 'comingSoon': return s.key === 'cobrokeMap' ? gs.cobrokeMap : t.tiles[s.key];
     case 'cobroke': return t.cobrokeTop;
   }
@@ -395,6 +398,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'expertAsk': return <ExpertAsk lang={lang} go={(next, o) => go(next, { replace: true, ...o })} expert={s.expert} propertyId={s.propertyId} />;
     case 'expertThread': return <ExpertThreadScreen key={s.id} lang={lang} go={go} id={s.id} />;
     case 'voice': return <VoiceCommand lang={lang} go={go} />;
+    case 'voiceDiag': return <VoiceDiagnostics lang={lang} go={go} />;
     case 'comingSoon': return (
       <section className="card stack-sm coming-soon" data-testid={`soon-${s.key}`}>
         <span className="badge soon-badge fit">{t.comingSoon}</span>
