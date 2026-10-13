@@ -1769,6 +1769,7 @@ test('U52 the phone’s storage upgrades from the Phase 1 layout without losing 
     r.onsuccess = () => {
       const tx = r.result.transaction('records', 'readwrite');
       tx.objectStore('records').put({ id: 'v1c', created: 1, updated: 1, name: 'From Phase One', roles: ['buyer'] }, 'c:contacts:v1c');
+      r.result.transaction('files', 'readwrite').objectStore('files').put(new Blob(['v1-photo-bytes'], { type: 'image/jpeg' }), 'v1file');
       tx.oncomplete = () => { r.result.close(); res(true); }; tx.onerror = () => rej(tx.error);
     };
     r.onerror = () => rej(r.error);
@@ -1780,6 +1781,8 @@ test('U52 the phone’s storage upgrades from the Phase 1 layout without losing 
   const info = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { res({ v: r.result.version, stores: [...r.result.objectStoreNames].sort() }); r.result.close(); }; }));
   assert.equal(info.v, 2);
   assert.deepEqual(info.stores, ['files', 'local', 'records']);
+  const kept = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('files').objectStore('files').get('v1file'); q.onsuccess = async () => res(q.result ? await q.result.text() : null); }; }));
+  assert.equal(kept, 'v1-photo-bytes', 'a stored photo survives the upgrade');
   await ctx.close();
 });
 
