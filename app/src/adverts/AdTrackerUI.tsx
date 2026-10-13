@@ -16,6 +16,7 @@ import { compressImage } from '../lib/images';
 import { fmtDate, ymd } from '../lib/dates';
 import { rm2 } from '../lib/money';
 
+const OTHER = '__other__';
 const title = (l: Listing) => [l.ref, cardTitle(l)].filter(Boolean).join(' · ') || '—';
 
 export function FakeBadge({ lang }: { lang: Lang }) {
@@ -55,7 +56,8 @@ function Editor({ lang, l, initial, isNew, onClose }: { lang: Lang; l: Listing; 
   const [confirmDel, setConfirmDel] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const set = (p: Partial<Advert>) => setA(x => ({ ...x, ...p }));
-  const platformOptions = [...new Set<string>([...PLATFORMS, a.platform].filter(Boolean))];
+  const known = (PLATFORMS as readonly string[]).includes(a.platform);
+  const [other, setOther] = useState(!known && initial.platform !== '');
 
   async function pick(f: File | undefined) {
     if (!f) return;
@@ -66,7 +68,7 @@ function Editor({ lang, l, initial, isNew, onClose }: { lang: Lang; l: Listing; 
     set({ screenshotFileId: id });
   }
   function save() {
-    const clean: Advert = { ...a, url: a.url?.trim() || undefined, title: a.title?.trim() || undefined, ref: a.ref?.trim() || undefined, notes: a.notes?.trim() || undefined };
+    const clean: Advert = { ...a, platform: a.platform.trim(), url: a.url?.trim() || undefined, title: a.title?.trim() || undefined, ref: a.ref?.trim() || undefined, notes: a.notes?.trim() || undefined };
     const bad = validateAd(clean);
     setIssues(bad);
     if (bad.length) return;
@@ -92,10 +94,13 @@ function Editor({ lang, l, initial, isNew, onClose }: { lang: Lang; l: Listing; 
     <div className="card stack-sm" data-testid="ad-editor-form">
       {a.fake && <><FakeBadge lang={lang} /><small className="muted">{t.fakeNote}</small></>}
       <label className="ff">{t.f.platform}
-        <select value={a.platform} onChange={e => set({ platform: e.target.value })} data-testid="ad-platform">
-          {platformOptions.map(p => <option key={p} value={p}>{p}</option>)}
+        <select value={other ? OTHER : a.platform} onChange={e => { if (e.target.value === OTHER) { setOther(true); set({ platform: known ? '' : a.platform }); } else { setOther(false); set({ platform: e.target.value }); } }} data-testid="ad-platform">
+          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+          <option value={OTHER}>{t.otherOption}</option>
         </select>
       </label>
+      {other && <label className="ff">{t.f.platformOther}<input value={a.platform} onChange={e => set({ platform: e.target.value })} aria-invalid={issues.includes('platform')} data-testid="ad-platform-other" /></label>}
+      {issues.includes('platform') && <small className="warn-text" role="alert">{t.err.platform}</small>}
       <label className="ff">{t.f.type}
         <select value={a.type ?? 'listing'} onChange={e => set({ type: e.target.value as AdType })} data-testid="ad-type">
           {AD_TYPES.map(x => <option key={x} value={x}>{t.types[x]}</option>)}

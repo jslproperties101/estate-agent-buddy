@@ -30,6 +30,7 @@ test('AD2 every status and type the brief names exists', () => {
 });
 
 test('AD3 validation: bad link, expiry before publish date, negative cost are refused; a normal advert passes', () => {
+  assert.deepEqual(validateAd({ id: 'a', platform: '  ' }), ['platform'], 'a platform name is required');
   assert.deepEqual(validateAd({ id: 'a', platform: 'x', url: 'www.example.com' }), ['url']);
   assert.deepEqual(validateAd({ id: 'a', platform: 'x', url: 'javascript:alert(1)' }), ['url']);
   assert.deepEqual(validateAd({ id: 'a', platform: 'x', url: 'https://www.propertyguru.com.my/listing/123' }), []);

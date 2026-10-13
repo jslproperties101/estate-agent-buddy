@@ -3426,6 +3426,29 @@ test('U87 Layout in English, Bahasa Malaysia and 中文: property detail, advert
   await page.context().close();
 });
 
+test('U88 Advert tracker: a platform that is not in the list can be typed; a blank name is refused; editing it later reopens as "Other"', async () => {
+  const page = await phone();
+  await bareProperty(page, 'Carousell house');
+  await page.getByTestId('open-ad-tracker').click();
+  await page.getByTestId('ad-add').click();
+  await page.getByTestId('ad-platform').selectOption({ label: 'Other (type the name)' });
+  await page.getByTestId('ad-save').click();
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /Type the name of the platform/);
+  assert.equal((await adsOf(page)).length, 0);
+  await page.getByTestId('ad-platform-other').fill('  Carousell  ');
+  await page.getByTestId('ad-save').click();
+  await page.getByTestId('ad-card').waitFor();
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.platform === 'Carousell'))");
+  assert.match(await page.getByTestId('ad-card').first().innerText(), /Carousell/);
+  await page.getByTestId('ad-edit').click();
+  assert.equal(await page.getByTestId('ad-platform-other').inputValue(), 'Carousell');
+  await page.getByTestId('ad-platform').selectOption('Mudah');
+  assert.equal(await page.getByTestId('ad-platform-other').count(), 0);
+  await page.getByTestId('ad-save').click();
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.length === 1 && v.marketing.ads[0].platform === 'Mudah')");
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

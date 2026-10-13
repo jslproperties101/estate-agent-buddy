@@ -24,10 +24,11 @@ export function shownStatus(a: Advert, today: string): AdStatus | undefined {
 }
 export const isStale = (a: Advert, today: string) => a.status === 'live' && shownStatus(a, today) === 'expired';
 
-export type AdIssue = 'url' | 'dates' | 'cost' | 'title';
+export type AdIssue = 'url' | 'dates' | 'cost' | 'platform';
 /** Problems that stop an advert being saved. */
 export function validateAd(a: Advert): AdIssue[] {
   const out: AdIssue[] = [];
+  if (!a.platform.trim()) out.push('platform');
   if (a.url && !/^https?:\/\/[^\s/]+\.[^\s/]+/i.test(a.url.trim())) out.push('url');
   if (a.start && a.end && (daysBetween(a.start, a.end) ?? 0) < 0) out.push('dates');
   if (a.cost !== undefined && (!Number.isFinite(a.cost) || a.cost < 0)) out.push('cost');
