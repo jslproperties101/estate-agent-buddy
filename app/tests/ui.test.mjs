@@ -1728,6 +1728,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await waitStored(page, 'local', "all.some(v => JSON.stringify(v).includes('Half Typed Buyer Two'))");
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.getByTestId('draft-banner').waitFor();   // the draft is restored asynchronously: wait for it, not for time
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer Two');
   // Discard: the form is empty again and the draft is gone for good.
   await page.getByTestId('draft-discard').first().click();
