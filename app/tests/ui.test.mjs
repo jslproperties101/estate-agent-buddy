@@ -2418,6 +2418,61 @@ test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', 
   await page.context().close();
 });
 
+// ---------------------------------------------------------------------------------------------------------------
+// Stage 4 — GPS Assistance. Simulated GPS and a stand-in for Google Maps: these show the screens and rules work, they are
+// NOT evidence of real GPS, real Google Maps or screen-off tracking on a phone.
+
+test('U70 My Banner Location: changing the position keeps the earlier place; a photo can be removed; a banner on a sample property is a sample', async () => {
+  const page = await phone({ maps: true, geo: { latitude: 2.8210, longitude: 101.8040, accuracy: 7 } });
+  await loadSample(page);
+  await tile(page, 'GPS Assistance'); await page.getByTestId('card-banners').click();
+  const card = page.getByTestId('banner-card').first();
+  const title = await card.locator('.banner-title').innerText();
+  await card.getByTestId('banner-add').click();
+  await page.getByTestId('banner-gps').click();
+  await page.getByTestId('banner-pos-set').waitFor();
+  await page.getByTestId('banner-photo-input').setInputFiles({ name: 'banner.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await page.locator('.banner-photo.big').waitFor();
+  await page.getByTestId('banner-photo-remove').click();
+  assert.equal(await page.locator('.banner-photo.big').count(), 0, 'photo removed before saving');
+  await page.getByTestId('banner-photo-input').setInputFiles({ name: 'banner.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await page.locator('.banner-photo.big').waitFor();
+  await page.getByTestId('banner-save').click();
+  const row = () => page.locator('[data-testid="banner-card"]', { hasText: title }).getByTestId('banner-up');
+  assert.equal(await row().locator('.banner-photo').count(), 1);
+  assert.equal(await row().getByTestId('banner-moves').count(), 0, 'nothing moved yet');
+  // Change the location by tapping the map: the old place is kept and listed.
+  await row().getByTestId('banner-edit').click();
+  await page.getByTestId('banner-pick-map').filter({ hasText: 'MAP' }).waitFor();   // the sheet's map is drawn
+  await page.evaluate(() => window.__mapClick(2.8301, 101.8102));
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/);
+  await page.getByTestId('banner-photo-remove').click();               // and take the photo off the saved banner
+  await page.getByTestId('banner-save').click();
+  assert.match(await row().getByTestId('banner-pos').innerText(), /2\.83010, 101\.81020/);
+  assert.equal(await row().locator('.banner-photo').count(), 0, 'the photo is gone from the saved banner');
+  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/);
+  await row().getByTestId('banner-moves').locator('summary').click();
+  assert.match(await row().getByTestId('banner-move').innerText(), /Was at 2\.82100, 101\.80400 until/);
+  assert.match(await row().getByTestId('banner-navigate').getAttribute('href'), /destination=2\.8301%2C101\.8102/, 'Navigate uses the new saved position');
+  // Editing only the note adds no move.
+  await row().getByTestId('banner-edit').click();
+  await page.locator('[data-field="bannerNote"]').fill('Repainted');
+  await page.getByTestId('banner-save').click();
+  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/);
+  // The moves stay in the history after taking it down, and the record is flagged sample (so it never syncs).
+  await row().getByTestId('banner-takedown').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
+  const old = page.locator('[data-testid="banner-card"]', { hasText: title }).getByTestId('banner-old');
+  await page.locator('[data-testid="banner-card"]', { hasText: title }).locator('.banner-history > summary').click();
+  assert.match(await old.innerText(), /Position changed 1 time/);
+  const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => { res(q.result.filter(x => x && x.placedOn)); r.result.close(); }; }; }));
+  assert.equal(rec.length, 1);
+  assert.equal(rec[0].sample, true, 'a banner on a sample property is a sample');
+  assert.equal(rec[0].moves.length, 1);
+  assert.ok(!rec[0].photoFileId);
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

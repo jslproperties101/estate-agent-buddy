@@ -4,7 +4,7 @@
 //    record (with the date removed) as history.
 //  - Adding a banner position sets the status to Yes. Taking down the last banner that is still up sets it to
 //    Removed. Any other status change is the agent's own choice and is never made automatically.
-import type { Banner } from '../data/types';
+import type { Banner, BannerMove } from '../data/types';
 import type { BannerStatus, Listing } from '../listing/model';
 
 /** Colours used on cards, chips and map pins. Green Yes, gold Not yet, grey No, red Owner doesn't allow, blue Removed. */
@@ -23,6 +23,25 @@ export const statusAfterAdd = (): BannerStatus => 'yes';
 /** Status after a banner is taken down: Removed when none is left up, otherwise unchanged. */
 export function statusAfterRemove(current: BannerStatus | undefined, stillUp: number): BannerStatus | undefined {
   return stillUp > 0 ? current : 'removed';
+}
+
+export interface BannerPos { lat: number; lng: number; acc?: number; source: Banner['source'] }
+
+/** A new banner record. A banner on a sample property is itself a sample, so it can never be sent to the team as real data. */
+export function buildBanner(id: string, property: Pick<Listing, 'id' | 'sample'>, pos: BannerPos, o: { placedOn: string; note?: string; photoFileId?: string }, now: number): Banner {
+  return {
+    id, created: now, updated: now, propertyId: property.id, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source,
+    placedOn: o.placedOn, note: o.note?.trim() || undefined, photoFileId: o.photoFileId, ...(property.sample ? { sample: true } : {}),
+  };
+}
+
+const sameSpot = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.abs(a.lat - b.lat) < 1e-7 && Math.abs(a.lng - b.lng) < 1e-7;
+
+/** The banner after its position, date, note or photo was changed. If the position moved, where it stood before is kept in `moves`. */
+export function changeBanner(x: Banner, pos: BannerPos, o: { placedOn?: string; note?: string; photoFileId?: string }, moveId: string, now: number): Banner {
+  const moves: BannerMove[] | undefined = sameSpot(x, pos) ? x.moves
+    : [...(x.moves ?? []), { id: moveId, at: now, lat: x.lat, lng: x.lng, acc: x.acc, source: x.source }];
+  return { ...x, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source, placedOn: o.placedOn || x.placedOn, note: o.note?.trim() || undefined, photoFileId: o.photoFileId, moves };
 }
 
 /** How many properties have each status (properties without one count as "unset"). */

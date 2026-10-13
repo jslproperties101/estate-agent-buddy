@@ -148,7 +148,10 @@ export interface Banner extends Base {
   photoFileId?: string;
   /** yyyy-mm-dd: set when the banner is taken down. The record is kept as history. */
   removedOn?: string;
+  /** Where this banner stood before each later change of its position (oldest first), so a correction never erases the earlier place. */
+  moves?: BannerMove[];
 }
+export interface BannerMove { id: string; /** when the position was changed (ms) */ at: number; lat: number; lng: number; acc?: number; source: Banner['source'] }
 
 // ---------- Agent Financial ----------
 export type DealStatus = 'estimated' | 'confirmed' | 'received';

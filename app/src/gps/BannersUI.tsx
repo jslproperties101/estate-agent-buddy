@@ -14,7 +14,7 @@ import { gpsStrings } from './strings';
 import { listingStrings } from '../listing/strings';
 import { MapView, MapsNotice, useGoogleMaps } from '../maps/MapView';
 import { BANNER_STATUSES, BannerStatus, Listing, cardTitle, hasPosition } from '../listing/model';
-import { BANNER_COLOURS, activeBanners, bannerCounts, bannersOf, statusAfterAdd, statusAfterRemove } from '../domain/banners';
+import { BANNER_COLOURS, activeBanners, bannerCounts, bannersOf, buildBanner, changeBanner, statusAfterAdd, statusAfterRemove } from '../domain/banners';
 import { navigationUrl, validLatLng } from '../lib/geo';
 import { fmtDate, ymd } from '../lib/dates';
 import { compressImage } from '../lib/images';
@@ -156,6 +156,12 @@ function BannerRow({ x, lang, onTakeDown, onEdit }: { x: Banner; lang: Lang; onT
         <strong>{b.placed(fmtDate(x.placedOn, lang))}{x.removedOn ? ` · ${b.takenDown(fmtDate(x.removedOn, lang))}` : ''}</strong>
         <small className="muted" data-testid="banner-pos">{x.lat.toFixed(5)}, {x.lng.toFixed(5)} · {b.source[x.source]}{x.acc ? ` ±${x.acc} m` : ''}</small>
         {x.note && <small>{x.note}</small>}
+        {(x.moves?.length ?? 0) > 0 && (
+          <details className="banner-moves" data-testid="banner-moves">
+            <summary className="small">{b.moved(x.moves!.length)}</summary>
+            {x.moves!.map(m => <small key={m.id} className="muted" data-testid="banner-move">{b.movedFrom(fmtDate(ymd(new Date(m.at)), lang), m.lat.toFixed(5), m.lng.toFixed(5))} · {b.source[m.source]}</small>)}
+          </details>
+        )}
         {!x.removedOn && (
           <div className="row-wrap">
             <a className="btn small primary" href={navigationUrl({ lat: x.lat, lng: x.lng })} target="_blank" rel="noreferrer" data-testid="banner-navigate">{g.navigate}</a>
@@ -217,12 +223,12 @@ function AddBannerSheet({ lang, property, maps, onClose, existing }: { lang: Lan
     if (existing) {
       // Same banner record, new position: the history keeps one entry per banner.
       if (existing.photoFileId && photo !== existing.photoFileId) store.removeFile(existing.photoFileId);
-      store.upsert('banners', { ...existing, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source, placedOn: placedOn || existing.placedOn, note: note.trim() || undefined, photoFileId: photo });
+      store.upsert('banners', changeBanner(existing, pos, { placedOn, note, photoFileId: photo }, newId(), now));
       toast(b.updated);
       onClose();
       return;
     }
-    store.upsert('banners', { id: newId(), created: now, updated: now, propertyId: property.id, lat: pos.lat, lng: pos.lng, acc: pos.acc, source: pos.source, placedOn: placedOn || ymd(new Date()), note: note.trim() || undefined, photoFileId: photo });
+    store.upsert('banners', buildBanner(newId(), property, pos, { placedOn: placedOn || ymd(new Date()), note, photoFileId: photo }, now));
     store.upsert('properties', { ...property, bannerStatus: statusAfterAdd() });
     toast(b.saved);
     onClose();
@@ -262,6 +268,7 @@ function AddBannerSheet({ lang, property, maps, onClose, existing }: { lang: Lan
             {photo ? b.changePhoto : b.addPhoto}
             <input className="file-input" type="file" accept="image/*" capture="environment" data-testid="banner-photo-input" onChange={e => { void addPhoto(e.target.files); e.currentTarget.value = ''; }} />
           </label>
+          {photo && <button type="button" className="btn small secondary danger-text" data-testid="banner-photo-remove" onClick={() => { if (photo !== existing?.photoFileId) store.removeFile(photo); setPhoto(undefined); }}>{b.removePhoto}</button>}
         </div>
         <div className="sheet-actions two">
           <button className="btn secondary" onClick={cancel}>{c.cancel}</button>

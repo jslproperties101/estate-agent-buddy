@@ -271,3 +271,10 @@ the real contact permission prompt, and the real speech service are **not** cove
 3. Phonebook icon on a contact and on the property owner: permission prompt, Don't allow, back-button cancel.
 4. Verification pickers with the Samsung keyboard; reading of the chips on the detail screen outdoors.
 
+## Stage 4 status — GPS Assistance (branch `feature/v2-stage4-gps`, from Stage 3 @ `e2a6b01`)
+
+Awaiting your review; Stage 3 is also still awaiting review. Full checklist, changes and the screen-off plan: `docs/GPS.md`.
+Gaps found and fixed: banner position history (`moves`), banners on sample properties now flagged sample (never synced), "Remove
+photo" on a banner. Screen-off recording is **not built** (plan only, needs a new APK and your approval). Everything else in the
+GPS audit was already present and is only browser-tested; none of it is proven on a phone.
+
