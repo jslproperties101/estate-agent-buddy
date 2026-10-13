@@ -39,7 +39,7 @@ export function newAd(id: string, o: Partial<Advert> = {}): Advert {
 }
 /** A dummy / test advert: always labelled, never counted, never live. */
 export function newFakeAd(id: string, o: Partial<Advert> = {}): Advert {
-  return newAd(id, { title: 'TEST listing', ...o, fake: true, status: 'planned' });
+  return newAd(id, { ...o, fake: true, status: 'planned' });
 }
 
 // ---------- attention list (expiry reminders) ----------

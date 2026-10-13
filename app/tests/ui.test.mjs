@@ -3381,6 +3381,51 @@ test('U86 Marketing Studio: a full property (photos, facts, long headline, agent
   await page.context().close();
 });
 
+test('U87 Layout in English, Bahasa Malaysia and 中文: property detail, advert tracker (with the editor), advertising summary, Photo Studio (both tabs) and Marketing Studio — nothing sideways, cut off or spilling', async () => {
+  const page = await phone();
+  await propertyWithPhotos(page, [{ name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') }]);
+  await page.getByTestId('open-ad-tracker').click();
+  await page.getByTestId('ad-add').click();
+  await page.getByTestId('ad-title').fill('Corner house');
+  await page.getByTestId('ad-status-select').selectOption('live');
+  await page.getByTestId('ad-end').fill(ymdLocal(2));
+  await page.locator('[data-field="ad-cost"]').fill('450');
+  await page.getByTestId('ad-save').click();
+  await page.getByTestId('ad-add-fake').click(); await page.getByTestId('ad-save').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 2);
+  await page.getByTestId('ad-edit').first().click();       // leave the editor open for the first check
+  for (const aria of ['English', 'Bahasa Malaysia', '中文']) {
+    await page.locator(`.lang button[aria-label="${aria}"]`).click();
+    const tag = aria === '中文' ? 'zh' : aria === 'English' ? 'en' : 'bm';
+    const check = async (name, where) => { const p = await layoutProblems(page); assert.deepEqual(p, [], `${aria} · ${name}: ${p.join(' | ')}`); await shot(page, `87-${tag}-${where}`, false); };
+    await page.getByTestId('ad-editor-form').waitFor();
+    await check('advert editor', 'ad-editor');
+    await page.getByTestId('ad-cancel').click();
+    await check('advert tracker', 'ad-tracker');
+    await page.getByTestId('ad-open-summary').click();
+    await check('advertising summary', 'ad-summary');
+    await page.locator('header .icon-btn').first().click();   // back to the tracker
+    await page.getByTestId('ad-tracker').waitFor();
+    await page.locator('header .icon-btn').first().click();   // back to the property
+    await page.getByTestId('listing-details').waitFor();
+    await check('property detail', 'detail');
+    await page.getByTestId('open-photo-studio').click();
+    await page.getByTestId('ps-preview').waitFor();
+    await check('Photo Studio, improve', 'photo-adjust');
+    await page.getByTestId('ps-tab-mask').click();
+    await check('Photo Studio, privacy masks', 'photo-mask');
+    await page.locator('header .icon-btn').first().click();
+    await page.getByTestId('open-marketing-studio').click();
+    await page.getByTestId('ms-make').click();
+    await page.getByTestId('ms-result').waitFor();
+    await check('Marketing Studio', 'marketing');
+    await page.locator('header .icon-btn').first().click();
+    await page.getByTestId('open-ad-tracker').click();
+    await page.getByTestId('ad-edit').first().click();
+  }
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
