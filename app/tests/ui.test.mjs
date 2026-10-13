@@ -529,6 +529,7 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'GPS Assistance');
   await page.getByTestId('card-house-shopping').click();
+  await page.getByTestId('journey-row').first().waitFor();   // the saved journeys are read from the phone's storage, so wait for them
   assert.equal(await page.getByTestId('journey-row').count(), 1, 'previous journeys can be reviewed');
   await home(page);
   await tile(page, 'GPS Assistance');
@@ -2087,7 +2088,7 @@ test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync
   }, SB);
   await p2.reload(); await p2.waitForSelector('nav.grid');
   assert.equal(await p2.getByTestId('owner-unknown').count(), 0, 'no ownership warning for a new phone');
-  await p2.waitForTimeout(1000);
+  for (let i = 0; i < 80 && !seen2.some(r => /eab_push_records/.test(r)); i++) await p2.waitForTimeout(250);   // up to 20 s: a slow machine needs longer than a fixed second
   assert.ok(seen2.some(r => /eab_push_records/.test(r)), 'the offline records go to the first team');
   await ctx2.close();
 });
@@ -2465,6 +2466,7 @@ test('U70 My Banner Location: changing the position keeps the earlier place; a p
   await row().getByTestId('banner-edit').click();
   await page.getByTestId('banner-pick-map').filter({ hasText: 'MAP' }).waitFor();   // the sheet's map is drawn
   await page.evaluate(() => window.__mapClick(2.8301, 101.8102));
+  await page.getByTestId('banner-pos-set').filter({ hasText: /2\.83010, 101\.81020 · map/ }).waitFor();   // wait for the screen to show the tapped place
   assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/);
   await page.getByTestId('banner-photo-remove').click();               // and take the photo off the saved banner
   await page.getByTestId('banner-save').click();
@@ -2532,6 +2534,7 @@ test('U71 Calculator: search and choose a property, choose a client, save, chang
   assert.equal(await page.getByTestId('calc-pick-item').count(), 1);
   await page.getByTestId('calc-pick-item').click();
   assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
+  await page.waitForFunction(() => document.querySelector('[data-field="price"]')?.value === '580,000').catch(() => {});   // the price is filled in after the property is read
   assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000', 'price came from the property');
   await page.getByTestId('calc-client').selectOption({ label: 'Buyer K (sample) · +60 12-111 2222' });
   await page.getByTestId('calc-name').fill('Offer A');
