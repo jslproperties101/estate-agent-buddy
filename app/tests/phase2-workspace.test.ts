@@ -235,7 +235,7 @@ test('W11 a genuinely NEW phone opens empty, records are entered offline, then i
   const cloud = new FakeCloud(); cloud.ws = 'wsB';
   const b = new MemoryBackend();
   const fresh = await Store.open(b);                                                       // first ever start: empty database
-  assert.equal(fresh.getState().meta.ownerChecked, true); assert.equal(fresh.getState().meta.ownerUnknown, undefined);
+  assert.equal(fresh.getState().meta.ownerChecked, true); assert.equal(fresh.getState().meta.ownerUnknown, undefined); assert.equal(fresh.getState().meta.ownerFresh, true, 'positively identified as new');
   fresh.upsert('contacts', contact('mine', 'Entered offline'));
   fresh.upsert('contacts', contact('mine2', 'Also offline'));
   fresh.remove('contacts', 'mine2');
@@ -248,4 +248,51 @@ test('W11 a genuinely NEW phone opens empty, records are entered offline, then i
   await syncNow(restarted, cfg, cloud.fetch);
   assert.equal(cloud.rows.get('wsB|contacts|mine')?.rev, 1, 'its first team receives the records');
   assert.equal(restarted.getState().meta.syncWorkspaceId, 'wsB');
+});
+
+// ---- A phone an INTERMEDIATE build already marked ownerChecked, with neither ownerUnknown nor ownerFresh ----
+async function intermediatePhone(withRecords = true) {
+  const b = new MemoryBackend();
+  if (withRecords) {
+    await seed(b, contact('c1', 'Existing record')); await seed(b, contact('c2', 'Existing, edit not sent'));
+    await b.put('c:properties:p1', { id: 'p1', created: 1, updated: 1, headline: 'House with a photo', photos: [{ id: 'f1', name: 'front.jpg' }], documents: [] });
+    await b.putFile('f1', new Blob(['photo-bytes'], { type: 'image/jpeg' }));
+  }
+  await b.put('s:meta', { fired: [], dirty: withRecords ? ['contacts:c2'] : [], tombstones: withRecords ? ['contacts:gone'] : [], ownerChecked: true });     // no lastSync, no owner, no ownerUnknown, no ownerFresh
+  return { store: await Store.open(b), backend: b };
+}
+
+test('W12 intermediate-build phone (ownerChecked, no owner, no lastSync, no marker) with real data: asks first; no records or files requested or sent', async () => {
+  const { store, backend } = await intermediatePhone();
+  const m0 = store.getState().meta;
+  assert.equal(m0.ownerChecked, true); assert.equal(m0.ownerUnknown, undefined); assert.equal(m0.ownerFresh, undefined); assert.equal(m0.lastSync, undefined);
+  const { cloudB, sessionB, rowsBefore } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true, 'its history cannot be established, so it asks');
+  const before = cloudB.log.length;
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), (e: unknown) => e instanceof SyncError && e.code === 'owner-unknown');
+  assert.ok(!cloudB.log.slice(before).some(l => /eab_records|eab_push_records|eab_files|storage/.test(l)), 'no records or files requested or sent');
+  assert.equal(JSON.stringify([...cloudB.rows.entries()]), rowsBefore); assert.equal(cloudB.files.size, 0); assert.equal(cloudB.objects.size, 0);
+  const m = store.getState().meta;
+  assert.deepEqual(m.dirty, ['contacts:c2']); assert.deepEqual(m.tombstones, ['contacts:gone']);
+  assert.equal(m.syncWorkspaceId, undefined, 'the signed-in team was not adopted'); assert.equal(m.lastSeq ?? 0, 0);
+  assert.deepEqual(store.getState().contacts.map(c => c.id).sort(), ['c1', 'c2']);
+  assert.ok(await backend.getFile('f1'), 'the photo is still on the phone');
+  confirmOwner(store);                                                                   // the person says: these are team B's
+  await syncNow(store, cfg, cloudB.fetch);
+  assert.ok(cloudB.rows.get('wsB|contacts|c2'), 'only after the answer');
+});
+
+test('W12b an intermediate-build phone with an EMPTY database that then enters records is asked once (history cannot be established), then works', async () => {
+  const { store } = await intermediatePhone(false);
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), false, 'nothing to protect yet');
+  store.upsert('contacts', contact('n1', 'Entered later'));
+  const cloudB = new FakeCloud(); cloudB.ws = 'wsB';
+  const user = cloudB.addUser('b@x.c');
+  store.setSingleton('meta', { syncSession: { accessToken: `tok-${user.id}`, refreshToken: 'r', expiresAt: Date.now() + 1e6, email: 'b@x.c', userId: user.id, workspaceId: 'wsB', workspaceName: 'Team B', role: 'owner' } });
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true);
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), /owner-unknown/);
+  assert.equal(cloudB.rows.size, 0);
+  confirmOwner(store); await syncNow(store, cfg, cloudB.fetch);
+  assert.equal(cloudB.rows.get('wsB|contacts|n1')?.rev, 1);
 });

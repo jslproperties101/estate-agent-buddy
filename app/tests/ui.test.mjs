@@ -2069,6 +2069,49 @@ test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync
   await ctx2.close();
 });
 
+test('U58 a phone an intermediate build already marked (real records, no team, no last-sync, no Phase 2 marker) still asks; no records or files are requested or sent first', async () => {
+  const SB = 'https://sync-test.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const seen = [];
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    seen.push(`${req.method()} ${u.pathname}`);
+    const body = u.pathname === '/rest/v1/rpc/eab_my_membership' ? [{ workspace_id: 'ws-B', workspace_name: 'Team B', role: 'owner' }]
+      : u.pathname === '/rest/v1/rpc/eab_push_records' ? JSON.parse(req.postData()).rows.map(r => ({ collection: r.collection, id: r.id, status: 'ok', rev: 1 })) : [];
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  await page.evaluate(async SBURL => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    await put('records', 'c:contacts:a1', { id: 'a1', created: 1, updated: 5, name: 'Intermediate Buyer', roles: ['buyer'] });
+    await put('records', 'c:properties:p1', { id: 'p1', created: 1, updated: 5, headline: 'House with a photo', photos: [{ id: 'f1', name: 'front.jpg' }], documents: [] });
+    await put('files', 'f1', new Blob(['photo-bytes'], { type: 'image/jpeg' }));
+    // ownerChecked already true (set by an intermediate build), but neither ownerUnknown nor ownerFresh, no lastSync, no owner; team B signed in.
+    await put('records', 's:meta', { fired: [], dirty: ['contacts:a1', 'properties:p1'], tombstones: [], ownerChecked: true, syncSession: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'b@x.c', userId: 'uB', workspaceId: 'ws-B', workspaceName: 'Team B', role: 'owner' } });
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'anon' });
+    db.close();
+  }, SB);
+  await page.reload();
+  await page.getByTestId('owner-unknown').waitFor();
+  assert.equal(await page.locator('nav.grid').count(), 0); assert.equal(await page.getByText('Intermediate Buyer').count(), 0);
+  await shot(page, '57-owner-unknown-intermediate', true);
+  await page.waitForTimeout(800);
+  assert.ok(!seen.some(r => /eab_push_records|eab_records|eab_files|storage/.test(r)), `no records or files requested or sent: ${seen}`);
+  const meta = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('s:meta'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
+  assert.equal(meta.syncWorkspaceId, undefined, 'team B not adopted'); assert.deepEqual(meta.dirty, ['contacts:a1', 'properties:p1']);
+  const photo = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('files').objectStore('files').get('f1'); g.onsuccess = () => { res(!!g.result); r.result.close(); }; }; }));
+  assert.equal(photo, true, 'the photo is still on the phone');
+  await page.getByTestId('owner-confirm').click();
+  await page.getByRole('button', { name: 'Yes, they belong to this team' }).click();
+  await page.waitForSelector('nav.grid'); await page.waitForTimeout(800);
+  assert.ok(seen.some(r => /eab_push_records/.test(r)), 'only after the answer are the records sent');
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

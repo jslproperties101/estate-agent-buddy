@@ -259,6 +259,9 @@ export interface Meta {
   ownerChecked?: boolean;
   /** Set at that first start when the database ALREADY held real records but no team could be established for them. */
   ownerUnknown?: boolean;
+  /** Set at that first start ONLY when the database was completely empty and nobody was signed in: the one state that
+   *  positively identifies a genuinely new phone. Without it, real records with no known team are treated as unowned. */
+  ownerFresh?: boolean;
   /** Position in the cloud's own change order (not a clock) up to which this phone has taken changes. */
   lastSeq?: number;
   /** Changes that could not be joined automatically. Both versions are kept; nothing is sent for these records

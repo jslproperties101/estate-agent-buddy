@@ -189,22 +189,25 @@ team differs and the phone holds any real record, waiting edit or waiting deleti
 - nothing is deleted: records, versions and sync position stay for the original team. Signing back in with that team resumes normally.
 Same team / different person is unchanged. A phone with no real records, or one that never synced, signs in to any team as before.
 
-### 8a. Phones last used by Phase 1 (owner not remembered)
+### 8a. Phones whose owner is not remembered (final behaviour)
 
-Phase 1 never wrote down which team a phone's records belong to. At the **first start of this version** (`ownerChecked` not yet set) the
-app looks at what is already on the phone:
-- **Still signed in:** it learns its team from that sign-in (once; a sign-in made later is never adopted).
-- **Database already holds real records, waiting edits or waiting deletions, and no team can be established:** it is remembered
-  (`ownerUnknown`). Whenever any account then signs in, the app asks "Whose records are on this phone?" before showing or
-  sending anything — **even if the phone never completed a sync** (no `lastSync`). A phone that was last synced by Phase 1
-  (`lastSync` set) is asked too, whether or not it was caught at the first start.
-  Choices: "These records belong to <team>" (asks once more, then they are treated as that team's) or "Sign out" (nothing changes).
-  The app **cannot verify** the answer; it relies on the person. Nothing is cleared, reset or adopted before the answer.
-- **Opens empty at the first start** (or holds only sample data): genuinely new. Records entered offline later belong to the first team it joins; no question.
+Phase 1 never wrote down which team a phone's records belong to, and an intermediate build of this branch set a first-start
+marker without recording history. The rule is therefore: **ask unless the phone is positively known to be new.**
 
-Trade-offs: (a) a Phase 1 phone that only ever held offline entries (never signed in) is now asked once too, because it cannot be
-told apart from one that was signed out; the answer is one tap. (b) A phone upgraded through a build that did not have this
-marker, with no `lastSync` and no owner, is not caught. Tested: W7–W11, screen tests U56 and U57 (stand-in clouds; not a live Supabase or a real device).
+- At the **first start of this version** (`ownerChecked` not yet set): still signed in → the phone learns its team from that sign-in;
+  database already holding real records, waiting edits or deletions with no team → `ownerUnknown`; database **completely empty** and nobody
+  signed in → `ownerFresh` (the only positive proof of a genuinely new phone).
+- **The question** ("Whose records are on this phone?") is shown after any sign-in when: no team is remembered, real records /
+  waiting edits / waiting deletions exist (sample data does not count), and the phone is **not** `ownerFresh` — or it has a `lastSync`.
+  So it covers: Phase 1 phones (synced or not), and phones an intermediate build already marked `ownerChecked` without `ownerFresh`.
+- Before the answer: nothing is requested, sent or loaded (records, files), the signed-in team is not adopted, sync positions are not
+  moved, and nothing local is cleared. "These records belong to <team>" (asks once more) treats them as that team's; "Sign out" changes nothing.
+  The app **cannot verify** the answer; it relies on the person.
+- Genuinely new phone (opened empty at the first start): records entered offline later join the first team with no question.
+
+Remaining limitations: (a) a phone from an intermediate build that is **empty** and enters records afterwards is asked once, because
+its history cannot be established; (b) a Phase 1 phone that only ever held offline entries is asked once; (c) if a phone's `ownerFresh`
+marker is lost (data cleared outside the app) the safe default applies again. Tested: W7–W12, screen tests U55–U58 (stand-in clouds; not a live Supabase or a real device).
 
 Limits: (1) the phone cannot be "handed over" to another team without first signing back in as the original team and
 clearing/removing its data; a per-team separate store (the larger change) is not built. (2) A phone upgraded from Phase 1 that

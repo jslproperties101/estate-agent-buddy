@@ -101,13 +101,14 @@ export function holdsOtherWorkspaceData(state: AppState, sessionWorkspaceId: str
   return holdsRealData(state);
 }
 
-/** True when real records are on this phone and nothing says which team they belong to, and either an older version
- *  synced it before (`lastSync`) or the database already held real records when this version first started (`ownerUnknown`,
- *  set in Store.open). The app cannot verify the owner, so the person must say before anything is sent or shown. A phone
- *  that opened empty at its first start is new: what it records later belongs to the first team it joins. */
+/** True when real records are on this phone, nothing says which team they belong to, and the phone is NOT positively known
+ *  to be a genuinely new one. "Genuinely new" means: this version's first start found the database empty (`ownerFresh`) and
+ *  the phone has never synced. Anything else - an older version's data, an intermediate build's marker without a history, or
+ *  a previous sync - cannot be told apart reliably, so the person must say before anything is sent or shown (the app
+ *  cannot verify the answer). Occasionally this asks a new phone once. */
 export function ownerUnknownWithData(state: AppState, sessionWorkspaceId: string | undefined): boolean {
   const m = state.meta;
-  return !m.syncWorkspaceId && !!sessionWorkspaceId && (!!m.lastSync || !!m.ownerUnknown) && holdsRealData(state);
+  return !m.syncWorkspaceId && !!sessionWorkspaceId && (!!m.lastSync || !m.ownerFresh) && holdsRealData(state);
 }
 
 /** The person says the records on this phone belong to the team they are signed in to. Nothing is changed or removed. */

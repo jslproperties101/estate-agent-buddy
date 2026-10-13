@@ -89,13 +89,15 @@ export class Store {
     // Once, on the first start that knows about owners. (1) A phone still signed in learns whose records it holds.
     // (2) A database that ALREADY holds real records, waiting edits or waiting deletions when this first start happens was
     // used by an older version; if no team can be established for it, that is remembered (`ownerUnknown`) and the person
-    // is asked after the next sign-in. A phone that opens EMPTY here is genuinely new: what it records later belongs to
-    // the first team it joins. Nothing is cleared, reset or adopted on the way.
+    // is asked after the next sign-in. Only a phone that opens EMPTY here is positively genuinely new (`ownerFresh`): what
+    // it records later belongs to the first team it joins. A phone that an intermediate build already marked
+    // `ownerChecked` carries neither marker, so its history cannot be established and it is treated as unowned too.
+    // Nothing is cleared, reset or adopted on the way.
     const m = state.meta;
     if (!m.ownerChecked) {
       const owner = m.syncWorkspaceId ?? m.syncSession?.workspaceId;
       const hadRealData = m.dirty.length > 0 || m.tombstones.length > 0 || COLLECTIONS.some(c => (state[c] as unknown as { sample?: boolean }[]).some(r => !r.sample));
-      store.setSingleton('meta', { ownerChecked: true, ...(owner ? { syncWorkspaceId: owner } : hadRealData ? { ownerUnknown: true } : {}) });
+      store.setSingleton('meta', { ownerChecked: true, ...(owner ? { syncWorkspaceId: owner } : hadRealData ? { ownerUnknown: true } : { ownerFresh: true }) });
     }
     return store;
   }
