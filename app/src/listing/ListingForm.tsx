@@ -3,7 +3,7 @@
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
 // Fields that may not be obvious have a "?" (ui/FieldHelp).
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { listingStrings } from './strings';
 import { mapStrings } from '../maps/strings';
@@ -11,12 +11,14 @@ import {
   Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
   FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
   rm, yearsRemaining, commissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
-  ALL_FORM_FIELDS, hasPosition,
+  ALL_FORM_FIELDS, hasPosition, cardTitle,
 } from './model';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
 import { compressImage } from '../lib/images';
 import { useApp } from '../data/useStore';
+import { possibleDuplicates } from '../domain/duplicates';
+import { dupStrings } from './dupStrings';
 import { newId } from '../data/store';
 import { Go, FormSection } from '../nav';
 import { OptionSelect } from '../ui/OptionSelect';
@@ -84,6 +86,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     const no = nextNumber(state.properties);
     return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
   });
+  const dups = useMemo(() => possibleDuplicates(d, state.properties), [d.street, d.unitNo, d.lotNo, d.township, d.city, d.id, state.properties]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [refNoText, setRefNoText] = useState(String(d.refNo ?? ''));
   const refNoInit = useRef(refNoText);
   const [busy, setBusy] = useState(false);
@@ -384,6 +387,13 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           </div>
         )}
       </div>
+      {dups.length > 0 && (
+        <div className="notice" role="status" data-testid="duplicate-warning">
+          <strong>{dupStrings[lang].title}</strong>
+          {dups.slice(0, 3).map(x => <small key={x.property.id} data-testid="duplicate-row">{[x.property.ref, cardTitle(x.property)].filter(Boolean).join(' · ')} ({dupStrings[lang][x.reason]})</small>)}
+          <small className="muted">{dupStrings[lang].help}</small>
+        </div>
+      )}
       {unchecked.length > 0 && (
         <div className="notice review-banner" role="status" data-testid="review-banner" data-checked={checked ? 'yes' : 'no'}>
           {checked ? <span>✓ {s.reviewDone}</span> : <>

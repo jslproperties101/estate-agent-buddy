@@ -3710,6 +3710,22 @@ test('U94 follow-up reminder: a quiet buyer is listed in Notifications, the sett
   await page.context().close();
 });
 
+test('U95 duplicate warning: typing an address that is already in the list shows a warning, and the property can still be saved', async () => {
+  const page = await phone();
+  await loadSample(page);
+  const stored = (await storedRecords(page, 'properties')).find(p => p.street && p.unitNo);
+  assert.ok(stored, 'a sample property with street, unit and area');
+  await tile(page, 'Property List');
+  await newProperty(page);
+  assert.equal(await page.getByTestId('duplicate-warning').count(), 0, 'no warning before anything is typed');
+  await page.locator('[data-field="street"]').fill(stored.street);
+  await page.locator('[data-field="unitNo"]').fill(stored.unitNo);
+  await page.getByTestId('duplicate-warning').waitFor();
+  assert.match(await page.getByTestId('duplicate-warning').innerText(), /may already be in your list/);
+  assert.ok(await page.getByTestId('duplicate-row').count() >= 1);
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
