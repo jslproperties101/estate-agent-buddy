@@ -3036,6 +3036,167 @@ test('U80 Advertising summary: needs-attention list and costs by property, platf
   await page.context().close();
 });
 
+/** Reads a stored picture file and returns its size, whether it holds the camera-data marker, and the colour at a point (0..1). */
+const storedPicture = (page, fileId, at = [[0.3, 0.35]]) => page.evaluate(({ fileId, at }) => new Promise((resolve, reject) => {
+  const r = indexedDB.open('estate-agent-buddy');
+  r.onerror = () => reject(r.error);
+  r.onsuccess = () => {
+    const g = r.result.transaction('files').objectStore('files').get(fileId);
+    g.onsuccess = async () => {
+      const blob = g.result; if (!blob) return resolve(null);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const head = new TextDecoder('latin1').decode(bytes.slice(0, 4000));
+      const bmp = await createImageBitmap(blob);
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
+      resolve({ w: bmp.width, h: bmp.height, size: blob.size, type: blob.type, exif: head.includes('Exif'), colours: at.map(([fx, fy]) => Array.from(x.getImageData(Math.floor(fx * bmp.width), Math.floor(fy * bmp.height), 1, 1).data.slice(0, 3))) });
+    };
+  };
+}), { fileId, at });
+async function propertyWithPhotos(page, photos) {
+  await bareProperty(page, 'Photo house');
+  await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
+  await page.getByTestId('photo-input').setInputFiles(photos);
+  await page.waitForFunction(n => document.querySelectorAll('[data-testid="listing-form"] img').length >= n, photos.length);
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  await waitStored(page, 'records', `all.some(v => v && v.headline === 'Photo house' && v.photos && v.photos.length === ${photos.length})`);
+}
+async function drag(page, testId, [x0, y0], [x1, y1]) {
+  await page.getByTestId(testId).evaluate(el => el.scrollIntoView({ block: 'center' }));
+  const b = await page.getByTestId(testId).boundingBox();
+  await page.mouse.move(b.x + b.width * x0, b.y + b.height * y0);
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width * ((x0 + x1) / 2), b.y + b.height * ((y0 + y1) / 2), { steps: 3 });
+  await page.mouse.move(b.x + b.width * x1, b.y + b.height * y1, { steps: 3 });
+  await page.mouse.up();
+}
+
+test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a NEW copy, the original is kept untouched, nothing is detected automatically, and turning the picture clears the masks', async () => {
+  const page = await phone();
+  await propertyWithPhotos(page, [{ name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') }]);
+  await page.getByTestId('open-photo-studio').click();
+  await page.getByTestId('photo-studio').waitFor();
+  assert.match(await page.getByTestId('photo-studio').innerText(), /Your original photo is kept unless you choose to replace it/);
+  assert.match(await page.getByTestId('ps-declutter').innerText(), /AI decluttering is not available/);
+  await page.getByTestId('ps-preview').waitFor();
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'nothing changed yet');
+  await page.getByTestId('ps-tab-mask').click();
+  assert.match(await page.getByTestId('ps-mask-warning').innerText(), /Nothing is detected automatically/);
+  assert.match(await page.getByTestId('ps-mask-empty').innerText(), /No areas covered yet/);
+  await drag(page, 'ps-stage', [0.05, 0.12], [0.6, 0.6]);        // covers the white "sign" in the test picture (x .16–.47, y .21–.52)
+  assert.match(await page.getByTestId('ps-mask-count').innerText(), /1 area covered/);
+  await shot(page, '81a-photo-studio-mask');
+  // a stray tap draws nothing
+  await drag(page, 'ps-stage', [0.8, 0.8], [0.805, 0.805]);
+  assert.equal(await page.getByTestId('ps-mask-item').count(), 1);
+  // turning the picture moves everything: masks are cleared and the agent is told
+  await page.getByTestId('ps-tab-adjust').click();
+  await page.getByTestId('ps-rotate-right').click();
+  await page.getByTestId('ps-rotate-left').click();
+  await page.getByTestId('ps-tab-mask').click();
+  assert.match(await page.getByTestId('ps-note').innerText(), /covered areas were removed/);
+  assert.equal(await page.getByTestId('ps-mask-item').count(), 0);
+  await drag(page, 'ps-stage', [0.05, 0.12], [0.6, 0.6]);
+  assert.equal(await page.getByTestId('ps-mask-item').count(), 1);
+  // Original / Edited comparison
+  const edited = await page.getByTestId('ps-preview').getAttribute('src');
+  await page.getByTestId('ps-show-original').click();
+  await page.waitForFunction(old => document.querySelector('[data-testid="ps-preview"]').getAttribute('src') !== old, edited);
+  await page.getByTestId('ps-show-edited').click();
+  // save as a NEW photo
+  await page.getByTestId('ps-save-new').click();
+  assert.match(await page.getByTestId('ps-msg').innerText(), /Saved as a new photo\. The original is unchanged/);
+  await waitStored(page, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 2 && v.photos[1].edit === 'masked')");
+  const rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
+  const [orig, copy] = rec.photos;
+  assert.equal(orig.name, 'front.jpg'); assert.equal(orig.edit, undefined, 'the original is not relabelled');
+  assert.equal(copy.name, 'front.jpg (privacy-masked)'); assert.equal(copy.editedFrom, orig.id);
+  assert.notEqual(copy.fileId, orig.fileId);
+  const o = await storedPicture(page, orig.fileId, [[0.3, 0.35], [0.9, 0.9]]);
+  const c = await storedPicture(page, copy.fileId, [[0.3, 0.35], [0.9, 0.9]]);
+  assert.ok(o.colours[0][0] > 200 && o.colours[0][1] > 200, `original still shows the white sign: ${o.colours[0]}`);
+  assert.ok(c.colours[0].every(v => v < 60), `copy is covered at the sign: ${c.colours[0]}`);
+  assert.ok(Math.abs(c.colours[1][1] - o.colours[1][1]) < 40, 'outside the mask the picture is the same');
+  assert.equal(c.type, 'image/jpeg');
+  assert.equal(c.exif, false, 'the copy carries no camera data block');
+  // the chip names it, the strip shows both
+  assert.equal(await page.getByTestId('ps-photo').count(), 2);
+  assert.match(await page.getByTestId('ps-chip').innerText(), /Privacy-masked copy/);
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'edit state was reset after saving');
+  await page.context().close();
+});
+
+test('U82 Photo Studio: improve a photo (brightness, straighten, crop, auto), compare, save as a copy; Replace asks first, Cancel changes nothing, and Replace swaps the picture and deletes the old file', async () => {
+  const page = await phone();
+  await propertyWithPhotos(page, [{ name: 'dark.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#223') }, { name: 'second.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#a53') }]);
+  await page.getByTestId('open-photo-studio').click();
+  await page.getByTestId('photo-studio').waitFor();
+  assert.equal(await page.getByTestId('ps-photo').count(), 2);
+  await page.getByTestId('ps-preview').waitFor();
+  await page.getByTestId('ps-brightness').fill('60');
+  await page.getByTestId('ps-clarity').fill('40');
+  await page.getByTestId('ps-straighten').fill('2');
+  await page.getByTestId('ps-crop-169').click();
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), false);
+  await page.getByTestId('ps-save-new').click();
+  await waitStored(page, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 3 && v.photos[1].edit === 'enhanced')");
+  let rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
+  assert.deepEqual(rec.photos.map(p => p.name), ['dark.jpg', 'dark.jpg (enhanced)', 'second.jpg'], 'the copy sits next to its original');
+  const first = await storedPicture(page, rec.photos[0].fileId, [[0.5, 0.9]]);
+  const copy = await storedPicture(page, rec.photos[1].fileId, [[0.5, 0.9]]);
+  assert.ok(copy.colours[0][2] > first.colours[0][2] + 20, `brighter: ${first.colours[0]} → ${copy.colours[0]}`);
+  assert.ok(Math.abs(copy.w / copy.h - 16 / 9) < 0.05, `16:9 crop: ${copy.w}x${copy.h}`);
+  assert.equal(rec.mainPhotoId, rec.photos[0].id, 'main photo unchanged');
+  // Replace: Cancel changes nothing
+  await page.getByTestId('ps-photo').nth(2).click();
+  await page.getByTestId('ps-auto').check();
+  await page.getByTestId('ps-contrast').fill('30');
+  await page.getByTestId('ps-replace').click();
+  assert.match(await page.getByRole('alertdialog').innerText(), /original picture is no longer used and is deleted from this phone later/);
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+  rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
+  assert.equal(rec.photos.length, 3); assert.equal(rec.photos[2].edit, undefined);
+  const oldFile = rec.photos[2].fileId;
+  assert.ok(await storedPicture(page, oldFile), 'the original file is still there');
+  // Replace: confirmed
+  await page.getByTestId('ps-replace').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Replace original' }).click();
+  assert.match(await page.getByTestId('ps-msg').innerText(), /original has been replaced/);
+  await waitStored(page, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 3 && v.photos[2].edit === 'enhanced')");
+  rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
+  assert.notEqual(rec.photos[2].fileId, oldFile);
+  assert.equal(rec.photos[2].name, 'second.jpg');
+  assert.ok(await storedPicture(page, rec.photos[2].fileId), 'the new picture is stored');
+  await waitStored(page, 'local', `all.some(v => v && v.id === '${oldFile}' && v.removedAt)`);   // marked for deletion (kept briefly, like every removed file), no longer used by the property
+  assert.ok(!rec.photos.some(p => p.fileId === oldFile), 'the property no longer uses the replaced original');
+  await shot(page, '82-photo-studio-adjust');
+  await page.context().close();
+});
+
+test('U83 Photo Studio: a property without photos explains itself; Bahasa Malaysia and Chinese show the privacy warning', async () => {
+  const page = await phone();
+  await bareProperty(page, 'No photo house');
+  assert.equal(await page.getByTestId('open-photo-studio').count(), 0, 'no button when there is nothing to edit');
+  await page.context().close();
+  for (const [aria, warn] of [['Bahasa Malaysia', /Tiada apa dikesan secara automatik/], ['中文', /不会自动检测/]]) {
+    const p = await phone();
+    await propertyWithPhotos(p, [{ name: 'a.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(p, '#3a7') }]);
+    await home(p);
+    await tile(p, 'Agent Profile');
+    await p.getByRole('button', { name: /Settings/ }).click();
+    await p.locator(`.lang button[aria-label="${aria}"]`).click();
+    await home(p);
+    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/ }).first().click();
+    await p.getByText('Photo house').first().click();
+    await p.getByTestId('open-photo-studio').click();
+    await p.getByTestId('ps-tab-mask').click();
+    assert.match(await p.getByTestId('ps-mask-warning').innerText(), warn);
+    await shot(p, `83-${aria === '中文' ? 'zh' : 'bm'}-photo-studio`);
+    await p.context().close();
+  }
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

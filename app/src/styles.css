@@ -771,3 +771,10 @@ li.has-preview { position: relative; }
 .ad-card.ad-fake { border: 2px dashed #b3261e; background: repeating-linear-gradient(135deg, transparent 0 10px, rgba(179,38,30,.08) 10px 20px); }
 .ad-shot img { max-width: 100%; max-height: 160px; border-radius: 8px; display: block; }
 .sum-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ps-stage { position: relative; touch-action: none; user-select: none; border-radius: 10px; overflow: hidden; background: #111; line-height: 0; }
+.ps-stage[data-mode="mask"] { cursor: crosshair; outline: 2px solid var(--gold, #c9a227); }
+.ps-stage img { width: 100%; height: auto; display: block; pointer-events: none; }
+.ps-drag { position: absolute; border: 2px dashed #fff; background: rgba(0,0,0,.35); pointer-events: none; }
+.photo-strip button .chip-tag { position: absolute; left: 2px; bottom: 2px; font-size: .62rem; }
+.photo-strip button { position: relative; }
+.photo-strip button.on { outline: 2px solid var(--gold, #c9a227); }

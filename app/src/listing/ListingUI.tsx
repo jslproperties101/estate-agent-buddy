@@ -17,6 +17,7 @@ import { verifyStateOf, toCheck, VerifyState } from './verify';
 import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
 import { adStrings } from '../adverts/strings';
+import { photoStrings } from '../photos/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { buyerStrings } from './buyerPdf';
 import { IconMic } from '../icons';
@@ -406,6 +407,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
       <SectionCard title={s.sec.photos} onEdit={edit('photos')} editLabel={EL} testId="sec-photos-view">
         {l.photos.length ? <div className="photo-strip">{l.photos.map(p => <button key={p.id} onClick={() => setPhotoId(p.id)} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div> : empty}
+        {l.photos.length > 0 && <button className="btn small secondary" onClick={() => go({ name: 'photoStudio', propertyId: l.id, photoId: shownPhoto.id })} data-testid="open-photo-studio">🖼️ {photoStrings[lang].open}</button>}
       </SectionCard>
 
       <SectionCard title={s.sec.location} onEdit={edit('location')} editLabel={EL} testId="sec-location-view">

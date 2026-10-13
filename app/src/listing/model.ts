@@ -54,7 +54,13 @@ export const BANNER_STATUSES: BannerStatus[] = ['yes', 'not_yet', 'no', 'not_all
 export const MAX_CUSTOM_FIELDS = 10;
 
 /** A photo is either a stored file (fileId, kept in the phone's storage) or a built-in sample picture (url). */
-export interface Photo { id: string; fileId?: string; url?: string; name: string; bytes?: number; sample?: boolean }
+export interface Photo {
+  id: string; fileId?: string; url?: string; name: string; bytes?: number; sample?: boolean;
+  /** Set on a copy made by the Photo Studio: enhanced, privacy-masked by hand, or both. The untouched original stays a separate photo unless the agent chose to replace it. */
+  edit?: 'enhanced' | 'masked' | 'both';
+  /** The photo this copy was made from (it may since have been removed). */
+  editedFrom?: string;
+}
 export interface Doc { id: string; category: DocCategory; name: string; fileId?: string; bytes?: number; mime?: string; added: number }
 export interface Tenancy { tenant?: string; start?: string; end?: string; rent?: number; notes?: string }
 /** What kind of advert it is (Stage 6). */

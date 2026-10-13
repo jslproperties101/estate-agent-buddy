@@ -36,6 +36,7 @@ export type Screen =
   | { name: 'buyerPdf'; propertyId: string }
   | { name: 'adTracker'; propertyId: string }
   | { name: 'adSummary' }
+  | { name: 'photoStudio'; propertyId: string; photoId?: string }
   | { name: 'profile' }
   | { name: 'profileEdit' }
   | { name: 'nameCard' }
