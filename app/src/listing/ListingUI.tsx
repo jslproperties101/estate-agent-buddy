@@ -16,6 +16,8 @@ import {
 import { verifyStateOf, toCheck, VerifyState } from './verify';
 import { PropertyVoice } from './PropertyVoice';
 import { Change, Command, applyChanges } from './commands';
+import { adStrings } from '../adverts/strings';
+import { FakeBadge } from '../adverts/AdTrackerUI';
 import { buyerStrings } from './buyerPdf';
 import { IconMic } from '../icons';
 import { useApp, useStore } from '../data/useStore';
@@ -502,12 +504,13 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         </dl>
         {(l.marketing?.ads ?? []).map(a => (
           <div key={a.id} className="ad-row">
-            <div className="between"><strong>{a.platform}</strong>{a.status && <span className={`ad-st ad-${a.status}`}>{s.adStatus[a.status]}</span>}</div>
+            <div className="between"><strong>{a.platform}{a.fake && <> <FakeBadge lang={lang} /></>}</strong>{a.status && <span className={`ad-st ad-${a.status}`}>{s.adStatus[a.status]}</span>}</div>
             <small className="muted">{[a.start && a.end ? `${a.start} → ${a.end}` : a.start, a.ref].filter(Boolean).join(' · ')}</small>
             {a.notes && <small>{a.notes}</small>}
           </div>
         ))}
         {!l.headline && !l.marketing?.advertised && !(l.marketing?.ads ?? []).length && empty}
+        <button className="btn small secondary" onClick={() => go({ name: 'adTracker', propertyId: l.id })} data-testid="open-ad-tracker">📣 {adStrings[lang].open}</button>
       </SectionCard>
 
       <SectionCard title={s.sec.notes} onEdit={edit('notes')} editLabel={EL}>

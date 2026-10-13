@@ -57,7 +57,17 @@ export const MAX_CUSTOM_FIELDS = 10;
 export interface Photo { id: string; fileId?: string; url?: string; name: string; bytes?: number; sample?: boolean }
 export interface Doc { id: string; category: DocCategory; name: string; fileId?: string; bytes?: number; mime?: string; added: number }
 export interface Tenancy { tenant?: string; start?: string; end?: string; rent?: number; notes?: string }
-export interface Advert { id: string; platform: string; start?: string; end?: string; ref?: string; status?: AdStatus; notes?: string }
+/** What kind of advert it is (Stage 6). */
+export type AdType = 'listing' | 'featured' | 'boosted' | 'social' | 'other';
+export const AD_TYPES: AdType[] = ['listing', 'featured', 'boosted', 'social', 'other'];
+/** One advert for a property. The Stage 6 fields are all optional, so adverts saved before them stay valid. `fake` marks a dummy / test
+ *  listing: it is never counted in costs or reminders and is always shown with a TEST label. The app records adverts; it never posts to a platform. */
+export interface Advert {
+  id: string; platform: string; start?: string; end?: string; ref?: string; status?: AdStatus; notes?: string;
+  type?: AdType; title?: string; url?: string; cost?: number; screenshotFileId?: string; fake?: boolean;
+  /** Days before the end date to remind (default 3). */
+  remindDays?: number;
+}
 export interface Marketing { advertised?: 'yes' | 'no'; ads: Advert[]; custom: Record<string, string> }
 export interface ChangeEntry { at: number; source: 'form' | 'voice' | 'map'; summary: string }
 /** Extra marketing fields the agent creates (at most 10). Shared by all properties; each property keeps its own values. */

@@ -34,6 +34,8 @@ export type Screen =
   | { name: 'incomeForm'; id?: string }
   | { name: 'calculator'; propertyId?: string }
   | { name: 'buyerPdf'; propertyId: string }
+  | { name: 'adTracker'; propertyId: string }
+  | { name: 'adSummary' }
   | { name: 'profile' }
   | { name: 'profileEdit' }
   | { name: 'nameCard' }

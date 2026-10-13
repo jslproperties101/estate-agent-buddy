@@ -34,6 +34,7 @@ import { contactStrings } from '../contacts/strings';
 import { VERIFY_STATES, VerifyState, isVerifiable, verifyStateOf, withVerification } from './verify';
 import { deleteListing } from './deleteListing';
 import { IconMic } from '../icons';
+import { FakeBadge } from '../adverts/AdTrackerUI';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
 const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'specs', 'money', 'tenancy', 'availability', 'owner', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
@@ -603,6 +604,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </label>
         {mk.ads.map((a, i) => (
           <div key={a.id} className="sub-card stack-sm" data-testid="ad-editor">
+            {a.fake && <FakeBadge lang={lang} />}
             <OptionSelect lang={lang} label={`${s.l.platform} ${i + 1}`} listKey="platform" allowEmpty={false} builtIns={PLATFORMS.map(p => ({ value: p }))} value={a.platform} onChange={v => setAd(a.id, { platform: v ?? PLATFORMS[0] })} />
             <label className="ff">{s.l.adStatus}
               <select aria-label={`${s.l.adStatus} ${i + 1}`} value={a.status ?? ''} onChange={e => setAd(a.id, { status: (e.target.value || undefined) as Advert['status'] })}>

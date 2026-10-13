@@ -34,6 +34,10 @@ import { FinanceScreen, DealForm, MoneyForm } from './finance/FinanceUI';
 import { CalculatorScreen } from './calculator/CalculatorUI';
 import { BuyerPdfScreen } from './listing/BuyerPdfUI';
 import { buyerStrings } from './listing/buyerPdf';
+import { AdTrackerScreen, AdSummaryScreen } from './adverts/AdTrackerUI';
+import { adStrings } from './adverts/strings';
+import { ymd } from './lib/dates';
+import { attention, adReminders } from './domain/adverts';
 import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './profile/ProfileUI';
 import { ExpertHome, ExpertAsk, ExpertThreadScreen } from './expert/ExpertUI';
 import { VoiceCommand } from './voice/VoiceCommandUI';
@@ -225,8 +229,13 @@ function Shell() {
   }, [store, lang]);
   useEffect(() => {
     const list = upcomingReminders(state.tasks, state.appointments, Date.now()).map(r => ({ id: idFor(r.key), at: r.at, ...reminderText(r, state, lang) }));
-    void scheduleNative(list);
-  }, [state.tasks, state.appointments, lang]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Advert expiry reminders (real adverts only; test and sample adverts never remind).
+    const ads = adReminders(state.properties, Date.now()).map(r => {
+      const p = state.properties.find(z => z.id === r.propertyId); const a = p?.marketing?.ads.find(z => z.id === r.adId);
+      return { id: idFor(r.key), at: r.at, title: adStrings[lang].reminderTitle, body: adStrings[lang].reminderBody(p ? (p.ref ?? cardTitle(p)) : '', a?.platform ?? '', r.days) };
+    });
+    void scheduleNative([...list, ...ads]);
+  }, [state.tasks, state.appointments, state.properties, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
@@ -337,6 +346,8 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'incomeForm': return s.id ? financeStrings[lang].editIncome : financeStrings[lang].newIncome;
     case 'calculator': return calcStrings[lang].title;
     case 'buyerPdf': return buyerStrings[lang].title;
+    case 'adTracker': return adStrings[lang].title;
+    case 'adSummary': return adStrings[lang].summaryTitle;
     case 'profile': return profileStrings[lang].title;
     case 'profileEdit': return profileStrings[lang].edit;
     case 'nameCard': return profileStrings[lang].sendTitle;
@@ -386,6 +397,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'incomeForm': return <MoneyForm key={s.id ?? 'new-i'} lang={lang} back={back} id={s.id} kind="income" />;
     case 'calculator': return <CalculatorScreen key={s.propertyId ?? ''} lang={lang} propertyId={s.propertyId} />;
     case 'buyerPdf': return <BuyerPdfScreen key={s.propertyId} lang={lang} propertyId={s.propertyId} />;
+    case 'adTracker': return <AdTrackerScreen key={s.propertyId} lang={lang} go={go} propertyId={s.propertyId} />;
+    case 'adSummary': return <AdSummaryScreen lang={lang} go={go} />;
     case 'profile': return <ProfileScreen lang={lang} go={go} />;
     case 'profileEdit': return <ProfileEdit lang={lang} back={back} />;
     case 'nameCard': return <NameCardSend lang={lang} />;
@@ -468,6 +481,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const sync = useSaveState();
   const now = Date.now();
   const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
+  const adAttn = attention(state.properties, ymd(new Date()));
   const perm = permission();
   const waiting = state.meta.dirty.length;
   const signedIn = !!state.meta.syncSession;
@@ -482,7 +496,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
   const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
   const draftCount = store.allDrafts().length;
-  const systemEmpty = soon.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0;
+  const systemEmpty = soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -500,6 +514,11 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         )}
         {draftCount > 0 && (
           <div className="stack-sm" data-testid="notif-drafts"><strong>{syncStrings[lang].drafts}</strong><small className="muted">{syncStrings[lang].draftsHint(draftCount)}</small><DraftsList lang={lang} go={go} /></div>
+        )}
+        {adAttn.length > 0 && (
+          <button className="link-row" data-testid="notif-adverts" onClick={() => go({ name: 'adSummary' })}>
+            <strong>📣 {adStrings[lang].attention} ({adAttn.length})</strong><small className="muted">{adStrings[lang].summaryTitle}</small>
+          </button>
         )}
         {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}
         {syncLine && <div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div>}

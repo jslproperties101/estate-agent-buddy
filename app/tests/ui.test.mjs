@@ -2892,6 +2892,150 @@ test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet a
   await page.context().close();
 });
 
+const ymdLocal = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+async function bareProperty(page, name = 'Bare minimum house') {
+  await tile(page, 'Property List');
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="headline"]').fill(name);
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+}
+const adsOf = async page => (await storedRecords(page, 'properties')).flatMap(p => (p.marketing?.ads ?? []).map(a => ({ ...a, prop: p.id })));
+
+test('U79 Advert tracker: add real and fake adverts, validation, stale live status, cost, saved after closing the app, test listings kept out of the totals', async () => {
+  const page = await phone();
+  await bareProperty(page);
+  await page.getByTestId('open-ad-tracker').click();
+  await page.getByTestId('ad-tracker').waitFor();
+  assert.match(await page.getByTestId('ad-tracker').innerText(), /never posts to a platform/);
+  assert.match(await page.getByTestId('ad-none').innerText(), /No adverts recorded/);
+  // a real advert: an invalid link is refused and nothing is stored
+  await page.getByTestId('ad-add').click();
+  await page.getByTestId('ad-platform').selectOption('PropertyGuru');
+  await page.getByTestId('ad-type').selectOption({ label: 'Boosted (paid)' });
+  await page.getByTestId('ad-title').fill('Corner house, quick sale');
+  await page.getByTestId('ad-url').fill('www.no-scheme.com');
+  await page.getByTestId('ad-status-select').selectOption('live');
+  await page.getByTestId('ad-start').fill(ymdLocal(-10));
+  await page.getByTestId('ad-end').fill(ymdLocal(-2));
+  await page.locator('[data-field="ad-cost"]').fill('450');
+  await page.getByTestId('ad-save').click();
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /must start with http/);
+  assert.equal((await adsOf(page)).length, 0, 'a refused advert is not stored');
+  await page.getByTestId('ad-url').fill('https://www.propertyguru.com.my/listing/123');
+  await page.getByTestId('ad-end').fill(ymdLocal(-12));
+  await page.getByTestId('ad-save').click();
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /before the published date/);
+  await page.getByTestId('ad-end').fill(ymdLocal(-2));
+  await page.getByTestId('ad-save').click();
+  await page.getByTestId('ad-card').waitFor();
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.platform === 'PropertyGuru' && a.cost === 450 && a.status === 'live' && a.type === 'boosted' && a.url.startsWith('https://')))");
+  const card = page.getByTestId('ad-card').first();
+  assert.match(await card.getByTestId('ad-status').innerText(), /Expired/, 'live but past its end date: shown as expired');
+  assert.match(await card.getByTestId('ad-stale').innerText(), /End date has passed/);
+  assert.equal((await adsOf(page))[0].status, 'live', 'the saved status is not rewritten by the screen');
+  assert.match(await card.getByTestId('ad-cost').innerText(), /RM 450\.00/);
+  await page.getByTestId('ad-mark-expired').click();
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.status === 'expired'))");
+  // a second real advert that is about to expire
+  await page.getByTestId('ad-add').click();
+  await page.getByTestId('ad-platform').selectOption('Mudah');
+  await page.getByTestId('ad-status-select').selectOption('live');
+  await page.getByTestId('ad-end').fill(ymdLocal(1));
+  await page.getByTestId('ad-save').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 2);
+  // a fake listing: labelled, planned, never counted
+  await page.getByTestId('ad-add-fake').click();
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /TEST · not a real listing/);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /not counted in costs or reminders/);
+  assert.equal(await page.getByTestId('ad-status-select').inputValue(), 'planned');
+  await page.getByTestId('ad-title').fill('Practice post');
+  await page.locator('[data-field="ad-cost"]').fill('5000');
+  await page.getByTestId('ad-save').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 3);
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.fake === true && a.cost === 5000))");
+  const fakeCard = page.locator('[data-testid="ad-card"][data-fake="yes"]');
+  assert.equal(await fakeCard.count(), 1);
+  assert.match(await fakeCard.innerText(), /TEST · not a real listing/);
+  assert.match(await page.getByTestId('ad-total').innerText(), /Total cost: RM 450\.00/, 'the 5,000 test cost is not added');
+  assert.match(await page.getByTestId('ad-total').innerText(), /1 test listing not counted/);
+  await shot(page, '79a-advert-tracker');
+  // closing the app keeps everything
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Property List');
+  await page.getByText('Bare minimum house').first().click();
+  assert.match(await page.getByTestId('marketing').innerText(), /TEST · not a real listing/, 'the detail page labels the test advert too');
+  await page.getByTestId('open-ad-tracker').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 3);
+  // edit keeps one record, not a copy
+  await page.getByTestId('ad-edit').first().click();
+  await page.getByTestId('ad-notes').fill('Renew after the weekend');
+  await page.getByTestId('ad-save').click();
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.notes === 'Renew after the weekend'))");
+  assert.equal((await adsOf(page)).length, 3);
+  // delete asks first
+  await page.locator('[data-testid="ad-card"][data-fake="yes"] [data-testid="ad-edit"]').click();
+  await page.getByTestId('ad-delete').click();
+  await page.getByRole('button', { name: 'Cancel' }).last().click();
+  assert.equal((await adsOf(page)).length, 3, 'cancelling the question deletes nothing');
+  await page.getByTestId('ad-delete').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await waitStored(page, 'records', "!all.some(v => v && v.marketing && v.marketing.ads.some(a => a.fake === true))");
+  const rec = (await storedRecords(page, 'properties'))[0];
+  assert.match(rec.history[0].summary, /Advert removed/);
+  await page.context().close();
+});
+
+test('U80 Advertising summary: needs-attention list and costs by property, platform and month; test listings and sample adverts are left out', async () => {
+  const page = await phone();
+  await bareProperty(page, 'Real house');
+  await page.getByTestId('open-ad-tracker').click();
+  const add = async (platform, o = {}) => {
+    await page.getByTestId('ad-add').click();
+    await page.getByTestId('ad-platform').selectOption(platform);
+    if (o.status) await page.getByTestId('ad-status-select').selectOption(o.status);
+    if (o.start) await page.getByTestId('ad-start').fill(o.start);
+    if (o.end) await page.getByTestId('ad-end').fill(o.end);
+    if (o.cost) await page.locator('[data-field="ad-cost"]').fill(String(o.cost));
+    await page.getByTestId('ad-save').click();
+  };
+  await add('PropertyGuru', { status: 'live', start: '2026-09-05', end: ymdLocal(-1), cost: 300 });
+  await add('Mudah', { status: 'live', start: '2026-10-01', end: ymdLocal(2), cost: 100 });
+  await add('PropertyGuru', { status: 'needs_update', start: '2026-10-09' });
+  await page.getByTestId('ad-add-fake').click(); await page.locator('[data-field="ad-cost"]').fill('7777'); await page.getByTestId('ad-save').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 4);
+  await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.length === 4)");
+  await page.getByTestId('ad-open-summary').click();
+  await page.getByTestId('ad-summary').waitFor();
+  assert.equal(await page.getByTestId('ad-attention-item').count(), 3, 'expired, expiring and needs-update — the test listing never appears');
+  assert.deepEqual(await page.getByTestId('ad-attention-item').evaluateAll(els => els.map(e => e.getAttribute('data-kind'))), ['expired', 'needs_update', 'expiring']);
+  assert.equal((await page.getByTestId('sum-total').innerText()), 'RM 400.00');
+  assert.match(await page.getByTestId('sum-count').innerText(), /3 adverts · 1 without a cost/);
+  assert.match(await page.getByTestId('sum-platform').innerText(), /PropertyGuru[\s\S]*RM 300\.00[\s\S]*Mudah[\s\S]*RM 100\.00/);
+  assert.match(await page.getByTestId('sum-month').innerText(), /2026-10[\s\S]*RM 100\.00[\s\S]*2026-09[\s\S]*RM 300\.00/);
+  assert.match(await page.getByTestId('sum-excluded').innerText(), /1 test listing/);
+  // a period limit
+  await page.getByTestId('sum-from').fill('2026-10-01');
+  assert.equal(await page.getByTestId('sum-total').innerText(), 'RM 100.00');
+  await page.getByTestId('sum-from').fill('');
+  // the bell shows the same list
+  await home(page);
+  await page.locator('header button[aria-label*="otification"], header button[aria-label*="Pemberitahuan"], header button[aria-label*="通知"]').first().click();
+  assert.match(await page.getByTestId('notif-adverts').innerText(), /Needs attention \(3\)/);
+  await home(page);
+  // sample data is kept out: load it, the sample adverts (live, ending soon) add nothing
+  await loadSample(page);
+  await tile(page, 'Property List');
+  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByTestId('open-ad-tracker').click();
+  assert.match(await page.getByTestId('ad-sample-note').innerText(), /not counted/);
+  await page.getByTestId('ad-open-summary').click();
+  assert.equal(await page.getByTestId('sum-total').innerText(), 'RM 400.00', 'sample property adverts are not counted');
+  assert.match(await page.getByTestId('sum-excluded').innerText(), /sample advert/);
+  assert.equal(await page.getByTestId('ad-attention-item').count(), 3, 'sample adverts never ask for attention');
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
