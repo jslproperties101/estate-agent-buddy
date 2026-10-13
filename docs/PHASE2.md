@@ -85,13 +85,31 @@ Files: `supabase/migrations/20261014000000_phase2_sync_refs_files.sql` (additive
    before the new triggers exist, so it does not create versions or history), adds tables, triggers, functions, policies and
    the private bucket `eab-files` (25 MB limit).
 4. Check Storage → `eab-files` exists and is **not** public.
-5. Install the new APK on every phone before the migration is relied on; older APKs keep the old protocol, which the new
-   function does not serve (see risks).
+5. **Then update every phone promptly** (see section 3a). Do not leave old APKs in use for long once the migration is live.
 6. Soft-deleted files: removed pictures stay in the bucket (rows marked `deleted`). To reclaim space, delete objects in
    Storage whose `eab_files` rows are all `deleted = true`.
 
-**Rollback / recovery:** run the rollback file (it deletes cloud history, registry and file metadata but **not** your records
-or uploaded objects). Restore from the backup of step 1 if anything looks wrong. The version columns can stay.
+**Rollback / recovery:** `supabase/rollback/20261014000000_phase2_rollback.sql` runs as one transaction (all or nothing). It deletes
+cloud history, the property-number registry and file metadata, but **not** your records or uploaded objects. The version
+columns stay (harmless). Take the backup of step 1 first; restore from it if anything looks wrong. After a rollback the
+new APK cannot sync until the migration is applied again; old APKs work as before. Rehearsed on a disposable local
+PostgreSQL only (`supabase/tests/rollback-test.sh`, 18 checks): records unchanged, the migration can be re-applied, and a
+rollback that fails part-way changes nothing. Not run against Supabase.
+
+### 3a. Old APK / new APK behaviour and rollout order
+
+| Situation | What happens | Basis |
+|---|---|---|
+| Old APK, migration applied | Still syncs. It writes straight to the table with an unconditional upsert, so it can **silently replace a newer record** written by a new APK (no version check, no conflict screen). The cloud keeps the replaced version in `eab_record_revisions` (last 25), so it is recoverable by you in SQL, not from the app. | Tested (local PostgreSQL): plain upsert works after the migration; the overwritten version is kept |
+| Old APK creating a duplicate property number | Refused by the database; the old app's whole 200-row batch fails and that phone shows a sync error until the duplicate is fixed | Tested (local PostgreSQL) for the refusal; the batch-failure effect is from reading the Phase 1 code |
+| New APK, migration **not** applied | Sync calls fail (missing function and columns); the phone shows a sync failure and keeps all data; nothing syncs | **Not tested.** From reading the code only |
+| New APK, migration applied | Full Phase 2 behaviour | Stand-in cloud + local PostgreSQL only; not live |
+
+**Rollout order:** (1) back up; (2) run the duplicate-reference check; (3) apply the migration; (4) update **every** phone to
+the new APK as soon as possible, ideally the same day; (5) check Sync review on each phone. Why this order: new APKs cannot
+sync before the migration, while old APKs keep working (unsafely) after it. The unsafe window is the time old APKs stay in
+use. During it, avoid editing the same records on old and new phones; anything an old phone overwrote can be found in
+`eab_record_revisions`. A later change could block old-style direct writes (section 7); it is **not** part of this patch.
 
 ## 4. Tests
 
@@ -117,16 +135,24 @@ tested separately in `supabase/tests/rls-test.sh`.
 
 ## 5. What was and was not tested
 
-- **Local PostgreSQL 16 only** (with stand-ins for Supabase's `auth` and `storage` schemas). **No live Supabase test was run.**
-  The Storage HTTP layer (upload/download endpoints, the real policy engine of Storage) was not exercised: object
-  policies were checked on the stand-in table only.
-- **No real device.** Browser tests ran in desktop Chromium at 384×824. The installed APK is untested.
-- Compression-for-upload uses the browser canvas; it is injected away in unit tests.
+**Tested (automated):**
+- Phone logic against a stand-in cloud that re-implements the SQL rules (unit tests, 134).
+- Browser screens in desktop Chromium at 384×824 (54), including the storage upgrade from the Phase 1 layout with a stored photo.
+- SQL rules, access policies, parallel duplicate/version races, the migration on existing data, and the rollback (including a
+  failing rollback) on a **local PostgreSQL 16** with stand-ins for Supabase's sign-in and storage schemas.
+
+**Not tested / assumptions:**
+- **No live Supabase test of any kind.** Supabase's real Storage service (upload/download endpoints, its policy engine,
+  raw-body POST uploads, the "already exists" answer for a repeated upload) is assumed, not exercised.
+- **No real device or installed APK.** Compression-for-upload uses the browser canvas and is untested on a phone.
+- A new APK against an un-migrated server (fails safely) is from code reading.
+- The migration and rollback have not been run in the Supabase SQL Editor.
+- An old copy of the app holding the local database open during the 1→2 upgrade is not handled or tested (unlikely on Android).
 
 ## 6. Remaining risks and decisions for you
 
-1. **Old APKs will stop syncing** once the migration is live (they call a protocol that no longer matches). Update all
-   phones first, then apply the migration.
+1. **Old APKs keep syncing after the migration and can silently overwrite newer records** (see 3a). The overwritten version
+   is kept in the cloud history but the app cannot show it. Update all phones promptly after applying the migration.
 2. **Legacy records edited before upgrade have no stored base**: the first join can list more fields as conflicts than
    really differ. Safe but noisy; only affects records with unsent edits at upgrade time.
 3. **Undo restores the retired value "Inactive"** (shown as "Inactive (retired)", flagged so it is not converted again).
@@ -141,3 +167,11 @@ tested separately in `supabase/tests/rls-test.sh`.
 9. **Join on non-identical id-lists** (e.g. one phone edits a photo's name, another removes that photo) is reported as a
    conflict of the whole list, not item by item.
 10. The reference check is by number only (as you confirmed); a property without a number is never blocked.
+
+## 7. Not in this patch: blocking old-style direct writes (to be decided later)
+
+Idea: after every phone runs the new APK and the new sync is verified, remove direct insert/update rights on `eab_records`
+so only `eab_push_records` can write. Before proposing that migration, confirm (a) every write path to block (PostgREST
+insert/upsert/patch/delete on `eab_records`, from any role), (b) that the new APK uses none of them (it writes records only
+through `eab_push_records`; to be re-verified by test), (c) how rights are restored on rollback (re-grant `insert, update`
+to `authenticated` and re-create the matching policies), (d) that no existing RLS policy is loosened. Nothing of this is implemented.

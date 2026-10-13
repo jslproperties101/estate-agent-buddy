@@ -46,4 +46,16 @@ check "an old app's plain upsert works again" "" "$(as "insert into eab_records 
 check "...and it changed the record" "Old app" "$($P -c "select data->>'name' from eab_records where id='c1'")"
 $DB -f supabase/migrations/20261014000000_phase2_sync_refs_files.sql >/dev/null 2>&1; check "migration can be applied again after a rollback" "0" "$?"
 check "re-applied: version column continues (never reset)" "t" "$($P -c "select rev >= 1 from eab_records where id='c1'")"
+SNAP2=$($P -c "select md5(string_agg(workspace_id::text||collection||id||coalesce(data::text,'')||deleted::text, ',' order by workspace_id, collection, id)) from eab_records")
+# Failure behaviour: something unexpected depends on a Phase 2 table, so the rollback cannot finish. Nothing may be half-done.
+$DB -c "create view public.zz_blocker as select file_id from public.eab_files;" >/dev/null
+count_p2() { $P -c "select (select count(*) from pg_trigger where tgname in ('eab_records_version','eab_records_keep_revision','eab_records_property_ref')) + (select count(*) from pg_proc where proname in ('eab_push_records','eab_sync_property_ref')) + (select count(*) from pg_tables where tablename in ('eab_files','eab_property_refs','eab_record_revisions')) + (select count(*) from pg_policies where policyname like 'eab file object%')"; }
+FULL=$(count_p2)
+$DB -f supabase/rollback/20261014000000_phase2_rollback.sql >/dev/null 2>&1; check "failing rollback stops with an error (stop-on-error mode)" "3" "$?"
+check "...and changed nothing (all Phase 2 objects still there)" "$FULL" "$(count_p2)"
+psql -d $DBN -q -f supabase/rollback/20261014000000_phase2_rollback.sql >/dev/null 2>&1   # a pasted script keeps going after an error
+check "failing rollback in keep-going mode also changes nothing" "$FULL" "$(count_p2)"
+check "records still intact after the failed attempts" "$SNAP2" "$($P -c "select md5(string_agg(workspace_id::text||collection||id||coalesce(data::text,'')||deleted::text, ',' order by workspace_id, collection, id)) from eab_records")"
+$DB -c "drop view public.zz_blocker;" >/dev/null
+$DB -f supabase/rollback/20261014000000_phase2_rollback.sql >/dev/null 2>&1; check "rollback succeeds again once the blocker is gone" "0" "$?"
 echo "passed $pass, failed $fail"; [ "$fail" -eq 0 ]

@@ -204,5 +204,10 @@ check "removed file: marked deleted, object kept" "1"       "$(as $A a@x.com "wi
 check "...still readable by the owner (undo can bring it back)" "2" "$(as $A a@x.com "select count(*) from storage.objects where bucket_id='eab-files'")"
 check "...but no new upload for a deleted file"  "row-level security" "$(as $A a@x.com "insert into storage.objects (bucket_id, name) values ('eab-files','$WSA/$H1')")"
 check "anon cannot call membership" "permission denied"    "$(printf "set role anon;\nselect * from eab_my_membership();\n" | $P 2>&1)"
+# An old app (Phase 1) writes with a plain upsert: it still works after the migration, and what it replaces is kept in history.
+as $A a@x.com "insert into eab_records (workspace_id, collection, id, data, updated) values ('$WSA','contacts','oldapp1','{\"name\":\"v1\"}',1)" >/dev/null
+as $A a@x.com "insert into eab_records (workspace_id, collection, id, data, updated) values ('$WSA','contacts','oldapp1','{\"name\":\"OLD APP OVERWRITE\"}',2) on conflict (workspace_id, collection, id) do update set data = excluded.data, updated = excluded.updated" >/dev/null
+check "old app plain upsert still overwrites (no version check)" "OLD APP OVERWRITE" "$($P -c "select data->>'name' from eab_records where id='oldapp1'")"
+check "...and the replaced version is kept in cloud history"      "v1"                "$($P -c "select data->>'name' from eab_record_revisions where record_id='oldapp1'")"
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]
