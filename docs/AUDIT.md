@@ -112,22 +112,22 @@ Tap opens details (DONE). Long-press preview and a visible Preview button: DONE 
 ### 12. Photo enhancement, privacy masking, AI declutter — NOT DONE
 Only automatic resize/compression on upload.
 
-### 13. Voice command — NOT PROVEN
+### 13. Voice command — NOT PROVEN (Stage 5: diagnostics and the three missing commands built; see docs/STAGE5.md)
 Web Speech API recogniser, on-device command parser for property create/find, to-dos, appointments, contacts; spoken
 numbers ("five hundred thousand", BM equivalents) parsed; results always open a form for checking (nothing saved
 silently). Tested with typed text only (U19); real microphone never tested. Likely reasons it "doesn't work" for you:
 (1) opened from a file or http page — browsers allow the microphone only on https or localhost; (2) Web Speech is not
 available in Samsung Internet, Firefox, or an Android WebView without a native speech plugin; (3) permission denied
 earlier. Missing commands: "set the asking price to…", "change status to Sold", "find buyers looking for…".
-→ Stage 5 (diagnostics screen + missing commands + native plugin plan).
+→ Stage 5 (diagnostics screen + missing commands + native plugin plan). **Built in Stage 5, browser-tested only; microphone on the S23 Ultra still unproven.**
 
-### 14. Property calculator — PARTIAL
+### 14. Property calculator — DONE in Stage 5 (browser-tested; PDF share on the phone NOT PROVEN)
 Purchase (deposit, loan, repayments, MOT/stamp duty tiers, legal fees, SST, disbursements), rental yield/ROI, sale
 with RPGT, agent commission; rates editable under Assumptions. Missing: searchable property dropdown inside the
 calculator (only opens pre-filled from a property), client selection, saved calculations and history, "Update Property
-Record", Share/Download PDF. → Stage 5.
+Record", Share/Download PDF. → Stage 5: all built (docs/STAGE5.md).
 
-### 15. Buyer PDF / share — NOT DONE (no PDF code anywhere)
+### 15. Buyer PDF / share — DONE in Stage 5 (local, picture-based PDF; share/download inside the Android app NOT PROVEN)
 ### 16. Marketing Studio — NOT DONE
 ### 17. Advertising & Listing Tracker — PARTIAL
 Per-property "adverts" list exists inside the property form (platform, status planned/live/needs update/paused/expired,

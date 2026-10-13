@@ -30,7 +30,7 @@ export function VoiceDiagnostics({ lang, go }: { lang: Lang; go: Go }) {
     setHeard(''); setTestErr(null); setTested('none'); got.current = false;
     setListening(true);
     live.current = listen(voiceLang, {
-      interim: x => setHeard(x),
+      interim: x => { if (x) setHeard(x); },
       final: x => { got.current = true; setHeard(x); },
       error: code => { if (code !== 'aborted') setTestErr(code); },
       end: () => { setListening(false); live.current = null; setTested(got.current ? 'heard' : 'silent'); run(); },

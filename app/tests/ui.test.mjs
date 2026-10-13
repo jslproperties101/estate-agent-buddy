@@ -2492,6 +2492,405 @@ test('U70 My Banner Location: changing the position keeps the earlier place; a p
   await page.context().close();
 });
 
+// ---------------------------------------------------------------------------------------------------------------
+// Stage 5: Property Calculator, PDFs and Voice Command. The browser's own canvas, file download and speech
+// stand-ins are used here; real PDF sharing, the real microphone and Android's speech service still have to be
+// checked on the S23 Ultra.
+
+/** Every record of one collection in the phone's storage (c:<collection>:<id>). */
+const storedRecords = (page, collection) => page.evaluate(c => new Promise(res => {
+  const r = indexedDB.open('estate-agent-buddy');
+  r.onsuccess = () => {
+    const db = r.result;
+    const q = db.transaction('records').objectStore('records').openCursor();
+    const out = [];
+    q.onsuccess = () => { const cur = q.result; if (cur) { if (String(cur.key).startsWith(`c:${c}:`)) out.push(cur.value); cur.continue(); } else { db.close(); res(out); } };
+  };
+}), collection);
+const calcTab = (page, name) => page.getByRole('tab', { name: new RegExp(`^${name}`) }).click();
+/** A real picture (so the PDF has something to draw), made in the page. */
+const makePhoto = (page, colour = '#3a7') => page.evaluate(c => { const cv = document.createElement('canvas'); cv.width = 640; cv.height = 480; const x = cv.getContext('2d'); x.fillStyle = c; x.fillRect(0, 0, 640, 480); x.fillStyle = '#fff'; x.fillRect(100, 100, 200, 150); return cv.toDataURL('image/jpeg', 0.8).split(',')[1]; }, colour).then(b => Buffer.from(b, 'base64'));
+/** Presses a button that downloads the PDF and returns the file's bytes. */
+async function pdfFrom(page, buttonTestId) {
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId(buttonTestId).click()]);
+  const { readFile } = await import('node:fs/promises');
+  return { bytes: await readFile(await dl.path()), name: dl.suggestedFilename() };
+}
+const pdfInfo = b => { const t = b.toString('latin1'); return { header: t.slice(0, 8), pages: (t.match(/\/Type \/Page /g) ?? []).length, images: (t.match(/\/DCTDecode/g) ?? []).length, eof: t.trimEnd().endsWith('%%EOF') }; };
+
+test('U71 Calculator: search and choose a property, choose a client, save, change and save again, reopen from History after closing the app, delete', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Property Calculator');
+  assert.equal(await page.getByTestId('calc-from').count(), 0, 'opened without a property');
+  await page.getByTestId('calc-pick-property').click();
+  await page.getByTestId('calc-search').fill('no such place xyz');
+  assert.equal(await page.getByTestId('calc-pick-item').count(), 0);
+  assert.match(await page.getByTestId('calc-no-match').innerText(), /No property matches/);
+  await page.getByTestId('calc-search').fill('P1004');
+  assert.equal(await page.getByTestId('calc-pick-item').count(), 1);
+  await page.getByTestId('calc-pick-item').click();
+  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
+  assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000', 'price came from the property');
+  await page.getByTestId('calc-client').selectOption({ label: 'Buyer K (sample) · +60 12-111 2222' });
+  await page.getByTestId('calc-name').fill('Offer A');
+  assert.equal((await storedRecords(page, 'calculations')).length, 0, 'nothing is saved until Save');
+  await page.getByTestId('calc-save').click();
+  assert.match(await page.getByTestId('calc-saved').innerText(), /Saved on this phone/);
+  await waitStored(page, 'records', "all.some(v => v && v.kind === 'purchase' && v.title === 'Offer A' && v.purchase && v.purchase.price === 580000 && v.propertyId && v.contactId === 'b1')");
+  // change and save again: the same record is updated
+  await page.locator('[data-field="price"]').fill('600000');
+  await page.getByTestId('calc-save').click();
+  assert.match(await page.getByTestId('calc-saved').innerText(), /Changes saved/);
+  await waitStored(page, 'records', "all.some(v => v && v.title === 'Offer A' && v.purchase && v.purchase.price === 600000)");
+  assert.equal((await storedRecords(page, 'calculations')).length, 1, 'edited in place, not duplicated');
+  // a second, different calculation (rental) saved as new
+  await calcTab(page, 'Rental');
+  await page.locator('[data-field="rent"]').fill('2400');
+  await page.getByTestId('calc-name').fill('Rent check B');
+  await page.getByTestId('calc-save-new').click();
+  await waitStored(page, 'records', "all.filter(v => v && v.kind === 'rental' && v.rental && v.rental.monthlyRent === 2400).length === 1");
+  assert.equal((await storedRecords(page, 'calculations')).length, 2);
+  // close the app and open it again: History still has both
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Property Calculator');
+  await calcTab(page, 'History');
+  assert.equal(await page.getByTestId('calc-history-item').count(), 2);
+  const first = page.getByTestId('calc-history-item').filter({ hasText: 'Offer A' });
+  assert.match(await first.innerText(), /Monthly repayment/);
+  assert.match(await first.innerText(), /P1004/);
+  assert.match(await first.innerText(), /Buyer K/);
+  await shot(page, '71-calc-history');
+  await first.getByTestId('calc-open').click();
+  assert.equal(await page.locator('[data-field="price"]').inputValue(), '600,000', 'the saved price is back');
+  assert.equal(await page.getByTestId('calc-name').inputValue(), 'Offer A');
+  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
+  assert.match(await page.getByTestId('calc-editing').innerText(), /Offer A/);
+  assert.equal(await page.getByTestId('calc-client').inputValue(), 'b1');
+  // delete from History (asks first)
+  await calcTab(page, 'History');
+  await page.getByTestId('calc-history-item').filter({ hasText: 'Offer A' }).getByTestId('calc-delete').click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await waitStored(page, 'records', "all.filter(v => v && v.kind && v.purchase && v.rental).length === 1");
+  assert.equal(await page.getByTestId('calc-history-item').count(), 1);
+  await page.context().close();
+});
+
+test('U72 Calculator: a saved calculation can update the property record only after a review; cancel and unticked values change nothing', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Property Calculator');
+  await page.getByTestId('calc-pick-property').click();
+  await page.getByTestId('calc-search').fill('P1004');
+  await page.getByTestId('calc-pick-item').click();
+  assert.equal(await page.getByTestId('calc-update-property').count(), 0, 'not offered before the calculation is saved');
+  await page.locator('[data-field="price"]').fill('600000');
+  await page.getByTestId('calc-save').click();
+  await waitStored(page, 'records', "all.some(v => v && v.kind === 'purchase' && v.purchase.price === 600000)");
+  await page.getByTestId('calc-update-property').click();
+  const sheet = page.getByTestId('calc-update-sheet');
+  assert.match(await sheet.innerText(), /Asking price/);
+  assert.match(await sheet.innerText(), /Now: RM 580,000\.00/);
+  assert.match(await sheet.innerText(), /New: RM 600,000\.00/);
+  const price = async () => (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004').askingPrice;
+  assert.equal(await price(), 580000, 'reviewing changes nothing');
+  await page.getByTestId('calc-update-cancel').click();
+  assert.equal(await price(), 580000, 'Cancel changes nothing');
+  await page.getByTestId('calc-update-property').click();
+  await page.getByTestId('upd-askingPrice').uncheck();
+  assert.equal(await page.getByTestId('calc-update-apply').isDisabled(), true, 'nothing ticked → nothing to apply');
+  await page.getByTestId('upd-askingPrice').check();
+  await page.getByTestId('calc-update-apply').click();
+  await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.askingPrice === 600000)");
+  const rec = (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004');
+  assert.match(rec.history[0].summary, /Updated from a saved calculation/);
+  assert.equal(rec.bedrooms !== undefined, true, 'other details are untouched');
+  // the same values again: nothing left to update
+  await page.getByTestId('calc-update-property').click();
+  assert.match(await page.getByTestId('calc-update-nothing').innerText(), /already has the same values/);
+  await page.getByTestId('calc-update-cancel').click();
+  await page.context().close();
+});
+
+test('U73 Calculator PDF: preview the pages, download a real PDF file, share falls back to a download, the assumptions on the day are printed', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Property Calculator');
+  await page.getByTestId('calc-pick-property').click();
+  await page.getByTestId('calc-search').fill('P1004');
+  await page.getByTestId('calc-pick-item').click();
+  await page.getByTestId('calc-name').fill('Offer for Mr Tan');
+  await page.getByTestId('calc-pdf').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  const pages = await page.getByTestId('pdf-page').count();
+  assert.ok(pages >= 1);
+  assert.match(await page.getByTestId('pdf-pages').innerText(), new RegExp(`${pages} page`));
+  assert.equal(await page.getByTestId('pdf-page').first().evaluate(i => i.naturalWidth), 1190, 'A4 at two pixels per point');
+  await shot(page, '73-calc-pdf-preview', false);
+  const dl = await pdfFrom(page, 'pdf-download');
+  const info = pdfInfo(dl.bytes);
+  assert.equal(info.header, '%PDF-1.4');
+  assert.equal(info.pages, pages, 'the file has the pages that were previewed');
+  assert.equal(info.images, pages); assert.ok(info.eof);
+  assert.match(dl.name, /^Offer-for-Mr-Tan.*\.pdf$/);
+  assert.match(await page.getByTestId('pdf-msg').innerText(), /PDF saved/);
+  // Share: this desktop browser cannot share a file, so it falls back to saving it (the share sheet is untested here)
+  const shared = await pdfFrom(page, 'pdf-share');
+  assert.equal(pdfInfo(shared.bytes).header, '%PDF-1.4');
+  await page.getByTestId('pdf-close').click();
+  assert.equal(await page.getByTestId('pdf-preview').count(), 0);
+  // an empty calculation (all zero, no property) still makes a PDF
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Property Calculator');
+  await calcTab(page, 'Sale');
+  await page.getByTestId('calc-pdf').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  assert.equal(pdfInfo((await pdfFrom(page, 'pdf-download')).bytes).header, '%PDF-1.4');
+  await page.context().close();
+});
+
+test('U74 Buyer PDF: choose details and photos, never offered: owner, commission, notes; missing details and no photos do not break it; the verification labels are kept', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Property List');
+  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByTestId('open-buyer-pdf').click();
+  const screen = page.getByTestId('buyer-pdf');
+  await screen.waitFor();
+  const text = await screen.innerText();
+  for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Current tenant', 'Arrangement', 'Handled by']) assert.ok(!text.includes(never), `${never} must not be offered`);
+  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Asking price.*RM 580,000/);
+  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated/, 'the existing check-status label is shown with the fact');
+  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /\d+ of \d+ ticked/);
+  assert.equal(await screen.getByTestId('bf-street').locator('input').isChecked(), false, 'the exact address starts unticked');
+  assert.equal(await screen.getByTestId('bf-askingPrice').locator('input').isChecked(), true);
+  // untick one, clear all, tick all
+  await screen.getByTestId('bf-bedrooms').locator('input').uncheck();
+  await screen.getByTestId('buyer-pdf-none').click();
+  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /^0 of/);
+  await screen.getByTestId('buyer-pdf-all').click();
+  assert.equal(await screen.getByTestId('bf-bedrooms').locator('input').isChecked(), true);
+  // missing details are listed apart and can be ticked ("To be confirmed")
+  await screen.getByTestId('buyer-pdf-missing').locator('summary').click();
+  assert.ok(await screen.getByTestId('buyer-pdf-missing').locator('input').count() > 0);
+  // the PDF language can differ from the app
+  await screen.getByTestId('buyer-pdf-lang').selectOption('zh');
+  assert.match(await screen.innerText(), /价格/);
+  await screen.getByTestId('buyer-pdf-lang').selectOption('en');
+  await screen.getByTestId('buyer-pdf-preview').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  const bytes = (await pdfFrom(page, 'pdf-download')).bytes;
+  assert.deepEqual([pdfInfo(bytes).header, pdfInfo(bytes).eof], ['%PDF-1.4', true]);
+  await shot(page, '74-buyer-pdf-preview', false);
+  await page.getByTestId('pdf-close').click();
+  await page.context().close();
+});
+
+test('U75 Buyer PDF with real photos: the agent chooses which go in; a property with no photos and almost no details still makes a PDF', async () => {
+  const page = await phone();
+  await tile(page, 'Property List');
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="headline"]').fill('Bare minimum house');
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  await page.getByTestId('open-buyer-pdf').click();
+  await page.getByTestId('buyer-pdf').waitFor();
+  assert.match(await page.getByTestId('buyer-pdf-no-photos').innerText(), /no photos yet/);
+  assert.match(await page.getByTestId('buyer-pdf-agent-none').innerText(), /Agent Profile/);
+  await page.getByTestId('buyer-pdf-preview').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  assert.equal(pdfInfo((await pdfFrom(page, 'pdf-download')).bytes).header, '%PDF-1.4', 'no photos, almost no details: still a PDF');
+  await page.getByTestId('pdf-close').click();
+  // now add two real photos to the property and choose one
+  await page.locator('header .icon-btn').first().click();
+  await page.getByTestId('listing-details').waitFor();
+  await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
+  await page.getByTestId('photo-input').setInputFiles([
+    { name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') },
+    { name: 'back.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#a53') },
+  ]);
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="listing-form"] img').length >= 2);
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  await page.getByTestId('open-buyer-pdf').click();
+  await page.getByTestId('buyer-pdf').waitFor();
+  assert.equal(await page.getByTestId('buyer-pdf-photo').count(), 2);
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /2 photos ticked/);
+  await page.getByTestId('buyer-pdf-photo').nth(1).locator('input').uncheck();
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /1 photo ticked/);
+  await page.getByTestId('buyer-pdf-preview').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  assert.equal(await page.getByTestId('buyer-pdf-skipped').count(), 0);
+  const one = pdfInfo((await pdfFrom(page, 'pdf-download')).bytes);
+  assert.equal(one.header, '%PDF-1.4');
+  await shot(page, '75-buyer-pdf-photo', false);
+  await page.getByTestId('pdf-close').click();
+  // none ticked → no picture section, still fine
+  await page.getByTestId('buyer-pdf-photo').nth(0).locator('input').uncheck();
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /0 photos ticked/);
+  await page.getByTestId('buyer-pdf-preview').click();
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  assert.equal(pdfInfo((await pdfFrom(page, 'pdf-download')).bytes).header, '%PDF-1.4');
+  await page.context().close();
+});
+
+test('U76 Voice diagnostics: unsupported recognition, blocked microphone and an insecure page are each explained; Test recognition really listens; the report says it is not proof', async () => {
+  const run = async (script, fn) => {
+    const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, isMobile: true, hasTouch: true });
+    await ctx.addInitScript(script);
+    const page = await ctx.newPage();
+    page.on('pageerror', e => consoleErrors.push(String(e)));
+    await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+    await tile(page, 'Voice Command');
+    await page.getByTestId('open-voice-diag').click();
+    await page.getByTestId('voice-diag-checks').waitFor();
+    await fn(page);
+    await ctx.close();
+  };
+  // 1. no speech recognition at all
+  await run('delete window.SpeechRecognition; delete window.webkitSpeechRecognition;', async page => {
+    assert.equal(await page.getByTestId('diag-engine').getAttribute('data-code'), 'unsupported');
+    assert.equal(await page.getByTestId('voice-diag-verdict').getAttribute('data-verdict'), 'blocked');
+    assert.match(await page.getByTestId('diag-engine').innerText(), /no speech recognition/);
+    assert.match(await page.getByTestId('voice-diag-sim').innerText(), /not proof/);
+    await page.getByTestId('voice-diag-start').click();
+    assert.match(await page.getByTestId('voice-diag-error').innerText(), /not supported here/);
+    await page.getByTestId('voice-diag-again').click();
+    assert.equal(await page.getByTestId('diag-last').getAttribute('data-code'), 'err_unsupported', 'the last problem is remembered and shown');
+  });
+  // 2. microphone blocked
+  await run(`${FAKE_SPEECH('Test 1 2 3')}; navigator.permissions.query = async () => ({ state: 'denied' });`, async page => {
+    assert.equal(await page.getByTestId('diag-permission').getAttribute('data-code'), 'perm_denied_web');
+    assert.match(await page.getByTestId('diag-permission').innerText(), /Site settings/);
+    assert.equal(await page.getByTestId('voice-diag-verdict').getAttribute('data-verdict'), 'blocked');
+  });
+  // 3. page not secure
+  await run(`${FAKE_SPEECH('Test 1 2 3')}; Object.defineProperty(window, 'isSecureContext', { value: false });`, async page => {
+    assert.equal(await page.getByTestId('diag-secure').getAttribute('data-code'), 'insecure');
+    assert.match(await page.getByTestId('diag-secure').innerText(), /https/);
+  });
+  // 4. working stand-in: Test recognition shows the words; the details text is plain and says "NOT proof"
+  await run(`${FAKE_SPEECH('Test 1 2 3')}; navigator.permissions.query = async () => ({ state: 'granted' });`, async page => {
+    assert.equal(await page.getByTestId('diag-engine').getAttribute('data-status'), 'ok');
+    await page.getByTestId('voice-diag-start').click();
+    await page.getByTestId('voice-diag-stop').click();
+    await page.getByTestId('voice-diag-ok').waitFor();
+    assert.match(await page.getByTestId('voice-diag-heard').innerText(), /Test 1 2 3/);
+    assert.equal(await page.getByTestId('diag-last').getAttribute('data-code'), 'lastOk');
+    await page.locator('summary', { hasText: 'Details to send' }).click();
+    const report = await page.getByTestId('voice-diag-report').innerText();
+    assert.match(report, /NOT proof that the microphone works/);
+    assert.ok(!/@|\+60/.test(report));
+    await shot(page, '76-voice-diagnostics');
+  });
+  // 5. a recognition error from the service is explained with what to do
+  await run(`class R { start() { setTimeout(() => this.onerror?.({ error: 'network' }), 30); setTimeout(() => this.onend?.(), 60); } stop() {} abort() {} } window.SpeechRecognition = R;`, async page => {
+    await page.getByTestId('voice-diag-start').click();
+    await page.getByTestId('voice-diag-error').waitFor();
+    assert.match(await page.getByTestId('voice-diag-error').innerText(), /speech service could not be reached.*internet connection/);
+  });
+});
+
+test('U77 Voice Command: set the asking price, change the status to Sold and find buyers — each opens a review; nothing is saved until Apply', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Voice Command');
+  const say = async t => { await page.getByTestId('voice-cmd').locator('textarea').fill(t); await page.getByRole('button', { name: 'Show proposed details' }).click(); };
+  const p1004 = async () => (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004');
+  // 1. asking price by reference
+  await say('Set the asking price of P1004 to RM600,000');
+  const panel = page.getByTestId('target-panel');
+  await panel.waitFor();
+  assert.match(await panel.innerText(), /P1004/);
+  assert.match(await panel.innerText(), /Now: RM 580,000/);
+  assert.match(await panel.innerText(), /New: RM 600,000/);
+  assert.equal((await p1004()).askingPrice, 580000, 'nothing saved from speech alone');
+  await page.getByTestId('target-cancel').click();
+  assert.equal((await p1004()).askingPrice, 580000, 'Cancel changes nothing');
+  await say('Set the asking price of P1004 to RM600,000');
+  await page.getByTestId('target-apply').click();
+  await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.askingPrice === 600000)");
+  assert.match(await page.getByTestId('voice-done').innerText(), /Property updated/);
+  assert.match((await p1004()).history[0].summary, /askingPrice/);
+  // 2. status to Sold (and Bahasa Malaysia wording)
+  await say('Change the status of P1004 to Sold');
+  assert.match(await page.getByTestId('target-panel').innerText(), /Now: .*\n?.*New: Sold/s);
+  assert.notEqual((await p1004()).status, 'sold');
+  await page.getByTestId('target-apply').click();
+  await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.status === 'sold')");
+  await say('tukar harga P1004 kepada RM590,000');
+  assert.match(await page.getByTestId('target-panel').innerText(), /590,000/);
+  await page.getByTestId('target-cancel').click();
+  assert.equal((await p1004()).askingPrice, 600000);
+  // 3. an unknown reference is explained, not guessed
+  await say('Change the status of P9999 to Sold');
+  assert.match(await page.getByTestId('target-none').innerText(), /No property matches/);
+  await say('Set the price to RM3 million');
+  assert.match(await page.getByTestId('target-none').innerText(), /Which property/);
+  // 4. find buyers by what they want
+  await say('Find buyers looking for a factory in Salak Tinggi');
+  const buyers = page.getByTestId('buyers-panel');
+  await buyers.waitFor();
+  assert.ok(await page.getByTestId('buyer-match').count() >= 1);
+  assert.match(await buyers.innerText(), /Tenant R/);
+  assert.match(await buyers.innerText(), /notes: factory|asked about/);
+  await shot(page, '77-find-buyers');
+  await page.getByTestId('buyer-match').first().getByTestId('buyer-open').click();
+  await page.getByTestId('contact-detail').waitFor();
+  await home(page);
+  await tile(page, 'Voice Command');
+  await say('Find buyers looking for a bungalow in Kajang');
+  assert.match(await page.getByTestId('buyers-none').innerText(), /No buyer or tenant matches/);
+  // 5. the existing commands still work
+  await say('Remind me to call Buyer K tomorrow at 3pm');
+  await page.waitForSelector('[data-testid="task-form"]');
+  await page.context().close();
+});
+
+test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet and voice diagnostics screens of Stage 5 are translated', async () => {
+  const page = await phone();
+  await loadSample(page);
+  const setLang = async aria => {
+    await home(page);
+    await page.locator('nav.grid > button').nth(9).click();                       // Agent Profile
+    await page.getByRole('button', { name: /Settings|Tetapan|设置/ }).click();
+    await page.locator(`.lang button[aria-label="${aria}"]`).click();
+    await home(page);
+  };
+  for (const [aria, expect] of [
+    ['Bahasa Malaysia', { hist: 'Sejarah', empty: /Belum ada/, pdf: 'Eksport PDF', diag: 'Diagnostik suara', diagText: /Menyemak mengapa/, buyer: 'PDF pembeli', buyerText: /Pilih apa yang pembeli lihat/, upd: /Kemas kini rekod hartanah/ }],
+    ['中文', { hist: '记录', empty: /还没有/, pdf: '导出 PDF', diag: '语音诊断', diagText: /检查这部手机/, buyer: '买家 PDF', buyerText: /选择买家能看到的内容/, upd: /更新房产记录/ }],
+  ]) {
+    await setLang(aria);
+    await page.locator('nav.grid > button').nth(8).click();                       // Property Calculator
+    await page.getByRole('tab', { name: new RegExp(expect.hist) }).click();
+    if (aria === 'Bahasa Malaysia') assert.match(await page.getByTestId('calc-history-empty').innerText(), expect.empty);
+    else assert.match(await page.getByTestId('calc-history-item').first().innerText(), /购买与贷款.*保存于/s);   // the calculation saved in the previous round
+    await page.getByRole('tab').first().click();
+    assert.match(await page.getByTestId('calc-pdf').innerText(), new RegExp(expect.pdf));
+    await page.getByTestId('calc-pick-property').click();
+    await page.getByTestId('calc-pick-item').first().click();
+    await page.locator('[data-field="price"]').fill('1234567');
+    await page.getByTestId('calc-save').click();
+    await page.getByTestId('calc-update-property').click();
+    assert.match(await page.getByTestId('calc-update-sheet').innerText(), expect.upd);
+    await page.getByTestId('calc-update-cancel').click();
+    await home(page);
+    await page.locator('nav.grid > button').nth(3).click();                       // Property list
+    await page.getByTestId('listing-card').first().click();
+    assert.match(await page.getByTestId('open-buyer-pdf').innerText(), new RegExp(expect.buyer));
+    await page.getByTestId('open-buyer-pdf').click();
+    assert.match(await page.getByTestId('buyer-pdf').innerText(), expect.buyerText);
+    await home(page);
+    await page.locator('nav.grid > button.voice-tile').click();
+    assert.match(await page.getByTestId('open-voice-diag').innerText(), new RegExp(expect.diag));
+    await page.getByTestId('open-voice-diag').click();
+    assert.match(await page.getByTestId('voice-diag').innerText(), expect.diagText);
+    await shot(page, `78-${aria === '中文' ? 'zh' : 'bm'}-voice-diagnostics`);
+  }
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
