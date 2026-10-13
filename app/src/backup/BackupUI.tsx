@@ -4,9 +4,15 @@ import { useState } from 'react';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { shareOrDownload } from '../lib/pdfRender';
+import { config } from '../config';
+import { startDriveConnect } from '../data/auth';
+import { downloadBackup, driveUsable, ensureFolder, listBackups, runDriveBackup, DriveFile } from './drive';
 import { fmtDateTime } from '../lib/dates';
 import { backupStrings } from './strings';
 import { createBackup, inspectBackup, noteBackupMade, planRestore, restoreBackup, Inspection, RestoreMode, RestorePlan } from './backup';
+
+/** A Drive backup older than this is called out (Settings and Notifications). */
+export const STALE_MS = 2 * 24 * 3600_000;
 
 export function BackupCard({ lang }: { lang: Lang }) {
   const { state, store } = useApp();
@@ -16,6 +22,38 @@ export function BackupCard({ lang }: { lang: Lang }) {
   const [insp, setInsp] = useState<Inspection | null>(null);
   const [mode, setMode] = useState<RestoreMode>('missing');
   const [plan, setPlan] = useState<RestorePlan | null>(null);
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMsg, setDriveMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  const [driveFiles, setDriveFiles] = useState<DriveFile[] | null>(null);
+  const meta = state.meta;
+  const signedIn = !!meta.syncSession;
+  const usable = driveUsable(meta.drive);
+
+  const connect = async () => {
+    setDriveMsg(null);
+    try { await startDriveConnect(config(state.settings)); } catch { setDriveMsg({ text: t.driveFail.network, bad: true }); }
+  };
+  const driveNow = async () => {
+    setDriveBusy(true); setDriveMsg(null);
+    const r = await runDriveBackup(store);
+    setDriveMsg(r.ok ? { text: t.driveOk(r.run.copies, r.run.fileName) } : { text: t.driveFail[r.error] ?? t.driveFail.server, bad: true });
+    setDriveBusy(false);
+  };
+  const showDrive = async () => {
+    setDriveBusy(true); setDriveMsg(null);
+    try { const tok = meta.drive!.token; const folder = await ensureFolder(fetch, tok); const l = await listBackups(fetch, tok, folder); setDriveFiles(l); if (!l.length) setDriveMsg({ text: t.driveNone }); }
+    catch { setDriveMsg({ text: t.driveListFail, bad: true }); }
+    setDriveBusy(false);
+  };
+  const useDriveFile = async (f: DriveFile) => {
+    setDriveBusy(true); setDriveMsg(null); setMsg(null);
+    try {
+      const i = await inspectBackup(await downloadBackup(fetch, meta.drive!.token, f.id));
+      if (!i.ok) setMsg({ text: t.problem[i.problems[0]] ?? t.problem.damaged, bad: true });
+      else { setInsp(i); setPlan(await planRestore(store, i, mode)); }
+    } catch { setDriveMsg({ text: t.driveListFail, bad: true }); }
+    setDriveBusy(false);
+  };
 
   const make = async () => {
     setBusy('making'); setMsg(null);
@@ -82,6 +120,24 @@ export function BackupCard({ lang }: { lang: Lang }) {
         </div>
       )}
       {msg && <small role={msg.bad ? 'alert' : 'status'} className={msg.bad ? 'warn-text' : 'ok-text'} data-testid="backup-msg">{msg.text}</small>}
+      <div className="card-title">{t.driveTitle}</div>
+      <small className="muted">{t.driveHint}</small>
+      <small className="muted">{t.driveLimit}</small>
+      {!signedIn ? <small className="muted" data-testid="drive-need-signin">{t.driveNotSetUp}</small> : <>
+        <small data-testid="drive-state">{usable ? t.connected(fmtDateTime(meta.drive!.expiresAt, lang)) : t.notConnected}</small>
+        <small className={meta.driveLastOkAt && Date.now() - meta.driveLastOkAt <= STALE_MS ? 'muted' : 'warn-text'} data-testid="drive-last">
+          {meta.driveLastOkAt ? (Date.now() - meta.driveLastOkAt > STALE_MS ? t.driveStale(fmtDateTime(meta.driveLastOkAt, lang)) : t.driveLastOk(fmtDateTime(meta.driveLastOkAt, lang))) : t.driveNever}
+        </small>
+        <button className="btn secondary" data-testid="drive-connect" disabled={driveBusy} onClick={connect}>{t.connect}</button>
+        {usable && <>
+          <button className="btn primary" data-testid="drive-now" disabled={driveBusy} onClick={driveNow}>{driveBusy ? t.driveBusy : t.driveNow}</button>
+          <button className="btn ghost" data-testid="drive-list" disabled={driveBusy} onClick={showDrive}>{t.driveList}</button>
+        </>}
+        {driveFiles && driveFiles.map(f => (
+          <div className="row" key={f.id} data-testid="drive-file"><small>{f.name}</small><button className="btn small ghost" disabled={driveBusy} onClick={() => void useDriveFile(f)}>{t.driveRestore}</button></div>
+        ))}
+        {driveMsg && <small role={driveMsg.bad ? 'alert' : 'status'} className={driveMsg.bad ? 'warn-text' : 'ok-text'} data-testid="drive-msg">{driveMsg.text}</small>}
+      </>}
     </div>
   );
 }

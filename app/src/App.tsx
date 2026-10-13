@@ -66,6 +66,9 @@ import { syncStrings } from './sync/strings';
 import { SyncReviewScreen, HistoryScreen, RecentlyDeletedScreen, DraftsList, OtherWorkspaceScreen, OwnerUnknownScreen } from './sync/SyncUI';
 import { pendingFileCount } from './data/savestate';
 import { convertInactive, inactiveContacts, reviewContacts } from './data/leadReview';
+import { backupDue, driveUsable, runDriveBackup } from './backup/drive';
+import { backupStrings } from './backup/strings';
+import { STALE_MS } from './backup/BackupUI';
 import { leadReviewStrings } from './data/leadReviewStrings';
 
 /** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
@@ -195,6 +198,11 @@ function Shell() {
   // Buyers still marked with the retired status "Inactive" (from an older version, or from another phone) become Dropped,
   // with a report. Runs on opening and again whenever a sync brings such a record in; it does nothing otherwise.
   useEffect(() => { if (inactiveContacts(state.contacts).length) convertInactive(store); }, [state.contacts, store]);
+  // A Google Drive backup once a day at app start, but only while Google's short-lived Drive token is still valid (see backup/drive.ts).
+  useEffect(() => {
+    const m = store.getState().meta;
+    if (m.syncSession && driveUsable(m.drive) && backupDue(m.driveLastOkAt)) void runDriveBackup(store);
+  }, [store]);
   const saveState = useSaveState();
   const lastSaveState = useRef(saveState);
   useEffect(() => {
@@ -506,7 +514,8 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
   const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
   const draftCount = store.allDrafts().length;
-  const systemEmpty = soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0;
+  const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
+  const systemEmpty = soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -528,6 +537,12 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         {adAttn.length > 0 && (
           <button className="link-row" data-testid="notif-adverts" onClick={() => go({ name: 'adSummary' })}>
             <strong>📣 {adStrings[lang].attention} ({adAttn.length})</strong><small className="muted">{adStrings[lang].summaryTitle}</small>
+          </button>
+        )}
+        {driveStale && (
+          <button className="link-row" data-testid="notif-drive" onClick={() => go({ name: 'settings' })}>
+            <strong>{backupStrings[lang].driveTitle}</strong>
+            <small className="muted">{state.meta.driveLastOkAt ? backupStrings[lang].driveStale(fmtDateTime(state.meta.driveLastOkAt, lang)) : backupStrings[lang].driveNever}</small>
           </button>
         )}
         {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}

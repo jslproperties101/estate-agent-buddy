@@ -9,6 +9,7 @@ import { SyncConfig, SyncError, Session, TokenResponse, toSession, supabaseCall,
 
 type FetchFn = typeof fetch;
 const PKCE_KEY = 'eab-pkce-verifier';
+const DRIVE_KEY = 'eab-drive-intent';
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
@@ -32,8 +33,8 @@ export function redirectUrl(): string {
 /** The web version can sign in only from a real web address (not a file opened from the phone's storage). */
 export const canSignInHere = () => isNative() || /^https?:$/.test(window.location.protocol);
 
-export function authorizeUrl(cfg: SyncConfig, redirect: string, challenge: string): string {
-  const q = new URLSearchParams({ provider: 'google', redirect_to: redirect, code_challenge: challenge, code_challenge_method: 's256' });
+export function authorizeUrl(cfg: SyncConfig, redirect: string, challenge: string, extra: Record<string, string> = {}): string {
+  const q = new URLSearchParams({ provider: 'google', redirect_to: redirect, code_challenge: challenge, code_challenge_method: 's256', ...extra });
   return `${cfg.supabaseUrl}/auth/v1/authorize?${q}`;
 }
 
@@ -52,7 +53,22 @@ export async function startGoogleSignIn(cfg: SyncConfig): Promise<void> {
   if (!(await openInBrowser(url))) throw new SyncError('network');
 }
 
-export type CallbackResult = { kind: 'none' } | { kind: 'error'; code: string; message?: string } | { kind: 'signed-in'; session: Session }
+/** Asks Google for permission to keep backup files in the app's own Drive folder (drive.file: nothing else in Drive).
+ *  The same Google account signs in again; the extra permission comes back as a short-lived token (see backup/drive.ts). */
+export async function startDriveConnect(cfg: SyncConfig): Promise<void> {
+  if (!configured(cfg)) throw new SyncError('not-configured');
+  const verifier = newVerifier();
+  store.set(verifier);
+  try { localStorage.setItem(DRIVE_KEY, '1'); } catch { /* storage blocked */ }
+  const url = authorizeUrl(cfg, redirectUrl(), await challengeFor(verifier), { scopes: 'https://www.googleapis.com/auth/drive.file', prompt: 'consent' });
+  if (!(await openInBrowser(url))) throw new SyncError('network');
+}
+/** True once, when the return from Google was started by "Connect Google Drive". */
+export function takeDriveIntent(): boolean {
+  try { const v = localStorage.getItem(DRIVE_KEY) === '1'; localStorage.removeItem(DRIVE_KEY); return v; } catch { return false; }
+}
+
+export type CallbackResult = { kind: 'none' } | { kind: 'error'; code: string; message?: string } | { kind: 'signed-in'; session: Session; providerToken?: string }
 
 /** Reads ?code= / ?error= from the return address and turns a code into a session (with the team role). */
 export async function handleCallback(cfg: SyncConfig, url: string, fetchFn: FetchFn = fetch): Promise<CallbackResult> {
@@ -73,8 +89,9 @@ export async function handleCallback(cfg: SyncConfig, url: string, fetchFn: Fetc
       method: 'POST', headers: supabaseHeaders(cfg), body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
     });
     store.clear();
-    const session = toSession((await r.json()) as TokenResponse);
-    return { kind: 'signed-in', session: await membership(cfg, session, fetchFn) };
+    const tok = (await r.json()) as TokenResponse;
+    const session = toSession(tok);
+    return { kind: 'signed-in', session: await membership(cfg, session, fetchFn), ...(tok.provider_token ? { providerToken: tok.provider_token } : {}) };
   } catch (e) {
     store.clear();
     return { kind: 'error', code: e instanceof SyncError ? e.code : 'network', message: e instanceof Error ? e.message.slice(0, 200) : undefined };

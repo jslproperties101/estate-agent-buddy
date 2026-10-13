@@ -6,7 +6,7 @@ import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { configured } from '../data/sync';
-import { startGoogleSignIn, handleCallback, cleanWebAddress, canSignInHere } from '../data/auth';
+import { startGoogleSignIn, handleCallback, cleanWebAddress, canSignInHere, takeDriveIntent } from '../data/auth';
 import { onAppUrlOpen, onBrowserClosed, isNative, AUTH_CALLBACK } from '../native/native';
 import { authStrings } from './strings';
 import { IconLogo } from '../icons';
@@ -25,8 +25,14 @@ export function useGoogleReturn(onDone: (error: string | null) => void): void {
       const r = await handleCallback(cfg, url);
       if (r.kind === 'none') return;
       cleanWebAddress();
-      if (r.kind === 'signed-in') { store.setSingleton('meta', { syncSession: r.session, offlineOnly: false, syncError: undefined }); done.current(null); }
-      else done.current(r.code);
+      if (r.kind === 'signed-in') {
+        const drive = takeDriveIntent();
+        store.setSingleton('meta', { syncSession: r.session, offlineOnly: false, syncError: undefined });
+        // Google's token for Drive lasts about an hour; it is kept on this phone only, and only when the person asked to connect Drive.
+        if (drive && r.providerToken) store.setSingleton('meta', { drive: { token: r.providerToken, expiresAt: Date.now() + 55 * 60_000, connectedAt: Date.now() } });
+        done.current(null);
+      }
+      else { takeDriveIntent(); done.current(r.code); }
     };
     if (!isNative() && /[?&#](code|error)=/.test(window.location.href)) void finish(window.location.href);
     let l: { remove: () => unknown } | null = null;

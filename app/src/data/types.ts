@@ -263,6 +263,10 @@ export interface Meta {
   /** When the last whole-app backup file was made / the last restore was applied on this phone. */
   lastBackupAt?: number;
   lastRestoreAt?: number;
+  /** Google Drive backup access: a short-lived Google token kept only on this phone (never in a backup file or the cloud). */
+  drive?: { token: string; expiresAt: number; connectedAt: number };
+  driveLastOkAt?: number;
+  driveLast?: { at: number; ok: boolean; error?: string; copies?: number; fileName?: string };
   syncSession?: {
     accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string;
     /** From the Google account (via Supabase). */

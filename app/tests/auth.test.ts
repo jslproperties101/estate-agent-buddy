@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { challengeFor, newVerifier, authorizeUrl, handleCallback } from '../src/data/auth';
+import { challengeFor, newVerifier, authorizeUrl, handleCallback, takeDriveIntent } from '../src/data/auth';
 
 const mem = new Map<string, string>();
 (globalThis as unknown as { localStorage: Storage }).localStorage = {
@@ -59,4 +59,24 @@ test('A3 return from Google: code exchanged with the saved verifier, role fetche
   localStorage.setItem('eab-pkce-verifier', 'V2');
   const refused = await handleCallback(cfg, 'https://localhost/?code=bad', (async () => new Response('{"error":"invalid_grant"}', { status: 400 })) as typeof fetch);
   assert.equal(refused.kind, 'error');
+});
+
+test('A4 connecting Google Drive asks for the drive.file permission only; the Drive token comes back separately and a normal sign-in asks for nothing extra', async () => {
+  const plain = new URL(authorizeUrl(cfg, 'r://cb', 'CH'));
+  assert.equal(plain.searchParams.get('scopes'), null, 'ordinary sign-in is unchanged');
+  const drive = new URL(authorizeUrl(cfg, 'r://cb', 'CH', { scopes: 'https://www.googleapis.com/auth/drive.file', prompt: 'consent' }));
+  assert.equal(drive.searchParams.get('scopes'), 'https://www.googleapis.com/auth/drive.file');
+  assert.equal(drive.searchParams.get('provider'), 'google');
+  const fetchFn = (async (url: string) => {
+    if (url.includes('grant_type=pkce')) return new Response(JSON.stringify({ access_token: 'at', refresh_token: 'rt', expires_in: 3600, provider_token: 'GOOGLE-TOKEN', user: { id: 'u1', email: 'agent@gmail.com' } }), { status: 200 });
+    if (url.includes('eab_my_membership')) return new Response(JSON.stringify([{ workspace_id: 'w1', workspace_name: 'J team', role: 'owner' }]), { status: 200 });
+    return new Response('', { status: 404 });
+  }) as typeof fetch;
+  localStorage.setItem('eab-pkce-verifier', 'V9');
+  const r = await handleCallback(cfg, 'https://localhost/?code=zz', fetchFn);
+  assert.equal(r.kind === 'signed-in' && r.providerToken, 'GOOGLE-TOKEN');
+  if (r.kind === 'signed-in') assert.ok(!JSON.stringify(r.session).includes('GOOGLE-TOKEN'), 'the Google token is not part of the sign-in session');
+  assert.equal(takeDriveIntent(), false);
+  localStorage.setItem('eab-drive-intent', '1');
+  assert.equal(takeDriveIntent(), true); assert.equal(takeDriveIntent(), false, 'the intent is used once');
 });

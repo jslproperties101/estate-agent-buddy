@@ -3599,6 +3599,70 @@ test('U91 backup file: made from Settings, a bad file is refused, and a restore 
   await ctx.close();
 });
 
+test('U92 Google Drive backup (stand-in Drive, browser only): a backup is sent and checked, a refused token is reported, no token reaches the file', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const drive = { files: [], mode: 'ok', uploads: [] };
+  await ctx.route('https://www.googleapis.com/**', async route => {
+    const req = route.request(); const u = new URL(req.url()); const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    const json = (o, status = 200) => route.fulfill({ status, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify(o) });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (drive.mode === 'refuse') return route.fulfill({ status: 401, headers: cors, body: 'expired' });
+    if (u.pathname === '/upload/drive/v3/files') {
+      const buf = req.postDataBuffer(); const marker = Buffer.from('content-type: application/zip\r\n\r\n'); const at = buf.indexOf(marker) + marker.length;
+      const tail = buf.lastIndexOf(Buffer.from('\r\n--eab'));
+      drive.uploads.push(buf.subarray(at, tail)); const f = { id: `u${drive.uploads.length}`, size: tail - at, name: /"name":"([^"]+)"/.exec(buf.toString('latin1', 0, at))[1] };
+      drive.files.push(f); return json({ id: f.id });
+    }
+    if (u.pathname === '/drive/v3/files' && req.method() === 'POST') return json({ id: 'folder1' });
+    if (u.pathname === '/drive/v3/files') {
+      const q = u.searchParams.get('q') ?? '';
+      if (q.includes('google-apps.folder')) return json({ files: [{ id: 'folder1', name: 'Estate Agent AI Buddy backups' }] });
+      return json({ files: drive.files.map(f => ({ id: f.id, name: f.name, createdTime: new Date().toISOString(), size: String(f.size) })) });
+    }
+    const m = /^\/drive\/v3\/files\/(.+)$/.exec(u.pathname);
+    if (m) { const f = drive.files.find(x => x.id === m[1]); return json({ id: m[1], size: String(f?.size ?? 0), trashed: false }); }
+    return json({}, 404);
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  // A phone that is signed in and has connected Drive (the Google sign-in itself is not exercised here).
+  const seed = (drv) => page.evaluate(drv => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => {
+      const tx = r.result.transaction('records', 'readwrite'); const st = tx.objectStore('records'); const g = st.get('s:meta');
+      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1' }, drive: drv }, 's:meta');
+        st.put({ id: 'dk1', created: 1, updated: 1, name: 'Drive Test Buyer', roles: ['buyer'], leadStatus: 'hot' }, 'c:contacts:dk1'); };
+      tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
+    };
+  }), drv);
+  await seed({ token: 'TOK', expiresAt: Date.now() + 3600000, connectedAt: Date.now() });
+  await page.reload(); await page.waitForSelector('nav.grid');
+  // the daily rule runs a backup at app start
+  await waitStored(page, 'records', "all.some(v => v && v.driveLastOkAt)");
+  assert.equal(drive.files.length, 1, 'one backup was sent at start');
+  assert.match(drive.files[0].name, /^EstateAgentBuddy-backup-/);
+  const text = drive.uploads[0].toString('latin1');
+  assert.ok(text.includes('Drive Test Buyer')); assert.ok(!text.includes('"token":"TOK"'), 'the Drive token is not in the file');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  assert.match(await page.getByTestId('drive-state').innerText(), /Drive connected until about/);
+  assert.match(await page.getByTestId('drive-last').innerText(), /Last Drive backup that worked/);
+  await page.getByTestId('drive-now').click();
+  await page.getByTestId('drive-msg').waitFor();
+  assert.match(await page.getByTestId('drive-msg').innerText(), /Backup sent to Google Drive and checked: EstateAgentBuddy-backup-.*zip\. \d+ copies are kept there/);
+  await page.getByTestId('drive-list').click();
+  await page.getByTestId('drive-file').first().waitFor();
+  assert.ok(await page.getByTestId('drive-file').count() >= 1);
+  await shot(page, '92-drive-backup', false);
+  // Google refuses the token: said plainly, and Drive is disconnected
+  drive.mode = 'refuse';
+  await page.getByTestId('drive-now').click();
+  await page.locator('[data-testid="drive-msg"][role="alert"]').waitFor();
+  assert.match(await page.getByTestId('drive-msg').innerText(), /Google did not accept the access/);
+  await page.getByTestId('drive-connect').waitFor();
+  assert.match(await page.getByTestId('drive-state').innerText(), /Drive is not connected on this phone/);
+  await ctx.close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

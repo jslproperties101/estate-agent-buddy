@@ -50,7 +50,7 @@ async function call(fetchFn: FetchFn, url: string, init: RequestInit): Promise<R
   return r;
 }
 
-export interface TokenResponse { access_token: string; refresh_token: string; expires_in: number; user: { id: string; email: string; user_metadata?: { full_name?: string; name?: string; avatar_url?: string } } }
+export interface TokenResponse { access_token: string; refresh_token: string; expires_in: number; provider_token?: string; user: { id: string; email: string; user_metadata?: { full_name?: string; name?: string; avatar_url?: string } } }
 export function toSession(j: TokenResponse, keep?: Partial<Session>): Session {
   return {
     ...keep,
