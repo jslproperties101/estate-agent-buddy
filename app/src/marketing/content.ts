@@ -16,7 +16,7 @@ export type OutputId = 'pdf' | 'png' | 'jpg' | 'webp';
 export interface FormatSpec {
   id: FormatId; /** pixels */ w: number; h: number; outputs: OutputId[]; /** most photos the design can show */ maxPhotos: number;
 }
-/** Sizes: A4 is 210 × 297 mm drawn at 150 dpi (1240 × 1754). The two post sizes are the Instagram feed sizes (1080 × 1080 square, 1080 × 1350 portrait 4:5); the square also suits WhatsApp and Facebook posts. */
+/** Sizes: A4 is 210 × 297 mm drawn at 150 dpi (1240 × 1754). The two post sizes (1080 × 1080 square, 1080 × 1350 portrait 4:5) are common social-post sizes from a third-party guide and are NOT verified against any platform, so no screen text names a platform. */
 export const FORMATS: Record<FormatId, FormatSpec> = {
   a4: { id: 'a4', w: 1240, h: 1754, outputs: ['pdf', 'png', 'jpg'], maxPhotos: 4 },
   square: { id: 'square', w: 1080, h: 1080, outputs: ['png', 'jpg', 'webp'], maxPhotos: 1 },

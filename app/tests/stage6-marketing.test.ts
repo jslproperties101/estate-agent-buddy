@@ -140,3 +140,11 @@ test('MK11 Marketing Studio text exists in all three languages and says nothing 
   assert.match(marketingStrings.zh.notPublished, /不会发布广告/);
   assert.equal(defaultAgentChoice({ fullName: 'A', phone: '1' }).regNo, false);
 });
+
+test('MK12 (Stage 7) no screen text claims a size is right for a named social platform — the sizes are not verified against the platforms', () => {
+  for (const lang of ['en', 'bm', 'zh'] as const) {
+    const all = JSON.stringify(marketingStrings[lang]);
+    assert.doesNotMatch(all, /Instagram|Facebook|WhatsApp|Meta/i, `${lang}: no platform named in the Marketing Studio text`);
+  }
+  assert.match(marketingStrings.en.formatHelp.square, /Check each platform/);
+});

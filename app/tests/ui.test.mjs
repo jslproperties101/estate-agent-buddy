@@ -3479,6 +3479,81 @@ test('U89 a reminder banner never sits on top of an open dialog, so the dialog b
   await page.context().close();
 });
 
+/** A JPEG that looks like a camera photo: noisy picture, plus a camera-data block holding "turned a quarter" and a GPS position. */
+const cameraJpeg = (page, w, h, quality) => page.evaluate(async ({ w, h, quality }) => {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const x = cv.getContext('2d'); const d = x.createImageData(w, h);
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] = Math.random() * 255; d.data[i + 1] = Math.random() * 255; d.data[i + 2] = Math.random() * 255; d.data[i + 3] = 255; }
+  x.putImageData(d, 0, 0);
+  const jpg = Uint8Array.from(atob(cv.toDataURL('image/jpeg', quality).split(',')[1]), c => c.charCodeAt(0));
+  // big-endian TIFF: IFD0 { Orientation = 6, GPSInfo -> IFD at 38 }, GPS IFD { N, 2.49°, E, 101.8° }
+  const t = new DataView(new ArrayBuffer(140)); const u = (o, v) => t.setUint16(o, v); const l = (o, v) => t.setUint32(o, v);
+  t.setUint8(0, 0x4D); t.setUint8(1, 0x4D); u(2, 42); l(4, 8);
+  u(8, 2); u(10, 0x0112); u(12, 3); l(14, 1); u(18, 6);
+  u(22, 0x8825); u(24, 4); l(26, 1); l(30, 38); l(34, 0);
+  u(38, 4);
+  u(40, 1); u(42, 2); l(44, 2); t.setUint8(48, 0x4E);
+  u(52, 2); u(54, 5); l(56, 3); l(60, 92);
+  u(64, 3); u(66, 2); l(68, 2); t.setUint8(72, 0x45);
+  u(76, 4); u(78, 5); l(80, 3); l(84, 116);
+  l(88, 0);
+  [2, 1, 49, 1, 0, 1, 101, 1, 48, 1, 0, 1].forEach((v, k) => l(92 + k * 4, v));
+  const head = new Uint8Array([0xFF, 0xE1, 0x00, 0x94, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+  const out = new Uint8Array(2 + head.length + 140 + jpg.length - 2);
+  out.set(jpg.slice(0, 2), 0); out.set(head, 2); out.set(new Uint8Array(t.buffer), 2 + head.length); out.set(jpg.slice(2), 2 + head.length + 140);
+  return Array.from(out);
+}, { w, h, quality }).then(a => Buffer.from(a));
+/** Size of a stored picture (as shown, turned upright) and whether it still holds a camera-data (Exif) block. */
+const storedInfo = (page, fileId) => page.evaluate(fileId => new Promise((resolve, reject) => {
+  const r = indexedDB.open('estate-agent-buddy');
+  r.onerror = () => reject(r.error);
+  r.onsuccess = () => {
+    const g = r.result.transaction('files').objectStore('files').get(fileId);
+    g.onsuccess = async () => {
+      const blob = g.result; if (!blob) return resolve(null);
+      const b = new Uint8Array(await blob.arrayBuffer());
+      let exif = false, i = 2;
+      while (i + 8 < b.length && b[i] === 0xFF) { const m = b[i + 1]; if (m === 0xDA || m === 0xD9) break; if (m === 0xE1 && String.fromCharCode(b[i + 4], b[i + 5], b[i + 6], b[i + 7]) === 'Exif') exif = true; i += 2 + ((b[i + 2] << 8) | b[i + 3]); }
+      const bmp = await createImageBitmap(blob); resolve({ w: bmp.width, h: bmp.height, size: blob.size, exif });
+    };
+  };
+}), fileId);
+
+test('U90 a photo with a camera-data block (turned sideways, GPS position): large photos are cleaned and turned upright on upload; the Photo Studio copy never carries the location, even when the kept original does', async () => {
+  const page = await phone();
+  // 1. a large camera-style photo: compressed on upload, so the stored picture is upright and holds no camera data
+  const big = await cameraJpeg(page, 2400, 1800, 0.9);
+  assert.ok(big.length > 1_000_000, `test photo is a real-sized file (${big.length} bytes)`);
+  assert.ok(big.includes(Buffer.from('Exif')), 'test photo really carries a camera-data block');
+  await propertyWithPhotos(page, [{ name: 'camera-big.jpg', mimeType: 'image/jpeg', buffer: big }]);
+  let rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
+  const bigInfo = await storedInfo(page, rec.photos[0].fileId);
+  assert.equal(bigInfo.exif, false, 'no location or camera data kept from a large photo');
+  assert.ok(bigInfo.h > bigInfo.w, `turned upright (${bigInfo.w}×${bigInfo.h}), not left sideways`);
+  assert.ok(bigInfo.size < big.length / 3, 'and made much smaller');
+  await page.context().close();
+
+  // 2. a small photo that would not get smaller keeps its own bytes (including the camera data); the Studio copy must still be clean
+  const p2 = await phone();
+  const small = await cameraJpeg(p2, 800, 600, 0.1);
+  await propertyWithPhotos(p2, [{ name: 'camera-small.jpg', mimeType: 'image/jpeg', buffer: small }]);
+  rec = (await storedRecords(p2, 'properties')).find(p => p.headline === 'Photo house');
+  const orig = await storedInfo(p2, rec.photos[0].fileId);
+  assert.equal(orig.exif, true, 'documented behaviour: a small photo that does not shrink is kept exactly as it came');
+  await p2.getByTestId('open-photo-studio').click();
+  await p2.getByTestId('ps-preview').waitFor();
+  await p2.getByTestId('ps-tab-mask').click();
+  await drag(p2, 'ps-stage', [0.1, 0.1], [0.5, 0.4]);
+  await p2.getByTestId('ps-save-new').click();
+  await waitStored(p2, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 2 && v.photos[1].edit === 'masked')");
+  rec = (await storedRecords(p2, 'properties')).find(p => p.headline === 'Photo house');
+  const copy = await storedInfo(p2, rec.photos[1].fileId);
+  assert.equal(copy.exif, false, 'the Photo Studio copy carries no camera data or GPS position');
+  assert.ok(copy.h > copy.w, `the copy is upright (${copy.w}×${copy.h})`);
+  assert.deepEqual(await storedInfo(p2, rec.photos[0].fileId), orig, 'the original is exactly as before');
+  await p2.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
