@@ -65,7 +65,7 @@ Source codes: **M** = original master instruction (`docs/AUDIT.md`), **D** = you
 | Workspace protection (never mix two teams’ records on one phone) | P2 | IT; **NV** with real accounts | `src/data/auth.ts`, `src/data/syncRunner.ts` | phase2-workspace.test.ts, U55–U58 | Needs two real accounts to prove. |
 | Unique property numbers across devices (server constraint) | M 8.1, P2 | NV | migration `20261014000000_phase2_sync_refs_files.sql` | RLS script (local PG) | Migration not applied anywhere real. |
 | Files / photos sync to cloud storage | M 5.2, P2 | NV | `src/data/filesync.ts`, `src/data/fileRefs.ts` | phase2-files.test.ts | Storage bucket never exercised (no Storage in the stand-in). |
-| Old app versions must not damage synced data | L | PI | `docs/PHASE2.md` §3a, §7 | Old-APK table is analysis, partly tested (U56–U58) | **The database write-block for old APKs is not built** (proposal only). Decision: PHASE2 §7. Until then an old APK can still write directly. |
+| Old app versions must not damage synced data | L | PI | `docs/PHASE2.md` §3a, §7, §7a; `supabase/proposed/20261015000000_block_direct_writes.sql` | U56–U58; `supabase/tests/write-block-test.sh` (22 checks, local PG) | **Proposal written and rehearsed locally, deliberately not applied.** Until you approve and apply it (after all phones are updated, and after a Supabase test project run), an old APK can still overwrite newer records. |
 | Whole-app backup file (ZIP) | L, M 5.3 | IT | `src/backup/zip.ts`, `backup.ts`, `BackupUI.tsx` | backup.test.ts B1–B7, U91 | Share/save on Android unproven. |
 | Protected restore (checks, workspace guard, safety copy, never deletes, history keeps replaced versions) | M 5.4, L | IT in test environment | `src/backup/backup.ts` | B1–B7 restore an actual backup into a fresh store and into one with later edits (browser/Node store, **not** a phone) | Default mode is “missing only”; your decision is open (preview-first merge recommended). Per your rule: *restore has restored data in a test environment*, not on a phone or from Drive on a real account. |
 | Daily Google Drive backup, 30 copies | M 5.3 (weekly), L (daily, 30) | NV | `src/backup/drive.ts`, `src/data/auth.ts`, `src/App.tsx` | drive.test.ts D1–D7, A4, U92 (stand-in Drive) | **Drive was never called for real.** Needs the Google OAuth `drive.file` scope added to your Google Cloud consent screen. The token lasts about an hour, so the app backs up only **while it is open**; a truly unattended daily backup needs a server job that is **not built** (NI). |
@@ -93,7 +93,7 @@ Source codes: **M** = original master instruction (`docs/AUDIT.md`), **D** = you
 | Residential land type | L | IT | `src/listing/model.ts`, `illustrations.ts`, `commands.ts` | P5 (listing), C-RL (commands) | — |
 | Per-field verification | M 8.3, S3 | IT | `src/listing/verify.ts` | stage3.test.ts | The list of 20 facts needs your confirmation (**BD**). |
 | Card preview (long press) | M 9, S3 | NV | `src/listing/ListingUI.tsx` | stage3.test.ts, U-preview | Touch feel unseen on a phone. |
-| Duplicate-property detection | M 8.1 | NI | — | — | To build. |
+| Duplicate-property detection | M 8.1 | IT | `src/domain/duplicates.ts`, `src/listing/dupStrings.ts`, `ListingForm.tsx` | DUP1–DUP4, U95 | Warns only (never blocks). Offline duplicate refs across devices rely on the server constraint (NV). |
 | Global search / saved searches | M | NI | — | — | To build. |
 | “Smart Capture” | earlier decisions | BD | removed in the current code | — | **Conflict:** original requirement vs removal. Not restored or discarded silently; you must say which decision is final. |
 
@@ -108,7 +108,7 @@ Source codes: **M** = original master instruction (`docs/AUDIT.md`), **D** = you
 | **Buyer requirements (types, areas, budget, beds, land, built-up, tenure, financing, adjoining units)** | M, S5 | IT (this session) | `src/data/types.ts`, `src/contacts/MatchUI.tsx`, `matchStrings.ts`, `ContactsUI.tsx` | M1–M9 (`matching.test.ts`), U93 | Unknown ≠ fit; adjoining units are shown as “cannot be verified from the record”. |
 | **Buyer ↔ property matching with reason shown** | M, S5 | IT | `src/domain/matching.ts`, `src/voice/buyerSearch.ts` | M1–M9, U93, stage5-voice tests | — |
 | Professional contacts directory (Pejabat Tanah by state, custom categories) | M | NI | — | — | To build. |
-| Inactive-contact follow-up (configurable, never auto-inactivate) | M 19 | NI | — | — | To build. Needs a “responsible negotiator” field. |
+| Inactive-contact follow-up (configurable, never auto-inactivate) | M 19 | PI | `src/domain/followup.ts`, `src/contacts/followStrings.ts`, `App.tsx` (Notifications), `ProfileUI.tsx` (setting) | F1–F5, U94 | Reminds only; threshold 14/30/60/90 days or off. “Responsible negotiator” notification to a team member and admin summary: not built (needs team roles live). |
 
 ### 2.5 GPS
 

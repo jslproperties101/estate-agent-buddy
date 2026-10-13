@@ -214,3 +214,16 @@ clearing/removing its data; a per-team separate store (the larger change) is not
 was already signed out cannot tell whose records it holds (the owner is learnt at the next sign-in/sign-out). (3) Within one
 team, waiting edits made under one person are sent under whoever syncs next (same workspace; role rules still apply).
 Tested: unit tests W1–W6, P2-21 and screen test U55 (stand-in clouds, desktop Chromium); not tested on a live Supabase or a real device.
+
+### 7a. Proposal written and rehearsed locally (14 Oct 2026) — NOT applied anywhere
+
+`supabase/proposed/20261015000000_block_direct_writes.sql` (with `..._rollback.sql`). It is deliberately outside `supabase/migrations`.
+How it works: `eab_push_records` runs as the signed-in user (`security invoker`), so simply removing insert/update rights would
+also stop the new app. Instead a trigger refuses writes from the `authenticated`/`anon` roles unless the call comes through
+`eab_push_records`, which is marked with `ALTER FUNCTION ... SET eab.via_push = 'on'` (the function body is not rewritten).
+The new app only reads the table over REST and writes through `eab_push_records` (checked in `src/data/sync.ts`).
+`supabase/tests/write-block-test.sh` (22 checks, local PostgreSQL 16): old plain insert/update/upsert refused with a clear message;
+Phase 2 push (new, edit, stale-edit conflict) still works; reading untouched; the setting is off outside the function; SQL-editor
+repairs by the database owner still possible; rollback restores the old behaviour; records unchanged throughout.
+**Not proven:** behaviour through the real PostgREST layer (the stand-in uses plain SQL roles), and with real Supabase roles.
+Apply it only after every phone runs the Phase 2 app and the test project (below) has shown it works.

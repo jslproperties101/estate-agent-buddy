@@ -70,6 +70,12 @@ jobs:
       - name: Roles and row-level security (Supabase migrations)
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
         run: bash supabase/tests/rls-test.sh
+      - name: Migration rollback rehearsal (local PostgreSQL)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/rollback-test.sh
+      - name: Proposed block on old-app direct writes (local PostgreSQL, not applied anywhere)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/write-block-test.sh
 
   android:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).
