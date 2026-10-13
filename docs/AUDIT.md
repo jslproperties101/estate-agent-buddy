@@ -109,8 +109,8 @@ Tap opens details (DONE). Long-press preview and a visible Preview button: DONE 
 | Rename Map → My Property Map | DONE |
 | Co-broke Opportunity Map (Coming Soon) | DONE (Coming Soon screen) |
 
-### 12. Photo enhancement, privacy masking, AI declutter — NOT DONE
-Only automatic resize/compression on upload.
+### 12. Photo enhancement, privacy masking, AI declutter — PARTIAL (Stage 6: Photo Studio built, browser-tested only)
+Only automatic resize/compression on upload before Stage 6. Stage 6 adds a local Photo Studio: improve (brightness, contrast, colour, clarity, turn, straighten, crop) and hand-drawn privacy masks, saved as a new labelled copy (original kept) or, after a confirmation, as a replacement. **Not built:** automatic detection of private details, AI decluttering (needs an approved online service and consent), batch processing, perspective correction. See docs/STAGE6.md.
 
 ### 13. Voice command — NOT PROVEN (Stage 5: diagnostics and the three missing commands built; see docs/STAGE5.md)
 Web Speech API recogniser, on-device command parser for property create/find, to-dos, appointments, contacts; spoken
@@ -128,11 +128,12 @@ calculator (only opens pre-filled from a property), client selection, saved calc
 Record", Share/Download PDF. → Stage 5: all built (docs/STAGE5.md).
 
 ### 15. Buyer PDF / share — DONE in Stage 5 (local, picture-based PDF; share/download inside the Android app NOT PROVEN)
-### 16. Marketing Studio — NOT DONE
-### 17. Advertising & Listing Tracker — PARTIAL
+### 16. Marketing Studio — PARTIAL (Stage 6: A4 flyer, square and portrait posts; browser-tested only)
+Built: choose one format, details, photos and contact lines; PDF / PNG / JPG / WebP. Not built: brochures, saved templates, AI copy, Facebook link-preview size. Social sizes are from a third-party guide and still need checking. See docs/STAGE6.md.
+### 17. Advertising & Listing Tracker — DONE in Stage 6 (browser-tested; phone reminders NOT PROVEN)
 Per-property "adverts" list exists inside the property form (platform, status planned/live/needs update/paused/expired,
 dates, ref, notes). Missing: own tracker on the detail page, cost, ad type incl. fake/dummy/test, title, URL,
-screenshot, statuses per section 17, expiry reminders, cost summaries, "Add Fake Listing". → Stage 6.
+screenshot, statuses per section 17, expiry reminders, cost summaries, "Add Fake Listing". → Stage 6: **built** (dedicated tracker from the property detail page, fake listings, expiry attention list and scheduled phone reminders, cost summaries, sample/test adverts kept out of figures); browser-tested only, phone notifications NOT PROVEN. See docs/STAGE6.md.
 
 ### 18. RM formatting — PARTIAL → Stage 1
 Display is consistent (`rm()` → "RM 500,000"). Typing is not: money fields show "500000" with no separators, and four

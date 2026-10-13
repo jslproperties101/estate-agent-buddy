@@ -120,4 +120,17 @@ None used or added. Local canvas drawing only. (Maps and the other services from
 
 ## 9. Test results
 
-See the report (filled in at the end of the stage).
+Run 14 Oct 2026 in Claude's workspace (Chromium 384 × 824 px; no phone):
+
+| Check | Result |
+| --- | --- |
+| Strict type check (`npm run typecheck`) | clean |
+| Lint (`npm run lint`) | passed, 167 files |
+| Unit tests | 254 of 254 (Stage 6 adds AD1–AD12, PH1–PH13, MK1–MK11 incl. MK3b, and BP11) |
+| Production build | succeeded |
+| Full screen suite, 3 complete runs on the final build | 87 of 87, 87 of 87, 87 of 87 (Stage 6 adds U79–U88) |
+| Database / RLS tests | not run: no migration or database file changed (the Stage 5 totals 125 / 18 are expected unchanged) |
+
+Intermittent failures: none seen in these 3 runs. During development one run of the Stage 5 suite had failed U50 once; that
+was fixed in Stage 5 (the test waited for the restored draft). Everything above uses stand-ins (no real phone, camera, share
+sheet, notification, Google or advertising platform).
