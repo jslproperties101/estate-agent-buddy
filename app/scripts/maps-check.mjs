@@ -32,6 +32,9 @@ const lines = [];
 try {
   await page.goto('https://localhost/');
   await page.waitForSelector('nav.grid');
+  // A clean install first asks "How would you like to start?" (added 13 Oct); that dialog covers the screen, so answer it.
+  const start = page.getByRole('button', { name: /Start Without Sample Data/ });
+  if (await start.isVisible().catch(() => false)) await start.click();
   await page.locator('nav.grid > button', { hasText: 'Agent Profile' }).click();
   await page.getByRole('button', { name: /Settings/ }).click();
   await page.getByTestId('maps-check-run').click();
