@@ -65,3 +65,11 @@ test('C6 find, and things not understood', () => {
   assert.deepEqual(parseCommand('Show condos for rent in Putra Nilai'), { kind: 'find', type: 'Condo / apartment', area: 'Putra Nilai', purpose: 'rent' });
   assert.deepEqual(parseCommand('What is the weather today'), { kind: 'unknown' });
 });
+
+test('C-RL Residential land can be created by voice in English and Malay', () => {
+  for (const say of ['Create a new residential land in Salak Tinggi, land area 8,000 square feet, asking price RM900,000', 'Cipta tanah kediaman baharu di Salak Tinggi, harga RM900,000']) {
+    const r = parseCommand(say);
+    assert.equal(r.kind, 'create', say);
+    if (r.kind === 'create') assert.equal(r.changes.find(c => c.key === 'type')?.value, 'Residential land', say);
+  }
+});

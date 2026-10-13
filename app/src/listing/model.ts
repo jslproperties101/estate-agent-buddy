@@ -22,13 +22,13 @@ export type AdStatus = 'planned' | 'live' | 'needs_update' | 'paused' | 'expired
 export type BannerStatus = 'yes' | 'no' | 'not_yet' | 'not_allowed' | 'removed';
 
 export const TYPES = [
-  'Terrace house', 'Semi-D house', 'Bungalow', 'Townhouse', 'Condo / apartment', 'Shoplot', 'Office',
+  'Terrace house', 'Semi-D house', 'Bungalow', 'Townhouse', 'Condo / apartment', 'Residential land', 'Shoplot', 'Office',
   'Terrace factory', 'Semi-D factory', 'Detached factory', 'Warehouse',
   'Industrial land', 'Agricultural land', 'Development land',
 ] as const;
 export const CATEGORIES: Category[] = ['residential', 'commercial', 'industrial', 'agricultural', 'development'];
 export const TYPE_CATEGORY: Record<string, Category> = {
-  'Terrace house': 'residential', 'Semi-D house': 'residential', 'Bungalow': 'residential', 'Townhouse': 'residential', 'Condo / apartment': 'residential',
+  'Terrace house': 'residential', 'Semi-D house': 'residential', 'Bungalow': 'residential', 'Townhouse': 'residential', 'Condo / apartment': 'residential', 'Residential land': 'residential',
   'Shoplot': 'commercial', 'Office': 'commercial',
   'Terrace factory': 'industrial', 'Semi-D factory': 'industrial', 'Detached factory': 'industrial', 'Warehouse': 'industrial', 'Industrial land': 'industrial',
   'Agricultural land': 'agricultural', 'Development land': 'development',
@@ -247,7 +247,8 @@ export function fieldsFor(type?: string): Set<FormField> {
   if (!type || !TYPE_CATEGORY[type]) return new Set(ALL_FORM_FIELDS);
   const strata = type === 'Condo / apartment' || type === 'Office';
   switch (TYPE_CATEGORY[type]) {
-    case 'residential': return new Set<FormField>([...BUILT, 'bedrooms', 'bathrooms', 'furnishing', ...(strata ? [] : LANDED)]);
+    case 'residential': if (type === 'Residential land') return new Set<FormField>([...LAND_ONLY, 'zoning', 'approvals']);
+      return new Set<FormField>([...BUILT, 'bedrooms', 'bathrooms', 'furnishing', ...(strata ? [] : LANDED)]);
     case 'commercial': return new Set<FormField>([...BUILT, 'bathrooms', 'furnishing', ...(strata ? [] : LANDED)]);
     case 'industrial': return type === 'Industrial land'
       ? new Set<FormField>([...LAND_ONLY, 'zoning', 'approvals'])

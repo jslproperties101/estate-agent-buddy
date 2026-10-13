@@ -219,7 +219,7 @@ export function sceneForType(type?: string): Scene | undefined {
   if (!type) return undefined;
   const map: Record<string, Scene> = {
     'Terrace house': 'terrace', 'Semi-D house': 'semid_house', 'Bungalow': 'bungalow', 'Townhouse': 'terrace',
-    'Condo / apartment': 'condo', 'Shoplot': 'shoplot', 'Office': 'office',
+    'Condo / apartment': 'condo', 'Residential land': 'devland', 'Shoplot': 'shoplot', 'Office': 'office',
     'Terrace factory': 'semid_factory', 'Semi-D factory': 'semid_factory', 'Detached factory': 'detached_factory', 'Warehouse': 'warehouse',
     'Industrial land': 'devland', 'Agricultural land': 'agri', 'Development land': 'devland',
   };

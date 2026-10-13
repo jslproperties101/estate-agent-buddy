@@ -1,7 +1,7 @@
 // Property List: filters, years remaining, phone format, commission, titles, fields by type, missing details.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFilters, activeCount, yearsRemaining, normalisePhone, commissionRm, title, Listing, fieldsFor, missingDetails, rmShort, landText, mainPhoto, phoneDigits, addressLine } from '../src/listing/model';
+import { applyFilters, activeCount, yearsRemaining, normalisePhone, commissionRm, title, Listing, fieldsFor, TYPE_CATEGORY, missingDetails, rmShort, landText, mainPhoto, phoneDigits, addressLine } from '../src/listing/model';
 import { sampleData } from '../src/data/sample';
 
 const L = sampleData(Date.UTC(2026, 9, 12)).properties;
@@ -50,6 +50,9 @@ test('P5 fields follow the property type; custom types show every field', () => 
   const fac = fieldsFor('Semi-D factory');
   assert.ok(fac.has('ceilingFt') && fac.has('powerKva') && !fac.has('bedrooms'));
   assert.ok(!fieldsFor('Condo / apartment').has('landSqft'));
+  const rl = fieldsFor('Residential land');
+  assert.ok(rl.has('landSqft') && rl.has('zoning') && !rl.has('bedrooms') && !rl.has('builtUpSqft'), 'Residential land is a land type');
+  assert.equal(TYPE_CATEGORY['Residential land'], 'residential');
   assert.equal(fieldsFor('Petrol station').size, fieldsFor(undefined).size);
 });
 

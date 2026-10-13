@@ -27,7 +27,7 @@ const en = {
   f: { location: 'Location', type: 'Type', category: 'Category', purpose: 'Sale or rent', price: 'Price (RM)', beds: 'Bedrooms (at least)', baths: 'Bathrooms (at least)', tenure: 'Tenure', lotType: 'Lot type', status: 'Status' },
   priceRent: 'Monthly rent (RM)',
   types: {
-    'Terrace house': 'Terrace house', 'Semi-D house': 'Semi-D house', 'Bungalow': 'Bungalow', 'Townhouse': 'Townhouse', 'Condo / apartment': 'Condo / apartment',
+    'Terrace house': 'Terrace house', 'Semi-D house': 'Semi-D house', 'Bungalow': 'Bungalow', 'Townhouse': 'Townhouse', 'Condo / apartment': 'Condo / apartment', 'Residential land': 'Residential land',
     'Shoplot': 'Shoplot', 'Office': 'Office', 'Terrace factory': 'Terrace factory', 'Semi-D factory': 'Semi-D factory', 'Detached factory': 'Detached factory',
     'Warehouse': 'Warehouse', 'Industrial land': 'Industrial land', 'Agricultural land': 'Agricultural land', 'Development land': 'Development land',
   } as Record<string, string>,
@@ -216,7 +216,7 @@ const bm: ListingStrings = {
   f: { location: 'Lokasi', type: 'Jenis', category: 'Kategori', purpose: 'Jual atau sewa', price: 'Harga (RM)', beds: 'Bilik tidur (sekurang-kurangnya)', baths: 'Bilik air (sekurang-kurangnya)', tenure: 'Pegangan', lotType: 'Jenis lot', status: 'Status' },
   priceRent: 'Sewa bulanan (RM)',
   types: {
-    'Terrace house': 'Rumah teres', 'Semi-D house': 'Rumah berkembar', 'Bungalow': 'Banglo', 'Townhouse': 'Rumah bandar', 'Condo / apartment': 'Kondominium / pangsapuri',
+    'Terrace house': 'Rumah teres', 'Semi-D house': 'Rumah berkembar', 'Bungalow': 'Banglo', 'Townhouse': 'Rumah bandar', 'Condo / apartment': 'Kondominium / pangsapuri', 'Residential land': 'Tanah kediaman',
     'Shoplot': 'Rumah kedai', 'Office': 'Pejabat', 'Terrace factory': 'Kilang teres', 'Semi-D factory': 'Kilang berkembar', 'Detached factory': 'Kilang sesebuah',
     'Warehouse': 'Gudang', 'Industrial land': 'Tanah industri', 'Agricultural land': 'Tanah pertanian', 'Development land': 'Tanah pembangunan',
   },
@@ -404,7 +404,7 @@ const zh: ListingStrings = {
   f: { location: '地点', type: '类型', category: '类别', purpose: '出售或出租', price: '价格 (RM)', beds: '卧室（至少）', baths: '浴室（至少）', tenure: '地契', lotType: '单位位置', status: '状态' },
   priceRent: '月租 (RM)',
   types: {
-    'Terrace house': '排屋', 'Semi-D house': '半独立式洋房', 'Bungalow': '独立式洋房', 'Townhouse': '镇屋', 'Condo / apartment': '公寓',
+    'Terrace house': '排屋', 'Semi-D house': '半独立式洋房', 'Bungalow': '独立式洋房', 'Townhouse': '镇屋', 'Condo / apartment': '公寓', 'Residential land': '住宅地',
     'Shoplot': '店屋', 'Office': '办公室', 'Terrace factory': '排式工厂', 'Semi-D factory': '半独立式工厂', 'Detached factory': '独立式工厂',
     'Warehouse': '仓库', 'Industrial land': '工业地', 'Agricultural land': '农业地', 'Development land': '发展地',
   },

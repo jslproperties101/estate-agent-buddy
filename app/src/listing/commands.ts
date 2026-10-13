@@ -28,6 +28,7 @@ export const KNOWN_AREAS = [
 ];
 
 const TYPE_WORDS: [RegExp, string][] = [
+  [/\bresidential\s+land|tanah\s+kediaman|tanah\s+rumah|住宅地/i, 'Residential land'],
   [/\bsemi[-\s]?d(?:etached)?\s+(?:factor(?:y|ies)|kilang)|kilang\s+berkembar/i, 'Semi-D factory'],
   [/\bterrace(?:d)?\s+factor(?:y|ies)|kilang\s+teres/i, 'Terrace factory'],
   [/\bdetached\s+factor(?:y|ies)|kilang\s+sesebuah/i, 'Detached factory'],
