@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { MemoryBackend } from '../src/data/backend';
 import { Store } from '../src/data/store';
 import { syncNow, signIn } from '../src/data/sync';
+import { FakeCloud, cfg } from './support/fakeCloud';
 import { sampleData, loadSampleInto, isSampleKey, isEmptyWorkspace } from '../src/data/sample';
 import { missingProfile, REQUIRED_PROFILE, shareText, DEFAULT_SHARE } from '../src/domain/namecard';
 import { fromNative } from '../src/lib/phonebook';
@@ -47,18 +48,13 @@ test('N3 sample data never goes to the cloud (nor its deletions); real records s
   assert.equal(loadSampleInto(s), 0, 'loading twice adds nothing');
   s.remove('tasks', 't1');
   s.upsert('contacts', { id: 'real1', created: 1, updated: 1, name: 'Real buyer', roles: ['buyer'] });
-  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
-  const pushed: { id: string }[] = [];
-  const fetchFn = (async (url: string, init: RequestInit = {}) => {
-    if (url.includes('/auth/v1/token')) return new Response(JSON.stringify({ access_token: 'tok', refresh_token: 'r', expires_in: 3600, user: { id: 'u1', email: 'a@b.c' } }), { status: 200 });
-    if (url.includes('/rpc/eab_my_membership')) return new Response(JSON.stringify([{ workspace_id: 'w1', workspace_name: 'A team', role: 'owner' }]), { status: 200 });
-    if (init.method === 'POST') { pushed.push(...JSON.parse(String(init.body))); return new Response('', { status: 201 }); }
-    // A sample record somehow in the cloud is not taken down either.
-    return new Response(JSON.stringify([{ collection: 'contacts', id: 'x9', data: { id: 'x9', created: 1, updated: 99, name: 'Cloud sample', roles: ['buyer'], sample: true }, deleted: false, updated: 99 }]), { status: 200 });
-  }) as typeof fetch;
-  s.setSingleton('meta', { syncSession: await signIn(cfg, 'a@b.c', 'pw', fetchFn) });
-  const r = await syncNow(s, cfg, fetchFn);
-  assert.deepEqual(pushed.map(x => x.id), ['real1'], 'only the real record is sent');
+  const cloud = new FakeCloud();
+  // A sample record somehow in the cloud is not taken down either.
+  cloud.rows.set('ws1|contacts|x9', { data: { id: 'x9', created: 1, updated: 99, name: 'Cloud sample', roles: ['buyer'], sample: true }, deleted: false, rev: 1, seq: 1, user_id: 'u-a@b.c', updated: 99 });
+  cloud.seq = 1;
+  s.setSingleton('meta', { syncSession: await signIn(cfg, 'a@b.c', 'pw', cloud.addUser('a@b.c') && cloud.fetch) });
+  const r = await syncNow(s, cfg, cloud.fetch);
+  assert.deepEqual([...cloud.rows.keys()].filter(k => !k.endsWith('x9')).map(k => k.split('|')[2]), ['real1'], 'only the real record is sent');
   assert.equal(r.pulled, 0);
   assert.ok(!s.getState().contacts.some(c => c.id === 'x9'));
   assert.deepEqual(s.getState().meta.dirty, [], 'nothing left waiting');

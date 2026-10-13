@@ -5,11 +5,27 @@
 // Who sees what is decided by the database (row-level security), not by this code: owner and admin see the whole
 // workspace, a team leader reads it all and edits own/assigned records, an agent sees own/assigned records, a limited
 // user only reads own/assigned records (its changes stay on the phone).
-// Conflicts: the most recently changed copy of a record wins. Photos and documents stay on the phone (not synced yet).
+// Phase 2 protocol (supabase/migrations/20261014000000_phase2_sync_refs_files.sql):
+//  - Every cloud record has a version number (rev) that the DATABASE increases on each write, and a change number (seq).
+//    This phone remembers, per record, the version the cloud last accepted or sent (the "base"). Nothing here compares
+//    device clocks.
+//  - A change is sent with the base version it was made from. The cloud accepts it only if that is still the current
+//    version; otherwise it answers "conflict" with its current copy and writes nothing.
+//  - A conflict is joined field by field (data/merge.ts). Fields changed on only one side are combined; a field changed
+//    differently on both sides stays as it is on this phone and is listed for the person (Sync review). The cloud's
+//    version is always kept in the record's history first. A record deleted on one side and edited on the other is also a
+//    conflict, never a silent delete or resurrection.
+//  - Each send carries an operation id, so a retry after a lost answer is recognised and not applied twice.
+//  - "Synced" is only ever set from the cloud's own answer, for the exact content that was sent; an edit made while the
+//    upload ran stays "waiting".
+//  - Property numbers must be unique across prefixes; the cloud refuses a duplicate with "ref_conflict" and the local
+//    record stays untouched, with the reason shown to the person.
 // Sample records are never sent up or taken down, so they never mix with real data in the team workspace.
-import type { Store } from './store';
-import { COLLECTIONS, CollectionName, Meta } from './types';
+import type { CloudBase, Store } from './store';
+import { COLLECTIONS, CollectionName, Conflict, Meta } from './types';
 import { isSampleKey } from './sample';
+import { hash53, recordHash } from './hash';
+import { applyChoices, merge3 } from './merge';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -68,73 +84,246 @@ export async function membership(cfg: SyncConfig, s: Session, fetchFn: FetchFn =
   return { ...s, workspaceId: rows[0].workspace_id, workspaceName: rows[0].workspace_name, role: rows[0].role };
 }
 
-interface Row { collection: string; id: string; data: Record<string, unknown> | null; deleted: boolean; updated: number }
+type Rec = Record<string, unknown>;
+interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
 
-export interface SyncResult { pushed: number; pulled: number; removed: number }
+export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number }
 
 /** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
  *  "Synced" after the cloud really answered. */
 export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch): Promise<SyncResult> {
   if (!configured(cfg)) throw new SyncError('not-configured');
   if (!store.getState().meta.syncSession) throw new SyncError('not-signed-in');
+  if (store.syncing) return { pushed: 0, pulled: 0, removed: 0, conflicts: 0 };   // one sync at a time
   store.setSyncing(true);
-  try { return await syncOnce(store, cfg, fetchFn); } finally { store.setSyncing(false); }
+  try { return await syncOnce(store, cfg, fetchFn); } finally { store.setInflight(store.getState().meta.dirty, false); store.setSyncing(false); }
+}
+
+const split = (key: string): [CollectionName, string] => { const i = key.indexOf(':'); return [key.slice(0, i) as CollectionName, key.slice(i + 1)]; };
+const find = (store: Store, key: string): (Rec & { id: string }) | undefined => {
+  const [c, id] = split(key);
+  return (store.getState()[c] as unknown as (Rec & { id: string })[] | undefined)?.find(x => x.id === id);
+};
+const metaNow = (store: Store) => store.getState().meta;
+const patchMeta = (store: Store, f: (m: Meta) => Partial<Meta>) => store.setSingleton('meta', f(metaNow(store)));
+const clearPending = (store: Store, key: string) => patchMeta(store, m => ({
+  dirty: m.dirty.filter(k => k !== key), tombstones: m.tombstones.filter(k => k !== key),
+  recErrors: m.recErrors && key in m.recErrors ? Object.fromEntries(Object.entries(m.recErrors).filter(([k]) => k !== key)) : m.recErrors,
+}));
+const setConflict = (store: Store, c: Conflict) => patchMeta(store, m => ({ conflicts: [...(m.conflicts ?? []).filter(x => x.key !== c.key), c] }));
+export const dropConflict = (store: Store, key: string) => patchMeta(store, m => ({ conflicts: (m.conflicts ?? []).filter(x => x.key !== key) }));
+const cloudBase = (row: CloudRow): CloudBase => ({ rev: row.rev, deleted: row.deleted, data: row.deleted ? null : row.data, hash: recordHash(row.deleted ? null : row.data) });
+const isSampleData = (d: Rec | null) => !!(d && (d as { sample?: boolean }).sample);
+
+type Taken = 'skipped' | 'applied' | 'removed' | 'repush' | 'conflict' | 'cleared';
+
+/** Takes one cloud row into this phone. Never overwrites a change that is still waiting to be sent. */
+function takeRemote(store: Store, row: CloudRow, role: string | undefined): Taken {
+  if (!(COLLECTIONS as string[]).includes(row.collection) || isSampleData(row.data)) return 'skipped';
+  const c = row.collection as CollectionName;
+  const key = `${c}:${row.id}`;
+  const base = store.getBase(key);
+  if (base && base.rev >= row.rev) return 'skipped';                    // already known (our own write coming back, or an old row)
+  const m = metaNow(store);
+  const local = find(store, key);
+  const dirty = m.dirty.includes(key);
+  const tomb = m.tombstones.includes(key);
+  const incoming = cloudBase(row);
+
+  if (!dirty) {
+    store.setBase(key, incoming);
+    if (row.deleted) { if (local) { store.applyRemote(c, row.id, null); return 'removed'; } return 'skipped'; }
+    if (!local || recordHash(local) !== incoming.hash) { store.applyRemote(c, row.id, row.data); return 'applied'; }
+    return 'skipped';
+  }
+
+  // A change is waiting here AND the cloud has a newer version: never overwrite either side silently.
+  if (role === 'limited') {
+    // This person can only read. Their own edit is kept in the history, and the cloud's copy is taken.
+    if (local) store.saveRevision(key, local, 'conflict', 'edit made while read-only');
+    store.setBase(key, incoming);
+    clearPending(store, key);
+    if (row.deleted) { if (local) store.applyRemote(c, row.id, null); return 'removed'; }
+    store.applyRemote(c, row.id, row.data);
+    return 'applied';
+  }
+  const now = Date.now();
+  if (tomb && !local) {                                                   // deleted here
+    if (row.deleted) { store.setBase(key, incoming); clearPending(store, key); return 'cleared'; }
+    if (row.data) store.saveRevision(key, row.data, 'conflict', 'edited elsewhere while deleted here');
+    setConflict(store, { key, collection: c, id: row.id, at: now, kind: 'deleted-local', remote: { rev: row.rev, data: row.data, deleted: false } });
+    return 'conflict';
+  }
+  if (!local) return 'skipped';
+  if (row.deleted) {                                                      // deleted elsewhere, edited here
+    store.saveRevision(key, local, 'conflict', 'edited here while deleted elsewhere');
+    setConflict(store, { key, collection: c, id: row.id, at: now, kind: 'deleted-remote', remote: { rev: row.rev, data: null, deleted: true } });
+    return 'conflict';
+  }
+  const remoteData = row.data as Rec;
+  store.saveRevision(key, remoteData, 'cloud', 'cloud version when joining');
+  const { merged, conflicts } = merge3(base?.data ?? null, local, remoteData);
+  if (conflicts.length) {
+    setConflict(store, { key, collection: c, id: row.id, at: now, kind: 'fields', fields: conflicts, remote: { rev: row.rev, data: remoteData, deleted: false } });
+    return 'conflict';
+  }
+  // No field disagrees: the joined record keeps both sides' changes and is sent on top of the cloud's version.
+  store.setBase(key, incoming);
+  dropConflict(store, key);
+  if (recordHash(merged) === incoming.hash) { store.applyRemote(c, row.id, remoteData); clearPending(store, key); return 'applied'; }
+  store.upsert(c, merged as never, false, 'merge', 'joined with a change from another phone');
+  return 'repush';
+}
+
+async function pullAll(store: Store, cfg: SyncConfig, session: Session, ws: string, fetchFn: FetchFn, tally: SyncResult): Promise<boolean> {
+  let again = false;
+  for (let page = 0; page < 200; page++) {
+    const since = metaNow(store).lastSeq ?? 0;
+    const r = await call(fetchFn, `${cfg.supabaseUrl}/rest/v1/${TABLE}?select=collection,id,data,deleted,rev,seq&workspace_id=eq.${ws}&seq=gt.${since}&order=seq.asc&limit=500`, { headers: headers(cfg, session.accessToken) });
+    const rows = (await r.json()) as CloudRow[];
+    for (const row of rows) {
+      const t = takeRemote(store, row, session.role);
+      if (t === 'applied') tally.pulled++; else if (t === 'removed') tally.removed++; else if (t === 'repush') again = true;
+    }
+    if (rows.length) patchMeta(store, () => ({ lastSeq: Math.max(since, ...rows.map(x => x.seq ?? 0)) }));
+    if (rows.length < 500) break;
+  }
+  return again;
+}
+
+interface PushOut { collection: string; id: string; status: 'ok' | 'conflict' | 'ref_conflict' | 'denied'; rev?: number; deleted?: boolean; data?: Rec | null;
+  ref_no?: number; ref?: string; other_ref?: string; other_id?: string | null; other_title?: string | null; other_visible?: boolean }
+
+async function pushAll(store: Store, cfg: SyncConfig, session: Session, ws: string, fetchFn: FetchFn, tally: SyncResult): Promise<boolean> {
+  if (session.role === 'limited') return false;
+  const m = metaNow(store);
+  const blocked = new Set((m.conflicts ?? []).map(c => c.key));
+  const deviceId = m.deviceId ?? 'device';
+  const rows: (Rec & { _hash: string; _key: string })[] = [];
+  for (const key of m.dirty) {
+    if (blocked.has(key)) continue;
+    const rec = find(store, key);
+    if (rec?.sample || (!rec && isSampleKey(key))) { clearPending(store, key); continue; }   // sample data never goes up
+    const base = store.getBase(key);
+    if (rec) {
+      const h = recordHash(rec);
+      if (base && !base.deleted && base.hash === h) { clearPending(store, key); continue; }  // changed and changed back: nothing to send
+      rows.push({ _key: key, _hash: h, collection: split(key)[0], id: rec.id, base_rev: base?.rev ?? 0, data: rec, deleted: false, updated: rec.updated, op_id: `${deviceId}.${hash53(`${key}|${h}|${base?.rev ?? 0}`)}` });
+    } else if (m.tombstones.includes(key)) {
+      if (!base) { clearPending(store, key); continue; }                                     // never reached the cloud: nothing to delete there
+      rows.push({ _key: key, _hash: 'deleted', collection: split(key)[0], id: split(key)[1], base_rev: base.rev, data: null, deleted: true, updated: Date.now(), op_id: `${deviceId}.${hash53(`${key}|deleted|${base.rev}`)}` });
+    } else clearPending(store, key);
+  }
+  let again = false;
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200);
+    store.setInflight(chunk.map(r => r._key), true);
+    const payload = chunk.map(({ _hash, _key, ...rest }) => { void _hash; void _key; return rest; });
+    const r = await call(fetchFn, `${cfg.supabaseUrl}/rest/v1/rpc/eab_push_records`, { method: 'POST', headers: headers(cfg, session.accessToken), body: JSON.stringify({ ws, rows: payload }) });
+    const out = (await r.json()) as PushOut[];
+    store.setInflight(chunk.map(x => x._key), false);
+    chunk.forEach((sent, idx) => {
+      const res = out[idx] && out[idx].collection === sent.collection && out[idx].id === sent.id ? out[idx] : out.find(o => o.collection === sent.collection && o.id === sent.id);
+      if (!res) return;                                                                      // no answer for it: stays waiting
+      const key = sent._key;
+      if (res.status === 'ok') {
+        tally.pushed++;
+        const wasDelete = sent.deleted === true;
+        store.setBase(key, { rev: res.rev!, deleted: wasDelete, data: wasDelete ? null : (sent.data as Rec), hash: recordHash(wasDelete ? null : sent.data) });
+        const now = find(store, key);
+        // Only clear the waiting mark when this phone still holds exactly what was accepted. A change made during the
+        // upload stays waiting and is sent next time (on top of the version just accepted).
+        const unchanged = wasDelete ? !now : !!now && recordHash(now) === sent._hash;
+        if (unchanged) clearPending(store, key); else again = true;
+      } else if (res.status === 'conflict') {
+        const t = takeRemote(store, { collection: sent.collection as string, id: sent.id as string, data: res.data ?? null, deleted: !!res.deleted, rev: res.rev! }, session.role);
+        if (t === 'repush') again = true;
+        if (t === 'skipped') {   // the base was already at that version: treat as a refusal we cannot explain, keep waiting
+          patchMeta(store, mm => ({ recErrors: { ...(mm.recErrors ?? {}), [key]: 'conflict-unresolved' } }));
+        }
+      } else if (res.status === 'ref_conflict') {
+        const rec = find(store, key);
+        setConflict(store, { key, collection: split(key)[0], id: split(key)[1], at: Date.now(), kind: 'reference',
+          ref: { ref: res.ref ?? String(rec?.ref ?? ''), refNo: res.ref_no ?? 0, otherRef: res.other_ref, otherId: res.other_id ?? undefined, otherTitle: res.other_title ?? undefined, otherVisible: !!res.other_visible } });
+      } else {
+        patchMeta(store, mm => ({ recErrors: { ...(mm.recErrors ?? {}), [key]: 'denied' } }));
+      }
+    });
+  }
+  return again;
 }
 
 async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn): Promise<SyncResult> {
-  const start = store.getState().meta;
+  const start = metaNow(store);
   if (!start.syncSession) throw new SyncError('not-signed-in');
   let session = await fresh(cfg, start.syncSession, fetchFn);
-  if (!session.workspaceId) session = await membership(cfg, session, fetchFn);
-  if (session !== start.syncSession) store.setSingleton('meta', { syncSession: session });
+  // Checked on every sync, so a deactivated account or a changed role is noticed straight away (and "no access" is
+  // never reported as "synced").
+  session = await membership(cfg, session, fetchFn);
+  if (JSON.stringify(session) !== JSON.stringify(start.syncSession)) store.setSingleton('meta', { syncSession: session });
   const ws = session.workspaceId!;
+  if (!metaNow(store).deviceId) store.setSingleton('meta', { deviceId: `d${hash53(`${Math.random()}|${Date.now()}`).slice(0, 10)}` });
+  if (metaNow(store).syncWorkspaceId !== ws) {
+    // A different team workspace: its change numbers and versions have nothing to do with the last one's.
+    for (const k of store.baseKeys()) store.setBase(k, undefined);
+    store.setSingleton('meta', { syncWorkspaceId: ws, lastSeq: 0 });
+  }
   await store.flush();
 
-  // 1. Bring down everything changed in the cloud since the last sync (with a 5-minute margin for clock drift).
-  const since = Math.max(0, (start.lastSync ?? 0) - 300_000);
-  const r = await call(fetchFn, `${cfg.supabaseUrl}/rest/v1/${TABLE}?select=collection,id,data,deleted,updated&workspace_id=eq.${ws}&updated=gt.${since}&order=updated.asc`, { headers: headers(cfg, session.accessToken) });
-  const rows = (await r.json()) as Row[];
-  let pulled = 0, removed = 0;
-  const remoteNewer = new Set<string>();
-  for (const row of rows) {
-    if (!(COLLECTIONS as string[]).includes(row.collection)) continue;
-    if (row.data && (row.data as { sample?: boolean }).sample) continue; // sample data never comes from the cloud
-    const c = row.collection as CollectionName;
-    const key = `${c}:${row.id}`;
-    const local = (store.getState()[c] as { id: string; updated: number }[]).find(x => x.id === row.id);
-    const localDirty = store.getState().meta.dirty.includes(key);
-    if (local && local.updated >= row.updated && localDirty) continue; // ours is newer: it is pushed below
-    if (row.deleted) { if (local) { store.remove(c, row.id, true); removed++; } }
-    else if (!local || row.updated > local.updated) { store.upsert(c, row.data as never, true); pulled++; }
-    remoteNewer.add(key);
+  // A property-number conflict is lifted once the number was changed; the person can also ask to check again.
+  for (const cf of metaNow(store).conflicts ?? []) {
+    if (cf.kind !== 'reference') continue;
+    const rec = find(store, cf.key);
+    if (!rec || String(rec.ref ?? '').toUpperCase() !== (cf.ref?.ref ?? '').toUpperCase()) dropConflict(store, cf.key);
   }
 
-  // 2. Send up what changed here and was not overtaken by a newer cloud copy.
-  const m = store.getState().meta;
-  // A limited user can only read: their changes stay on this phone.
-  const toPush = session.role === 'limited' ? [] : m.dirty.filter(k => !remoteNewer.has(k));
-  const body: (Row & { user_id: string; workspace_id: string })[] = [];
-  for (const key of toPush) {
-    const [c, id] = key.split(':') as [CollectionName, string];
-    const rec = (store.getState()[c] as { id: string; updated: number; sample?: boolean }[] | undefined)?.find(x => x.id === id);
-    // Sample records stay on this phone: they must never mix with the team's real data in the cloud.
-    if (rec?.sample || (!rec && isSampleKey(key))) continue;
-    if (rec) body.push({ user_id: session.userId, workspace_id: ws, collection: c, id, data: rec as unknown as Record<string, unknown>, deleted: false, updated: rec.updated });
-    else if (m.tombstones.includes(key)) body.push({ user_id: session.userId, workspace_id: ws, collection: c, id, data: null, deleted: true, updated: Date.now() });
+  const tally: SyncResult = { pushed: 0, pulled: 0, removed: 0, conflicts: 0 };
+  let again = await pullAll(store, cfg, session, ws, fetchFn, tally);
+  again = (await pushAll(store, cfg, session, ws, fetchFn, tally)) || again;
+  for (let round = 0; again && round < 3; round++) {
+    again = await pullAll(store, cfg, session, ws, fetchFn, tally);
+    again = (await pushAll(store, cfg, session, ws, fetchFn, tally)) || again;
   }
-  for (let i = 0; i < body.length; i += 200) {
-    await call(fetchFn, `${cfg.supabaseUrl}/rest/v1/${TABLE}?on_conflict=workspace_id,collection,id`, {
-      method: 'POST', headers: { ...headers(cfg, session.accessToken), prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(body.slice(i, i + 200)),
-    });
+  tally.conflicts = (metaNow(store).conflicts ?? []).length;
+  // "Synced" needs a finished sync. Whatever is still waiting (an edit made during the upload, a record that is in
+  // conflict) keeps its own waiting/conflict state and the overall line will not say Synced.
+  patchMeta(store, () => ({ lastSync: Date.now(), syncError: undefined }));
+  return tally;
+}
+
+/** Puts a record's pending state back to "send again" after the person chose how to settle a conflict. */
+export function resolveConflict(store: Store, key: string, choice: { fields?: Record<string, 'local' | 'remote'>; whole?: 'local' | 'remote' }) {
+  const cf = (metaNow(store).conflicts ?? []).find(c => c.key === key);
+  if (!cf) return false;
+  const [c, id] = split(key);
+  const local = find(store, key);
+  const remote = cf.remote;
+  if (cf.kind === 'fields' && local && remote?.data) {
+    const base = store.getBase(key);
+    const { merged, conflicts } = merge3(base?.data ?? null, local, remote.data);
+    const picks: Record<string, 'local' | 'remote'> = {};
+    for (const f of conflicts) picks[f.field] = choice.fields?.[f.field] ?? choice.whole ?? 'local';
+    const resolved = applyChoices(merged, conflicts, picks);
+    store.setBase(key, { rev: remote.rev, deleted: false, data: remote.data, hash: recordHash(remote.data) });
+    dropConflict(store, key);
+    if (recordHash(resolved) === recordHash(remote.data)) { store.applyRemote(c, id, remote.data, 'merge'); clearPending(store, key); }
+    else store.upsert(c, { ...resolved, id } as never, false, 'merge', 'settled by you');
+    return true;
   }
-  const after = store.getState().meta;
-  // Done with: everything sent, and anything a newer cloud copy replaced. (A limited user's own edits stay pending.)
-  const cleared = new Set(session.role === 'limited' ? [...remoteNewer] : m.dirty);
-  store.setSingleton('meta', {
-    dirty: after.dirty.filter(k => !cleared.has(k)),
-    tombstones: after.tombstones.filter(k => !cleared.has(k)),
-    lastSync: Date.now(),
-    syncError: undefined,
-  });
-  return { pushed: body.length, pulled, removed };
+  if (cf.kind === 'deleted-remote') {
+    store.setBase(key, { rev: remote!.rev, deleted: true, data: null, hash: recordHash(null) });
+    dropConflict(store, key);
+    if (choice.whole === 'remote') { store.applyRemote(c, id, null); clearPending(store, key); }   // accept the deletion
+    else if (local) store.upsert(c, local as never, false, 'merge', 'kept after it was deleted elsewhere');    // keep it: send it again
+    return true;
+  }
+  if (cf.kind === 'deleted-local') {
+    store.setBase(key, { rev: remote!.rev, deleted: false, data: remote!.data, hash: recordHash(remote!.data) });
+    dropConflict(store, key);
+    if (choice.whole === 'remote' && remote?.data) { store.applyRemote(c, id, remote.data, 'merge'); clearPending(store, key); }   // bring it back
+    // otherwise the deletion stays pending and is sent on top of the newer version
+    return true;
+  }
+  if (cf.kind === 'reference') { dropConflict(store, key); return true; }   // check again on the next sync
+  return false;
 }

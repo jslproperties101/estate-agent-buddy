@@ -245,8 +245,37 @@ export interface Meta {
   syncError?: string;
   /** The person chose to use the app on this phone only, without signing in (only when sign-in is not set up). */
   offlineOnly?: boolean;
-  /** The report of buyers whose old "Inactive" status was moved to Dropped, until the owner marks it reviewed. */
-  leadReview?: { at: number; ids: string[]; reviewed: boolean };
+  /** The report of buyers whose old "Inactive" status was moved to Dropped, until the owner marks it reviewed.
+   *  `undone` lists the ones the owner chose to put back (only those; nothing else is touched). */
+  leadReview?: { at: number; ids: string[]; reviewed: boolean; undone?: string[] };
+  /** Random name of this phone for the cloud's records of who wrote what. Never shown, never a person's data. */
+  deviceId?: string;
+  /** The workspace the phone's sync position and cloud copies belong to; a different one starts a fresh position. */
+  syncWorkspaceId?: string;
+  /** Position in the cloud's own change order (not a clock) up to which this phone has taken changes. */
+  lastSeq?: number;
+  /** Changes that could not be joined automatically. Both versions are kept; nothing is sent for these records
+   *  until the person decides (Settings → Sync review). */
+  conflicts?: Conflict[];
+  /** Records whose last send was refused for a reason other than a conflict, e.g. "denied": "collection:id" → why. */
+  recErrors?: Record<string, string>;
+}
+
+/** One field that differs between this phone and the cloud. */
+export interface FieldConflict { field: string; local: unknown; remote: unknown }
+export interface Conflict {
+  /** "collection:id" */
+  key: string;
+  collection: CollectionName;
+  id: string;
+  at: number;
+  /** fields: same field changed on both sides · deleted-remote: deleted elsewhere, edited here · deleted-local: deleted here,
+   *  edited elsewhere · reference: the property number is already used by another property. */
+  kind: 'fields' | 'deleted-remote' | 'deleted-local' | 'reference';
+  fields?: FieldConflict[];
+  /** The cloud copy at the time (also kept in the record's history). */
+  remote?: { rev: number; data: Record<string, unknown> | null; deleted: boolean };
+  ref?: { ref: string; refNo: number; otherRef?: string; otherId?: string; otherTitle?: string; otherVisible: boolean };
 }
 
 export interface Collections {

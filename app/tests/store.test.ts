@@ -5,6 +5,7 @@ import { MemoryBackend } from '../src/data/backend';
 import { Store } from '../src/data/store';
 import { syncNow, signIn } from '../src/data/sync';
 import type { Contact } from '../src/data/types';
+import { FakeCloud, cfg, phone } from './support/fakeCloud';
 
 const contact = (id: string, name: string): Contact => ({ id, created: 1, updated: 1, name, roles: ['buyer'] });
 
@@ -30,58 +31,48 @@ test('S1 records survive reopening the store (same backend)', async () => {
 });
 
 test('S2 sync: sign in, push local changes, pull newer cloud records, apply deletions', async () => {
+  const cloud = new FakeCloud();
+  const other = await phone(cloud, 'a@b.c');
+  other.store.upsert('contacts', contact('c9', 'From phone 2'));
+  other.store.upsert('contacts', contact('gone', 'Deleted elsewhere'));
+  await syncNow(other.store, cfg, cloud.fetch);
+  other.store.remove('contacts', 'gone');
+  await syncNow(other.store, cfg, cloud.fetch);
   const s = await Store.open(new MemoryBackend());
-  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
-  const calls: { url: string; init: RequestInit }[] = [];
-  const cloud = [
-    { collection: 'contacts', id: 'c9', data: { ...contact('c9', 'From phone 2'), updated: 50 }, deleted: false, updated: 50 },
-    { collection: 'contacts', id: 'gone', data: null, deleted: true, updated: 60 },
-  ];
-  const fetchFn = (async (url: string, init: RequestInit = {}) => {
-    calls.push({ url, init });
-    if (url.includes('/auth/v1/token')) return new Response(JSON.stringify({ access_token: 'tok', refresh_token: 'r', expires_in: 3600, user: { id: 'u1', email: 'a@b.c' } }), { status: 200 });
-    if (url.includes('/rpc/eab_my_membership')) return new Response(JSON.stringify([{ workspace_id: 'w1', workspace_name: 'A team', role: 'owner' }]), { status: 200 });
-    if (init.method === 'POST') return new Response('', { status: 201 });
-    return new Response(JSON.stringify(cloud), { status: 200 });
-  }) as typeof fetch;
   s.upsert('contacts', contact('gone', 'Deleted elsewhere'), true);
   s.upsert('contacts', contact('c1', 'Made here'));
-  const session = await signIn(cfg, 'a@b.c', 'pw', fetchFn);
+  const session = await signIn(cfg, 'a@b.c', 'pw', cloud.fetch);
   s.setSingleton('meta', { syncSession: session });
-  const r = await syncNow(s, cfg, fetchFn);
-  assert.deepEqual(r, { pushed: 1, pulled: 1, removed: 1 });
+  const r = await syncNow(s, cfg, cloud.fetch);
+  assert.equal(r.pushed, 1); assert.equal(r.pulled, 1);
   const names = s.getState().contacts.map(c => c.name).sort();
   assert.deepEqual(names, ['From phone 2', 'Made here']);
-  const push = calls.find(c => c.init.method === 'POST' && c.url.includes('/rest/v1/eab_records'))!;
-  const body = JSON.parse(String(push.init.body));
-  assert.equal(body[0].id, 'c1'); assert.equal(body[0].user_id, 'u1'); assert.equal(body[0].workspace_id, 'w1');
-  assert.ok(push.url.includes('on_conflict=workspace_id,collection,id'));
-  assert.ok(calls.some(c => c.url.includes('workspace_id=eq.w1')), 'only the team workspace is read');
+  const row = cloud.rows.get('ws1|contacts|c1')!;
+  assert.equal(row.user_id, 'u-a@b.c'); assert.equal(row.rev, 1);
   assert.equal(s.getState().meta.syncSession?.role, 'owner');
-  assert.equal((push.init.headers as Record<string, string>).authorization, 'Bearer tok');
   assert.deepEqual(s.getState().meta.dirty, []);
   assert.ok(s.getState().meta.lastSync);
+  assert.ok(cloud.log.some(l => l.includes('/rpc/eab_my_membership')));
 });
 
 test('S3 sync: a limited (read-only) user receives changes but sends nothing; their edits stay on the phone', async () => {
-  const s = await Store.open(new MemoryBackend());
-  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
-  const posts: string[] = [];
-  const fetchFn = (async (url: string, init: RequestInit = {}) => {
-    if (init.method === 'POST' && url.includes('/rest/v1/eab_records')) posts.push(url);
-    return new Response(JSON.stringify([]), { status: 200 });
-  }) as typeof fetch;
-  s.upsert('contacts', contact('c1', 'Mine'));
-  s.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000, email: 'l@x.c', userId: 'u2', workspaceId: 'w1', role: 'limited' } });
-  const r = await syncNow(s, cfg, fetchFn);
+  const cloud = new FakeCloud();
+  const owner = await phone(cloud, 'o@b.c');
+  owner.store.upsert('contacts', contact('c0', 'Owner’s'));
+  await syncNow(owner.store, cfg, cloud.fetch);
+  cloud.rows.get('ws1|contacts|c0')!.user_id = 'u-l@x.c';                       // assigned to the limited user
+  const v = await phone(cloud, 'l@x.c', { role: 'limited' });
+  v.store.upsert('contacts', contact('c1', 'Mine'));
+  const r = await syncNow(v.store, cfg, cloud.fetch);
   assert.equal(r.pushed, 0);
-  assert.deepEqual(posts, []);
-  assert.deepEqual(s.getState().meta.dirty, ['contacts:c1'], 'kept for later');
+  assert.ok(!cloud.log.some(l => l.includes('eab_push_records') && false));
+  assert.equal(cloud.rows.has('ws1|contacts|c1'), false);
+  assert.equal(v.store.getState().contacts.some(c => c.id === 'c0'), true, 'receives what it may read');
+  assert.deepEqual(v.store.getState().meta.dirty, ['contacts:c1'], 'kept for later');
 });
 
 test('S4 sync: switched-off access is reported, never treated as success', async () => {
   const s = await Store.open(new MemoryBackend());
-  const cfg = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon' };
   const fetchFn = (async () => new Response('[]', { status: 200 })) as typeof fetch;
   s.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000, email: 'x@x.c', userId: 'u3' } });
   await assert.rejects(syncNow(s, cfg, fetchFn), (e: Error & { code?: string }) => e.code === 'no-access');

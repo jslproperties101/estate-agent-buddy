@@ -12,7 +12,8 @@ export function SaveStatus({ lang }: { lang: Lang }) {
   const text = state === 'phone' ? (app.meta.syncSession && waiting > 0 ? s.phoneWaiting(waiting) : s.phone)
     : state === 'syncing' ? s.syncing
       : state === 'synced' ? s.synced
-        : state === 'failed-sync' ? s.failedSync : s.failedPhone;
+        : state === 'conflict' ? s.conflict((app.meta.conflicts ?? []).length)
+          : state === 'failed-sync' ? s.failedSync : s.failedPhone;
   return (
     <div className={`save-status ${state}`} role={state.startsWith('failed') ? 'alert' : 'status'} data-testid="save-status" data-state={state} aria-label={s.label}>
       <span className="save-dot" aria-hidden="true" />{text}

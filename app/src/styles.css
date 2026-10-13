@@ -689,6 +689,8 @@ label.btn { position: relative; cursor: pointer; }
 .save-status.syncing .save-dot { background: var(--gold-hi); animation: pulse 1s infinite; }
 .save-status.failed-phone, .save-status.failed-sync { color: var(--red); font-weight: 700; }
 .save-status.failed-phone .save-dot, .save-status.failed-sync .save-dot { background: var(--red); }
+.save-status.conflict { color: var(--gold-hi); font-weight: 700; }
+.save-status.conflict .save-dot { background: var(--gold-hi); }
 .toast.error { border-color: var(--red); }
 .toast.error span { color: var(--red); font-weight: 700; }
 
