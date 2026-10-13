@@ -16,10 +16,10 @@ has not been shown · **NOT BUILT**.
 
 | # | Finding | Evidence | Status |
 | --- | --- | --- | --- |
-| F1 | **GitHub's automatic test job was red on every branch from Phase 1 to Stage 6** (14 runs). My own earlier reports quoted only local runs; I had not looked at the GitHub results. | GitHub Actions: run `38452169593` (Stage 6) and every earlier run of `Build` on `feature/v2-phase1/2`, Stage 3, 4, 5 show `test = failure`. `database` and `android` jobs were green. | Partly fixed here; see F2–F4 and the result in section 5 |
+| F1 | **GitHub's automatic checks showed "failure" on every `Build` run from `feature/v2-phase1` (13 Oct 12:17 UTC) through Stage 6** (14 runs listed). My own earlier reports quoted only local runs; I had not looked at the GitHub results. | I confirmed job by job for Stage 4 (`adf9c18`: U13, U57, U70, U47, U50 failed), Stage 5 (`7549978`) and Stage 6 (`7e6943e`): U13, U57, U70, U71, U73 failed; in all three the `test` job failed while `database` and `android` were green. For the earlier runs I did not open the failing job. I did not investigate the Stage 4-only U47 and U50 failures (they are not in the Stage 5 or 6 lists). | **Fixed**: GitHub run `38464738106` on commit `9927a89` — `test`, `database` and `android` all green (first all-green run since Phase 1). See section 5 for the runs in between |
 | F2 | **Real app defect (FAIL → fixed): a due-reminder banner was drawn on top of open dialogs and covered their buttons** (for example "Download PDF"), so the button could not be pressed while a reminder was showing. | Reproduced locally with a UTC clock (test U73 timed out because the banner "intercepts pointer events"). New test **U89** fails on the old CSS and passes on the fix. | **Fixed** (`z-index` of the banner 25 → 18, below dialogs at 20). Needs a phone look. |
-| F3 | The automatic **Google Maps check** in the build has not completed in any build since 13 Oct: the first-start "sample data?" dialog blocks it (its screenshot in release `android-7e6943e` shows that dialog). So **Google Maps with your restricted key has not been checked by anything.** | Release notes of all six APK builds say "Check could not finish: locator.click Timeout"; screenshot downloaded and viewed. | Script fixed (answers the dialog; ran locally without a key and now reaches the five checks). The real result is **BLOCKED until the next GitHub build with your key secret reports**. |
-| F4 | Four screen tests (U13, U57, U70, U71) failed on GitHub every time but passed in my workspace. They read the screen at once or wait a fixed second, which is not enough on a slower machine. I reproduced the same class of failure locally by slowing the browser's CPU (6–8×). | CI annotations; local throttled runs (original vs fixed tests). | Test waits fixed. **Proof is the GitHub run — see section 5.** |
+| F3 | The automatic **Google Maps check** in the build has not completed in any build since 13 Oct: the first-start "sample data?" dialog blocks it (its screenshot in release `android-7e6943e` shows that dialog). So **Google Maps with your restricted key has not been checked by anything.** | Release notes of all six APK builds say "Check could not finish: locator.click Timeout"; screenshot downloaded and viewed. | Script fixed (answers the dialog). **GitHub build 26 (`android-9927a89`) then ran the real check with your key**: Map loads, Geocoding, Places (new) and Routes (Nilai → KLIA 22.5 km) all **Working**, 23 map images drawn; screenshot viewed. This is a desktop Chromium on a GitHub runner at the app's own address `https://localhost/` — **not** the phone's WebView. |
+| F4 | Four screen tests (U13, U57, U70, U71) failed on GitHub every time but passed in my workspace. They read the screen at once or wait a fixed second, which is not enough on a slower machine. I reproduced the same class of failure locally by slowing the browser's CPU (6–8×). | CI annotations; local throttled runs (original vs fixed tests). | Test waits fixed; **all four now pass on GitHub** (run `38464738106`). Root causes: U13 reloaded before the saved journey had reached storage; U57 replaced the stored "unsent changes" list before it had been written (the GitHub log showed a sync with nothing to send); U70/U71 read the screen before React had updated it. None is an app fault as far as I can tell. |
 | F5 | **A Stage 6 (or any feature-branch) APK would silently replace itself with the old production bundle**, so a phone test could be testing different code. | See section 2. | **Needs your decision** |
 | F7 | **Unsupported platform claim on the Marketing Studio screen (FAIL → fixed).** The square size's help text said "Instagram, Facebook and WhatsApp posts" and the portrait text said "Instagram feed", although the sizes come from a third-party guide and no platform's own specification was verified. My Stage 6 notes had said the opposite ("offered as a general post image"), so the notes and the screen disagreed. | Read in `src/marketing/strings.ts` (EN, BM, 中文). | **Fixed**: all three languages now say "a common size for social posts — check each platform's own size guide"; new unit test MK12 forbids platform names in that text. |
 | F8 | **Photo privacy edge case (observation, not changed).** A large camera photo is re-drawn on upload, so its location data is dropped and it is turned upright (proved with a real GPS-tagged, sideways JPEG, test U90). But a **small photo that would not get smaller keeps its own bytes, including any GPS block** (`compressImage`: "keep the original if compression would not make it smaller"). The app never shares photo files directly (PDFs and designs are re-drawn), and the Photo Studio copy is always clean (U90), but cloud sync uploads the stored file to your team's storage. | U90 | Your decision: strip the data from small originals too (a small change), or accept. |
@@ -75,7 +75,7 @@ Method key: **U** = unit test (node:test, 254), **B** = browser screen test (Pla
 | Feature | Label | Method and evidence | What is missing |
 | --- | --- | --- | --- |
 | Real GPS readings and My Location | NOT PROVEN | B with simulated positions: U13, U29, U38. App asks for a fresh reading on every press (15 s limit then a message) | Real fix outdoors, after screen-off |
-| My Property Map, layers, markers, navigation | NOT PROVEN / BLOCKED | B with a stand-in map: U14, U27, U29. **Real Google Maps with your key has never been checked** (F3) | Real map on the phone; the next GitHub build's Maps check |
+| My Property Map, layers, markers, navigation | NOT PROVEN | B with a stand-in map: U14, U27, U29. Real Google Maps (map, geocoding, places, routes) with your key **works in a browser at `https://localhost/`** (F3, GitHub build 26) — the map screens themselves were not exercised against it | The real map screens in the phone's WebView, taps and drags |
 | Banner placement by GPS, map tap, typed coordinates | NOT PROVEN | B: U27, U38, U70 | Finger tap on a real map |
 | Banner movement history, photo, take-down history | PASS (browser) · phone NOT PROVEN | B/U: U27, U70, banners.test | |
 | House Shopping start / pause / resume / stop / save journey | NOT PROVEN | B with simulated route: U13 | Real walk/drive |
@@ -123,7 +123,7 @@ Method key: **U** = unit test (node:test, 254), **B** = browser screen test (Pla
 
 | Feature | Label | Method and evidence | What is missing |
 | --- | --- | --- | --- |
-| Google Maps with the configured restricted key | BLOCKED | No key in this workspace; the build's own check never completed (F3). Not claimed | Next GitHub build with the fixed check; phone |
+| Google Maps with the configured restricted key | PASS (GitHub runner, Chromium at referrer `https://localhost/`, the same address the app uses) · phone NOT PROVEN | Build 26 release notes + screenshot: Maps JavaScript API, Geocoding, Places (new), Routes all Working with the built-in key; I do not hold the key and did not use it myself | Phone WebView; billing/quota alerts on the key (F6) |
 | Google sign-in and Supabase sync (live) | BLOCKED | No test account/credentials here. Sync logic only with stand-ins: U: phase2-sync; B: U54–U58 | Test account on the QA APK |
 | Database roles and row-level security | PASS (local PostgreSQL 16, throwaway; **not** your Supabase project) | DB: `rls-test.sh` **125 passed, 0 failed**; `rollback-test.sh` **18 passed, 0 failed** | The same against a Supabase *test* project if you want a live check; no migration was applied to your project |
 | Permission failure messages | PASS (browser) · phone NOT PROVEN | B with stand-ins: location denied (U29), contacts refused / cancelled / unsupported (U33, U66), microphone blocked (U76) | Real denial prompts |
@@ -136,15 +136,30 @@ Method key: **U** = unit test (node:test, 254), **B** = browser screen test (Pla
 | ID | Defect | Fix | Test | Result |
 | --- | --- | --- | --- | --- |
 | D1 | Reminder banner covered dialog buttons (F2) | `src/styles.css`: `.alerts` z-index 25 → 18 | U89 (fails before, passes after); U73 passes with UTC clock | fixed, local; GitHub result in section 5 |
-| D2 | Maps check script blocked by the start dialog (F3) | `scripts/maps-check.mjs` answers "Start Without Sample Data" first | run locally without a key: reaches all five checks | script fixed; real outcome pending |
-| D3 | Four tests racing the screen (F4) | waits added in U13, U57, U70, U71 (tests only, no app code) | repeated runs | see section 5 |
+| D2 | Maps check script blocked by the start dialog (F3) | `scripts/maps-check.mjs` answers "Start Without Sample Data" first | GitHub build 26 | script fixed; check now completes: all five items Working |
+| D3 | Four tests racing the screen or the storage (F4) | waits added in U13, U57, U70, U71 (tests only, no app code) | same tests | pass locally ×4 and on GitHub (run `38464738106`) |
 | D4 | Unsupported social-platform wording (F7) | `src/marketing/strings.ts` (3 languages), comment in `content.ts` | MK12 | fixed; unit 255/255 |
 | — | New verification test, no defect found: photo camera data and orientation (F8) | none (test only) | U90 | passes |
 
 ## 5. Automated regression results
 
-See the final report for the totals (filled in after the last run). Commands: `npm run typecheck`, `npm run lint`, `node scripts/test-unit.mjs`,
-`node scripts/build.mjs --no-env`, `node --test tests/ui.test.mjs` (three full runs), DB scripts on a local PostgreSQL 16.
+Run 14 Oct 2026. Workspace = Chromium 141, Node 22, 2 cores, clock Asia/Kuala_Lumpur unless stated.
+
+| Check | Result |
+| --- | --- |
+| Strict type check | clean (0 errors) |
+| Lint | passed, 167 files |
+| Unit tests | **255 of 255** (254 from Stage 6 + MK12) |
+| Production build (`--no-env`) | succeeded |
+| Full screen suite, local | **89 of 89** on every full run on the final code: 4 consecutive runs (+ 1 with the clock set to UTC, 88 of 88 before U90 was added) |
+| Database / RLS, local PostgreSQL 16 (throwaway; not your Supabase) | `rls-test.sh` **125 passed, 0 failed**; `rollback-test.sh` **18 passed, 0 failed** |
+| GitHub Actions `Build` on `9927a89` (Ubuntu runner, clock UTC) | **test, database, android all success** — run `38464738106` |
+
+**GitHub runs on this branch, in order (the intermittent / environment-dependent failures, stated plainly):**
+`1dab590` test failed (U13, U57, U70, U71 — U73 fixed by the banner change) · `b95f82b` test failed (U57) · `522c0b1` test failed (U57, with the diagnostic that showed a sync with nothing to send) · `d0f6a8d` test failed (**U13** — it had *passed* on the previous run with identical app code, so U13 was intermittent on GitHub) · `9927a89` **all green**.
+One green run is not proof that GitHub can no longer show a slow-machine failure; keep watching the next few runs.
+
+Not run: any test on the S23 Ultra; sign-in or sync against a live Supabase project; the share sheet, camera, microphone, contacts, notifications; Samsung keyboard.
 
 ## 6. Steps for the S23 Ultra (when a safe build is chosen)
 
