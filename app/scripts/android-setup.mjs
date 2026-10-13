@@ -11,6 +11,11 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const cfg = JSON.parse(readFileSync('capacitor.config.json', 'utf8'));
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+// EAB_QA=1: the isolated QA app. A different package name (so it installs BESIDE the real app with its own storage and cannot
+// overwrite it), its own sign-in return link and its own app name. The web side is built with the same flag (updates off).
+const QA = process.env.EAB_QA === '1';
+const APP_ID = QA ? `${cfg.appId}.qa` : cfg.appId;
+const APP_NAME = QA ? 'EAB QA' : cfg.appName;
 const A = 'android/app/src/main';
 const must = p => { if (!existsSync(p)) throw new Error(`Missing ${p}: run "npx cap add android" first.`); return p; };
 const edit = (p, fn) => { const s = readFileSync(must(p), 'utf8'); const t = fn(s); if (t !== s) writeFileSync(p, t); };
@@ -37,13 +42,13 @@ edit(`${A}/AndroidManifest.xml`, s => {
     s = s.replace(/<application/, '<queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n\n    <application');
   }
   // The Capacitor template normally already has this filter; add it if not.
-  if (!s.includes('@string/custom_url_scheme') && !s.includes(`android:scheme="${cfg.appId}"`)) {
+  if (!s.includes('@string/custom_url_scheme') && !s.includes(`android:scheme="${APP_ID}"`)) {
     s = s.replace(/(<activity[^>]*android:name="[^"]*MainActivity"[\s\S]*?)(<\/activity>)/, `$1
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="${cfg.appId}" />
+                <data android:scheme="${APP_ID}" />
             </intent-filter>
         $2`);
   }
@@ -56,10 +61,10 @@ edit(`${A}/res/values/strings.xml`, s => {
     const re = new RegExp(`<string name="${name}">[^<]*</string>`);
     return re.test(s) ? s.replace(re, `<string name="${name}">${value}</string>`) : s.replace('</resources>', `    <string name="${name}">${value}</string>\n</resources>`);
   };
-  s = set('app_name', cfg.appName);
-  s = set('title_activity_main', cfg.appName);
-  s = set('package_name', cfg.appId);
-  s = set('custom_url_scheme', cfg.appId);
+  s = set('app_name', APP_NAME);
+  s = set('title_activity_main', APP_NAME);
+  s = set('package_name', APP_ID);
+  s = set('custom_url_scheme', APP_ID);
   return s;
 });
 
@@ -73,7 +78,8 @@ if (existsSync(styles)) edit(styles, s => (s.includes('android:windowBackground'
 const run = Number(process.env.GITHUB_RUN_NUMBER || 1);
 edit('android/app/build.gradle', s => {
   // The version name carries the native version ("2.0.0-n2"): automatic updates check it before installing a bundle.
-  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}-n${pkg.nativeVersion ?? 1}"`);
+  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}${QA ? '-qa' : ''}-n${pkg.nativeVersion ?? 1}"`);
+  if (QA) s = s.replace(/applicationId\s+"[^"]*"/, `applicationId "${APP_ID}"`);
   if (!s.includes('android-config/debug.keystore')) {
     s = s.replace(/android\s*\{/, `android {
     signingConfigs {
@@ -88,4 +94,4 @@ edit('android/app/build.gradle', s => {
   return s;
 });
 
-console.log(`Android project configured: ${cfg.appName} (${cfg.appId}), version ${pkg.version} (${run}).`);
+console.log(`Android project configured: ${APP_NAME} (${APP_ID}${QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);

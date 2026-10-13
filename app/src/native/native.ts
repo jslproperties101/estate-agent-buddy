@@ -11,7 +11,10 @@ export const isNative = (): boolean => { try { return Capacitor.isNativePlatform
 export const platform = (): 'android' | 'ios' | 'web' => { try { return Capacitor.getPlatform() as 'android' | 'ios' | 'web'; } catch { return 'web'; } };
 
 /** Android package / iOS bundle id, also the URL scheme Google sign-in returns to. */
-export const APP_ID = 'com.jslproperties.estateagentbuddy';
+declare const __EAB_BUILD__: { qa?: boolean } | undefined;
+/** The isolated QA build (EAB_QA=1 at build time): separate package name and sign-in return link, never updates itself. */
+export const IS_QA = typeof __EAB_BUILD__ !== 'undefined' && !!__EAB_BUILD__?.qa;
+export const APP_ID = IS_QA ? 'com.jslproperties.estateagentbuddy.qa' : 'com.jslproperties.estateagentbuddy';
 export const AUTH_CALLBACK = `${APP_ID}://auth-callback`;
 
 const cache = new Map<string, any>();

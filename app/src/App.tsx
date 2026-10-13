@@ -57,6 +57,7 @@ import {
 } from './icons';
 import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
+import { BUILD } from './native/updates';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, holdsOtherWorkspaceData, ownerUnknownWithData } from './data/sync';
@@ -125,7 +126,7 @@ function StartupLogo({ phase, lang, onRetry }: { phase: StartupPhase; lang: Lang
   const text = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : s.opening;
   return (
     <div className={`intro${phase === 'ready' ? ' leaving' : ''}`} data-testid="startup-logo" data-phase={phase}>
-      <div className="intro-stage" aria-hidden="true"><IconLogo size={168} big /></div>
+      <div className="intro-stage" aria-hidden="true"><IconLogo size={168} big splash /></div>
       {phase !== 'ready' && <p className={`intro-msg ${phase}`} role={phase === 'failed' ? 'alert' : 'status'} data-testid="startup-msg">{text}</p>}
       {(phase === 'slow' || phase === 'failed') && <button className="btn secondary" data-testid="startup-retry" onClick={onRetry}>{s.retry}</button>}
     </div>
@@ -266,6 +267,7 @@ function Shell() {
           </div>
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
+        {BUILD.qa && <div className="proto-bar qa-bar" role="status" data-testid="qa-bar">QA · {BUILD.sha} · {t.update.qaOff(BUILD.sha)}</div>}
         <UpdateBanner lang={lang} />
         <SaveStatus lang={lang} />
 

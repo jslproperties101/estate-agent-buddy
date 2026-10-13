@@ -1,6 +1,8 @@
 // Small inline icons, so the app needs no icon package and works offline.
 import logo256 from './brand/logo-256.webp';
 import logo512 from './brand/logo-512.webp';
+import splash256 from './brand/splash-256.webp';
+import splash512 from './brand/splash-512.webp';
 type P = { size?: number };
 const svg = (d: string) => ({ size = 22 }: P) => (
   <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -37,7 +39,7 @@ export const IconChat = svg('M4 5h16v11H9l-5 4zM8.5 10.5c1-1.6 2.2-2.4 3.5-2.4s2
 /** Settings: a gear. */
 export const IconGear = svg('M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1');
 export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3M8 21h8');
-/** Estate Agent AI Buddy logo (the owner's artwork, white outer border removed; source in assets/brand/). */
-export const IconLogo = ({ size = 28, big }: P & { big?: boolean }) => (
-  <img className="logo-img" src={big ? logo512 : logo256} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} />
+/** Estate Agent AI Buddy logo (the owner's gold-robot app icon: launcher icon, header, sign-in; source in assets/brand/). `splash` keeps the earlier artwork the owner asked to leave on the start-up screens. */
+export const IconLogo = ({ size = 28, big, splash }: P & { big?: boolean; splash?: boolean }) => (
+  <img className="logo-img" src={splash ? (big ? splash512 : splash256) : (big ? logo512 : logo256)} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} />
 );

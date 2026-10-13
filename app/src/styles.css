@@ -75,6 +75,7 @@ small, .small { font-size: 14px; }
 .lang button[aria-pressed="true"] { background: var(--gold-grad); color: var(--on-gold); }
 .update-bar { background: #221B0E; color: #F3DDA6; border-bottom: 1px solid var(--gold-lo); padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
 .proto-bar { background: #2A120E; color: #FFD9D2; font-size: 14px; padding: 6px 12px; text-align: center; border-bottom: 1px solid var(--line); }
+.qa-bar { background: #B45309; color: #fff; font-weight: 600; }
 
 .content { flex: 1; padding: 14px max(14px, env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px)); min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }

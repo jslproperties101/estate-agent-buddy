@@ -44,8 +44,9 @@ export function AboutCard({ lang }: { lang: Lang }) {
   return (
     <div className="card stack-sm" data-testid="about">
       <div className="card-title">{u.about}</div>
-      <small className="muted" data-testid="about-version">{u.version(BUILD.version, BUILD.sha, isNative() ? native : BUILD.nativeVersion)}</small>
-      <button className="btn secondary" disabled={busy} data-testid="check-update" onClick={async () => {
+      <small className="muted" data-testid="about-version">{u.version(BUILD.version, BUILD.sha, isNative() ? native : BUILD.nativeVersion)}{BUILD.qa ? ' · QA' : ''}</small>
+      {BUILD.qa && <small role="status" data-testid="about-qa">{u.qaOff(BUILD.sha)}</small>}
+      <button className="btn secondary" disabled={busy || !!BUILD.qa} data-testid="check-update" onClick={async () => {
         setBusy(true); setMsg('');
         const r = await checkForUpdate();
         setSt(r);

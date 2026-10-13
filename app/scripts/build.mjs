@@ -31,7 +31,10 @@ const config = {
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 let sha = (env.GITHUB_SHA ?? '').slice(0, 7);
 if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { sha = 'dev'; } }
-const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString() };
+// EAB_QA=1 makes the isolated QA build: its own Android package name, its own phone storage and NO automatic update check
+// (so it can never download the production bundle). See docs/QA.md. Normal builds do not set it.
+const qa = env.EAB_QA === '1';
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(qa ? { qa: true } : {}) };
 
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist', { recursive: true });

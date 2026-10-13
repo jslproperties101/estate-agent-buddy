@@ -72,9 +72,18 @@ jobs:
         run: bash supabase/tests/rls-test.sh
 
   android:
+    # "prod" = the normal debug APK (same package as your real app, publishes the update package).
+    # "qa"   = the isolated QA APK (separate package name and storage, automatic updates OFF, release tag qa-<commit>);
+    #          built only for branches whose name contains "qa" (and never publishes anything to the update address).
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(contains(github.ref_name, 'qa') && '["prod","qa"]' || '["prod"]') }}
+    name: android (${{ matrix.variant }})
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app } }
     env:
+      EAB_QA: ${{ matrix.variant == 'qa' && '1' || '' }}
       EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
       EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
       EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
@@ -91,13 +100,14 @@ jobs:
           node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           npm install --no-audit --no-fund
       - name: Build for the Google Maps check (without sign-in, so the check reaches Settings)
-        if: env.EAB_GOOGLE_MAPS_API_KEY != ''
+        if: env.EAB_GOOGLE_MAPS_API_KEY != '' && matrix.variant == 'prod'
         run: |
           EAB_SUPABASE_URL= EAB_SUPABASE_ANON_KEY= npm run build
           rm -rf ../dist-maps-check && cp -r dist ../dist-maps-check
       - name: Build the app
         run: npm run build && rm -f dist/*.map
       - name: Update package for installed apps (no reinstall needed)
+        if: matrix.variant == 'prod'
         run: |
           SHORT=${GITHUB_SHA::7}
           NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
@@ -110,6 +120,7 @@ jobs:
             "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > ../site/updates/latest.json
           cat ../site/updates/latest.json
       - uses: actions/upload-artifact@v4
+        if: matrix.variant == 'prod'
         with: { name: site, path: site }
       - name: Android project
         run: |
@@ -124,6 +135,10 @@ jobs:
             grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
           done
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Check the APK (package name, app name, launcher icons, splash, QA flag)
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          if [ "$EAB_QA" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy.qa "EAB QA" qa; else node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy "Estate Agent AI Buddy" prod; fi
       - name: Check the APK signature (same debug key every build)
         run: |
           SHA1=$(keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA1:' | awk '{print $2}')
@@ -133,17 +148,17 @@ jobs:
         id: apk
         run: |
           SHORT=${GITHUB_SHA::7}
-          OUT="EstateAgentBuddy-${SHORT}-debug.apk"
+          if [ "$EAB_QA" = "1" ]; then OUT="EstateAgentBuddy-QA-${SHORT}-debug.apk"; TAG="qa-$SHORT"; else OUT="EstateAgentBuddy-${SHORT}-debug.apk"; TAG="android-$SHORT"; fi
           cp android/app/build/outputs/apk/debug/app-debug.apk "../$OUT"
           echo "file=$OUT" >> "$GITHUB_OUTPUT"
-          echo "tag=android-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "maps=$([ -n "$EAB_GOOGLE_MAPS_API_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
           echo "supabase=$([ -n "$EAB_SUPABASE_URL" ] && [ -n "$EAB_SUPABASE_ANON_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
-        with: { name: apk, path: '${{ steps.apk.outputs.file }}' }
+        with: { name: 'apk-${{ matrix.variant }}', path: '${{ steps.apk.outputs.file }}' }
       - name: Real Google Maps check (only with the Maps key secret)
         id: maps
-        if: steps.apk.outputs.maps == 'yes'
+        if: steps.apk.outputs.maps == 'yes' && matrix.variant == 'prod'
         continue-on-error: true
         run: |
           npx playwright install --with-deps chromium
@@ -155,7 +170,13 @@ jobs:
           cd ..
           TAG='${{ steps.apk.outputs.tag }}'
           {
-            echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
+            if [ "$EAB_QA" = "1" ]; then
+              echo "**QA APK (isolated test app)** for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
+              echo
+              echo "Package com.jslproperties.estateagentbuddy.qa, app name EAB QA: installs BESIDE your real app, with its own empty storage. Automatic updates are OFF, so it keeps running exactly this commit. Settings -> About shows the commit and says QA."
+            else
+              echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}. WARNING: same package as your real app; it installs over it and may switch itself to the production bundle. For testing use the QA APK."
+            fi
             echo
             echo "Install: open this page on the Android phone, tap the .apk below, allow installing from this source, then Install."
             echo

@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { isNative, plugin, platform } from './native';
 
-export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string }
+export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string; qa?: boolean }
 declare const __EAB_BUILD__: BuildInfo | undefined;
 export const BUILD: BuildInfo = (typeof __EAB_BUILD__ !== 'undefined' && __EAB_BUILD__) || { sha: 'dev', version: '0.0.0', nativeVersion: 1, builtAt: '' };
 
@@ -60,6 +60,8 @@ export async function installedNativeVersion(): Promise<number> {
 
 /** Checks GitHub Pages for a newer version and, in the Android app, downloads it ready for the next start. */
 export async function checkForUpdate(fetchFn: typeof fetch = fetch): Promise<UpdateState> {
+  // The isolated QA build never looks for, downloads or switches to another bundle (it must keep running the commit it was built from).
+  if (BUILD.qa) return { kind: 'none' };
   // The single-file copy opened from the phone's storage cannot update itself.
   // On the web, only the published site checks (not a copy opened from the phone's storage or a local test server).
   if (!isNative() && !override() && !(typeof window !== 'undefined' && window.location.hostname.endsWith('github.io'))) return { kind: 'none' };
