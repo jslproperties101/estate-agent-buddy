@@ -1,9 +1,9 @@
 // "Find buyers looking for a factory in Salak Tinggi under RM3 million".
-// The app does not keep a structured "requirements" form for buyers, so the match uses what IS recorded, on the phone:
+// The match uses what IS recorded, on the phone:
+//   - the buyer's saved requirements (type, areas, budget, bedrooms, purpose), when the agent has filled them in,
 //   - the buyer's notes and source (what the agent typed about what they want), and
 //   - the properties the buyer asked about or was booked to view (type, place, price, bedrooms).
 // Only what was said in the command is used as a condition. The result is a list to review; nothing is changed.
-// Whether buyers should get proper requirement fields is an open product decision (docs/STAGE5.md).
 import { BUYER_ROLES, Contact, Inquiry, Appointment, LeadStatus } from '../data/types';
 import { Listing } from '../listing/model';
 import { prepare, readDetails } from '../listing/commands';
@@ -64,6 +64,15 @@ export function findBuyers(q: BuyerQuery, contacts: Contact[], inquiries: Inquir
     if (q.area && has(notes, q.area)) reasons.push(`notes: ${q.area}`);
     if (q.bedrooms !== undefined && new RegExp(`\\b${q.bedrooms}\\s*[- ]?(?:bed|br\\b|bilik)`, 'i').test(notes)) reasons.push(`notes: ${q.bedrooms} bed`);
     if (q.purpose === 'rent' && /\b(?:rent|sewa|tenant|penyewa)/i.test(notes)) reasons.push('notes: rent');
+    // What the buyer has recorded they are looking for (Contacts → Buyer → What this buyer wants).
+    for (const r of c.requirements ?? []) {
+      const label = r.label || 'requirement';
+      if (q.type && (r.types ?? []).some(t => typeHit(t, q.type!))) reasons.push(`requirement: ${q.type}`);
+      if (q.area && (r.areas ?? []).some(a => has(a, q.area!) || has(q.area!, a))) reasons.push(`requirement: ${q.area}`);
+      if (q.maxPrice !== undefined && q.maxPrice > 0 && r.budgetMax !== undefined && r.budgetMax <= q.maxPrice) reasons.push(`requirement: budget within (${label})`);
+      if (q.bedrooms !== undefined && r.bedroomsMin !== undefined && r.bedroomsMin <= q.bedrooms) reasons.push(`requirement: ${q.bedrooms} bed`);
+      if (q.purpose && r.purpose && (r.purpose === q.purpose || r.purpose === 'sale_or_rent')) reasons.push(`requirement: ${q.purpose}`);
+    }
     const seen = new Set<string>();
     const linked = [...inquiries.filter(i => i.contactId === c.id), ...appointments.filter(a => a.contactId === c.id)].map(x => x.propertyId).filter((x): x is string => !!x);
     for (const pid of linked) {

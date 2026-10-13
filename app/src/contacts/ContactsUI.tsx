@@ -26,6 +26,7 @@ import { RecordStatus } from '../sync/SyncUI';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
 import { reviewContacts, undoInactiveConversion, UndoResult } from '../data/leadReview';
+import { BuyerRequirementsCard, RequirementsEditor } from './MatchUI';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
 
@@ -185,6 +186,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         {isVendor && <VendorStatusPicker lang={lang} value={c.vendorStatus} onChange={v => store.upsert('contacts', { ...c, vendorStatus: v })} />}
         {isBuyer && <LeadPicker lang={lang} value={c.leadStatus} onChange={v => store.upsert('contacts', { ...c, leadStatus: v })} />}
       </div>
+      {c.roles.some(r => BUYER_ROLES.includes(r)) && <BuyerRequirementsCard lang={lang} c={c} go={go} />}
       <SectionCard title={s.properties}>
         {props.length === 0 ? <Empty>{s.noProperties}</Empty> : props.map(p => (
           <button key={p.id} className="link-row" onClick={() => go({ name: 'listingDetail', id: p.id })}>{[p.ref, cardTitle(p)].filter(Boolean).join(' · ')}</button>
@@ -252,6 +254,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         <OptionSelect lang={lang} label={s.f.source} listKey="leadSource" builtIns={s.sources.map(v => ({ value: v }))} value={d.source} onChange={v => setD(x => ({ ...x, source: v }))} />
         <label className="ff">{s.f.notes}<textarea rows={3} value={d.notes ?? ''} onChange={e => setD(x => ({ ...x, notes: e.target.value || undefined }))} /></label>
       </div>
+      {d.roles.some(r => BUYER_ROLES.includes(r)) && <div className="card stack-sm"><RequirementsEditor lang={lang} value={d.requirements ?? []} onChange={v => setD(x => ({ ...x, requirements: v.length ? v : undefined }))} /></div>}
       {existing && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{t.c.delete}</button>}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{t.c.cancel}</button>

@@ -3663,6 +3663,27 @@ test('U92 Google Drive backup (stand-in Drive, browser only): a backup is sent a
   await ctx.close();
 });
 
+test('U93 buyer requirements: a buyer\'s page lists what they want and the properties that fit, with the reason; a property lists fitting buyers', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Buyer List');
+  await page.locator('main').getByText('Tenant R (sample)').first().click();
+  await page.getByTestId('buyer-requirements').waitFor();
+  assert.match(await page.getByTestId('requirement-summary').first().innerText(), /Factory near KLIA/);
+  await page.getByTestId('buyer-matches').waitFor();
+  const rows = page.getByTestId('match-row');
+  assert.ok(await rows.count() >= 1, 'at least one fitting property');
+  const first = await rows.first().innerText();
+  assert.match(first, /factory|Warehouse|Semi-D|Detached/i);
+  assert.match(first, /Adjoining|adjoin|land/i, 'the reason names a criterion, including the unverifiable adjoining-units one');
+  await shot(page, '93-buyer-matches', false);
+  // property side
+  await rows.first().locator('button.link-row').click();
+  await page.getByTestId('property-buyers').waitFor();
+  assert.match(await page.getByTestId('property-buyers').innerText(), /Tenant R \(sample\)|No buyer/);
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

@@ -54,6 +54,33 @@ export interface Contact extends Base {
   notes?: string;
   /** Last meaningful interaction (inquiry, viewing, completed task or appointment). Routine edits do not change it. */
   lastInteraction?: number;
+  /** What a buyer / tenant / investor is looking for. A buyer can have several (for example a factory and a house). */
+  requirements?: BuyerRequirement[];
+}
+
+export type FinancingState = 'cash' | 'approved' | 'in_progress' | 'not_started' | 'unknown';
+export const FINANCING_STATES: FinancingState[] = ['cash', 'approved', 'in_progress', 'not_started', 'unknown'];
+/** One thing a buyer wants. Every field is optional: only what is filled in is used when matching properties. */
+export interface BuyerRequirement {
+  id: string;
+  /** A short name the agent gives it, e.g. "Factory for the logistics business". */
+  label?: string;
+  purpose?: 'sale' | 'rent' | 'sale_or_rent';
+  /** Property types (as in the property list: "Semi-D factory", "Terrace house"…). Any one of them fits. */
+  types?: string[];
+  /** Township / city / state words; a property in any one of them fits. */
+  areas?: string[];
+  /** Price for a purchase, or monthly rent for a tenant. */
+  budgetMin?: number;
+  budgetMax?: number;
+  bedroomsMin?: number;
+  landMinSqft?: number;
+  builtUpMinSqft?: number;
+  tenure?: 'freehold' | 'leasehold';
+  /** How many next-door units must be available together. Never verifiable from the records alone. */
+  adjoiningUnits?: number;
+  financing?: FinancingState;
+  notes?: string;
 }
 
 // ---------- inquiries and viewings ----------

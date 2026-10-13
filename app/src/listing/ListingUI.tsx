@@ -20,6 +20,7 @@ import { adStrings } from '../adverts/strings';
 import { photoStrings } from '../photos/strings';
 import { marketingStrings } from '../marketing/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
+import { PropertyBuyersCard } from '../contacts/MatchUI';
 import { buyerStrings } from './buyerPdf';
 import { IconMic } from '../icons';
 import { useApp, useStore } from '../data/useStore';
@@ -528,6 +529,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         {docs.map(d => <DocRow key={d.id} d={d} s={s} lang={lang} />)}
       </SectionCard>
 
+      <PropertyBuyersCard lang={lang} p={l} go={go} />
       <InquiryHistory lang={lang} go={go} propertyId={l.id} />
       <ViewingHistory lang={lang} go={go} propertyId={l.id} />
 
