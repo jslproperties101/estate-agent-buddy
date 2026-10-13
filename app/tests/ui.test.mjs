@@ -525,6 +525,7 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await page.getByTestId('trk-stop').click();
   await page.waitForSelector('[data-testid="journey-detail"]');
   assert.match(await page.getByTestId('jd-distance').innerText(), /\d+ m/);
+  await waitStored(page, 'records', "all.some(v => v && v.status === 'saved' && Array.isArray(v.points) && v.points.length > 1)");   // the write lands a moment after the screen shows it
   // the saved journey and the found property are kept
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'GPS Assistance');
