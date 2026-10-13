@@ -207,6 +207,17 @@ export class Store {
     }
     return out.sort((a, b) => b.at - a.at);
   }
+  /** A whole-phone safety copy taken just before a restore (kept: the latest three). It lives in the local area, never in the cloud. */
+  async putSafety(at: number, data: unknown) {
+    await this.flush();
+    await this.backend.putLocal(`safety:${String(at).padStart(15, '0')}`, { at, data });
+    const all = await this.backend.listLocal('safety:');
+    for (const old of all.slice(0, Math.max(0, all.length - 3))) await this.backend.removeLocal(old.key);
+  }
+  async safetyCopies(): Promise<{ at: number; data: unknown }[]> {
+    await this.flush();
+    return (await this.backend.listLocal('safety:')).map(r => r.value as { at: number; data: unknown }).sort((a, b) => b.at - a.at);
+  }
   /** Forgets history of records deleted more than 30 days ago and files nobody uses (run when the app opens). */
   async purgeOld(now = Date.now()) {
     await this.flush();

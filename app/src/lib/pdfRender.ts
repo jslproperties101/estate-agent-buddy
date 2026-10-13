@@ -84,9 +84,9 @@ export const pdfFileName = (base: string) => `${(base || 'document').replace(/[^
 export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'failed';
 /** Hands the PDF to the phone's share sheet when the browser/WebView can share a file (WhatsApp, email, Drive…);
  *  otherwise saves it as a download. Neither path is proven inside the Android app (see docs/STAGE5.md). */
-export async function shareOrDownload(pdf: Blob, fileName: string, title: string): Promise<ShareResult> {
+export async function shareOrDownload(pdf: Blob, fileName: string, title: string, mime = 'application/pdf'): Promise<ShareResult> {
   try {
-    const file = new File([pdf], fileName, { type: 'application/pdf' });
+    const file = new File([pdf], fileName, { type: mime });
     const nav = navigator as Navigator & { canShare?: (d: object) => boolean; share?: (d: object) => Promise<void> };
     if (nav.canShare?.({ files: [file] }) && nav.share) {
       try { await nav.share({ files: [file], title }); return 'shared'; }

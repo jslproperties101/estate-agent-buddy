@@ -6,6 +6,7 @@ import { AboutCard } from '../native/UpdateUI';
 import { BUILD } from '../native/updates';
 import { bugStrings } from '../bugreport/strings';
 import { MapsCheck } from '../maps/MapsCheck';
+import { BackupCard } from '../backup/BackupUI';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
 import { Go } from '../nav';
@@ -245,6 +246,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <small className="muted">{bugStrings[lang].settingsHint}</small>
         <button className="btn primary" data-testid="open-bug-report" onClick={() => go({ name: 'bugReport', from: 'settings' })}>{bugStrings[lang].open}</button>
       </div>
+      <BackupCard lang={lang} />
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>

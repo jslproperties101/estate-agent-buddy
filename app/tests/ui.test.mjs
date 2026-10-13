@@ -3556,6 +3556,49 @@ test('U90 a photo with a camera-data block (turned sideways, GPS position): larg
   await p2.context().close();
 });
 
+test('U91 backup file: made from Settings, a bad file is refused, and a restore brings a deleted contact back (browser only, not Android)', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, acceptDownloads: true });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  const putContact = id => page.evaluate(id => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => { const tx = r.result.transaction('records', 'readwrite'); tx.objectStore('records').put({ id, created: 1, updated: 1, name: 'Backup Test Buyer', phone: '+60 12-000 2222', roles: ['buyer'], leadStatus: 'warm' }, `c:contacts:${id}`); tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error); };
+  }), id);
+  await putContact('bk1');
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  const card = page.getByTestId('backup-card');
+  await card.waitFor();
+  assert.match(await page.getByTestId('backup-last').innerText(), /No backup file has been made/);
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('backup-make').click()]);
+  assert.match(dl.suggestedFilename(), /^EstateAgentBuddy-backup-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/);
+  const zipPath = await dl.path();
+  await page.getByTestId('backup-msg').waitFor();
+  assert.match(await page.getByTestId('backup-msg').innerText(), /Backup file made: 1 records and 0 files/);
+  assert.match(await page.getByTestId('backup-last').innerText(), /Last backup file made/);
+  // a file that is not a backup is refused and changes nothing
+  await page.getByTestId('backup-file').setInputFiles({ name: 'notes.zip', mimeType: 'application/zip', buffer: Buffer.from('this is not a backup') });
+  await page.locator('[data-testid="backup-msg"][role="alert"]').waitFor();
+  assert.match(await page.getByTestId('backup-msg').innerText(), /not an Estate Agent AI Buddy backup file\. Nothing was changed/);
+  // delete the contact on the phone, then restore it from the file
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => { const tx = r.result.transaction('records', 'readwrite'); tx.objectStore('records').delete('c:contacts:bk1'); tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error); };
+  }));
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByTestId('backup-file').setInputFiles(zipPath);
+  await page.getByTestId('backup-preview').waitFor();
+  assert.match(await page.getByTestId('backup-plan').innerText(), /Will bring back 1 records, replace 0, leave 0 as they are, and bring back 0 files/);
+  await shot(page, '91-backup-restore', false);
+  await page.getByTestId('backup-restore').click();
+  await page.locator('[data-testid="backup-msg"]').filter({ hasText: /Restored: 1 records brought back/ }).waitFor();
+  await waitStored(page, 'records', "all.some(v => v && v.name === 'Backup Test Buyer')");
+  await home(page); await tile(page, 'Buyer List');
+  assert.equal(await page.getByText('Backup Test Buyer').count(), 1, 'the contact is back');
+  await ctx.close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

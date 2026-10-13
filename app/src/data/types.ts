@@ -260,6 +260,9 @@ export interface Meta {
   /** Deleted records not yet removed from the cloud copy: "collection:id". */
   tombstones: string[];
   lastSync?: number;
+  /** When the last whole-app backup file was made / the last restore was applied on this phone. */
+  lastBackupAt?: number;
+  lastRestoreAt?: number;
   syncSession?: {
     accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string;
     /** From the Google account (via Supabase). */
