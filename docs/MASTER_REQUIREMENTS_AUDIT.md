@@ -207,6 +207,19 @@ Everything marked NV: live Supabase (sync, RLS, Storage, bug-report bucket), rea
 5. **Voice, GPS, photos, marketing, notifications, Android sharing.** Mostly built and browser-tested; real-device proof missing; Chinese voice, batch photos, brochures/templates, screen-off GPS, Android sharing remain.
 6. **Gold robot and Residential land.** Done and tested (section 2.2/2.3).
 
-## 6. Test evidence on the latest commit
+## 6. Test evidence on the latest code commit
 
-See section 8; filled in after the final run.
+Run on `a549cc5` (code identical to the commit that carries this document; that commit changes documents only), on this machine, from scratch:
+
+| Check | Result |
+|---|---|
+| TypeScript (strict) | 0 errors |
+| Lint (also enforces EN/BM/ZH coverage) | passed, 188 files |
+| Unit tests (Node) | 301 / 301 passed |
+| Browser screen tests (Chromium, 384 × 824, stand-ins) | 94 / 94 passed (one full run; earlier in this session one run showed U6 failing, which was a real defect in my new match cards and is fixed) |
+| Database: row-level security (local PostgreSQL 16) | 125 / 125 |
+| Database: rollback rehearsal (local PostgreSQL 16) | 18 / 18 |
+| Database: proposed write-block rehearsal (local PostgreSQL 16) | 22 / 22 |
+| GitHub Actions on this commit | see the final report (pushed after this file was written) |
+
+None of this is Android evidence. Browser tests are not Android tests.
