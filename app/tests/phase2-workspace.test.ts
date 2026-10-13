@@ -3,7 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/data/store';
-import { syncNow, SyncError, holdsOtherWorkspaceData } from '../src/data/sync';
+import { syncNow, SyncError, holdsOtherWorkspaceData, ownerUnknownWithData, confirmOwner } from '../src/data/sync';
+import { MemoryBackend } from '../src/data/backend';
 import type { Contact } from '../src/data/types';
 import { FakeCloud, cfg, phone } from './support/fakeCloud';
 
@@ -104,4 +105,95 @@ test('W6 same team, different person: allowed (one workspace)', async () => {
   const { cloudA, a } = await twoTeams();
   a.store.upsert('contacts', contact('c1', 'Shared')); await syncNow(a.store, cfg, cloudA.fetch);
   assert.equal(holdsOtherWorkspaceData(a.store.getState(), 'wsA'), false);
+});
+
+// ---- Phone last used by Phase 1: no remembered owner (Phase 1 never wrote one down) ----
+const seed = (b: MemoryBackend, c: Contact) => b.put(`c:contacts:${c.id}`, c);
+/** What a Phase 1 phone looks like on disk: records, an unsent edit, an unsent deletion, lastSync, and no owner. */
+async function legacyPhone(opts: { signedInAs?: { workspaceId: string; workspaceName: string }; lastSync?: number | undefined } = {}) {
+  const b = new MemoryBackend();
+  await seed(b, contact('c1', 'Team A clean')); await seed(b, contact('c2', 'Team A edited, not sent'));
+  const session = opts.signedInAs ? { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3_600_000, email: 'a@x.c', userId: 'uA', role: 'owner' as const, ...opts.signedInAs } : undefined;
+  await b.put('s:meta', { fired: [], dirty: ['contacts:c2'], tombstones: ['contacts:gone'], lastSync: 'lastSync' in opts ? opts.lastSync : Date.now() - 86_400_000, syncSession: session });
+  return Store.open(b);
+}
+async function joinTeamB() {
+  const cloudB = new FakeCloud(); cloudB.ws = 'wsB';
+  const tB = await phone(cloudB, 'b@x.c');
+  // team B already has a record with the same id as the phone's, and one the phone's tombstone points at
+  tB.store.upsert('contacts', contact('c1', 'Team B own')); tB.store.upsert('contacts', contact('gone', 'Team B own, other id use'));
+  await syncNow(tB.store, cfg, cloudB.fetch);
+  const sessionB = { ...tB.store.getState().meta.syncSession!, workspaceId: 'wsB', workspaceName: 'Team B', role: 'owner' as const };
+  return { cloudB, sessionB, rowsBefore: JSON.stringify([...cloudB.rows.entries()]) };
+}
+
+test('W7 Phase 1 phone with real records, no remembered owner, a different team signs in: nothing is uploaded or loaded until the owner is confirmed', async () => {
+  const store = await legacyPhone();                               // signed out, last synced by Phase 1
+  assert.equal(store.getState().meta.syncWorkspaceId, undefined);
+  const { cloudB, sessionB, rowsBefore } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true, 'the gate asks first');
+  assert.equal(holdsOtherWorkspaceData(store.getState(), 'wsB'), false);
+  const before = cloudB.log.length;
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), (e: unknown) => e instanceof SyncError && e.code === 'owner-unknown');
+  const calls = cloudB.log.slice(before);
+  assert.ok(!calls.some(l => /eab_records|eab_push_records|eab_files|storage/.test(l)), `only the membership check: ${calls}`);
+  assert.equal(JSON.stringify([...cloudB.rows.entries()]), rowsBefore, 'team B\'s data is unchanged');
+  // everything is still on the phone, nothing cleared
+  const m = store.getState().meta;
+  assert.deepEqual(m.dirty, ['contacts:c2']); assert.deepEqual(m.tombstones, ['contacts:gone']);
+  assert.deepEqual(store.getState().contacts.map(c => c.id).sort(), ['c1', 'c2']);
+  assert.equal(m.syncWorkspaceId, undefined, 'ownership is still unknown, not guessed');
+  // a second attempt (the one-minute timer) changes nothing either
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), /owner-unknown/);
+  assert.equal(JSON.stringify([...cloudB.rows.entries()]), rowsBefore);
+});
+
+test('W7b after the person confirms, the records belong to that team and sync normally; a third team is then blocked', async () => {
+  const store = await legacyPhone();
+  const { cloudB, sessionB } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });
+  confirmOwner(store);
+  assert.equal(store.getState().meta.syncWorkspaceId, 'wsB');
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), false);
+  await syncNow(store, cfg, cloudB.fetch);                         // the person said these are team B's
+  assert.equal(store.getState().contacts.some(c => c.id === 'c2'), true, 'nothing was dropped');
+  assert.equal(holdsOtherWorkspaceData(store.getState(), 'wsC'), true, 'now a third team is blocked');
+});
+
+test('W7c "not this team": signing out keeps every record, edit and deletion for the right team', async () => {
+  const store = await legacyPhone();
+  const { sessionB } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });
+  store.setSingleton('meta', { syncSession: undefined, syncError: undefined });          // what the Sign out button does here
+  assert.deepEqual(store.getState().contacts.map(c => c.id).sort(), ['c1', 'c2']);
+  assert.deepEqual(store.getState().meta.dirty, ['contacts:c2']); assert.deepEqual(store.getState().meta.tombstones, ['contacts:gone']);
+  assert.equal(store.getState().meta.syncWorkspaceId, undefined);
+});
+
+test('W8 Phase 1 phone that is STILL signed in when upgraded learns its owner at the first start, so a later switch is blocked', async () => {
+  const store = await legacyPhone({ signedInAs: { workspaceId: 'wsA', workspaceName: 'Team A' } });
+  assert.equal(store.getState().meta.syncWorkspaceId, 'wsA');
+  assert.equal(store.getState().meta.ownerChecked, true);
+  const { cloudB, sessionB } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });                                  // sign-out then sign-in as team B
+  assert.equal(holdsOtherWorkspaceData(store.getState(), 'wsB'), true);
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), /other-workspace/);
+});
+
+test('W8b the one-time step never adopts a team that signed in later: restarting on the question screen does not answer it', async () => {
+  const b = new MemoryBackend();
+  await seed(b, contact('c1', 'Team A clean'));
+  await b.put('s:meta', { fired: [], dirty: [], tombstones: [], lastSync: 1, ownerChecked: true, syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3_600_000, email: 'b@x.c', userId: 'uB', workspaceId: 'wsB', workspaceName: 'Team B', role: 'owner' } });
+  const store = await Store.open(b);                                                       // restart while team B is signed in
+  assert.equal(store.getState().meta.syncWorkspaceId, undefined);
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true);
+});
+
+test('W9 genuinely new phones are unchanged: never synced (no lastSync), or only sample data, signs in to the first team without a question', async () => {
+  const neverSynced = await legacyPhone({ lastSync: undefined });
+  assert.equal(ownerUnknownWithData(neverSynced.getState(), 'wsB'), false);
+  const sampleOnly = await phone(new FakeCloud(), 'x@x.c');
+  sampleOnly.store.setSingleton('meta', { lastSync: 5 });
+  assert.equal(ownerUnknownWithData(sampleOnly.store.getState(), 'wsB'), false, 'no real records: nothing to protect');
 });

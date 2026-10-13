@@ -7,7 +7,7 @@ import type { Go, Screen } from '../nav';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { RecordState, recordStateOf } from '../data/recordstate';
-import { resolveConflict } from '../data/sync';
+import { resolveConflict, confirmOwner } from '../data/sync';
 import { signOutRemote } from '../data/auth';
 import { runSync } from '../data/syncRunner';
 import { recordFileSummary, retryFile } from '../data/filesync';
@@ -361,6 +361,29 @@ export function OtherWorkspaceScreen({ lang }: { lang: Lang }) {
         void signOutRemote(config(store.getState().settings), m.syncSession!).catch(() => undefined);
         store.setSingleton('meta', { syncSession: undefined, syncError: undefined });
       }}>{s.otherSignOut}</button>
+    </main>
+  );
+}
+
+/** Shown when real records are on this phone but nothing says which team they belong to (the phone was last used by an
+ *  older version and signed out). Nothing is sent, loaded or deleted until the person decides. */
+export function OwnerUnknownScreen({ lang }: { lang: Lang }) {
+  const { state, store } = useApp();
+  const s = syncStrings[lang];
+  const [ask, setAsk] = useState(false);
+  const team = state.meta.syncSession?.workspaceName ?? '—';
+  return (
+    <main className="screen" data-testid="owner-unknown" role="alert" style={{ padding: 24 }}>
+      <h1>{s.unkTitle}</h1>
+      <p>{s.unkBody(team)}</p>
+      <button className="btn primary" data-testid="owner-confirm" onClick={() => setAsk(true)}>{s.unkConfirm(team)}</button>
+      <button className="btn secondary" data-testid="owner-signout" onClick={() => {
+        const m = store.getState().meta;
+        void signOutRemote(config(store.getState().settings), m.syncSession!).catch(() => undefined);
+        store.setSingleton('meta', { syncSession: undefined, syncError: undefined });
+      }}>{s.otherSignOut}</button>
+      {ask && <Confirm lang={lang} title={s.unkConfirmQ} body={s.unkConfirmBody(team)} okLabel={s.unkConfirmOk} danger={false} onCancel={() => setAsk(false)}
+        onOk={() => { setAsk(false); confirmOwner(store); }} />}
     </main>
   );
 }

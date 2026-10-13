@@ -86,6 +86,10 @@ export class Store {
     for (const { key, value } of await backend.listLocal('base:')) store.bases.set(key.slice(5), value as CloudBase);
     for (const { key, value } of await backend.listLocal('draft:')) store.drafts.set(key.slice(6), value as Draft);
     for (const { key, value } of await backend.listLocal('file:')) store.fileEntries.set(key.slice(5), value as FileEntry);
+    // Once, on the first start that knows about owners: a phone that is still signed in learns whose records it holds
+    // (an older version never wrote this down). A phone signed out by an older version cannot be told; sync.ts handles it.
+    const m = state.meta;
+    if (!m.ownerChecked) store.setSingleton('meta', { ownerChecked: true, ...(m.syncWorkspaceId || !m.syncSession?.workspaceId ? {} : { syncWorkspaceId: m.syncSession.workspaceId }) });
     return store;
   }
 

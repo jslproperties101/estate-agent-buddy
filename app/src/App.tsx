@@ -47,10 +47,10 @@ import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
-import { configured, holdsOtherWorkspaceData } from './data/sync';
+import { configured, holdsOtherWorkspaceData, ownerUnknownWithData } from './data/sync';
 import { runSync } from './data/syncRunner';
 import { syncStrings } from './sync/strings';
-import { SyncReviewScreen, HistoryScreen, RecentlyDeletedScreen, DraftsList, OtherWorkspaceScreen } from './sync/SyncUI';
+import { SyncReviewScreen, HistoryScreen, RecentlyDeletedScreen, DraftsList, OtherWorkspaceScreen, OwnerUnknownScreen } from './sync/SyncUI';
 import { pendingFileCount } from './data/savestate';
 import { convertInactive, inactiveContacts, reviewContacts } from './data/leadReview';
 import { leadReviewStrings } from './data/leadReviewStrings';
@@ -127,6 +127,7 @@ function Gate() {
   if (configured(config(state.settings)) && !state.meta.syncSession) return <LoginScreen lang={lang} />;
   // Signed in to a different team than the one whose records are on this phone: show none of them, send none of them.
   if (holdsOtherWorkspaceData(state, state.meta.syncSession?.workspaceId)) return <OtherWorkspaceScreen lang={lang} />;
+  if (ownerUnknownWithData(state, state.meta.syncSession?.workspaceId)) return <OwnerUnknownScreen lang={lang} />;
   return <Shell />;
 }
 

@@ -255,6 +255,8 @@ export interface Meta {
   deviceId?: string;
   /** The workspace the phone's sync position and cloud copies belong to; a different one starts a fresh position. */
   syncWorkspaceId?: string;
+  /** Set once by the first start of a version that knows whose records a phone holds (see Store.open). */
+  ownerChecked?: boolean;
   /** Position in the cloud's own change order (not a clock) up to which this phone has taken changes. */
   lastSeq?: number;
   /** Changes that could not be joined automatically. Both versions are kept; nothing is sent for these records

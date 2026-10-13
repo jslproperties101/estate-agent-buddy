@@ -189,6 +189,15 @@ team differs and the phone holds any real record, waiting edit or waiting deleti
 - nothing is deleted: records, versions and sync position stay for the original team. Signing back in with that team resumes normally.
 Same team / different person is unchanged. A phone with no real records, or one that never synced, signs in to any team as before.
 
+### 8a. Phones last used by Phase 1 (owner not remembered)
+
+Phase 1 never wrote down which team a phone's records belong to. What the data allows, and what is done:
+- **Still signed in when upgraded:** at the first start of this version the phone learns its team from the current sign-in (done once; a sign-in made later is never adopted, so restarting on the question screen does not answer it).
+- **Signed out, but synced before** (Phase 1 recorded a last-sync time) **and holds real records, waiting edits or waiting deletions:** ownership is *unknown*. When any account signs in, the app asks "Whose records are on this phone?" before showing or sending anything. Choices: "These records belong to <team>" (asks once more, then the records are treated as that team's and sync) or "Sign out" (nothing changes; sign in with the right team's account). The app **cannot verify** the answer; it relies on the person.
+- **Never synced** (no last-sync time) or **only sample data / no records:** treated as new, as before: records entered before the first sign-in belong to whoever signs in first.
+
+Trade-off / what cannot be detected: a Phase 1 phone that was signed in, never completed a single sync, and was signed out looks the same as a brand-new phone with offline entries, so it is treated as new (the original first-sign-in rule). Making that case ask too would add a question for every new user who entered records offline first. Tested: W7–W9, screen test U56 (stand-in clouds; not a live Supabase or a real device).
+
 Limits: (1) the phone cannot be "handed over" to another team without first signing back in as the original team and
 clearing/removing its data; a per-team separate store (the larger change) is not built. (2) A phone upgraded from Phase 1 that
 was already signed out cannot tell whose records it holds (the owner is learnt at the next sign-in/sign-out). (3) Within one

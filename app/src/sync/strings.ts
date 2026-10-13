@@ -2,6 +2,9 @@
 import type { Lang } from '../i18n';
 
 const en = {
+  unkTitle: 'Whose records are on this phone?',
+  unkBody: (team: string) => `This phone was used with an earlier version of the app and holds records, but the app cannot tell which team they belong to. It cannot check this for you. Nothing has been sent or loaded, and nothing has been deleted. If these records are ${team}'s, confirm below. If they belong to another team, sign out and sign in with that team's account instead.`,
+  unkConfirm: (team: string) => `These records belong to ${team}`, unkConfirmQ: 'Send these records to this team?', unkConfirmBody: (team: string) => `The records on this phone will be sent to ${team} and shared with its members. Only continue if they really belong to ${team}. Nothing is deleted.`, unkConfirmOk: 'Yes, they belong to this team',
   otherTitle: 'This phone holds another team\'s records', otherBody: 'The records on this phone belong to a different team than the account you just signed in to. To keep both teams\' data safe, nothing was sent to or loaded from the new account, and the old records are hidden. They are still on this phone, untouched. Sign out, then sign in again with the original account to see them.', otherSignOut: 'Sign out',
   title: 'Data safety',
   help: 'Nothing here deletes your work. Both versions of a record are kept until you choose.',
@@ -40,6 +43,9 @@ const en = {
 };
 export type SyncStrings = typeof en;
 const bm: SyncStrings = {
+  unkTitle: 'Rekod siapakah pada telefon ini?',
+  unkBody: (team: string) => `Telefon ini pernah digunakan dengan versi aplikasi yang lebih lama dan menyimpan rekod, tetapi aplikasi tidak dapat mengetahui pasukan mana yang memilikinya. Aplikasi tidak dapat menyemaknya untuk anda. Tiada apa-apa dihantar atau dimuat, dan tiada apa-apa dipadam. Jika rekod ini milik ${team}, sahkan di bawah. Jika milik pasukan lain, log keluar dan log masuk dengan akaun pasukan itu.`,
+  unkConfirm: (team: string) => `Rekod ini milik ${team}`, unkConfirmQ: 'Hantar rekod ini kepada pasukan ini?', unkConfirmBody: (team: string) => `Rekod pada telefon ini akan dihantar kepada ${team} dan dikongsi dengan ahlinya. Teruskan hanya jika ia benar-benar milik ${team}. Tiada apa-apa dipadam.`, unkConfirmOk: 'Ya, milik pasukan ini',
   otherTitle: 'Telefon ini menyimpan rekod pasukan lain', otherBody: 'Rekod pada telefon ini milik pasukan yang berbeza daripada akaun yang baru anda log masuk. Untuk melindungi data kedua-dua pasukan, tiada apa-apa dihantar ke atau dimuat daripada akaun baharu, dan rekod lama disembunyikan. Rekod itu masih ada pada telefon ini, tidak disentuh. Log keluar, kemudian log masuk semula dengan akaun asal untuk melihatnya.', otherSignOut: 'Log keluar',
   title: 'Keselamatan data',
   help: 'Tiada apa di sini memadam kerja anda. Kedua-dua versi rekod disimpan sehingga anda memilih.',
@@ -77,6 +83,9 @@ const bm: SyncStrings = {
   continueDraft: 'Sambung', draftFor: what => `Draf: ${what}`, newOne: 'baharu',
 };
 const zh: SyncStrings = {
+  unkTitle: '本手机上的记录属于谁？',
+  unkBody: (team: string) => `本手机曾使用较早版本的应用，并保存着记录，但应用无法判断它们属于哪个团队，也无法替您核实。目前没有发送或加载任何内容，也没有删除任何内容。如果这些记录属于${team}，请在下方确认；如果属于其他团队，请退出登录，改用该团队的账号登录。`,
+  unkConfirm: (team: string) => `这些记录属于${team}`, unkConfirmQ: '把这些记录发送给该团队？', unkConfirmBody: (team: string) => `本手机上的记录将发送给${team}，并与其成员共享。只有确实属于${team}时才继续。不会删除任何内容。`, unkConfirmOk: '是的，属于该团队',
   otherTitle: '本手机保存着另一个团队的记录', otherBody: '本手机上的记录属于与您刚登录的账号不同的团队。为保护两个团队的数据，没有向新账号发送任何内容，也没有从新账号加载任何内容，旧记录已被隐藏。它们仍保留在本手机上，未被改动。请退出登录，再用原账号重新登录即可查看。', otherSignOut: '退出登录',
   title: '数据安全',
   help: '这里的任何操作都不会删除您的工作。记录的两个版本会一直保留，直到您做出选择。',

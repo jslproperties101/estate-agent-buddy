@@ -33,7 +33,7 @@ export type Session = NonNullable<Meta['syncSession']>;
 type FetchFn = typeof fetch;
 
 export class SyncError extends Error {
-  constructor(public code: 'not-configured' | 'not-signed-in' | 'auth' | 'network' | 'server' | 'no-access' | 'other-workspace', message?: string) { super(message ?? code); }
+  constructor(public code: 'not-configured' | 'not-signed-in' | 'auth' | 'network' | 'server' | 'no-access' | 'other-workspace' | 'owner-unknown', message?: string) { super(message ?? code); }
 }
 
 const TABLE = 'eab_records';
@@ -87,15 +87,36 @@ export async function membership(cfg: SyncConfig, s: Session, fetchFn: FetchFn =
 
 type Rec = Record<string, unknown>;
 
+function holdsRealData(state: AppState): boolean {
+  if (state.meta.tombstones.length || state.meta.dirty.length) return true;
+  return COLLECTIONS.some(c => (state[c] as unknown as { sample?: boolean }[]).some(r => !r.sample));
+}
+
 /** True when this phone still holds real records (or waiting deletions) that belong to a DIFFERENT team workspace than
  *  the one `sessionWorkspaceId` signs in to. Sample data does not count. Such a phone must neither show those records
  *  to the new account nor send anything to the new workspace. */
 export function holdsOtherWorkspaceData(state: AppState, sessionWorkspaceId: string | undefined): boolean {
   const owner = state.meta.syncWorkspaceId;
   if (!owner || !sessionWorkspaceId || owner === sessionWorkspaceId) return false;
-  if (state.meta.tombstones.length || state.meta.dirty.length) return true;
-  return COLLECTIONS.some(c => (state[c] as unknown as { sample?: boolean }[]).some(r => !r.sample));
+  return holdsRealData(state);
 }
+
+/** True when real records are on this phone, it HAS been synced before (an older version recorded `lastSync`), yet nothing
+ *  says which team those records belong to (an older version never wrote the owner down and the account was signed out).
+ *  The app cannot verify the owner, so the person must say before anything is sent or shown. A phone that has never synced
+ *  (no `lastSync`) is treated as new: records entered before the first sign-in belong to whoever signs in first. If an
+ *  older phone somehow lost `lastSync`, that is the one case this cannot detect. */
+export function ownerUnknownWithData(state: AppState, sessionWorkspaceId: string | undefined): boolean {
+  const m = state.meta;
+  return !m.syncWorkspaceId && !!sessionWorkspaceId && !!m.lastSync && holdsRealData(state);
+}
+
+/** The person says the records on this phone belong to the team they are signed in to. Nothing is changed or removed. */
+export function confirmOwner(store: Store): void {
+  const ws = store.getState().meta.syncSession?.workspaceId;
+  if (ws) store.setSingleton('meta', { syncWorkspaceId: ws });
+}
+
 interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
 
 export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number }
@@ -273,6 +294,7 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: F
   session = await membership(cfg, session, fetchFn);
   // Another team's records are still on this phone: stop before anything is read, changed or sent.
   if (holdsOtherWorkspaceData(store.getState(), session.workspaceId)) throw new SyncError('other-workspace');
+  if (ownerUnknownWithData(store.getState(), session.workspaceId)) throw new SyncError('owner-unknown');
   if (JSON.stringify(session) !== JSON.stringify(start.syncSession)) store.setSingleton('meta', { syncSession: session });
   const ws = session.workspaceId!;
   if (!metaNow(store).deviceId) store.setSingleton('meta', { deviceId: `d${hash53(`${Math.random()}|${Date.now()}`).slice(0, 10)}` });
