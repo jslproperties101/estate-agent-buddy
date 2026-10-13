@@ -84,6 +84,26 @@ async function chooseStart(page, which) {
 }
 const shot = (page, name, fullPage = true) => page.screenshot({ path: `${SHOTS}${name}.png`, fullPage });
 /** Opens a dashboard card. Buyers and vendors are inside the Contacts card since 13 Oct 2026. */
+/** Waits until the phone's own storage (IndexedDB) really holds what the screen says it saved — `expr` is evaluated with
+ *  `all` = every value in that store. This replaces sleeping for a fixed time: it passes as soon as the data is stored and
+ *  fails (after `timeout`) if it never is, so a lost write is a failure, not something a long delay hides. */
+async function waitStored(page, storeName, expr, timeout = 10000) {
+  const check = () => page.evaluate(({ storeName, expr }) => new Promise(res => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onerror = () => res(false);
+    r.onsuccess = () => {
+      const db = r.result;
+      const q = db.transaction(storeName).objectStore(storeName).getAll();
+      q.onsuccess = () => { const all = q.result; db.close(); res(!!new Function('all', `return (${expr});`)(all)); };
+      q.onerror = () => { db.close(); res(false); };
+    };
+  }), { storeName, expr });
+  const end = Date.now() + timeout;
+  while (!(await check())) {
+    if (Date.now() > end) throw new Error(`Not stored within ${timeout} ms: ${expr}`);
+    await page.waitForTimeout(50);
+  }
+}
 async function tile(page, name) {
   if (name === 'Buyer List' || name === 'Vendor List') {
     await page.locator('nav.grid > button', { hasText: 'Contacts' }).first().click();
@@ -1640,6 +1660,7 @@ test('U47 old Inactive buyers become Dropped (gray), with a reviewable report; n
   await home(page); await tile(page, 'Contacts');
   await page.getByTestId('lead-review-done').click();
   assert.equal(await page.getByTestId('lead-review').count(), 0);
+  await waitStored(page, 'records', "all.some(v => v && v.leadReview && v.leadReview.reviewed === true)");   // really stored, not just shown
   await page.reload(); await page.waitForSelector('nav.grid'); await tile(page, 'Contacts');
   assert.equal(await page.getByTestId('lead-review').count(), 0, 'stays reviewed after reopening');
   await ctx.close();
@@ -1685,7 +1706,6 @@ test('U49 property cards: no "Unit" prefix on any card or view, and the stored u
 
 // ---------- Phase 2 (14 Oct 2026): drafts, record status, history, upgrade, conflicts ----------
 const waitFor = async (cond, ms = 6000) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) throw new Error('timed out waiting'); await new Promise(r => setTimeout(r, 50)); } };
-const DEBOUNCE_WAIT = 1100;   // the draft is written 0.7 s after the last keystroke
 
 test('U50 draft autosave: closing the app during entry keeps the form; editing, discarding and saving behave', async () => {
   const page = await phone();
@@ -1705,7 +1725,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   assert.equal(await page.locator('[data-field="whatsapp"]').inputValue(), '@half');
   // Edit the restored draft; close again; the edit is what comes back.
   await page.locator('[data-field="name"]').fill('Half Typed Buyer Two');
-  await page.waitForTimeout(DEBOUNCE_WAIT);
+  await waitStored(page, 'local', "all.some(v => JSON.stringify(v).includes('Half Typed Buyer Two'))");
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer Two');
@@ -1713,7 +1733,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await page.getByTestId('draft-discard').first().click();
   assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
   assert.equal(await page.getByTestId('draft-banner').count(), 0);
-  await page.waitForTimeout(DEBOUNCE_WAIT);
+  await waitStored(page, 'local', "!all.some(v => JSON.stringify(v).includes('Half Typed Buyer'))");   // the draft is really gone from storage
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
   assert.equal(await page.getByTestId('draft-banner').count(), 0, 'nothing comes back after a discard');
@@ -1891,10 +1911,9 @@ test('U54 sync review: a same-field conflict, a property number already used, an
   await fields.getByTestId('conflict-apply').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="conflict-card"]').length === 2);
   // Taking the other phone's value means this phone now equals the cloud: nothing needs to be sent for it.
-  // The screen updates before the phone has finished writing to its storage, so wait for the stored value instead of reading once.
-  const readC1 = () => page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:c1'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
-  let c1 = await readC1();
-  for (let i = 0; i < 30 && c1.phone !== 'REMOTE-PHONE'; i++) { await page.waitForTimeout(100); c1 = await readC1(); }
+  // The screen updates before the phone has finished writing to its storage, so wait for the stored value itself.
+  await waitStored(page, 'records', "all.some(v => v && v.id === 'c1' && v.phone === 'REMOTE-PHONE')");
+  const c1 = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:c1'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
   assert.equal(c1.phone, 'REMOTE-PHONE'); assert.equal(c1.name, 'Ahmad');
   assert.equal(pushed.filter(r => r.id === 'c1' && r.base_rev === 2).length, 0);
 
