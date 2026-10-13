@@ -21,14 +21,23 @@ export function useApp(): { state: AppState; store: Store } {
 /** Object URL for a stored file (photo, document, name card), or undefined while loading or when missing. */
 export function useFileUrl(fileId?: string): string | undefined {
   const store = useStore();
+  // Goes up when a picture arrives from the cloud, so a picture that was missing appears without reopening the screen.
+  const epoch = useSyncExternalStore(store.subscribe, () => store.fileEpoch);
   const [url, setUrl] = useState<string | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    setUrl(undefined);
     if (fileId) void store.fileUrl(fileId).then(u => { if (live) setUrl(u); });
+    else setUrl(undefined);
     return () => { live = false; };
-  }, [fileId, store]);
+  }, [fileId, store, epoch]);
   return url;
+}
+
+/** Cloud state of a stored file (undefined for a file that never needed the cloud). */
+export function useFileStatus(fileId?: string) {
+  const store = useStore();
+  useSyncExternalStore(store.subscribe, () => store.fileEpoch);
+  return fileId ? store.fileEntry(fileId)?.status : undefined;
 }
 
 /** The status-line state (see savestate.ts). A plain word, so a screen redraws only when it really changes. */

@@ -21,6 +21,9 @@ import { pickPhoneContacts, phonebookSupported, phonebookProblem, PickedContact 
 import { useToast } from '../ui/toast';
 import { PhonebookButton } from '../ui/PhonebookButton';
 import { leadReviewStrings } from '../data/leadReviewStrings';
+import { RecordStatus } from '../sync/SyncUI';
+import { useDraft } from '../ui/useDraft';
+import { DraftBanner } from '../ui/DraftBanner';
 import { reviewContacts, undoInactiveConversion, UndoResult } from '../data/leadReview';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
@@ -155,6 +158,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
   const isBuyer = inRole(c, 'buyer') || !isVendor;
   return (
     <section className="stack" data-testid="contact-detail">
+      {!c.sample && <RecordStatus lang={lang} collection="contacts" id={c.id} go={go} />}
       {c.sample && <p className="notice sample-note" data-testid="sample-note">{t.sampleNote}</p>}
       <div className="card stack-sm" style={isBuyer && c.leadStatus ? { borderLeft: `6px solid ${LEAD_COLOURS[c.leadStatus] ?? '#9CA3AF'}` } : isVendor && c.vendorStatus ? { borderLeft: `6px solid ${VENDOR_COLOURS[c.vendorStatus]}` } : undefined}>
         <h2 className="contact-name">{c.name}</h2>
@@ -206,6 +210,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
   });
   const [err, setErr] = useState(false);
   const [del, setDel] = useState(false);
+  const draft = useDraft<Contact>({ collection: 'contacts', existing, value: d, apply: setD, variant: { role, prefill } });
   const dup = d.phone && phoneDigits(d.phone).length >= 8 ? state.contacts.find(x => x.id !== d.id && x.phone && phoneDigits(x.phone) === phoneDigits(d.phone)) : undefined;
   const [replace, setReplace] = useState<PickedContact | null>(null);
   const apply = (p: PickedContact) => setD(x => ({ ...x, name: p.name || x.name, phone: normalisePhone(p.tel) ?? x.phone, email: x.email || p.email }));
@@ -219,6 +224,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
   const toggleRole = (r: ContactRole) => setD(x => ({ ...x, roles: x.roles.includes(r) ? x.roles.filter(y => y !== r) : [...x.roles, r] }));
   return (
     <section className="stack" data-testid="contact-form">
+      <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <label className="ff">{s.f.name}<input data-field="name" aria-invalid={err} value={d.name} onChange={e => { setD(x => ({ ...x, name: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{t.c.nameRequired}</p>}
@@ -254,6 +260,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
           if (!d.name.trim()) { setErr(true); return; }
           const saved = store.upsert('contacts', { ...d, name: d.name.trim(), phone: normalisePhone(d.phone), whatsapp: d.whatsapp?.trim() || undefined, roles: d.roles.length ? d.roles : ['other'],
             vendorStatus: formVendor ? d.vendorStatus : undefined });
+          draft.clear();
           toast(t.c.saved);
           if (existing) back(); else go({ name: 'contactDetail', id: saved.id });
         }}>{t.c.save}</button>

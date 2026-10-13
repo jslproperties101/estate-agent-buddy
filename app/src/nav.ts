@@ -1,6 +1,6 @@
 // Every screen in the app and what it needs to open. App.tsx draws the current screen; others call go(...).
 import type { Filters, Listing } from './listing/model';
-import type { ApptKind, ExpertKey, Task } from './data/types';
+import type { ApptKind, CollectionName, ExpertKey, Task } from './data/types';
 
 export type FormSection =
   | 'basics' | 'tenure' | 'photos' | 'location' | 'details' | 'specs' | 'money' | 'tenancy' | 'availability'
@@ -38,6 +38,9 @@ export type Screen =
   | { name: 'nameCard' }
   | { name: 'settings' }
   | { name: 'bugReport'; from?: string }
+  | { name: 'syncReview' }
+  | { name: 'history'; collection: CollectionName; id: string }
+  | { name: 'recentlyDeleted' }
   | { name: 'expert' }
   | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
   | { name: 'expertThread'; id: string }

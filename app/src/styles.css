@@ -703,3 +703,20 @@ label.btn { position: relative; cursor: pointer; }
 /* Easy Bug Report */
 .bug-steps { margin: 0; padding-left: 22px; }
 .bug-preview { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); align-self: flex-start; }
+
+/* ---- Phase 2: record status, drafts, conflicts, history, file status ---- */
+.rec-status { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line, #3a362b); background: var(--card, #1d1b16); font-size: 13px; line-height: 18px; }
+.rec-status .save-dot { display: inline-block; width: 9px; height: 9px; border-radius: 5px; background: var(--gold-hi); margin-right: 4px; }
+.rec-status.synced .save-dot { background: var(--ok); }
+.rec-status.syncing .save-dot { animation: pulse 1s infinite; }
+.rec-status.conflict { border-color: var(--gold-hi); }
+.rec-status.failed { border-color: var(--red); }
+.rec-status.failed .save-dot { background: var(--red); }
+.rec-status.draft .save-dot { background: var(--muted, #BEB7A6); }
+.draft-notice { display: flex; flex-direction: column; gap: 8px; }
+.pick { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: 10px; border: 2px solid var(--line, #3a362b); background: transparent; color: inherit; min-height: 44px; word-break: break-word; }
+.pick.on { border-color: var(--gold-hi); }
+.pick em { font-style: normal; font-weight: 700; font-size: 12px; }
+.img-missing { background: repeating-linear-gradient(45deg, #2a2720, #2a2720 6px, #332f26 6px, #332f26 12px); display: inline-block; }
+.file-badge { font-size: 12px; color: var(--muted, #BEB7A6); display: inline-flex; gap: 6px; align-items: center; }
+.file-badge.failed, .file-badge.denied { color: var(--red); }

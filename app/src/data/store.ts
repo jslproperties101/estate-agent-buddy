@@ -30,7 +30,7 @@ export type RevisionSource = 'edit' | 'cloud' | 'merge' | 'delete' | 'restore' |
 export interface Revision { at: number; source: RevisionSource; hash: string; data: Record<string, unknown>; note?: string }
 /** What the cloud last accepted or sent for a record (its version number and content). The base of every later join. */
 export interface CloudBase { rev: number; hash: string; deleted: boolean; data: Record<string, unknown> | null }
-export interface Draft { form: string; recordKey?: string; baseHash?: string; savedAt: number; data: unknown; extra?: unknown }
+export interface Draft { form: string; recordKey?: string; baseHash?: string; savedAt: number; data: unknown; extra?: unknown; /** what a new record's form was pre-filled with, so the draft can be reopened the same way */ variant?: unknown }
 export type FileStatus = 'local' | 'pending' | 'uploaded' | 'failed' | 'missing' | 'denied';
 export interface FileEntry {
   id: string; status: FileStatus; bytes: number; mime?: string; sha256?: string; addedAt: number;
@@ -210,6 +210,15 @@ export class Store {
         this.bases.delete(rk);
       }
     }
+    // A draft nobody came back to for 30 days goes too, with the pictures only it used.
+    for (const [k, d] of [...this.drafts]) {
+      if (now - d.savedAt <= RECENTLY_DELETED_MS) continue;
+      const ids: string[] = [];
+      const walk = (v: unknown) => { if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === 'object') for (const [kk, x] of Object.entries(v)) { if ((kk === 'fileId' || kk === 'photoFileId') && typeof x === 'string') ids.push(x); else walk(x); } };
+      walk(d.data);
+      this.discardDraft(k);
+      for (const id of ids) this.discardFile(id);
+    }
     const used = new Set(fileRefs(this.state).map(r => r.fileId));
     for (const e of [...this.fileEntries.values()]) {
       if (!e.removedAt || used.has(e.id) || now - e.removedAt < RECENTLY_DELETED_MS) continue;
@@ -257,6 +266,7 @@ export class Store {
 
   // ---------- generic second-area access (used by file sync and tests) ----------
   getLocal(key: string) { return this.backend.getLocal(key); }
+  async listLocal(prefix: string) { await this.flush(); return this.backend.listLocal(prefix); }
 
   setSingleton<S extends SingletonName>(s: S, patch: Partial<Singletons[S]>) {
     const value = { ...this.state[s], ...patch } as Singletons[S];

@@ -13,6 +13,8 @@ import {
   rm, yearsRemaining, commissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
   ALL_FORM_FIELDS, hasPosition,
 } from './model';
+import { useDraft } from '../ui/useDraft';
+import { DraftBanner } from '../ui/DraftBanner';
 import { compressImage } from '../lib/images';
 import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
@@ -75,6 +77,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
   });
   const [refNoText, setRefNoText] = useState(String(d.refNo ?? ''));
+  const refNoInit = useRef(refNoText);
   const [busy, setBusy] = useState(false);
   const [locating, setLocating] = useState(false);
   const [posErr, setPosErr] = useState(false);
@@ -92,6 +95,16 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const toggle = (sid: string) => setOpen(o => { const n = new Set(o); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const addedFiles = useRef<string[]>([]);
   const removedFiles = useRef<string[]>([]);
+  // Draft autosave: what is typed here survives closing the app; it is not a saved record until Save is pressed.
+  const draft = useDraft<Listing>({
+    collection: 'properties', existing: initial, value: d, apply: setD, extra: refNoText, variant: prefill,
+    applyExtra: e => setRefNoText(typeof e === 'string' ? e : refNoInit.current),
+    onDiscard: dv => {   // pictures and documents added only for the draft go with it
+      const kept = new Set([...(initial?.photos ?? []).map(p => p.fileId), ...(initial?.documents ?? []).map(x => x.fileId)]);
+      for (const f of [...dv.photos.map(p => p.fileId), ...(dv.documents ?? []).map(x => x.fileId)]) if (f && !kept.has(f)) store.discardFile(f);
+      addedFiles.current = [];
+    },
+  });
   const shownNum = (k: string, v: unknown) => (raw[k] !== undefined && num(raw[k]) === v ? raw[k] : v ?? '');
   const vf = fieldsFor(d.type);
   const show = (k: FormField) => vf.has(k);
@@ -280,18 +293,22 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     const isNew = !initial;
     next = { ...next, history: [{ at: Date.now(), source: (prefill ? 'voice' : 'form') as 'voice' | 'form', summary: '' }, ...(next.history ?? [])].slice(0, 50) };
     store.upsert('properties', next);
+    draft.clear();
     for (const f of removedFiles.current) store.removeFile(f);
     if (isNew) store.setSingleton('settings', { lastPrefix: next.refPrefix });
     if (next.refPrefix && !(BUILTIN_PREFIXES as readonly string[]).includes(next.refPrefix)) store.touchOption('refPrefix', next.refPrefix);
     if (isNew) go({ name: 'listingDetail', id: next.id }); else back();
   }
   function cancel() {
-    for (const f of addedFiles.current) store.removeFile(f);
+    // Leaving without saving keeps the draft (and the pictures it uses) so it can be picked up again; with no draft the
+    // pictures added in this visit are dropped as before.
+    if (!draft.flush()) for (const f of addedFiles.current) store.discardFile(f);
     back();
   }
 
   return (
     <section className="stack listing" data-testid="listing-form">
+      <DraftBanner lang={lang} draft={draft} />
       <p className="notice">{s.allOptional}</p>
       <div className="between form-tools">
         <small className="muted">{s.formTip}</small>

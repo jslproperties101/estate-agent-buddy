@@ -47,7 +47,11 @@ import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
-import { configured, syncNow, SyncError } from './data/sync';
+import { configured } from './data/sync';
+import { runSync } from './data/syncRunner';
+import { syncStrings } from './sync/strings';
+import { SyncReviewScreen, HistoryScreen, RecentlyDeletedScreen, DraftsList } from './sync/SyncUI';
+import { pendingFileCount } from './data/savestate';
 import { convertInactive, inactiveContacts, reviewContacts } from './data/leadReview';
 import { leadReviewStrings } from './data/leadReviewStrings';
 
@@ -136,15 +140,11 @@ function useAutoSync() {
       const s = store.getState();
       const cfg = config(s.settings);
       if (busy.current || !configured(cfg) || !s.meta.syncSession) return;
-      if (!force && !s.meta.dirty.length && s.meta.lastSync && Date.now() - s.meta.lastSync < 5 * 60_000) return;
+      if (!force && !s.meta.dirty.length && pendingFileCount(store) === 0 && s.meta.lastSync && Date.now() - s.meta.lastSync < 5 * 60_000) return;
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       busy.current = true;
-      try { await syncNow(store, cfg); }
-      catch (e) {
-        const code = e instanceof SyncError ? e.code : 'network';
-        if (code === 'auth' || code === 'no-access') store.setSingleton('meta', { syncSession: undefined, syncError: code === 'auth' ? 'expired' : code });
-        else store.setSingleton('meta', { syncError: code });
-      } finally { busy.current = false; }
+      try { await runSync(store, cfg); }
+      finally { busy.current = false; }
     };
     void run(true);
     const t = setInterval(() => void run(), 60_000);
@@ -163,6 +163,8 @@ function Shell() {
   const [toast, setToast] = useState<{ text: string; kind: ToastKind } | null>(null);
   const [alerts, setAlerts] = useState<DueReminder[]>([]);
   useAutoSync();
+  // Old deleted records, their removed pictures and forgotten drafts are cleared after 30 days.
+  useEffect(() => { void store.purgeOld(); }, [store]);
 
   // A success message ("Saved on this phone.") is shown only after the phone's storage has really finished writing,
   // and never if that write failed (the failure message is shown instead). It stays two seconds; an error stays six.
@@ -332,6 +334,9 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'nameCard': return profileStrings[lang].sendTitle;
     case 'settings': return profileStrings[lang].setTitle;
     case 'bugReport': return bugStrings[lang].title;
+    case 'syncReview': return syncStrings[lang].review;
+    case 'history': return syncStrings[lang].history;
+    case 'recentlyDeleted': return syncStrings[lang].recent;
     case 'expert': return expertStrings[lang].title;
     case 'expertAsk': return expertStrings[lang].experts[s.expert];
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
@@ -376,6 +381,9 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'nameCard': return <NameCardSend lang={lang} />;
     case 'settings': return <SettingsScreen lang={lang} go={go} />;
     case 'bugReport': return <BugReportScreen lang={lang} from={s.from ?? 'settings'} />;
+    case 'syncReview': return <SyncReviewScreen lang={lang} go={go} />;
+    case 'history': return <HistoryScreen key={`${s.collection}:${s.id}`} lang={lang} collection={s.collection} id={s.id} go={go} />;
+    case 'recentlyDeleted': return <RecentlyDeletedScreen lang={lang} go={go} />;
     case 'expert': return <ExpertHome lang={lang} go={go} />;
     case 'expertAsk': return <ExpertAsk lang={lang} go={(next, o) => go(next, { replace: true, ...o })} expert={s.expert} propertyId={s.propertyId} />;
     case 'expertThread': return <ExpertThreadScreen key={s.id} lang={lang} go={go} id={s.id} />;
@@ -443,7 +451,7 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
  *  News cards are kept under a clearly marked "sample, not live" preview rather than deleted. Push notifications to the
  *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet. */
 function Notifications({ lang, go }: { lang: Lang; go: Go }) {
-  const { state } = useApp();
+  const { state, store } = useApp();
   const t = strings[lang];
   const ss = saveStrings[lang];
   const sync = useSaveState();
@@ -452,14 +460,18 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const perm = permission();
   const waiting = state.meta.dirty.length;
   const signedIn = !!state.meta.syncSession;
+  const conflictCount0 = (state.meta.conflicts ?? []).length;
   const syncLine = sync === 'failed-phone' ? ss.failedPhone
     : !signedIn ? null
       : sync === 'failed-sync' ? t.notif.syncFailed
+        : sync === 'conflict' ? ss.conflict(conflictCount0)
         : sync === 'syncing' ? ss.syncing
           : waiting > 0 ? t.notif.syncWaiting(waiting)
             : state.meta.lastSync ? t.notif.syncOk(fmtDateTime(state.meta.lastSync, lang)) : null;
   const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
-  const systemEmpty = soon.length === 0 && !syncLine && review === 0;
+  const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
+  const draftCount = store.allDrafts().length;
+  const systemEmpty = soon.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -469,6 +481,14 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
           <button className="link-row" data-testid="notif-lead-review" onClick={() => go({ name: 'contactsHome' })}>
             <strong>{leadReviewStrings[lang].review}</strong><small className="muted">{leadReviewStrings[lang].notice(review)}</small>
           </button>
+        )}
+        {conflictCount > 0 && (
+          <button className="link-row" data-testid="notif-conflicts" onClick={() => go({ name: 'syncReview' })}>
+            <strong>{syncStrings[lang].review}</strong><small className="muted">{syncStrings[lang].reviewHint(conflictCount)}</small>
+          </button>
+        )}
+        {draftCount > 0 && (
+          <div className="stack-sm" data-testid="notif-drafts"><strong>{syncStrings[lang].drafts}</strong><small className="muted">{syncStrings[lang].draftsHint(draftCount)}</small><DraftsList lang={lang} go={go} /></div>
         )}
         {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}
         {syncLine && <div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div>}

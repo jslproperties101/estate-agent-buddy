@@ -1,6 +1,6 @@
 // Small shared screen pieces.
 import { ReactNode, useState } from 'react';
-import { useApp, useFileUrl } from '../data/useStore';
+import { useApp, useFileStatus, useFileUrl } from '../data/useStore';
 import { strings, Lang } from '../i18n';
 import { leadReviewStrings } from '../data/leadReviewStrings';
 import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
@@ -86,8 +86,12 @@ export function LeadPicker({ lang, value, onChange }: { lang: Lang; value?: Lead
 
 export function StoredImage({ fileId, url, alt = '', className }: { fileId?: string; url?: string; alt?: string; className?: string }) {
   const stored = useFileUrl(fileId);
+  const status = useFileStatus(fileId);
   const src = url ?? stored;
-  return src ? <img src={src} alt={alt} className={className} /> : <span className={`img-wait ${className ?? ''}`} aria-hidden="true" />;
+  if (src) return <img src={src} alt={alt} className={className} />;
+  // Not on this phone: still loading, or waiting for the cloud copy, or it is gone / not allowed. The record stays usable.
+  const gone = status === 'missing' || status === 'denied';
+  return <span className={`img-wait ${gone ? 'img-missing' : ''} ${className ?? ''}`} data-testid={gone ? 'img-missing' : undefined} data-state={status} aria-hidden={gone ? undefined : 'true'} role={gone ? 'img' : undefined} aria-label={gone ? alt || 'Picture not available' : undefined} />;
 }
 
 export function Confirm({ lang, title, body, okLabel, danger = true, onOk, onCancel }: {

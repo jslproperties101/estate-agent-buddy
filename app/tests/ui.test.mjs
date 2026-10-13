@@ -1612,7 +1612,7 @@ test('U47 old Inactive buyers become Dropped (gray), with a reviewable report; n
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   // Put an old-version record straight into the phone's storage, then reopen the app.
   await page.evaluate(() => new Promise((resolve, reject) => {
-    const r = indexedDB.open('estate-agent-buddy', 1);
+    const r = indexedDB.open('estate-agent-buddy');
     r.onsuccess = () => {
       const tx = r.result.transaction('records', 'readwrite');
       tx.objectStore('records').put({ id: 'old1', created: 1, updated: 1, name: 'Old Inactive Buyer', phone: '+60 12-000 1111', notes: 'Keep these notes', roles: ['buyer'], leadStatus: 'inactive' }, 'c:contacts:old1');
@@ -1676,11 +1676,238 @@ test('U49 property cards: no "Unit" prefix on any card or view, and the stored u
   assert.doesNotMatch(await page.locator('.photo-cards').innerText().catch(() => ''), /\bUnit\b/, 'dashboard recent card');
   // The stored value is untouched: the unit number is saved exactly as typed.
   const stored = await page.evaluate(() => new Promise((resolve, reject) => {
-    const r = indexedDB.open('estate-agent-buddy', 1);
+    const r = indexedDB.open('estate-agent-buddy');
     r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').getAll(); g.onsuccess = () => resolve(g.result.filter(x => x && x.unitNo).map(x => x.unitNo)); g.onerror = () => reject(g.error); };
   }));
   assert.deepEqual(stored, ['12A']);
   await page.context().close();
+});
+
+// ---------- Phase 2 (14 Oct 2026): drafts, record status, history, upgrade, conflicts ----------
+const waitFor = async (cond, ms = 6000) => { const t = Date.now(); while (!cond()) { if (Date.now() - t > ms) throw new Error('timed out waiting'); await new Promise(r => setTimeout(r, 50)); } };
+const DEBOUNCE_WAIT = 1100;   // the draft is written 0.7 s after the last keystroke
+
+test('U50 draft autosave: closing the app during entry keeps the form; editing, discarding and saving behave', async () => {
+  const page = await phone();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Half Typed Buyer');
+  await page.locator('[data-field="whatsapp"]').fill('@half');
+  await page.getByTestId('draft-saved').waitFor();
+  assert.match(await page.getByTestId('draft-saved').innerText(), /Draft saved on this phone/);
+  // "Closing the app": the page is reloaded. Nothing was saved with the Save button, so no record exists.
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Buyer List');
+  assert.equal(await page.getByTestId('contact-row').count(), 0, 'a draft is not a record');
+  await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.getByTestId('draft-banner').waitFor();
+  assert.match(await page.getByTestId('draft-banner').innerText(), /Draft from .* restored\. It is not saved yet/);
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer');
+  assert.equal(await page.locator('[data-field="whatsapp"]').inputValue(), '@half');
+  // Edit the restored draft; close again; the edit is what comes back.
+  await page.locator('[data-field="name"]').fill('Half Typed Buyer Two');
+  await page.waitForTimeout(DEBOUNCE_WAIT);
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer Two');
+  // Discard: the form is empty again and the draft is gone for good.
+  await page.getByTestId('draft-discard').first().click();
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
+  assert.equal(await page.getByTestId('draft-banner').count(), 0);
+  await page.waitForTimeout(DEBOUNCE_WAIT);
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  assert.equal(await page.getByTestId('draft-banner').count(), 0, 'nothing comes back after a discard');
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
+  // A partly filled form that cannot be saved yet (no name) keeps what was typed.
+  await page.locator('[data-field="whatsapp"]').fill('@nobody');
+  await page.getByTestId('save-contact').click();
+  assert.equal(await page.locator('[data-field="name"]').getAttribute('aria-invalid'), 'true');
+  assert.equal(await page.locator('[data-field="whatsapp"]').inputValue(), '@nobody');
+  // Save for real: one record, and the draft is cleared (no banner next time).
+  await page.locator('[data-field="name"]').fill('Saved Buyer');
+  await page.getByTestId('save-contact').click();
+  await page.getByTestId('contact-detail').waitFor();
+  await home(page); await tile(page, 'Buyer List');
+  assert.equal(await page.getByTestId('contact-row').count(), 1, 'exactly one record');
+  await page.getByRole('button', { name: 'New buyer' }).click();
+  assert.equal(await page.getByTestId('draft-banner').count(), 0, 'saving cleared the draft');
+  assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
+  await page.context().close();
+});
+
+test('U51 the long property form keeps its draft too, and Save then leaves a single property', async () => {
+  const page = await phone();
+  await tile(page, 'Property List');
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="street"]').fill('Jalan Draft Test');
+  await page.locator('[data-field="unitNo"]').fill('9B');
+  await page.getByTestId('draft-saved').waitFor();
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Property List');
+  assert.equal(await page.getByTestId('listing-card').count(), 0, 'no property was created by typing');
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  await page.getByTestId('draft-banner').waitFor();
+  assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Draft Test');
+  assert.equal(await page.locator('[data-field="unitNo"]').inputValue(), '9B');
+  await page.getByTestId('save-property').click();
+  await page.getByTestId('listing-details').waitFor();
+  await home(page); await tile(page, 'Property List');
+  assert.equal(await page.getByTestId('listing-card').count(), 1);
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  assert.equal(await page.getByTestId('draft-banner').count(), 0);
+  await page.context().close();
+});
+
+test('U52 the phone’s storage upgrades from the Phase 1 layout without losing a record', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await ctx.route(`${base}no-such-page`, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>x</title>' }));
+  await page.goto(`${base}no-such-page`);       // same origin, but the app is not running here
+  await page.evaluate(() => new Promise((res, rej) => {
+    const r = indexedDB.open('estate-agent-buddy', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('records'); r.result.createObjectStore('files'); };
+    r.onsuccess = () => {
+      const tx = r.result.transaction('records', 'readwrite');
+      tx.objectStore('records').put({ id: 'v1c', created: 1, updated: 1, name: 'From Phase One', roles: ['buyer'] }, 'c:contacts:v1c');
+      tx.oncomplete = () => { r.result.close(); res(true); }; tx.onerror = () => rej(tx.error);
+    };
+    r.onerror = () => rej(r.error);
+  }));
+  await page.goto(base); await page.waitForSelector('nav.grid');
+  if (await page.getByTestId('start-choice').count()) await chooseStart(page, 'empty');
+  await tile(page, 'Buyer List');
+  assert.match(await page.getByTestId('contact-row').first().innerText(), /From Phase One/);
+  const info = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { res({ v: r.result.version, stores: [...r.result.objectStoreNames].sort() }); r.result.close(); }; }));
+  assert.equal(info.v, 2);
+  assert.deepEqual(info.stores, ['files', 'local', 'records']);
+  await ctx.close();
+});
+
+test('U53 record status chip, History with restore, and Recently deleted with restore', async () => {
+  const page = await phone();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Ahmad History');
+  await page.getByTestId('save-contact').click();
+  await page.getByTestId('contact-detail').waitFor();
+  assert.equal(await page.getByTestId('record-status').getAttribute('data-state'), 'phone');
+  assert.match(await page.getByTestId('record-status').innerText(), /Saved on this phone/);
+  await shot(page, '50-record-status', false);
+  // Edit: the earlier version goes to History.
+  await page.getByRole('button', { name: 'Edit' }).first().click();
+  await page.locator('[data-field="name"]').fill('Ahmad Renamed');
+  await page.getByTestId('save-contact').click();
+  await page.getByTestId('contact-detail').waitFor();
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad Renamed/);
+  await page.getByTestId('rec-history').click();
+  await page.getByTestId('revision-list').waitFor();
+  assert.equal(await page.getByTestId('revision').count(), 1);
+  assert.match(await page.getByTestId('revision').first().innerText(), /Edited on this phone/);
+  await shot(page, '51-history', false);
+  await page.getByTestId('restore-revision').first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Restore this version' }).click();
+  await page.getByTestId('history-msg').waitFor();
+  await page.locator('header .icon-btn').first().click();
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/, 'the earlier name is back');
+  // Delete, then bring it back from Recently deleted.
+  await page.getByRole('button', { name: 'Edit' }).first().click();
+  await page.getByRole('button', { name: 'Delete' }).first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await page.waitForSelector('nav.grid');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByTestId('open-recently-deleted').click();
+  await page.getByTestId('deleted-item').waitFor();
+  assert.match(await page.getByTestId('deleted-item').first().innerText(), /Ahmad History/);
+  await shot(page, '52-recently-deleted', false);
+  await page.getByTestId('restore-deleted').first().click();
+  await page.getByTestId('contact-detail').waitFor();
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/);
+  await page.context().close();
+});
+
+test('U54 sync review: a same-field conflict, a property number already used, and a record deleted elsewhere — each reviewable, nothing lost', async () => {
+  const SB = 'https://sync-test.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const pushed = [];
+  let phase = 'conflicts';
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    const json = b => route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(b) });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (u.pathname === '/rest/v1/rpc/eab_my_membership') return json([{ workspace_id: 'ws-1', workspace_name: 'Test team', role: 'owner' }]);
+    if (u.pathname === '/rest/v1/rpc/eab_push_records') {
+      const body = JSON.parse(req.postData());
+      pushed.push(...body.rows);
+      return json(body.rows.map(r => {
+        if (phase === 'conflicts' && r.id === 'c1') return { collection: r.collection, id: r.id, status: 'conflict', rev: 2, deleted: false, data: { id: 'c1', created: 1, updated: 9, name: 'Ahmad', phone: 'REMOTE-PHONE', roles: ['buyer'] } };
+        if (phase === 'conflicts' && r.id === 'p1') return { collection: r.collection, id: r.id, status: 'ref_conflict', ref_no: 1001, ref: 'A1001', other_ref: 'P1001', other_id: 'p9', other_title: 'Terrace in Puchong', other_visible: true };
+        if (phase === 'conflicts' && r.id === 'c2') return { collection: r.collection, id: r.id, status: 'conflict', rev: 2, deleted: true, data: null };
+        return { collection: r.collection, id: r.id, status: 'ok', rev: 3 };
+      }));
+    }
+    if (u.pathname === '/rest/v1/eab_records') return json([]);
+    if (u.pathname === '/rest/v1/eab_files') return json([]);
+    return route.fulfill({ status: 404, headers: cors, body: '' });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  // Seed what a phone with unsent changes looks like, signed in to a workspace.
+  await page.evaluate(async SBURL => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    await put('records', 'c:contacts:c1', { id: 'c1', created: 1, updated: 5, name: 'Ahmad', phone: 'LOCAL-PHONE', roles: ['buyer'] });
+    await put('records', 'c:contacts:c2', { id: 'c2', created: 1, updated: 5, name: 'Siti Deleted Elsewhere', notes: 'edited here', roles: ['buyer'] });
+    await put('records', 'c:properties:p1', { id: 'p1', created: 1, updated: 5, headline: 'Condo in Cheras', ref: 'A1001', refPrefix: 'A', refNo: 1001, photos: [], type: 'condo' });
+    await put('local', 'base:contacts:c1', { rev: 1, hash: 'x', deleted: false, data: { id: 'c1', created: 1, updated: 1, name: 'Ahmad', phone: 'OLD-PHONE', roles: ['buyer'] } });
+    await put('local', 'base:contacts:c2', { rev: 1, hash: 'x', deleted: false, data: { id: 'c2', created: 1, updated: 1, name: 'Siti Deleted Elsewhere', roles: ['buyer'] } });
+    await put('records', 's:meta', { fired: [], dirty: ['contacts:c1', 'contacts:c2', 'properties:p1'], tombstones: [], syncWorkspaceId: 'ws-1', lastSeq: 5, syncSession: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'a@x.c', userId: 'u1', workspaceId: 'ws-1', workspaceName: 'Test team', role: 'owner' } });
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'anon' });
+    db.close();
+  }, SB);
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await page.locator('[data-testid="save-status"][data-state="conflict"]').waitFor({ timeout: 8000 });
+  assert.match(await page.getByTestId('save-status').innerText(), /3 need review/, 'the status line does not say Synced');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByTestId('open-sync-review').click();
+  await page.getByTestId('sync-review').waitFor();
+  assert.equal(await page.getByTestId('conflict-card').count(), 3);
+  await shot(page, '53-sync-review', true);
+
+  // The property number: explained, the other property named, nothing renamed.
+  const ref = page.locator('[data-testid="conflict-card"][data-kind="reference"]');
+  assert.match(await ref.innerText(), /A1001 could not be sent/);
+  assert.match(await ref.innerText(), /Used by P1001 · Terrace in Puchong/);
+  assert.match(await ref.innerText(), /not renamed/);
+  await ref.getByTestId('open-other').waitFor();
+
+  // Same field: this phone's value stays until a choice is made; choosing "theirs" sends it.
+  const fields = page.locator('[data-testid="conflict-card"][data-kind="fields"]');
+  assert.match(await fields.innerText(), /LOCAL-PHONE/); assert.match(await fields.innerText(), /REMOTE-PHONE/);
+  assert.equal(await fields.getByTestId('conflict-apply').isDisabled(), true, 'a choice is needed first');
+  await fields.getByTestId('pick-theirs').click();
+  await fields.getByTestId('conflict-apply').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="conflict-card"]').length === 2);
+  // Taking the other phone's value means this phone now equals the cloud: nothing needs to be sent for it.
+  const c1 = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:c1'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
+  assert.equal(c1.phone, 'REMOTE-PHONE'); assert.equal(c1.name, 'Ahmad');
+  assert.equal(pushed.filter(r => r.id === 'c1' && r.base_rev === 2).length, 0);
+
+  // Deleted elsewhere, edited here: keep mine → sent again (not silently deleted).
+  phase = 'settled';
+  const del = page.locator('[data-testid="conflict-card"][data-kind="deleted-remote"]');
+  assert.match(await del.innerText(), /Deleted elsewhere, edited here/);
+  await del.getByTestId('keep-mine').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="conflict-card"]').length === 1);
+  await waitFor(() => pushed.some(r => r.id === 'c2' && r.base_rev === 2));
+  const sentC2 = pushed.filter(r => r.id === 'c2').pop();
+  assert.equal(sentC2.deleted, false); assert.equal(sentC2.data.notes, 'edited here'); assert.equal(sentC2.base_rev, 2);
+
+  // The property number card: open the form to change it; the number was not touched.
+  await ref.getByTestId('change-number').click();
+  await expandForm(page);
+  assert.equal(await page.locator('#ref-no-input').inputValue(), '1001');
+  await shot(page, '54-ref-conflict-form', false);
+  await ctx.close();
 });
 
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {

@@ -2,6 +2,7 @@
 // Cards hide the reference number; the detail page shows it. Every detail section has its own Edit button that
 // opens the form straight at that section.
 import { useMemo, useState } from 'react';
+import { RecordStatus, FileBadge } from '../sync/SyncUI';
 import { BannerDot } from '../gps/BannersUI';
 import { activeBanners } from '../domain/banners';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -259,6 +260,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
   return (
     <section className="stack listing" data-testid="listing-details">
+      {!l.sample && <RecordStatus lang={lang} collection="properties" id={l.id} go={go} />}
       <div className="lc-card">
         <span className="lc-photo tall">
           <StoredImage fileId={shownPhoto.fileId} url={shownPhoto.url} />
@@ -433,7 +435,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         <div className="doc-sum">
           {DOC_CATEGORIES.map(cat => <div key={cat}><span>{s.docCat[cat]}{CONFIDENTIAL_DOCS.includes(cat) ? ' 🔒' : ''}</span><strong>{docs.filter(d => d.category === cat).length}</strong></div>)}
         </div>
-        {docs.map(d => <DocRow key={d.id} d={d} s={s} />)}
+        {docs.map(d => <DocRow key={d.id} d={d} s={s} lang={lang} />)}
       </SectionCard>
 
       <InquiryHistory lang={lang} go={go} propertyId={l.id} />
@@ -448,13 +450,14 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   );
 }
 
-function DocRow({ d, s }: { d: Doc; s: ListingStrings }) {
+function DocRow({ d, s, lang }: { d: Doc; s: ListingStrings; lang: Lang }) {
   const store = useStore();
   return (
     <div className="doc-row"><span>{d.name}</span>
       {d.fileId
         ? <button className="btn small secondary" onClick={() => void store.fileUrl(d.fileId!).then(u => { if (u) window.open(u, '_blank'); })}>{s.open1}</button>
         : <small className="muted">{s.sample}</small>}
+      <FileBadge lang={lang} fileId={d.fileId} />
     </div>
   );
 }

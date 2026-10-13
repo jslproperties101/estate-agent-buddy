@@ -1,5 +1,7 @@
 // To-Do, Calendar, appointments, inquiries: real records saved on the phone, with reminders.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useDraft } from '../ui/useDraft';
+import { DraftBanner } from '../ui/DraftBanner';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
@@ -58,6 +60,8 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
   const [follow, setFollow] = useState(followTask?.due?.slice(0, 10) ?? '');
   const [err, setErr] = useState(false);
   const [del, setDel] = useState(false);
+  const followInit = useRef(follow);
+  const draft = useDraft<Inquiry>({ collection: 'inquiries', existing, value: d, apply: setD, extra: follow, applyExtra: e => setFollow(typeof e === 'string' ? e : followInit.current), variant: { contactId, propertyId } });
   const contact = state.contacts.find(x => x.id === d.contactId);
 
   function save(): Inquiry | null {
@@ -65,7 +69,8 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
     let next = { ...d };
     if (follow) {
       const title = a.inq.followUpTitle(contact?.name ?? '');
-      const task = followTask ? { ...followTask, due: follow, title: followTask.title || title } : followUpTask({ id: newId(), title, due: follow, contactId: d.contactId, propertyId: d.propertyId, inquiryId: d.id, notes: d.message });
+      // The follow-up task's id comes from the inquiry's, so pressing Save twice can never create two tasks.
+      const task = followTask ? { ...followTask, due: follow, title: followTask.title || title } : followUpTask({ id: `${d.id}:fu`, title, due: follow, contactId: d.contactId, propertyId: d.propertyId, inquiryId: d.id, notes: d.message });
       store.upsert('tasks', task);
       next = { ...next, followUpTaskId: task.id };
     }
@@ -76,6 +81,7 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
 
   return (
     <section className="stack" data-testid="inquiry-form">
+      <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <ContactSelect lang={lang} label={a.inq.who} roles={BUYER_ROLES.slice(0, 1)} value={d.contactId || undefined} required invalid={err}
           onChange={v => { setD(x => ({ ...x, contactId: v ?? '' })); setErr(false); }} />
@@ -97,6 +103,7 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
             const saved = save(); if (!saved) return;
             store.upsert('appointments', convertToViewing(saved, { id: newId() }));
             store.remove('inquiries', saved.id);
+            draft.clear();
             toast(a.inq.converted); back();
           }}>{a.inq.convert}</button>
           <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>
@@ -104,7 +111,7 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
       )}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
-        <button className="btn primary" data-testid="save-inquiry" onClick={() => { if (save()) { toast(c.saved); back(); } }}>{c.save}</button>
+        <button className="btn primary" data-testid="save-inquiry" onClick={() => { if (save()) { draft.clear(); toast(c.saved); back(); } }}>{c.save}</button>
       </div></div>
       {del && existing && <Confirm lang={lang} title={c.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('inquiries', existing.id); back(); }} />}
     </section>
@@ -127,6 +134,11 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
   const [dDate, setDDate] = useState(datePart(d.start));
   const [dTime, setDTime] = useState(timePart(d.start));
   const [del, setDel] = useState(false);
+  const dtInit = useRef({ dDate, dTime });
+  const draft = useDraft<Appointment>({
+    collection: 'appointments', existing, value: d, apply: setD, extra: { dDate, dTime }, variant: { kind, propertyId, contactId, date, time, title },
+    applyExtra: e => { const x = (e ?? dtInit.current) as { dDate: string; dTime: string }; setDDate(x.dDate); setDTime(x.dTime); },
+  });
   const contact = state.contacts.find(x => x.id === d.contactId);
   const statusLabel = (s: string) => (d.kind === 'viewing' ? a.view.status[s] : a.appt.status[s]);
 
@@ -140,6 +152,7 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
 
   return (
     <section className="stack" data-testid="appt-form">
+      <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <label className="ff">{a.appt.kind}
           <select data-field="kind" value={d.kind} onChange={e => setD(x => ({ ...x, kind: e.target.value as ApptKind }))}>
@@ -173,7 +186,7 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
             const saved = save();
             const name = [a.appt.kinds[saved.kind], contact?.name].filter(Boolean).join(' · ');
             const due = ymd(addDays(new Date(), 1));
-            store.upsert('tasks', followUpTask({ id: newId(), title: a.appt.followUpTitle(name), due, contactId: saved.contactId, propertyId: saved.propertyId, appointmentId: saved.id }));
+            store.upsert('tasks', followUpTask({ id: `${saved.id}:fu`, title: a.appt.followUpTitle(name), due, contactId: saved.contactId, propertyId: saved.propertyId, appointmentId: saved.id }));
             toast(c.saved);
           }}>{a.appt.followUp}</button>
           <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>
@@ -181,7 +194,7 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
       )}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
-        <button className="btn primary" data-testid="save-appt" onClick={() => { save(); toast(c.saved); back(); }}>{c.save}</button>
+        <button className="btn primary" data-testid="save-appt" onClick={() => { save(); draft.clear(); toast(c.saved); back(); }}>{c.save}</button>
       </div></div>
       {del && existing && <Confirm lang={lang} title={a.appt.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('appointments', existing.id); back(); }} />}
     </section>
@@ -257,8 +270,14 @@ export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => 
   const [dTime, setDTime] = useState(timePart(d.due));
   const [err, setErr] = useState(false);
   const [del, setDel] = useState(false);
+  const dtInit = useRef({ dDate, dTime });
+  const draft = useDraft<Task>({
+    collection: 'tasks', existing, value: d, apply: setD, extra: { dDate, dTime }, variant: prefill,
+    applyExtra: e => { const x = (e ?? dtInit.current) as { dDate: string; dTime: string }; setDDate(x.dDate); setDTime(x.dTime); },
+  });
   return (
     <section className="stack" data-testid="task-form">
+      <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <label className="ff">{a.todo.fields.title}<input data-field="title" aria-invalid={err} value={d.title} onChange={e => { setD(x => ({ ...x, title: e.target.value })); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{a.todo.titleRequired}</p>}
@@ -284,6 +303,7 @@ export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => 
         <button className="btn primary" data-testid="save-task" onClick={() => {
           if (!d.title.trim()) { setErr(true); return; }
           store.upsert('tasks', { ...d, title: d.title.trim(), due: joinDT(dDate, dTime) });
+          draft.clear();
           toast(c.saved); back();
         }}>{c.save}</button>
       </div></div>

@@ -1,6 +1,8 @@
 // Button 8 — Agent Financial: income, commissions (estimated, confirmed, received), expenses, targets, outstanding
 // commissions, completed deals and summaries for a month or a year. All records are saved on the phone.
 import { useState } from 'react';
+import { useDraft } from '../ui/useDraft';
+import { DraftBanner } from '../ui/DraftBanner';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
@@ -134,6 +136,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
   });
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [del, setDel] = useState(false);
+  const draft = useDraft<Deal>({ collection: 'deals', existing, value: d, apply: setD, variant: { propertyId } });
   const update = (k: 'value' | 'commissionPct' | 'commission' | 'sharePct' | 'receivedAmount', v: number | undefined) => setD(x => {
     const next = { ...x, [k]: v } as Deal;
     if ((k === 'value' || k === 'commissionPct') && next.value && next.commissionPct !== undefined) { next.commission = commissionFrom(next.value, next.commissionPct); setRaw(r => { const y = { ...r }; delete y.commission; return y; }); }
@@ -148,6 +151,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
   );
   return (
     <section className="stack" data-testid="deal-form">
+      <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <label className="ff">{f.f.title}<input value={d.title ?? ''} onChange={e => setD(x => ({ ...x, title: e.target.value || undefined }))} /></label>
         <PropertySelect lang={lang} label={f.f.property} value={d.propertyId} onChange={v => {
@@ -178,7 +182,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
       {existing && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
-        <button className="btn primary" data-testid="save-deal" onClick={() => { store.upsert('deals', { ...d, value: d.value || 0, commission: d.commission || 0, sharePct: d.sharePct ?? 100 }); toast(c.saved); back(); }}>{c.save}</button>
+        <button className="btn primary" data-testid="save-deal" onClick={() => { store.upsert('deals', { ...d, value: d.value || 0, commission: d.commission || 0, sharePct: d.sharePct ?? 100 }); draft.clear(); toast(c.saved); back(); }}>{c.save}</button>
       </div></div>
       {del && existing && <Confirm lang={lang} title={c.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('deals', existing.id); back(); }} />}
     </section>

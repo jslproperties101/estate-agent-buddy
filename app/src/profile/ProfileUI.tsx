@@ -21,6 +21,7 @@ import { PhonebookButton } from '../ui/PhonebookButton';
 import { FieldHelp } from '../ui/FieldHelp';
 import { config } from '../config';
 import { AccountCard } from '../auth/AccountUI';
+import { DataSafetyCard } from '../sync/SyncUI';
 import { permission, requestPermission } from '../lib/notify';
 import { loadSampleInto } from '../data/sample';
 
@@ -272,6 +273,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         }}>{t.saveSettings}</button>
       </div>
       <AccountCard lang={lang} />
+      <DataSafetyCard lang={lang} go={go} />
       <AboutCard lang={lang} />
       <div className="card stack-sm">
         <div className="card-title">{t.notif}</div>
