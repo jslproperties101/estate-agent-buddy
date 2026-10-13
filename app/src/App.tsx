@@ -4,9 +4,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
 import { openBackend } from './data/backend';
 import { Store } from './data/store';
-import { StoreContext, useApp } from './data/useStore';
+import { StoreContext, useApp, useSaveState } from './data/useStore';
 import { Screen, Go } from './nav';
-import { ToastContext } from './ui/toast';
+import { ToastContext, ToastKind, TOAST_OK_MS, TOAST_ERROR_MS } from './ui/toast';
+import { SaveStatus } from './ui/SaveStatus';
+import { saveStrings } from './ui/savestrings';
+import { beginStartup, startupLang, StartupPhase } from './startup/startup';
+import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
 import { showNow, scheduleNative, idFor } from './lib/notify';
@@ -31,22 +35,26 @@ import { CalculatorScreen } from './calculator/CalculatorUI';
 import { ProfileScreen, ProfileEdit, NameCardSend, SettingsScreen } from './profile/ProfileUI';
 import { ExpertHome, ExpertAsk, ExpertThreadScreen } from './expert/ExpertUI';
 import { VoiceCommand } from './voice/VoiceCommandUI';
+import { BugReportScreen } from './bugreport/BugReportUI';
+import { bugStrings } from './bugreport/strings';
 import { StoredImage } from './ui/common';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
-  IconBack, IconNews, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat, IconGear,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconCobroke,
+  IconBack, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
+  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconCobroke, IconSubsale, IconMarket,
 } from './icons';
 import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, syncNow, SyncError } from './data/sync';
+import { convertInactive, inactiveContacts } from './data/leadReview';
+import { leadReviewStrings } from './data/leadReviewStrings';
 
-/** The 15 home buttons, in the agreed order (3 columns × 5 rows on a phone), recalculated on 13 Oct 2026:
- *  Buyer List + Vendor List → one Contacts card (Buyers and Vendors inside); Subsale → News; Co-broke moved to the
- *  top bar (Coming Soon); Voice Command is card 15. Inquiries & Viewings and Settings (both existing screens) fill
- *  the places that became free. `soon` marks a card whose screen says plainly that the feature is not built yet. */
+/** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
+ *  card: it lives inside Agent Profile. News is no longer a card: News / Announcements is a section of Notifications.
+ *  Subsale, Project and Market Intelligence are honest Coming Soon screens (`soon`): nothing on them pretends to work.
+ *  Co-broke Opportunities (Coming Soon) and Notifications stay in the top bar. */
 export const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
   { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
   { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
@@ -59,39 +67,51 @@ export const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon
   { key: 'calculator', icon: () => <IconCalc />, target: { name: 'calculator' } },
   { key: 'profile', icon: () => <IconCard />, target: { name: 'profile' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
-  { key: 'news', icon: () => <IconNews />, target: { name: 'news' } },
+  { key: 'subsale', icon: () => <IconSubsale />, target: { name: 'comingSoon', key: 'subsale' }, soon: true },
   { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' }, soon: true },
-  { key: 'settings', icon: () => <IconGear />, target: { name: 'settings' } },
+  { key: 'market', icon: () => <IconMarket />, target: { name: 'comingSoon', key: 'market' }, soon: true },
   { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
 ];
 
-/** How long the startup logo animation shows (about one second, as agreed). The phone's storage opens at the same
- *  time underneath, so the animation adds no waiting of its own beyond this. */
-export const INTRO_MS = 1000;
-
+/** Startup is driven by readiness, not by a timer: the dashboard appears the moment the phone's storage is open, however
+ *  early that is. Only if opening takes longer than about five seconds does the screen say so; if it fails, the screen
+ *  says that and offers "Try again". Nothing here waits for the internet. */
 export default function App() {
   const [store, setStore] = useState<Store | null>(null);
-  const [intro, setIntro] = useState(true);
-  useEffect(() => { void openBackend().then(Store.open).then(setStore); }, []);
+  const [phase, setPhase] = useState<StartupPhase>('opening');
+  const [attempt, setAttempt] = useState(0);
+  const [gone, setGone] = useState(false);
+  const lang = startupLang(typeof navigator === 'undefined' ? undefined : navigator.languages);
+  useEffect(() => beginStartup(() => openBackend().then(Store.open), (p, value) => {
+    setPhase(p);
+    if (p === 'ready' && value) setStore(value);
+  }), [attempt]);
   // The Android splash (a still logo) is hidden as soon as the app can draw, so the spinning logo follows straight on.
-  useEffect(() => { void hideSplash(); const x = setTimeout(() => setIntro(false), INTRO_MS); return () => clearTimeout(x); }, []);
+  useEffect(() => { void hideSplash(); }, []);
   useEffect(() => { if (store) void nativeLook(); }, [store]);
+  // After the short fade-out the cover is removed from the page altogether.
+  useEffect(() => { if (phase !== 'ready') return; const x = setTimeout(() => setGone(true), FADE_MS); return () => clearTimeout(x); }, [phase]);
   return (
     <>
-      {store
-        ? <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>
-        : <div className="shell"><p className="loading" role="status">{intro ? '' : 'Estate Agent AI Buddy…'}</p></div>}
-      {intro && <StartupLogo />}
+      {store && <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>}
+      {!gone && <StartupLogo phase={phase} lang={store?.getState().settings.lang ?? lang} onRetry={() => setAttempt(n => n + 1)} />}
     </>
   );
 }
 
-/** Startup animation: the Estate Agent AI Buddy logo spins once (like a game's start screen), then the app or the
- *  sign-in screen appears. People who ask the phone for reduced motion get a short fade instead of the spin. */
-function StartupLogo() {
+/** The cover fades away over this long once the app is ready (only a visual fade; it never holds the dashboard back). */
+export const FADE_MS = 120;
+
+/** Startup cover: the logo and one truthful line about what is happening. The spin is decoration only. People who ask
+ *  the phone for reduced motion get a short fade instead of the spin. */
+function StartupLogo({ phase, lang, onRetry }: { phase: StartupPhase; lang: Lang; onRetry: () => void }) {
+  const s = startupStrings[lang];
+  const text = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : s.opening;
   return (
-    <div className="intro" data-testid="startup-logo" aria-hidden="true">
-      <div className="intro-stage"><IconLogo size={168} big /></div>
+    <div className={`intro${phase === 'ready' ? ' leaving' : ''}`} data-testid="startup-logo" data-phase={phase}>
+      <div className="intro-stage" aria-hidden="true"><IconLogo size={168} big /></div>
+      {phase !== 'ready' && <p className={`intro-msg ${phase}`} role={phase === 'failed' ? 'alert' : 'status'} data-testid="startup-msg">{text}</p>}
+      {(phase === 'slow' || phase === 'failed') && <button className="btn secondary" data-testid="startup-retry" onClick={onRetry}>{s.retry}</button>}
     </div>
   );
 }
@@ -140,13 +160,29 @@ function Shell() {
   const t = strings[lang];
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
   const stack = useRef<Screen[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; kind: ToastKind } | null>(null);
   const [alerts, setAlerts] = useState<DueReminder[]>([]);
   useAutoSync();
 
-  const showToast = useCallback((text: string) => { setToast(text); }, []);
-  useEffect(() => { if (!toast) return; const x = setTimeout(() => setToast(null), 4000); return () => clearTimeout(x); }, [toast]);
-  useEffect(() => { store.onWriteError = () => setToast(t.storage.writeError); }, [store, t]);
+  // A success message ("Saved on this phone.") is shown only after the phone's storage has really finished writing,
+  // and never if that write failed (the failure message is shown instead). It stays two seconds; an error stays six.
+  const showToast = useCallback((text: string, kind: ToastKind = 'ok') => {
+    if (kind === 'error') { setToast({ text, kind }); return; }
+    const failedBefore = store.writeErrors;
+    void store.flush().then(() => { if (store.writeErrors === failedBefore && !store.writeFailed) setToast({ text, kind: 'ok' }); });
+  }, [store]);
+  useEffect(() => { if (!toast) return; const x = setTimeout(() => setToast(null), toast.kind === 'error' ? TOAST_ERROR_MS : TOAST_OK_MS); return () => clearTimeout(x); }, [toast]);
+  useEffect(() => { store.onWriteError = () => setToast({ text: t.storage.writeError, kind: 'error' }); }, [store, t]);
+  // When syncing to the cloud starts failing, say so once (the changes themselves are still saved on this phone).
+  // Buyers still marked with the retired status "Inactive" (from an older version, or from another phone) become Dropped,
+  // with a report. Runs on opening and again whenever a sync brings such a record in; it does nothing otherwise.
+  useEffect(() => { if (inactiveContacts(state.contacts).length) convertInactive(store); }, [state.contacts, store]);
+  const saveState = useSaveState();
+  const lastSaveState = useRef(saveState);
+  useEffect(() => {
+    if (saveState === 'failed-sync' && lastSaveState.current !== 'failed-sync') setToast({ text: saveStrings[lang].syncFailedToast, kind: 'error' });
+    lastSaveState.current = saveState;
+  }, [saveState, lang]);
   useEffect(() => { document.documentElement.lang = htmlLang(lang); }, [lang]);
 
   const go: Go = useCallback((next, opts) => {
@@ -209,6 +245,7 @@ function Shell() {
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
         <UpdateBanner lang={lang} />
+        <SaveStatus lang={lang} />
 
         {alerts.length > 0 && (
           <div className="alerts" role="status" data-testid="reminder-alerts">
@@ -234,8 +271,8 @@ function Shell() {
         {needsStartChoice(state) && <StartChoice lang={lang} />}
 
         {toast && (
-          <div className="toast" role="status">
-            <span>{toast}</span>
+          <div className={toast.kind === 'error' ? 'toast error' : 'toast'} role={toast.kind === 'error' ? 'alert' : 'status'} data-testid="toast" data-kind={toast.kind}>
+            <span>{toast.text}</span>
             <button aria-label={t.c.close} onClick={() => setToast(null)}>✕</button>
           </div>
         )}
@@ -265,7 +302,6 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
   const ls = listingStrings[lang], ag = agendaStrings[lang], cs = contactStrings[lang], gs = gpsStrings[lang];
   switch (s.name) {
     case 'home': return t.appName;
-    case 'news': return t.news;
     case 'notifications': return t.notifications;
     case 'contactsHome': return cs.contacts;
     case 'opportunities': return t.tiles.opportunities;
@@ -295,6 +331,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'profileEdit': return profileStrings[lang].edit;
     case 'nameCard': return profileStrings[lang].sendTitle;
     case 'settings': return profileStrings[lang].setTitle;
+    case 'bugReport': return bugStrings[lang].title;
     case 'expert': return expertStrings[lang].title;
     case 'expertAsk': return expertStrings[lang].experts[s.expert];
     case 'expertThread': { const th = state.expertThreads.find(x => x.id === s.id); return th ? expertStrings[lang].experts[th.expert] : expertStrings[lang].title; }
@@ -308,7 +345,6 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
   const t = strings[lang];
   switch (s.name) {
     case 'home': return <Home lang={lang} go={go} />;
-    case 'news': return <News lang={lang} />;
     case 'notifications': return <Notifications lang={lang} go={go} />;
     case 'contactsHome': return <ContactsHome lang={lang} go={go} />;
     case 'opportunities': return <section className="card stack-sm" data-testid="opportunities"><h2>{t.notBuilt}</h2><p>{t.opportunitiesBody}</p></section>;
@@ -338,7 +374,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'profile': return <ProfileScreen lang={lang} go={go} />;
     case 'profileEdit': return <ProfileEdit lang={lang} back={back} />;
     case 'nameCard': return <NameCardSend lang={lang} />;
-    case 'settings': return <SettingsScreen lang={lang} />;
+    case 'settings': return <SettingsScreen lang={lang} go={go} />;
+    case 'bugReport': return <BugReportScreen lang={lang} from={s.from ?? 'settings'} />;
     case 'expert': return <ExpertHome lang={lang} go={go} />;
     case 'expertAsk': return <ExpertAsk lang={lang} go={(next, o) => go(next, { replace: true, ...o })} expert={s.expert} propertyId={s.propertyId} />;
     case 'expertThread': return <ExpertThreadScreen key={s.id} lang={lang} go={go} id={s.id} />;
@@ -401,38 +438,41 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   );
 }
 
-function News({ lang }: { lang: Lang }) {
-  const n = strings[lang].newsPage;
-  return (
-    <section className="stack">
-      <div className="news-banner">
-        <span className="badge soon-badge fit">{strings[lang].comingSoon}</span>
-        <h2>{n.banner}</h2>
-        <p className="small">{n.sampleOnly}</p>
-      </div>
-      {n.cards.map(([cat, head]) => (
-        <article key={cat} className="card stack-sm">
-          <span className="eyebrow">{cat}</span>
-          <strong>{head}</strong>
-          <small className="muted">{n.sampleOnly}</small>
-        </article>
-      ))}
-      <p className="notice">{n.rule}</p>
-    </section>
-  );
-}
-
+/** Notifications, in two clear sections. System Notifications: reminders and the cloud-sync status. News / Announcements:
+ *  messages published by the owner. Publishing is not built yet, so that section is empty for now; the earlier sample
+ *  News cards are kept under a clearly marked "sample, not live" preview rather than deleted. Push notifications to the
+ *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet. */
 function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
   const t = strings[lang];
+  const ss = saveStrings[lang];
+  const sync = useSaveState();
   const now = Date.now();
   const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
   const perm = permission();
+  const waiting = state.meta.dirty.length;
+  const signedIn = !!state.meta.syncSession;
+  const syncLine = sync === 'failed-phone' ? ss.failedPhone
+    : !signedIn ? null
+      : sync === 'failed-sync' ? t.notif.syncFailed
+        : sync === 'syncing' ? ss.syncing
+          : waiting > 0 ? t.notif.syncWaiting(waiting)
+            : state.meta.lastSync ? t.notif.syncOk(fmtDateTime(state.meta.lastSync, lang)) : null;
+  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? state.meta.leadReview.ids.length : 0;
+  const systemEmpty = soon.length === 0 && !syncLine && review === 0;
+  const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
-      <div className="card stack-sm">
-        <div className="card-title">{t.notif.upcoming}</div>
-        {soon.length === 0 ? <small className="muted">{t.notif.none}</small> : (
+      <div className="card stack-sm" data-testid="notif-system">
+        <div className="card-title">{t.notif.system}</div>
+        {review > 0 && (
+          <button className="link-row" data-testid="notif-lead-review" onClick={() => go({ name: 'contactsHome' })}>
+            <strong>{leadReviewStrings[lang].review}</strong><small className="muted">{leadReviewStrings[lang].notice(review)}</small>
+          </button>
+        )}
+        {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}
+        {syncLine && <div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div>}
+        {soon.length > 0 && (
           <ul className="notif-list">
             {soon.map(r => {
               const x = reminderText(r, state, lang);
@@ -447,6 +487,24 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
           </ul>
         )}
       </div>
+      <div className="card stack-sm" data-testid="notif-news">
+        <div className="card-title">{t.notif.newsTitle}</div>
+        <small className="muted" data-testid="notif-empty-news">{t.notif.empty}</small>
+        <details className="news-sample">
+          <summary>{t.notif.previewTitle}</summary>
+          <div className="stack-sm">
+            <p className="small">{n.banner}</p>
+            {n.cards.map(([cat, head]) => (
+              <article key={cat} className="stack-sm">
+                <span className="eyebrow">{cat}</span>
+                <strong>{head}</strong>
+                <small className="muted">{n.sampleOnly}</small>
+              </article>
+            ))}
+            <p className="notice">{n.rule}</p>
+          </div>
+        </details>
+      </div>
       <div className="card stack-sm coming-soon">
         <div className="between"><div className="card-title">{t.notif.push}</div><span className="badge soon-badge fit">{t.comingSoon}</span></div>
         <small className="muted">{t.notif.pushBody}</small>
@@ -455,7 +513,6 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         <div className="card-title">{t.notif.settings}</div>
         <small className="muted">{t.reminders.note}</small>
         {perm === 'granted' ? <small className="ok-text">{t.reminders.allowed}</small> : perm === 'denied' ? <small className="warn-text">{t.reminders.blocked}</small> : null}
-        <button className="btn secondary" onClick={() => go({ name: 'settings' })}>⚙ {t.tiles.settings}</button>
       </div>
     </section>
   );

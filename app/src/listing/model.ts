@@ -185,9 +185,10 @@ export function phoneDigits(raw?: string): string {
 /** The place name shown on cards: township, else city. */
 export const placeName = (l: Pick<Listing, 'township' | 'city'>) => l.township || l.city || '';
 
-/** Address-style title: unit or lot, street, then township. */
+/** Address-style title: unit number or lot, street, then township. The unit number is shown as it was typed, without
+ *  the word "Unit" in front (owner, 13 Oct 2026). The stored unitNo itself is never changed. */
 export function title(l: Listing): string {
-  const head = l.unitNo ? `Unit ${l.unitNo}` : l.lotNo ? `Lot ${l.lotNo}` : '';
+  const head = l.unitNo ? l.unitNo : l.lotNo ? `Lot ${l.lotNo}` : '';
   return [head, l.street, placeName(l)].filter(Boolean).join(', ');
 }
 export const cardTitle = (l: Listing) => l.headline || title(l);

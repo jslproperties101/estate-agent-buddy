@@ -31,6 +31,12 @@ export class Store {
   private fileUrls = new Map<string, string>();
   /** Called when a write to storage fails, so the screen can say so. */
   onWriteError: (e: unknown) => void = () => {};
+  /** How many writes to the phone's storage have failed since the app opened. A screen that wants to say "Saved" waits
+   *  for flush() and checks that this number did not go up, so a failed save is never reported as saved. */
+  writeErrors = 0;
+  /** True from a failed write until the next write succeeds (shown as "not saved" in the status line). */
+  writeFailed = false;
+  private cloudBusy = false;
 
   private constructor(private backend: Backend, state: AppState) { this.state = state; }
 
@@ -55,8 +61,15 @@ export class Store {
 
   private emit() { for (const l of this.listeners) l(); }
   private write(op: () => Promise<void>) {
-    this.queue = this.queue.then(op).catch(e => this.onWriteError(e));
+    this.queue = this.queue.then(op).then(
+      () => { if (this.writeFailed) { this.writeFailed = false; this.emit(); } },
+      e => { this.writeErrors++; this.writeFailed = true; this.emit(); this.onWriteError(e); },
+    );
   }
+
+  /** True while a cloud sync is running. Only the sync code sets it. */
+  get syncing() { return this.cloudBusy; }
+  setSyncing(busy: boolean) { if (this.cloudBusy !== busy) { this.cloudBusy = busy; this.emit(); } }
   /** Resolves when every change so far has been written (used by tests and before a sync). */
   flush() { return this.queue; }
 

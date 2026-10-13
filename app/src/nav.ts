@@ -8,7 +8,6 @@ export type FormSection =
 
 export type Screen =
   | { name: 'home' }
-  | { name: 'news' }
   | { name: 'notifications' }
   | { name: 'contactsHome' }
   | { name: 'opportunities' }
@@ -38,11 +37,12 @@ export type Screen =
   | { name: 'profileEdit' }
   | { name: 'nameCard' }
   | { name: 'settings' }
+  | { name: 'bugReport'; from?: string }
   | { name: 'expert' }
   | { name: 'expertAsk'; expert: ExpertKey; propertyId?: string }
   | { name: 'expertThread'; id: string }
   | { name: 'voice' }
-  | { name: 'comingSoon'; key: 'subsale' | 'project' | 'cobrokeMap' }
+  | { name: 'comingSoon'; key: 'subsale' | 'project' | 'market' | 'cobrokeMap' }
   | { name: 'cobroke' };
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */

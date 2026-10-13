@@ -4,7 +4,7 @@ import type { Lang } from '../i18n';
 const en = {
   vendors: 'Vendors', buyers: 'Buyers', contacts: 'Contacts',
   countPeople: (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`, hotCount: (n: number) => `${n} hot`, waitingCount: (n: number) => `${n} waiting on you`,
-  hubNote: 'Buyers and tenants use the lead colours (Cold, Warm, Hot, Dropped, Inactive). Vendors and landlords have their own status: Pending Property Info, Pending Follow-up, Listed and so on.',
+  hubNote: 'Buyers and tenants use the lead colours (Cold, Warm, Hot, Dropped, Booked / Bought). Vendors and landlords have their own status: Pending Property Info, Pending Follow-up, Listed and so on.',
   addVendor: '+ New vendor', addBuyer: '+ New buyer',
   search: 'Search name, phone, company',
   none: 'No contacts yet.',
@@ -42,7 +42,7 @@ export type ContactStrings = typeof en;
 const bm: ContactStrings = {
   vendors: 'Penjual', buyers: 'Pembeli', contacts: 'Kenalan',
   countPeople: (n: number) => `${n} orang`, hotCount: (n: number) => `${n} panas`, waitingCount: (n: number) => `${n} menunggu tindakan`,
-  hubNote: 'Pembeli dan penyewa menggunakan warna prospek (Sejuk, Suam, Panas, Digugurkan, Tidak aktif). Penjual dan tuan rumah mempunyai status sendiri: Menunggu Maklumat Hartanah, Menunggu Susulan, Disenaraikan dan lain-lain.',
+  hubNote: 'Pembeli dan penyewa menggunakan warna prospek (Sejuk, Suam, Panas, Digugurkan, Ditempah / Dibeli). Penjual dan tuan rumah mempunyai status sendiri: Menunggu Maklumat Hartanah, Menunggu Susulan, Disenaraikan dan lain-lain.',
   addVendor: '+ Penjual baharu', addBuyer: '+ Pembeli baharu',
   search: 'Cari nama, telefon, syarikat',
   none: 'Belum ada kenalan.',
@@ -79,7 +79,7 @@ const bm: ContactStrings = {
 const zh: ContactStrings = {
   vendors: '卖家', buyers: '买家', contacts: '联系人',
   countPeople: (n: number) => `${n} 人`, hotCount: (n: number) => `${n} 位热门`, waitingCount: (n: number) => `${n} 位待处理`,
-  hubNote: '买家和租客使用客户热度颜色（冷、温、热、已放弃、不活跃）。卖家和房东有自己的状态：待补房产资料、待跟进、已上架等。',
+  hubNote: '买家和租客使用客户热度颜色（冷、温、热、已放弃、已预订 / 已购买）。卖家和房东有自己的状态：待补房产资料、待跟进、已上架等。',
   addVendor: '+ 新卖家', addBuyer: '+ 新买家',
   search: '搜索姓名、电话、公司',
   none: '还没有联系人。',

@@ -1,5 +1,5 @@
 // Contacts (one dashboard card) → Buyers or Vendors (one contact list, two views), contact page and contact form.
-// Buyers keep the lead colours: Blue = Cold, Yellow = Warm, Red = Hot, Green = Dropped, Gray = Inactive.
+// Buyers keep the lead colours: Blue = Cold, Yellow = Warm, Red = Hot, Gray = Dropped, Green = Booked / Bought.
 // Vendors have their own status system (Pending Property Info, Pending Follow-up, Listed, …), kept separate.
 import { useMemo, useState } from 'react';
 import { Lang, strings } from '../i18n';
@@ -20,16 +20,19 @@ import { fmtDate } from '../lib/dates';
 import { pickPhoneContacts, phonebookSupported, phonebookProblem, PickedContact } from '../lib/phonebook';
 import { useToast } from '../ui/toast';
 import { PhonebookButton } from '../ui/PhonebookButton';
+import { leadReviewStrings } from '../data/leadReviewStrings';
+import { reviewContacts } from '../data/leadReview';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
 
 /** The Contacts dashboard card: Buyers and Vendors. */
 export function ContactsHome({ lang, go }: { lang: Lang; go: Go }) {
-  const { state } = useApp();
+  const { state, store } = useApp();
   const s = contactStrings[lang];
   const buyers = state.contacts.filter(c => inRole(c, 'buyer'));
   const vendors = state.contacts.filter(c => inRole(c, 'vendor'));
   const hot = buyers.filter(c => c.leadStatus === 'hot').length;
+  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids) : [];
   const waiting = vendors.filter(c => c.vendorStatus === 'pending_info' || c.vendorStatus === 'pending_follow_up').length;
   return (
     <section className="stack" data-testid="contacts-home">
@@ -45,6 +48,18 @@ export function ContactsHome({ lang, go }: { lang: Lang; go: Go }) {
           <small className="muted">{s.countPeople(vendors.length)}{waiting ? ` · ${s.waitingCount(waiting)}` : ''}</small>
         </button>
       </div>
+      {review.length > 0 && (
+        <div className="card stack-sm" data-testid="lead-review">
+          <div className="card-title">{leadReviewStrings[lang].title}</div>
+          <p className="small">{leadReviewStrings[lang].body(review.length)}</p>
+          <ul className="notif-list">
+            {review.map(c => (
+              <li key={c.id}><button className="link-row" data-testid="lead-review-item" onClick={() => go({ name: 'contactDetail', id: c.id })}><strong>{c.name}</strong></button></li>
+            ))}
+          </ul>
+          <button className="btn secondary" data-testid="lead-review-done" onClick={() => store.setSingleton('meta', { leadReview: { ...state.meta.leadReview!, reviewed: true } })}>{leadReviewStrings[lang].reviewed}</button>
+        </div>
+      )}
       <small className="muted">{s.hubNote}</small>
     </section>
   );
@@ -69,8 +84,8 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
 
   async function importPhone() {
     let picked: PickedContact[] | null;
-    try { picked = await pickPhoneContacts(true); } catch (e) { const pr = phonebookProblem(e); toast(pr === 'denied' ? s.pickDenied : pr === 'plugin-missing' ? s.pluginMissing : s.importUnsupported); return; }
-    if (picked === null) { toast(s.importUnsupported); return; }
+    try { picked = await pickPhoneContacts(true); } catch (e) { const pr = phonebookProblem(e); toast(pr === 'denied' ? s.pickDenied : pr === 'plugin-missing' ? s.pluginMissing : s.importUnsupported, 'error'); return; }
+    if (picked === null) { toast(s.importUnsupported, 'error'); return; }
     let added = 0, skipped = 0;
     for (const p of picked) {
       const tel = normalisePhone(p.tel);

@@ -72,8 +72,16 @@ interface Row { collection: string; id: string; data: Record<string, unknown> | 
 
 export interface SyncResult { pushed: number; pulled: number; removed: number }
 
+/** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
+ *  "Synced" after the cloud really answered. */
 export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch): Promise<SyncResult> {
   if (!configured(cfg)) throw new SyncError('not-configured');
+  if (!store.getState().meta.syncSession) throw new SyncError('not-signed-in');
+  store.setSyncing(true);
+  try { return await syncOnce(store, cfg, fetchFn); } finally { store.setSyncing(false); }
+}
+
+async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn): Promise<SyncResult> {
   const start = store.getState().meta;
   if (!start.syncSession) throw new SyncError('not-signed-in');
   let session = await fresh(cfg, start.syncSession, fetchFn);

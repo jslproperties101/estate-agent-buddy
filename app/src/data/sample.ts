@@ -102,7 +102,7 @@ export function sampleData(now = Date.now()) {
     c('b2', 'Buyer L (sample)', ['buyer'], { phone: '+60 13-333 4444', leadStatus: 'warm', source: 'Referral' }),
     c('b3', 'Tenant M (sample)', ['tenant'], { phone: '+60 17-555 6666', leadStatus: 'cold', source: 'Mudah' }),
     c('b4', 'Investor N (sample)', ['investor'], { phone: '+60 19-777 8888', leadStatus: 'dropped' }),
-    c('b5', 'Buyer O (sample)', ['buyer'], { leadStatus: 'inactive' }),
+    c('b5', 'Buyer O (sample)', ['buyer'], { leadStatus: 'booked' }),
     c('b6', 'Tenant R (sample)', ['tenant'], { phone: '+60 16-404 5050', leadStatus: 'hot', source: 'Facebook', notes: 'Needs a 20,000 sq ft factory near KLIA within 2 months.' }),
     c('e1', 'Lawyer P (sample)', ['professional'], { profession: 'lawyer', phone: '+60 3-2222 1111', company: 'Messrs P & Co (sample)' }),
     c('e2', 'Banker Q (sample)', ['professional'], { profession: 'banker', phone: '+60 12-999 0000', company: 'Bank Q (sample)' }),

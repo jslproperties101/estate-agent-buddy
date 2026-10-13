@@ -14,6 +14,7 @@ const DIST = new URL('../dist/', import.meta.url).pathname;
 const SHOTS = new URL('./screens/', import.meta.url).pathname;
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.map': 'application/json' };
 let server, browser, base;
+const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 const external = [];
 const consoleErrors = [];
 
@@ -124,17 +125,17 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard: Estate Agent AI Buddy, 15 cards in 3 × 5 (Contacts, News, Voice Command = 15), Notifications and Co-broke (Coming Soon) at the top', async () => {
+test('U1 dashboard: Estate Agent AI Buddy, the approved 15 cards in 3 × 5 (Subsale, Project, Market Intelligence Coming Soon; Voice Command = 15), Notifications and Co-broke (Coming Soon) at the top', async () => {
   const page = await phone();
   assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent AI Buddy');
   assert.equal(await page.title(), 'Estate Agent AI Buddy');
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
-  // Owner, 13 Oct 2026: Buyers + Vendors → one Contacts card; Subsale → News; Co-broke → top bar; Voice Command = 15.
+  // Owner, 13 Oct 2026 (approved arrangement): Settings lives inside Agent Profile, News inside Notifications.
   assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Property List', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
-    'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'News',
-    'Project (Coming Soon)', 'Settings', 'Voice Command']);
+    'Agent Financial', 'Property Calculator', 'Agent Profile', 'Ask Expert', 'Subsale (Coming Soon)',
+    'Project (Coming Soon)', 'Market Intelligence (Coming Soon)', 'Voice Command']);
   assert.equal(names.indexOf('Voice Command') + 1, 15, 'Voice Command is card 15');
-  for (const gone of ['Buyer List', 'Vendor List', 'Subsale (Coming Soon)', 'Co-broke']) assert.ok(!names.includes(gone), `no ${gone} card`);
+  for (const gone of ['Buyer List', 'Vendor List', 'News', 'Settings', 'Co-broke']) assert.ok(!names.includes(gone), `no ${gone} card`);
   assert.equal(await page.locator('nav.grid > button.voice-tile').getAttribute('data-tile'), '15', 'the bright-gold Voice Command card is number 15');
   // Top bar: Co-broke Opportunities (Coming Soon) and Notifications (the old Big News button).
   assert.equal(await page.getByTestId('top-cobroke').getAttribute('aria-label'), 'Co-broke Opportunities (Coming Soon)');
@@ -146,8 +147,8 @@ test('U1 dashboard: Estate Agent AI Buddy, 15 cards in 3 × 5 (Contacts, News, V
   await page.getByTestId('top-cobroke').click();
   assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/);
   await home(page);
-  await tile(page, 'News');
-  assert.match(await page.locator('main').innerText(), /Coming Soon/, 'News content is marked as not live');
+  await tile(page, 'Market Intelligence');
+  assert.match(await page.getByTestId('soon-market').innerText(), /Coming Soon[\s\S]*lawful and reliable source[\s\S]*Nothing here is live/, 'Market Intelligence is honest: no feed is pretended');
   await home(page);
   await tile(page, 'Contacts');
   assert.deepEqual(await page.locator('.hub-card strong').allInnerTexts(), ['Buyers', 'Vendors']);
@@ -393,12 +394,12 @@ test('U9 inquiries and viewings are separate; Convert to Viewing moves it as Pen
   await page.context().close();
 });
 
-test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Green Dropped, Gray Inactive', async () => {
+test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Gray Dropped, Green Booked / Bought', async () => {
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Buyer List');
   const colours = await page.locator('[role="radiogroup"] .lead-dot').evaluateAll(d => d.map(x => getComputedStyle(x).backgroundColor));
-  assert.deepEqual(colours, ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(34, 197, 94)', 'rgb(156, 163, 175)']);
+  assert.deepEqual(colours, ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)', 'rgb(34, 197, 94)']);
   const hot = page.locator('[data-testid="contact-row"][data-lead="hot"]').first();
   assert.equal(await hot.evaluate(el => getComputedStyle(el).borderLeftColor), 'rgb(239, 68, 68)');
   await page.getByRole('radio', { name: /Warm/ }).click();
@@ -827,9 +828,11 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await page.context().close();
 });
 
-test('U25 Coming Soon: Project card and Co-broke (top bar) say so; Co-broke lists real co-broke properties only; no Subsale card', async () => {
+test('U25 Coming Soon: Subsale, Project and Co-broke (top bar) say so; Co-broke lists real co-broke properties only', async () => {
   const page = await phone();
-  assert.equal(await page.locator('nav.grid > button', { hasText: 'Subsale' }).count(), 0, 'Subsale became News');
+  await tile(page, 'Subsale');
+  assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/);
+  await home(page);
   await tile(page, 'Project');
   assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/);
   await home(page); await page.getByTestId('top-cobroke').click();
@@ -963,6 +966,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const SB = 'https://demo-project.supabase.co';
   let mode = 'ok';
+  let bugMode = 'ok';
   const seen = [];
   await ctx.route(`${SB}/**`, async route => {
     const req = route.request();
@@ -987,6 +991,10 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
     if (u.pathname === '/rest/v1/eab_members') return json([{ user_id: 'u-owner', email: 'agent.j@gmail.com', role: 'owner', active: true, created_at: '2026-10-12' }, { user_id: 'u-b', email: 'nego.b@gmail.com', role: 'agent', active: true, created_at: '2026-10-12' }]);
     if (u.pathname === '/rest/v1/eab_invites' || u.pathname === '/rest/v1/eab_audit' || u.pathname === '/rest/v1/eab_records') return req.method() === 'POST' ? route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' }) : json([]);
     if (u.pathname.startsWith('/rest/v1/rpc/')) return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    if (u.pathname === '/rest/v1/eab_bug_reports' || u.pathname.startsWith('/storage/v1/object/bug-reports/')) {
+      if (bugMode === 'fail') return route.fulfill({ status: 500, headers: { 'access-control-allow-origin': '*' }, body: 'boom' });
+      return route.fulfill({ status: 201, headers: { 'access-control-allow-origin': '*' }, body: '' });
+    }
     if (u.pathname === '/auth/v1/logout') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' }, body: '' });
     return route.fulfill({ status: 404, body: '' });
   });
@@ -1025,6 +1033,29 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   assert.ok(seen.includes('POST /rest/v1/rpc/eab_invite'));
   assert.ok(seen.some(x => x === 'GET /rest/v1/eab_records'), 'synced after sign-in');
   await shot(page, '28b-account-team', false);
+  // Save status: signed in, nothing waiting, and the (stand-in) cloud answered the sync: "Synced", not just "Saved".
+  await page.locator('[data-testid="save-status"][data-state="synced"]').waitFor({ timeout: 5000 });
+  assert.equal((await page.getByTestId('save-status').innerText()).trim(), 'Synced');
+  // Easy Bug Report while signed in: screenshot + description are sent, and success is shown only after the service accepted them.
+  await page.getByTestId('open-bug-report').click();
+  await page.getByTestId('bug-file').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await page.getByTestId('bug-preview').waitFor();
+  await page.getByTestId('bug-desc').fill('The calendar did not open.');
+  bugMode = 'fail';
+  await page.getByTestId('bug-send').click();
+  await page.getByTestId('bug-fail').waitFor();
+  assert.equal(await page.getByTestId('bug-fail').getAttribute('data-reason'), 'server');
+  assert.equal(await page.getByTestId('bug-sent').count(), 0, 'no success message after a failure');
+  assert.equal(await page.getByTestId('bug-desc').inputValue(), 'The calendar did not open.', 'the description is kept');
+  assert.equal(await page.getByTestId('bug-preview').count(), 1, 'the screenshot is kept');
+  bugMode = 'ok';
+  await page.getByTestId('bug-send').click();
+  await page.getByTestId('bug-sent').waitFor();
+  assert.match(await page.getByTestId('bug-sent').innerText(), /Your report was sent/);
+  assert.ok(seen.some(x => /^POST \/storage\/v1\/object\/bug-reports\/u-owner\/[0-9a-f-]{36}\.jpg$/.test(x)), 'screenshot went to the private bucket under the person’s own folder');
+  assert.ok(seen.includes('POST /rest/v1/eab_bug_reports'));
+  await page.locator('header .icon-btn').first().click();   // back to Settings
+  await page.getByTestId('settings').waitFor();
   // Still signed in after closing and reopening.
   await page.reload(); await page.waitForSelector('nav.grid');
   // Sign out: back to the sign-in screen; records stay on the phone.
@@ -1253,12 +1284,12 @@ test('U34 new user: Populate with Sample Data (recommended) or Start Without; sa
   await page.context().close();
 });
 
-test('U35 vendors have their own status (Pending Property Info, Pending Follow-up…); buyers keep Cold/Warm/Hot/Dropped/Inactive', async () => {
+test('U35 vendors have their own status (Pending Property Info, Pending Follow-up…); buyers use Cold/Warm/Hot/Dropped/Booked / Bought', async () => {
   const page = await phone({ start: 'sample' });
   await tile(page, 'Vendor List');
   const vs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
   assert.deepEqual(vs, ['Pending Property Info', 'Pending Follow-up', 'Listed', 'Negotiating', 'On Hold', 'Closed (Sold / Rented)', 'Withdrawn']);
-  for (const old of ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive']) assert.ok(!vs.includes(old), `no ${old} for vendors`);
+  for (const old of ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive', 'Booked / Bought']) assert.ok(!vs.includes(old), `no ${old} for vendors`);
   await page.getByTestId('status-filter').locator('[data-status="pending_follow_up"]').click();
   const rows = await page.getByTestId('contact-row').count();
   assert.ok(rows >= 1);
@@ -1267,7 +1298,8 @@ test('U35 vendors have their own status (Pending Property Info, Pending Follow-u
   assert.equal(await page.getByTestId('vendor-status-picker').locator('[aria-checked="true"]').getAttribute('data-vstat'), 'pending_info');
   await home(page); await tile(page, 'Buyer List');
   const bs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
-  assert.deepEqual(bs, ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive']);
+  assert.deepEqual(bs, ['Cold', 'Warm', 'Hot', 'Dropped', 'Booked / Bought']);
+  assert.ok(!bs.includes('Inactive'), 'Inactive is not a buyer filter any more');
   await shot(page, '35-buyers', false);
   await page.context().close();
 });
@@ -1374,18 +1406,281 @@ test('U38 GPS: My Location gets a fresh position every time (even when live upda
   await ctx.close();
 });
 
-test('U39 startup: the logo spins for about one second, then the app opens', async () => {
+test('U39 startup: readiness-driven, not a timer: the app opens as soon as the phone storage is ready, with a truthful line', async () => {
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
   const page = await ctx.newPage();
   const t0 = Date.now();
   await page.goto(base);
   await page.getByTestId('startup-logo').waitFor({ state: 'attached', timeout: 2000 });
-  assert.match(await page.locator('.intro .logo-img').evaluate(e => getComputedStyle(e).animationName), /intro-spin/);
   await page.getByTestId('startup-logo').waitFor({ state: 'detached', timeout: 3000 });
   const took = Date.now() - t0;
-  assert.ok(took >= 900 && took < 2500, `about one second (${took} ms)`);
+  assert.ok(took < 2000, `ready without a deliberate wait (${took} ms; the old fixed 1 second is gone)`);
   await page.waitForSelector('nav.grid');
   await ctx.close();
+});
+
+test('U40 startup: slow storage says so after about five seconds, and Try again recovers (never an indefinite silent splash)', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
+  await ctx.addInitScript(() => {
+    window.__hang = true;
+    const real = indexedDB.open.bind(indexedDB);
+    indexedDB.open = (...a) => (window.__hang ? {} : real(...a));   // a request that never answers
+  });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  await page.goto(base);
+  await page.getByTestId('startup-msg').waitFor();
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Opening your data on this phone/);
+  assert.equal(await page.getByTestId('startup-logo').getAttribute('data-phase'), 'opening');
+  await page.locator('[data-testid="startup-logo"][data-phase="slow"]').waitFor({ timeout: 8000 });
+  const took = Date.now() - t0;
+  assert.ok(took >= 4500 && took < 7500, `the notice comes at about five seconds (${took} ms)`);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /taking longer than usual\. Your saved data has not been changed/);
+  assert.ok(!/encrypt|secur|AI update/i.test(await page.getByTestId('startup-logo').innerText()), 'no untrue claims');
+  await page.evaluate(() => { window.__hang = false; });
+  await page.getByTestId('startup-retry').click();
+  await page.waitForSelector('nav.grid');
+  await page.getByTestId('startup-logo').waitFor({ state: 'detached' });
+  await ctx.close();
+});
+
+test('U41 startup: a storage that cannot be read ends in a clear message with Try again, and nothing is changed', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
+  await ctx.addInitScript(() => {
+    window.__fail = true;
+    const real = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (...a) { if (window.__fail) throw new Error('simulated storage failure'); return real.apply(this, a); };
+  });
+  const page = await ctx.newPage();
+  await page.goto(base);
+  await page.locator('[data-testid="startup-logo"][data-phase="failed"]').waitFor({ timeout: 4000 });
+  assert.match(await page.getByTestId('startup-msg').innerText(), /could not be opened\. Nothing was changed or deleted/);
+  assert.equal(await page.getByTestId('startup-msg').getAttribute('role'), 'alert');
+  assert.equal(await page.locator('nav.grid').count(), 0, 'the dashboard is not shown over a store that failed to open');
+  await page.evaluate(() => { window.__fail = false; });
+  await page.getByTestId('startup-retry').click();
+  await page.waitForSelector('nav.grid');
+  await ctx.close();
+});
+
+test('U42 startup message follows the phone language (Bahasa Malaysia)', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, locale: 'ms-MY' });
+  await ctx.addInitScript(() => { window.__hang = true; const real = indexedDB.open.bind(indexedDB); indexedDB.open = (...a) => (window.__hang ? {} : real(...a)); });
+  const page = await ctx.newPage();
+  await page.goto(base);
+  await page.getByTestId('startup-msg').waitFor();
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Membuka data anda dalam telefon ini/);
+  await ctx.close();
+});
+
+test('U43 save confirmation: "Saved on this phone." appears after the write and goes after two seconds; a failed write shows an error, never success', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => {
+    window.__failWrites = false;
+    const real = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...a) { if (window.__failWrites) throw new Error('simulated disk full'); return real.apply(this, a); };
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'phone');
+  assert.match(await page.getByTestId('save-status').innerText(), /Saved on this phone/);
+  // Good save: the message shows, then goes in about two seconds.
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Timing Buyer');
+  await page.getByTestId('save-contact').click();
+  const toast = page.getByTestId('toast');
+  await toast.waitFor();
+  const t0 = Date.now();
+  assert.equal(await toast.getAttribute('data-kind'), 'ok');
+  assert.match(await toast.innerText(), /Saved on this phone\./);
+  await toast.waitFor({ state: 'detached', timeout: 4000 });
+  const shown = Date.now() - t0;
+  assert.ok(shown >= 1500 && shown <= 2800, `the success message stays about two seconds (${shown} ms), not four`);
+  // Failed save: the phone's storage refuses the write.
+  await page.evaluate(() => { window.__failWrites = true; });
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Not Saved Buyer');
+  await page.getByTestId('save-contact').click();
+  await page.locator('[data-testid="toast"][data-kind="error"]').waitFor();
+  assert.match(await page.getByTestId('toast').innerText(), /Could not save to the phone’s storage/);
+  await page.waitForTimeout(400);
+  assert.equal(await page.getByText('Saved on this phone.', { exact: true }).count(), 0, 'no success message after a failed write');
+  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'failed-phone');
+  assert.equal(await page.getByTestId('save-status').getAttribute('role'), 'alert');
+  // An error message stays longer than a success message.
+  const e0 = Date.now();
+  await page.getByTestId('toast').waitFor({ state: 'detached', timeout: 9000 });
+  assert.ok(Date.now() - e0 > 2500, 'an error is not as brief as a success');
+  // Recovered.
+  await page.evaluate(() => { window.__failWrites = false; });
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.locator('[data-field="name"]').fill('Saved Again');
+  await page.getByTestId('save-contact').click();
+  await page.locator('[data-testid="toast"][data-kind="ok"]').waitFor();
+  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'phone');
+  await ctx.close();
+});
+
+test('U44 Notifications: System Notifications and News / Announcements sections, the exact empty wording, sample News kept and marked, no push claim', async () => {
+  const page = await phone();
+  await page.getByTestId('top-notifications').click();
+  await page.getByTestId('notifications').waitFor();
+  assert.deepEqual(await page.locator('[data-testid="notifications"] .card-title').allInnerTexts(), ['System Notifications', 'News / Announcements', 'Push messages', 'Notification settings']);
+  const empty = 'You\'re all caught up — we\'ll let you know when there\'s something important.';
+  assert.equal(await page.getByTestId('notif-empty-system').innerText(), empty);
+  assert.equal(await page.getByTestId('notif-empty-news').innerText(), empty);
+  // The earlier News content is kept, under a clear "sample, not live" heading, inside Notifications.
+  await page.getByTestId('notif-news').locator('summary').click();
+  assert.match(await page.getByTestId('notif-news').innerText(), /not live[\s\S]*Property market/i);
+  // Push messages are not claimed to work.
+  assert.match(await page.locator('.coming-soon').innerText(), /Coming Soon[\s\S]*not set up yet/);
+  await shot(page, '44-notifications', false);
+  // A reminder coming up appears under System Notifications.
+  await home(page); await tile(page, 'To-Do');
+  await page.getByRole('button', { name: '+ New to-do' }).click();
+  await page.locator('[data-field="title"]').fill('Call the lawyer');
+  const soon = new Date(Date.now() + 2 * 86_400_000); const ymd = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+  await page.locator('[data-field="due"]').fill(ymd);
+  await page.getByTestId('reminders').getByRole('button', { name: '1 day before' }).click();
+  await page.getByTestId('save-task').click();
+  await home(page);
+  await page.getByTestId('top-notifications').click();
+  assert.match(await page.getByTestId('notif-system').innerText(), /Call the lawyer/);
+  assert.equal(await page.getByTestId('notif-empty-system').count(), 0, 'not empty any more');
+  await page.context().close();
+});
+
+test('U45 Settings sits inside Agent Profile and starts with the Easy Bug Report; the wording is approved; screenshot preview and removal; failure keeps the report', async () => {
+  const page = await phone();
+  assert.equal(await page.locator('nav.grid > button', { hasText: /^Settings/ }).count(), 0, 'no Settings card on the dashboard');
+  await tile(page, 'Agent Profile');
+  await page.getByRole('button', { name: /Settings/ }).click();
+  const first = await page.locator('[data-testid="settings"] > .card').first().getAttribute('data-testid');
+  assert.equal(first, 'bug-entry', 'Easy Bug Report is the first item in Settings');
+  await shot(page, '45a-settings-bug-entry', false);
+  await page.getByTestId('open-bug-report').click();
+  const intro = await page.getByTestId('bug-intro').innerText();
+  assert.ok(intro.includes('Found a problem? No worries — it’s as easy as 1-2-3.'));
+  assert.deepEqual(await page.locator('.bug-steps li').allInnerTexts(), ['Screenshot.', 'Brief description.', 'Send.']);
+  assert.ok(intro.includes('We’ll look into it and improve your experience.'));
+  // Description is needed.
+  await page.getByTestId('bug-send').click();
+  assert.match(await page.getByTestId('bug-fail').innerText(), /write a short description/);
+  // Screenshot: preview, remove, add again.
+  await page.getByTestId('bug-file').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await page.getByTestId('bug-preview').waitFor();
+  await page.getByTestId('bug-remove').click();
+  assert.equal(await page.getByTestId('bug-preview').count(), 0, 'removed');
+  await page.getByTestId('bug-file').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+  assert.equal(await page.getByTestId('bug-fail').getAttribute('data-reason'), 'badImage', 'a non-image is refused with a reason');
+  await page.getByTestId('bug-file').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await page.getByTestId('bug-preview').waitFor();
+  await page.getByTestId('bug-desc').fill('Voice button does nothing.');
+  await shot(page, '45b-bug-report', true);
+  // Nothing is set up on this phone: the report is NOT sent, and it says so (never a false success). Nothing leaves the phone.
+  await page.getByTestId('bug-send').click();
+  assert.equal(await page.getByTestId('bug-fail').getAttribute('data-reason'), 'notConfigured');
+  assert.match(await page.getByTestId('bug-fail').innerText(), /was not sent[\s\S]*still here/);
+  assert.equal(await page.getByTestId('bug-sent').count(), 0);
+  assert.equal(await page.getByTestId('bug-desc').inputValue(), 'Voice button does nothing.');
+  assert.equal(await page.getByTestId('bug-preview').count(), 1);
+  await page.context().close();
+});
+
+test('U46 Easy Bug Report in Bahasa Malaysia and Chinese: every new label is translated', async () => {
+  const page = await phone();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.locator('.lang button[aria-label="Bahasa Malaysia"]').click();
+  assert.equal(await page.getByTestId('bug-entry').locator('.card-title').innerText(), 'Lapor Pepijat Mudah');
+  await page.getByTestId('open-bug-report').click();
+  assert.match(await page.getByTestId('bug-intro').innerText(), /Jumpa masalah\? Jangan risau — semudah 1-2-3\./);
+  await page.getByTestId('bug-send').click();
+  assert.match(await page.getByTestId('bug-fail').innerText(), /Sila tulis penerangan ringkas/);
+  await page.locator('.lang button[aria-label="中文"]').click();
+  assert.match(await page.getByTestId('bug-intro').innerText(), /发现问题了/);
+  await home(page);
+  await page.getByTestId('top-notifications').click();
+  assert.match(await page.getByTestId('notif-empty-news').innerText(), /您已查看全部/);
+  await page.locator('.lang button[aria-label="Bahasa Malaysia"]').click();
+  assert.match(await page.getByTestId('notif-empty-news').innerText(), /Anda sudah mengikuti semuanya/);
+  await page.context().close();
+});
+
+test('U47 old Inactive buyers become Dropped (gray), with a reviewable report; nothing else about them changes', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  // Put an old-version record straight into the phone's storage, then reopen the app.
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy', 1);
+    r.onsuccess = () => {
+      const tx = r.result.transaction('records', 'readwrite');
+      tx.objectStore('records').put({ id: 'old1', created: 1, updated: 1, name: 'Old Inactive Buyer', phone: '+60 12-000 1111', notes: 'Keep these notes', roles: ['buyer'], leadStatus: 'inactive' }, 'c:contacts:old1');
+      tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Contacts');
+  await page.getByTestId('lead-review').waitFor();
+  assert.match(await page.getByTestId('lead-review').innerText(), /Inactive is no longer used as a buyer status\. 1 buyer was marked Inactive, so it was moved to Dropped/);
+  assert.deepEqual(await page.getByTestId('lead-review-item').allInnerTexts(), ['Old Inactive Buyer']);
+  await shot(page, '47a-lead-review', false);
+  // It is also listed under System Notifications.
+  await home(page); await page.getByTestId('top-notifications').click();
+  assert.match(await page.getByTestId('notif-lead-review').innerText(), /1 buyer moved from Inactive to Dropped/);
+  await home(page); await tile(page, 'Buyer List');
+  const row = page.locator('[data-testid="contact-row"][data-lead="dropped"]');
+  assert.equal(await row.count(), 1);
+  assert.equal(await row.locator('.lead-dot').first().evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(156, 163, 175)', 'Dropped is gray');
+  assert.equal(await page.getByTestId('status-filter').locator('[data-status="inactive"]').count(), 0);
+  await row.locator('.row-main').click();
+  assert.match(await page.locator('main').innerText(), /Keep these notes/);
+  assert.match(await page.locator('main').innerText(), /\+60 12-000 1111/);
+  // Reviewed: the report goes away; the contact stays.
+  await home(page); await tile(page, 'Contacts');
+  await page.getByTestId('lead-review-done').click();
+  assert.equal(await page.getByTestId('lead-review').count(), 0);
+  await page.reload(); await page.waitForSelector('nav.grid'); await tile(page, 'Contacts');
+  assert.equal(await page.getByTestId('lead-review').count(), 0, 'stays reviewed after reopening');
+  await ctx.close();
+});
+
+test('U48 Booked / Bought is green and can be chosen; new sample data has no Inactive buyer', async () => {
+  const page = await phone({ start: 'sample' });
+  await tile(page, 'Buyer List');
+  assert.equal(await page.getByTestId('status-filter').locator('[data-status="booked"]').count(), 1);
+  await page.getByTestId('status-filter').locator('[data-status="booked"]').click();
+  const rows = page.locator('[data-testid="contact-row"][data-lead="booked"]');
+  assert.ok(await rows.count() >= 1);
+  assert.equal(await rows.first().evaluate(el => getComputedStyle(el).borderLeftColor).catch(() => ''), await rows.first().evaluate(el => getComputedStyle(el).borderLeftColor));
+  assert.equal(await rows.first().locator('.lead-dot').first().evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(34, 197, 94)');
+  assert.equal(await page.locator('[data-lead="inactive"]').count(), 0);
+  await page.context().close();
+});
+
+test('U49 property cards: no "Unit" prefix on any card or view, and the stored unit number is still there', async () => {
+  const page = await phone();
+  await tile(page, 'Property List');
+  await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
+  await page.locator('[data-field="unitNo"]').fill('12A');
+  await page.locator('[data-field="street"]').fill('Jalan Prefix Test');
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  assert.doesNotMatch(await page.locator('main').innerText(), /\bUnit 12A\b/, 'detail page');
+  assert.match(await page.locator('header h1').innerText(), /^12A, Jalan Prefix Test$/);
+  await home(page); await tile(page, 'Property List');
+  assert.equal(await page.getByTestId('listing-card').count(), 1);
+  assert.match(await page.getByTestId('listing-card').first().innerText(), /12A, Jalan Prefix Test/);
+  assert.doesNotMatch(await page.getByTestId('listing-card').first().innerText(), /\bUnit\b/, 'list card');
+  await home(page);
+  assert.doesNotMatch(await page.locator('.photo-cards').innerText().catch(() => ''), /\bUnit\b/, 'dashboard recent card');
+  // The stored value is untouched: the unit number is saved exactly as typed.
+  const stored = await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy', 1);
+    r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').getAll(); g.onsuccess = () => resolve(g.result.filter(x => x && x.unitNo).map(x => x.unitNo)); g.onerror = () => reject(g.error); };
+  }));
+  assert.deepEqual(stored, ['12A']);
+  await page.context().close();
 });
 
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {

@@ -225,7 +225,7 @@ label.btn { position: relative; cursor: pointer; }
 .flash { animation: flash 1.6s ease-out; }
 @keyframes flash { 0% { box-shadow: 0 0 0 3px var(--gold); } 100% { box-shadow: 0 0 0 0 transparent; } }
 
-/* Lead colours: Blue Cold, Yellow Warm, Red Hot, Green Dropped, Gray Inactive */
+/* Lead colours: Blue Cold, Yellow Warm, Red Hot, Gray Dropped, Green Booked / Bought */
 .lead { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; }
 .lead-dot { width: 14px; height: 14px; border-radius: 7px; display: inline-block; flex: none; border: 2px solid rgba(255,255,255,.25); }
 
@@ -611,9 +611,13 @@ label.btn { position: relative; cursor: pointer; }
 .activate-hint { padding: 0 4px; }
 .pb-msg { margin-top: -2px; }
 
-/* Startup logo animation (about 1 second): the logo spins in like a game start screen, then fades away. */
-.intro { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg);
-  animation: intro-out .16s ease-in .84s forwards; }
+/* Startup cover: the logo spins while the phone's storage opens, with one truthful line under it. The cover goes away
+   as soon as the app is ready (a 120 ms fade, never a fixed wait). */
+.intro { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; gap: 18px; align-items: center; justify-content: center;
+  padding: 24px; text-align: center; background: var(--bg); }
+.intro.leaving { animation: intro-out .12s ease-in forwards; pointer-events: none; }
+.intro-msg { margin: 0; max-width: 300px; color: var(--muted); font-size: 14px; }
+.intro-msg.slow, .intro-msg.failed { color: var(--ink); }
 .intro-stage { perspective: 700px; }
 .intro .logo-img { display: block; border-radius: 22%; filter: drop-shadow(0 0 24px rgba(212,175,55,.35));
   animation: intro-spin .8s cubic-bezier(.2,.7,.25,1) both; will-change: transform; }
@@ -677,3 +681,23 @@ label.btn { position: relative; cursor: pointer; }
 .choice-card small { color: var(--muted); }
 .choice-card.rec { border: 2px solid var(--gold); background: #1E1B15; }
 .rec-badge { background: var(--gold-grad); color: var(--on-gold); border: 0; font-weight: 800; }
+
+/* Save status line: where the latest changes are (saved on this phone, syncing, synced, failed) */
+.save-status { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 3px 14px; min-height: 24px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--muted, #BEB7A6); }
+.save-status .save-dot { width: 9px; height: 9px; border-radius: 5px; background: var(--gold-hi); flex: none; }
+.save-status.synced .save-dot { background: var(--ok); }
+.save-status.syncing .save-dot { background: var(--gold-hi); animation: pulse 1s infinite; }
+.save-status.failed-phone, .save-status.failed-sync { color: var(--red); font-weight: 700; }
+.save-status.failed-phone .save-dot, .save-status.failed-sync .save-dot { background: var(--red); }
+.toast.error { border-color: var(--red); }
+.toast.error span { color: var(--red); font-weight: 700; }
+
+/* Notifications: sync status line and the sample News preview. */
+.notif-sync { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid var(--line); }
+.notif-sync.failed-sync, .notif-sync.failed-phone { border-left-color: var(--bad, #d64545); }
+.notif-sync.synced { border-left-color: var(--ok, #2e9e5b); }
+.news-sample summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+
+/* Easy Bug Report */
+.bug-steps { margin: 0; padding-left: 22px; }
+.bug-preview { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); align-self: flex-start; }

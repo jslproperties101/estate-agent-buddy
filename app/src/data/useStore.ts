@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import type { Store } from './store';
 import type { AppState } from './types';
+import { SaveState, saveStateFromStore } from './savestate';
 
 export const StoreContext = createContext<Store | null>(null);
 
@@ -28,4 +29,10 @@ export function useFileUrl(fileId?: string): string | undefined {
     return () => { live = false; };
   }, [fileId, store]);
   return url;
+}
+
+/** The status-line state (see savestate.ts). A plain word, so a screen redraws only when it really changes. */
+export function useSaveState(): SaveState {
+  const store = useStore();
+  return useSyncExternalStore(store.subscribe, () => saveStateFromStore(store));
 }

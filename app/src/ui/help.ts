@@ -153,9 +153,9 @@ export const HELP: Record<string, Topic> = {
     zh: { what: '此人在 WhatsApp 上使用的名字（若与真名不同）。', enter: '其 WhatsApp 名称或别名。', eg: '@KL Factory Hunter', why: '当 WhatsApp 名字不同时，方便找到对话。' },
   },
   buyerStatus: {
-    en: { what: 'How likely this buyer is to buy soon.', enter: 'Cold, Warm, Hot, Dropped or Inactive.', why: 'Lets you focus your calls on hot buyers first.' },
-    bm: { what: 'Sejauh mana pembeli ini mungkin membeli tidak lama lagi.', enter: 'Sejuk, Suam, Panas, Gugur atau Tidak aktif.', why: 'Fokuskan panggilan kepada pembeli panas dahulu.' },
-    zh: { what: '此买家近期购买的可能性。', enter: '冷、温、热、放弃或不活跃。', why: '让您优先联系热门买家。' },
+    en: { what: 'How likely this buyer is to buy soon.', enter: 'Cold, Warm, Hot, Dropped or Booked / Bought.', why: 'Lets you focus your calls on hot buyers first.' },
+    bm: { what: 'Sejauh mana pembeli ini mungkin membeli tidak lama lagi.', enter: 'Sejuk, Suam, Panas, Digugurkan atau Ditempah / Dibeli.', why: 'Fokuskan panggilan kepada pembeli panas dahulu.' },
+    zh: { what: '此买家近期购买的可能性。', enter: '冷、温、热、已放弃或已预订 / 已购买。', why: '让您优先联系热门买家。' },
   },
   vendorStatus: {
     en: { what: 'Where you are with this owner’s listing.', enter: 'Choose the next thing waiting, e.g. Pending Property Info or Pending Follow-up.', why: 'Shows at a glance which vendors need action.' },

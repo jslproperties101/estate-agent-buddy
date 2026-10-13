@@ -70,6 +70,22 @@ check "switched-off B sees nothing" "0"                    "$(as $B b@x.com "sel
 check "switched-off B gets no new workspace" "1"           "$($P -c "select count(*) from eab_members where user_id='$B'")"
 check "assigned record visible to agent" "1"              "$(as $A a@x.com "select eab_set_member('$WSA','$B','agent',true)" >/dev/null; $P -c "update eab_records set assigned_to='$B' where id='p1'"; as $B b@x.com "select count(*) from eab_records where id='p1'")"
 check "audit has the changes"       "access_off"           "$($P -c "select string_agg(action, ',' order by id) from eab_audit")"
+# ---- Easy Bug Report (migration 20261013120000_bug_reports.sql). Storage does not exist in this stand-in database, so only
+# the table and its policies are tested here; the guarded storage part is skipped by the migration itself.
+$DB -f supabase/migrations/20261013120000_bug_reports.sql >/dev/null 2>&1
+check "bug report migration applied" "eab_bug_reports"      "$($P -c "select to_regclass('public.eab_bug_reports')")"
+check "B adds a bug report as self"  ""                     "$(as $B b@x.com "insert into eab_bug_reports (id, description, app_version, platform, language, screen) values ('11111111-1111-1111-1111-111111111111','Button does not work','2.1.0','android','en','settings')")"
+check "report is stored for B"       "$B"                   "$($P -c "select user_id from eab_bug_reports where id='11111111-1111-1111-1111-111111111111'")"
+check "B cannot report as A (user_id cannot be set)" "permission denied" "$(as $B b@x.com "insert into eab_bug_reports (id, user_id, description) values ('22222222-2222-2222-2222-222222222222','$A','x')")"
+check "empty description refused"    "violates check constraint"   "$(as $B b@x.com "insert into eab_bug_reports (description) values ('   ')")"
+check "other user's screenshot path refused" "violates check constraint" "$(as $B b@x.com "insert into eab_bug_reports (description, screenshot_path) values ('x','$A/abc.jpg')")"
+check "B reads own report"           "1"                    "$(as $B b@x.com "select count(*) from eab_bug_reports")"
+check "A cannot read B's report"     "0"                    "$(as $A a@x.com "select count(*) from eab_bug_reports")"
+check "reports cannot be edited"     "permission denied"    "$(as $B b@x.com "update eab_bug_reports set description='changed'")"
+check "reports cannot be deleted"    "permission denied"    "$(as $B b@x.com "delete from eab_bug_reports")"
+check "reporter cannot set status"   "permission denied"    "$(as $B b@x.com "insert into eab_bug_reports (description, status) values ('x','fixed')")"
+check "anon cannot read reports"     "permission denied"    "$(printf "set role anon;\nselect count(*) from eab_bug_reports;\n" | $P 2>&1)"
+check "anon cannot add reports"      "permission denied"    "$(printf "set role anon;\ninsert into eab_bug_reports (description) values ('x');\n" | $P 2>&1)"
 check "anon cannot call membership" "permission denied"    "$(printf "set role anon;\nselect * from eab_my_membership();\n" | $P 2>&1)"
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

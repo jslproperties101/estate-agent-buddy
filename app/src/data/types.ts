@@ -6,11 +6,12 @@ import type { Lang } from '../i18n';
 export interface Base { id: string; created: number; updated: number; sample?: boolean }
 
 // ---------- contacts and leads ----------
-export type LeadStatus = 'cold' | 'warm' | 'hot' | 'dropped' | 'inactive';
-export const LEAD_STATUSES: LeadStatus[] = ['cold', 'warm', 'hot', 'dropped', 'inactive'];
-/** Blue = Cold, Yellow = Warm, Red = Hot, Green = Dropped, Gray = Inactive (owner's colour rule). */
+export type LeadStatus = 'cold' | 'warm' | 'hot' | 'dropped' | 'booked';
+export const LEAD_STATUSES: LeadStatus[] = ['cold', 'warm', 'hot', 'dropped', 'booked'];
+/** Blue = Cold, Yellow = Warm, Red = Hot, Gray = Dropped, Green = Booked / Bought (owner's colour rule, 13 Oct 2026).
+ *  "Inactive" is no longer a status: records that had it were moved to Dropped (see data/leadReview.ts). */
 export const LEAD_COLOURS: Record<LeadStatus, string> = {
-  cold: '#3B82F6', warm: '#EAB308', hot: '#EF4444', dropped: '#22C55E', inactive: '#9CA3AF',
+  cold: '#3B82F6', warm: '#EAB308', hot: '#EF4444', dropped: '#9CA3AF', booked: '#22C55E',
 };
 
 export type ContactRole = 'vendor' | 'landlord' | 'buyer' | 'tenant' | 'investor' | 'professional' | 'other';
@@ -39,8 +40,10 @@ export interface Contact extends Base {
   roles: ContactRole[];
   /** For professional contacts: which Ask Expert specialist they are. */
   profession?: ExpertKey;
-  /** Buyer / tenant lead colour (Cold, Warm, Hot, Dropped, Inactive). */
+  /** Buyer / tenant lead colour (Cold, Warm, Hot, Dropped, Booked / Bought). */
   leadStatus?: LeadStatus;
+  /** Set only when the old status "Inactive" was converted to Dropped, so the original is never lost. */
+  previousLeadStatus?: 'inactive';
   /** Vendor / landlord status (Pending Property Info, Pending Follow-up, …), kept separate from the buyer colours. */
   vendorStatus?: VendorStatus;
   source?: string;
@@ -242,6 +245,8 @@ export interface Meta {
   syncError?: string;
   /** The person chose to use the app on this phone only, without signing in (only when sign-in is not set up). */
   offlineOnly?: boolean;
+  /** The report of buyers whose old "Inactive" status was moved to Dropped, until the owner marks it reviewed. */
+  leadReview?: { at: number; ids: string[]; reviewed: boolean };
 }
 
 export interface Collections {

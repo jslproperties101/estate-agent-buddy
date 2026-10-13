@@ -39,7 +39,7 @@ test('P3 years remaining, phone numbers, commission', () => {
 });
 
 test('P4 titles and address in the agreed location order', () => {
-  assert.equal(title(L[0]), 'Unit 7, Jalan Perindustrian 2/3, Kawasan Perindustrian Nilai');
+  assert.equal(title(L[0]), '7, Jalan Perindustrian 2/3, Kawasan Perindustrian Nilai');
   assert.equal(addressLine(L[0]), 'Unit 7, Lot 2/14, Jalan Perindustrian 2/3, Kawasan Perindustrian Nilai, Nilai, Negeri Sembilan, Malaysia');
   assert.equal(title({ id: 'e', created: 0, updated: 0, photos: [] }), '');
 });

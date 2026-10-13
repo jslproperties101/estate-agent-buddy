@@ -125,7 +125,7 @@ export function touchContact(c: Contact, at = Date.now()): Contact {
 }
 
 export function leadCounts(contacts: Contact[]): Record<LeadStatus, number> {
-  const r: Record<LeadStatus, number> = { cold: 0, warm: 0, hot: 0, dropped: 0, inactive: 0 };
+  const r: Record<LeadStatus, number> = { cold: 0, warm: 0, hot: 0, dropped: 0, booked: 0 };
   for (const c of contacts) if (c.leadStatus) r[c.leadStatus]++;
   return r;
 }

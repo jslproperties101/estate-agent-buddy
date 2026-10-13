@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { AboutCard } from '../native/UpdateUI';
 import { BUILD } from '../native/updates';
+import { bugStrings } from '../bugreport/strings';
 import { MapsCheck } from '../maps/MapsCheck';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
@@ -226,7 +227,7 @@ export function NameCardSend({ lang }: { lang: Lang }) {
   );
 }
 
-export function SettingsScreen({ lang }: { lang: Lang }) {
+export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const t = profileStrings[lang];
   const toast = useToast();
@@ -238,6 +239,11 @@ export function SettingsScreen({ lang }: { lang: Lang }) {
 
   return (
     <section className="stack" data-testid="settings">
+      <div className="card stack-sm" data-testid="bug-entry">
+        <div className="card-title">{bugStrings[lang].settingsItem}</div>
+        <small className="muted">{bugStrings[lang].settingsHint}</small>
+        <button className="btn primary" data-testid="open-bug-report" onClick={() => go({ name: 'bugReport', from: 'settings' })}>{bugStrings[lang].open}</button>
+      </div>
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>
