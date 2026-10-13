@@ -22,7 +22,7 @@
 //    record stays untouched, with the reason shown to the person.
 // Sample records are never sent up or taken down, so they never mix with real data in the team workspace.
 import type { CloudBase, Store } from './store';
-import { COLLECTIONS, CollectionName, Conflict, Meta } from './types';
+import { AppState, COLLECTIONS, CollectionName, Conflict, Meta } from './types';
 import { isSampleKey } from './sample';
 import { hash53, recordHash } from './hash';
 import { applyChoices, merge3 } from './merge';
@@ -33,7 +33,7 @@ export type Session = NonNullable<Meta['syncSession']>;
 type FetchFn = typeof fetch;
 
 export class SyncError extends Error {
-  constructor(public code: 'not-configured' | 'not-signed-in' | 'auth' | 'network' | 'server' | 'no-access', message?: string) { super(message ?? code); }
+  constructor(public code: 'not-configured' | 'not-signed-in' | 'auth' | 'network' | 'server' | 'no-access' | 'other-workspace', message?: string) { super(message ?? code); }
 }
 
 const TABLE = 'eab_records';
@@ -86,6 +86,16 @@ export async function membership(cfg: SyncConfig, s: Session, fetchFn: FetchFn =
 }
 
 type Rec = Record<string, unknown>;
+
+/** True when this phone still holds real records (or waiting deletions) that belong to a DIFFERENT team workspace than
+ *  the one `sessionWorkspaceId` signs in to. Sample data does not count. Such a phone must neither show those records
+ *  to the new account nor send anything to the new workspace. */
+export function holdsOtherWorkspaceData(state: AppState, sessionWorkspaceId: string | undefined): boolean {
+  const owner = state.meta.syncWorkspaceId;
+  if (!owner || !sessionWorkspaceId || owner === sessionWorkspaceId) return false;
+  if (state.meta.tombstones.length || state.meta.dirty.length) return true;
+  return COLLECTIONS.some(c => (state[c] as unknown as { sample?: boolean }[]).some(r => !r.sample));
+}
 interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
 
 export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number }
@@ -261,6 +271,8 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: F
   // Checked on every sync, so a deactivated account or a changed role is noticed straight away (and "no access" is
   // never reported as "synced").
   session = await membership(cfg, session, fetchFn);
+  // Another team's records are still on this phone: stop before anything is read, changed or sent.
+  if (holdsOtherWorkspaceData(store.getState(), session.workspaceId)) throw new SyncError('other-workspace');
   if (JSON.stringify(session) !== JSON.stringify(start.syncSession)) store.setSingleton('meta', { syncSession: session });
   const ws = session.workspaceId!;
   if (!metaNow(store).deviceId) store.setSingleton('meta', { deviceId: `d${hash53(`${Math.random()}|${Date.now()}`).slice(0, 10)}` });

@@ -2,6 +2,7 @@
 import type { Lang } from '../i18n';
 
 const en = {
+  otherTitle: 'This phone holds another team\'s records', otherBody: 'The records on this phone belong to a different team than the account you just signed in to. To keep both teams\' data safe, nothing was sent to or loaded from the new account, and the old records are hidden. They are still on this phone, untouched. Sign out, then sign in again with the original account to see them.', otherSignOut: 'Sign out',
   title: 'Data safety',
   help: 'Nothing here deletes your work. Both versions of a record are kept until you choose.',
   review: 'Sync review', reviewHint: (n: number) => n ? `${n} need${n === 1 ? 's' : ''} your decision` : 'Nothing needs your decision.',
@@ -39,6 +40,7 @@ const en = {
 };
 export type SyncStrings = typeof en;
 const bm: SyncStrings = {
+  otherTitle: 'Telefon ini menyimpan rekod pasukan lain', otherBody: 'Rekod pada telefon ini milik pasukan yang berbeza daripada akaun yang baru anda log masuk. Untuk melindungi data kedua-dua pasukan, tiada apa-apa dihantar ke atau dimuat daripada akaun baharu, dan rekod lama disembunyikan. Rekod itu masih ada pada telefon ini, tidak disentuh. Log keluar, kemudian log masuk semula dengan akaun asal untuk melihatnya.', otherSignOut: 'Log keluar',
   title: 'Keselamatan data',
   help: 'Tiada apa di sini memadam kerja anda. Kedua-dua versi rekod disimpan sehingga anda memilih.',
   review: 'Semakan segerak', reviewHint: n => (n ? `${n} memerlukan keputusan anda` : 'Tiada yang memerlukan keputusan anda.'),
@@ -75,6 +77,7 @@ const bm: SyncStrings = {
   continueDraft: 'Sambung', draftFor: what => `Draf: ${what}`, newOne: 'baharu',
 };
 const zh: SyncStrings = {
+  otherTitle: '本手机保存着另一个团队的记录', otherBody: '本手机上的记录属于与您刚登录的账号不同的团队。为保护两个团队的数据，没有向新账号发送任何内容，也没有从新账号加载任何内容，旧记录已被隐藏。它们仍保留在本手机上，未被改动。请退出登录，再用原账号重新登录即可查看。', otherSignOut: '退出登录',
   title: '数据安全',
   help: '这里的任何操作都不会删除您的工作。记录的两个版本会一直保留，直到您做出选择。',
   review: '同步检查', reviewHint: n => (n ? `${n} 项需要您决定` : '没有需要您决定的事项。'),

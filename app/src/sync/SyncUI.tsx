@@ -8,6 +8,7 @@ import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { RecordState, recordStateOf } from '../data/recordstate';
 import { resolveConflict } from '../data/sync';
+import { signOutRemote } from '../data/auth';
 import { runSync } from '../data/syncRunner';
 import { recordFileSummary, retryFile } from '../data/filesync';
 import { fileRefs } from '../data/fileRefs';
@@ -343,5 +344,23 @@ export function DataSafetyCard({ lang, go }: { lang: Lang; go: Go }) {
       <button className="link-row" data-testid="open-recently-deleted" onClick={() => go({ name: 'recentlyDeleted' })}><strong>{y.recent}</strong><small className="muted">{deleted ? `${deleted}` : y.recentHint}</small></button>
       <div className="stack-sm"><strong>{y.drafts}</strong><small className="muted">{y.draftsHint(drafts)}</small><DraftsList lang={lang} go={go} /></div>
     </div>
+  );
+}
+
+/** Shown instead of the app when the signed-in account's team differs from the team that owns the records on this phone.
+ *  The old records stay on the phone untouched but are not shown, and nothing is sent or loaded. */
+export function OtherWorkspaceScreen({ lang }: { lang: Lang }) {
+  const { store } = useApp();
+  const s = syncStrings[lang];
+  return (
+    <main className="screen" data-testid="other-workspace" role="alert" style={{ padding: 24 }}>
+      <h1>{s.otherTitle}</h1>
+      <p>{s.otherBody}</p>
+      <button className="btn primary" data-testid="other-workspace-signout" onClick={() => {
+        const m = store.getState().meta;
+        void signOutRemote(config(store.getState().settings), m.syncSession!).catch(() => undefined);
+        store.setSingleton('meta', { syncSession: undefined, syncError: undefined });
+      }}>{s.otherSignOut}</button>
+    </main>
   );
 }

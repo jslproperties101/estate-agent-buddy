@@ -56,7 +56,7 @@ export function AccountCard({ lang }: { lang: Lang }) {
       )}
       {msg && <p className="small" role="status" data-testid="account-msg">{msg}</p>}
       {ask && s && <Confirm lang={lang} title={a.signOutQ} body={a.signOutBody} okLabel={a.signOut} danger={false} onCancel={() => setAsk(false)}
-        onOk={() => { setAsk(false); void signOutRemote(cfg, s); store.setSingleton('meta', { syncSession: undefined, syncError: undefined }); }} />}
+        onOk={() => { setAsk(false); void signOutRemote(cfg, s); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? s.workspaceId }); }} />}
       {s && (s.role === 'owner' || s.role === 'admin') && configured(cfg) && <TeamCard lang={lang} session={s} />}
     </div>
   );

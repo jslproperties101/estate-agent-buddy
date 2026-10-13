@@ -401,7 +401,7 @@ test('P2-20 a cloud change that replaces an unchanged local copy keeps the repla
   assert.ok(hist.some(h => (h.data as Contact).name === 'Ahmad' && h.source === 'cloud'), 'the version replaced by the cloud is recoverable');
 });
 
-test('P2-21 a different team workspace starts a fresh position and does not reuse old versions', async () => {
+test('P2-21 a different team workspace is refused while this phone still holds the old team\'s records (nothing is sent)', async () => {
   const cloud = new FakeCloud();
   const a = await phone(cloud, 'o@x.c');
   a.store.upsert('contacts', contact('c1', 'Ahmad'));
@@ -409,7 +409,8 @@ test('P2-21 a different team workspace starts a fresh position and does not reus
   assert.equal(a.store.getState().meta.syncWorkspaceId, 'ws1');
   cloud.ws = 'ws2';
   a.store.upsert('contacts', { ...get(a.store, 'c1')!, notes: 'x' });
-  await sync(a.store, cloud);
-  assert.equal(a.store.getState().meta.syncWorkspaceId, 'ws2');
-  assert.equal(cloud.rows.get('ws2|contacts|c1')!.rev, 1, 'sent to the new workspace as a new record');
+  await assert.rejects(() => sync(a.store, cloud), /other-workspace/);
+  assert.equal(a.store.getState().meta.syncWorkspaceId, 'ws1', 'the phone still knows whose records these are');
+  assert.equal(cloud.rows.has('ws2|contacts|c1'), false, 'nothing was written to the other team');
+  assert.deepEqual(a.store.getState().meta.dirty, ['contacts:c1'], 'the edit is still waiting');
 });

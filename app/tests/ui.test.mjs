@@ -1913,6 +1913,43 @@ test('U54 sync review: a same-field conflict, a property number already used, an
   await ctx.close();
 });
 
+test('U55 signing in to a different team on a phone that holds another team\'s records: they are hidden, nothing is sent, sign-out is offered', async () => {
+  const SB = 'https://sync-test.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const seen = [];
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    seen.push(`${req.method()} ${u.pathname}`);
+    if (u.pathname === '/rest/v1/rpc/eab_my_membership') return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify([{ workspace_id: 'ws-B', workspace_name: 'Team B', role: 'owner' }]) });
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: '[]' });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  await page.evaluate(async SBURL => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    await put('records', 'c:contacts:a1', { id: 'a1', created: 1, updated: 5, name: 'Team A Secret Buyer', roles: ['buyer'] });
+    await put('records', 's:meta', { fired: [], dirty: ['contacts:a1'], tombstones: [], syncWorkspaceId: 'ws-A', lastSeq: 5, syncSession: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'b@x.c', userId: 'uB', workspaceId: 'ws-B', workspaceName: 'Team B', role: 'owner' } });
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'anon' });
+    db.close();
+  }, SB);
+  await page.reload();
+  await page.getByTestId('other-workspace').waitFor();
+  assert.equal(await page.locator('nav.grid').count(), 0, 'the app (and its records) is not shown');
+  assert.equal(await page.getByText('Team A Secret Buyer').count(), 0);
+  await shot(page, '54-other-workspace', true);
+  await page.waitForTimeout(500);
+  assert.ok(!seen.some(r => /eab_push_records|eab_records|eab_files|storage/.test(r)), `nothing sent or loaded: ${seen}`);
+  // The records are still on the phone, untouched, and still waiting for team A.
+  const kept = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:a1'); g.onsuccess = () => { res(g.result?.name); r.result.close(); }; }; }));
+  assert.equal(kept, 'Team A Secret Buyer');
+  await page.getByTestId('other-workspace-signout').click();
+  await page.getByTestId('login').waitFor();
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

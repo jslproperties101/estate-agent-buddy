@@ -175,3 +175,22 @@ so only `eab_push_records` can write. Before proposing that migration, confirm (
 insert/upsert/patch/delete on `eab_records`, from any role), (b) that the new APK uses none of them (it writes records only
 through `eab_push_records`; to be re-verified by test), (c) how rights are restored on rollback (re-grant `insert, update`
 to `authenticated` and re-create the matching policies), (d) that no existing RLS policy is loosened. Nothing of this is implemented.
+
+## 8. Switching accounts on one phone (fix after review)
+
+The phone's records are shared by whoever signs in; sign-out only clears the sign-in. Before this fix, signing in to a
+**different team** reset the stored cloud versions but kept the old team's records, waiting edits and waiting deletions,
+so they were uploaded into the new team's workspace and were visible to the new account.
+
+Now: the phone remembers which team its records belong to (`syncWorkspaceId`, also set at sign-out). If the signed-in account's
+team differs and the phone holds any real record, waiting edit or waiting deletion (sample data does not count):
+- the sync stops with `other-workspace` **before** anything is read, written or sent (only the membership check is asked);
+- the app shows a full-screen explanation instead of the records, with a Sign out button;
+- nothing is deleted: records, versions and sync position stay for the original team. Signing back in with that team resumes normally.
+Same team / different person is unchanged. A phone with no real records, or one that never synced, signs in to any team as before.
+
+Limits: (1) the phone cannot be "handed over" to another team without first signing back in as the original team and
+clearing/removing its data; a per-team separate store (the larger change) is not built. (2) A phone upgraded from Phase 1 that
+was already signed out cannot tell whose records it holds (the owner is learnt at the next sign-in/sign-out). (3) Within one
+team, waiting edits made under one person are sent under whoever syncs next (same workspace; role rules still apply).
+Tested: unit tests W1–W6, P2-21 and screen test U55 (stand-in clouds, desktop Chromium); not tested on a live Supabase or a real device.
