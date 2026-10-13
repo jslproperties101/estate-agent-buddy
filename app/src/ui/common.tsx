@@ -2,6 +2,7 @@
 import { ReactNode, useState } from 'react';
 import { useApp, useFileUrl } from '../data/useStore';
 import { strings, Lang } from '../i18n';
+import { leadReviewStrings } from '../data/leadReviewStrings';
 import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
 import { FieldHelp } from './FieldHelp';
 import { REMINDER_CHOICES } from '../domain/workflow';
@@ -27,12 +28,13 @@ export function SectionCard({ title, onEdit, editLabel, children, testId, classN
   );
 }
 
-export function LeadDot({ status, lang, withText = true }: { status?: LeadStatus; lang: Lang; withText?: boolean }) {
+export function LeadDot({ status, lang, withText = true }: { status?: LeadStatus | 'inactive'; lang: Lang; withText?: boolean }) {
   if (!status) return null;
-  const label = strings[lang].lead[status];
+  // "inactive" only appears after the owner used Undo in the status review (a retired value, kept visible and unmistakable).
+  const label = status === 'inactive' ? leadReviewStrings[lang].legacy : strings[lang].lead[status];
   return (
     <span className={`lead lead-${status}`} title={label} data-lead={status}>
-      <span className="lead-dot" style={{ background: LEAD_COLOURS[status] }} aria-hidden="true" />
+      <span className="lead-dot" style={{ background: LEAD_COLOURS[status as LeadStatus] ?? '#9CA3AF' }} aria-hidden="true" />
       {withText ? <span>{label}</span> : <span className="sr-only">{label}</span>}
     </span>
   );

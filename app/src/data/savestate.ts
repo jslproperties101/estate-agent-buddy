@@ -13,8 +13,13 @@ import { fileRefs } from './fileRefs';
 /** Pictures and documents that a saved record uses but the cloud does not have yet. */
 export function pendingFileCount(store: Store): number {
   const used = new Set(fileRefs(store.getState()).map(r => r.fileId));
+  const have = new Map(store.allFileEntries().map(e => [e.id, e]));
   let n = 0;
-  for (const e of store.allFileEntries()) if (used.has(e.id) && !e.removedAt && e.status !== 'uploaded' && e.status !== 'missing') n++;
+  for (const id of used) {
+    const e = have.get(id);
+    // no entry yet = not looked at by file sync yet; "denied" / "missing" are shown on the file itself and cannot be fixed by waiting
+    if (!e || (!e.removedAt && e.status !== 'uploaded' && e.status !== 'missing' && e.status !== 'denied')) n++;
+  }
   return n;
 }
 

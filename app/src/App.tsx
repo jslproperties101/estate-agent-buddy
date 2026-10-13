@@ -48,7 +48,7 @@ import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, syncNow, SyncError } from './data/sync';
-import { convertInactive, inactiveContacts } from './data/leadReview';
+import { convertInactive, inactiveContacts, reviewContacts } from './data/leadReview';
 import { leadReviewStrings } from './data/leadReviewStrings';
 
 /** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
@@ -458,7 +458,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         : sync === 'syncing' ? ss.syncing
           : waiting > 0 ? t.notif.syncWaiting(waiting)
             : state.meta.lastSync ? t.notif.syncOk(fmtDateTime(state.meta.lastSync, lang)) : null;
-  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? state.meta.leadReview.ids.length : 0;
+  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
   const systemEmpty = soon.length === 0 && !syncLine && review === 0;
   const n = t.newsPage;
   return (

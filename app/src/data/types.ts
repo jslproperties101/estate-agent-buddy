@@ -44,6 +44,9 @@ export interface Contact extends Base {
   leadStatus?: LeadStatus;
   /** Set only when the old status "Inactive" was converted to Dropped, so the original is never lost. */
   previousLeadStatus?: 'inactive';
+  /** Set when the owner put a converted buyer back to the retired "Inactive" (Undo in the status review). It stops the
+   *  automatic conversion from moving this buyer to Dropped again, on any phone. */
+  inactiveKept?: boolean;
   /** Vendor / landlord status (Pending Property Info, Pending Follow-up, …), kept separate from the buyer colours. */
   vendorStatus?: VendorStatus;
   source?: string;

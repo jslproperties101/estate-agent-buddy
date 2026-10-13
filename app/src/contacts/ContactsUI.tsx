@@ -21,7 +21,7 @@ import { pickPhoneContacts, phonebookSupported, phonebookProblem, PickedContact 
 import { useToast } from '../ui/toast';
 import { PhonebookButton } from '../ui/PhonebookButton';
 import { leadReviewStrings } from '../data/leadReviewStrings';
-import { reviewContacts } from '../data/leadReview';
+import { reviewContacts, undoInactiveConversion, UndoResult } from '../data/leadReview';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
 
@@ -32,6 +32,8 @@ export function ContactsHome({ lang, go }: { lang: Lang; go: Go }) {
   const buyers = state.contacts.filter(c => inRole(c, 'buyer'));
   const vendors = state.contacts.filter(c => inRole(c, 'vendor'));
   const hot = buyers.filter(c => c.leadStatus === 'hot').length;
+  const [undoMsg, setUndoMsg] = useState('');
+  const undoText = (r: UndoResult) => `${r.restored.length ? leadReviewStrings[lang].undone(r.restored.length) : ''} ${r.skipped.length ? leadReviewStrings[lang].skipped(r.skipped.length) : ''}`.trim();
   const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids) : [];
   const waiting = vendors.filter(c => c.vendorStatus === 'pending_info' || c.vendorStatus === 'pending_follow_up').length;
   return (
@@ -54,9 +56,18 @@ export function ContactsHome({ lang, go }: { lang: Lang; go: Go }) {
           <p className="small">{leadReviewStrings[lang].body(review.length)}</p>
           <ul className="notif-list">
             {review.map(c => (
-              <li key={c.id}><button className="link-row" data-testid="lead-review-item" onClick={() => go({ name: 'contactDetail', id: c.id })}><strong>{c.name}</strong></button></li>
+              <li key={c.id} className="between">
+                <button className="link-row" data-testid="lead-review-item" onClick={() => go({ name: 'contactDetail', id: c.id })}><strong>{c.name}</strong>{c.inactiveKept && <small className="muted"> · {leadReviewStrings[lang].legacy}</small>}</button>
+                {c.leadStatus === 'dropped' && c.previousLeadStatus === 'inactive' && (
+                  <button className="btn small ghost" data-testid="lead-review-undo-one" onClick={() => setUndoMsg(undoText(undoInactiveConversion(store, [c.id])))}>{leadReviewStrings[lang].undo}</button>
+                )}
+              </li>
             ))}
           </ul>
+          {undoMsg && <small role="status" className="ok-text" data-testid="lead-review-msg">{undoMsg}</small>}
+          {review.some(c => c.leadStatus === 'dropped' && c.previousLeadStatus === 'inactive') && (
+            <button className="btn secondary" data-testid="lead-review-undo-all" onClick={() => setUndoMsg(undoText(undoInactiveConversion(store)))}>{leadReviewStrings[lang].undoAll}</button>
+          )}
           <button className="btn secondary" data-testid="lead-review-done" onClick={() => store.setSingleton('meta', { leadReview: { ...state.meta.leadReview!, reviewed: true } })}>{leadReviewStrings[lang].reviewed}</button>
         </div>
       )}
@@ -145,7 +156,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
   return (
     <section className="stack" data-testid="contact-detail">
       {c.sample && <p className="notice sample-note" data-testid="sample-note">{t.sampleNote}</p>}
-      <div className="card stack-sm" style={isBuyer && c.leadStatus ? { borderLeft: `6px solid ${LEAD_COLOURS[c.leadStatus]}` } : isVendor && c.vendorStatus ? { borderLeft: `6px solid ${VENDOR_COLOURS[c.vendorStatus]}` } : undefined}>
+      <div className="card stack-sm" style={isBuyer && c.leadStatus ? { borderLeft: `6px solid ${LEAD_COLOURS[c.leadStatus] ?? '#9CA3AF'}` } : isVendor && c.vendorStatus ? { borderLeft: `6px solid ${VENDOR_COLOURS[c.vendorStatus]}` } : undefined}>
         <h2 className="contact-name">{c.name}</h2>
         <div className="row-wrap">{c.roles.map(r => <span key={r} className="chip-tag">{s.roles[r]}</span>)}{c.profession && <span className="chip-tag">{s.experts[c.profession]}</span>}</div>
         <dl className="dl">

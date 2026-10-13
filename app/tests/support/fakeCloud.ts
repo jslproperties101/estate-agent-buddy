@@ -153,7 +153,7 @@ export class FakeCloud {
   private async filesTable(me: { id: string; role: RoleName | null }, method: string, u: URL, init: RequestInit): Promise<Response> {
     const prefer = ((init.headers ?? {}) as Record<string, string>).prefer ?? '';
     if (method === 'GET') {
-      const eq = (k: string) => u.searchParams.get(k)?.replace(/^eq\./, '');
+      const eq = (k: string) => { const v = u.searchParams.get(k); return v?.startsWith('eq.') ? v.slice(3) : undefined; };
       const inList = u.searchParams.get('file_id')?.startsWith('in.(') ? u.searchParams.get('file_id')!.slice(4, -1).split(',').map(x => x.replace(/"/g, '')) : null;
       const out = [...this.files.values()].filter(f => this.recordReadable(me, f.collection, f.record_id)
         && (!inList || inList.includes(f.file_id)) && (!eq('sha256') || f.sha256 === eq('sha256')) && (!eq('status') || f.status === eq('status')) && (!eq('file_id') || f.file_id === eq('file_id')) && (!eq('deleted') || String(f.deleted) === eq('deleted')));

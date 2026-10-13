@@ -7,6 +7,11 @@ const en = {
   reviewed: 'Mark as reviewed',
   notice: (n: number) => `${n} buyer${n === 1 ? '' : 's'} moved from Inactive to Dropped. Please review.`,
   review: 'Review',
+  legacy: 'Inactive (retired)',
+  undo: 'Put back as Inactive',
+  undoAll: 'Undo all',
+  undone: (n: number) => `${n} buyer${n === 1 ? '' : 's'} put back as Inactive (retired). Choose a current status for ${n === 1 ? 'it' : 'them'} when ready.`,
+  skipped: (n: number) => `${n} not changed: the status was changed or the contact is gone.`,
 };
 export type LeadReviewStrings = typeof en;
 const bm: LeadReviewStrings = {
@@ -15,6 +20,11 @@ const bm: LeadReviewStrings = {
   reviewed: 'Tandakan telah disemak',
   notice: (n: number) => `${n} pembeli dipindahkan daripada Tidak aktif ke Digugurkan. Sila semak.`,
   review: 'Semak',
+  legacy: 'Tidak aktif (dihentikan)',
+  undo: 'Kembalikan ke Tidak aktif',
+  undoAll: 'Buat asal semua',
+  undone: (n: number) => `${n} pembeli dikembalikan ke Tidak aktif (dihentikan). Pilih status semasa apabila bersedia.`,
+  skipped: (n: number) => `${n} tidak diubah: status telah ditukar atau kenalan telah tiada.`,
 };
 const zh: LeadReviewStrings = {
   title: '状态检查',
@@ -22,5 +32,10 @@ const zh: LeadReviewStrings = {
   reviewed: '标记为已检查',
   notice: (n: number) => `${n} 位买家已从“不活跃”移至“已放弃”，请检查。`,
   review: '检查',
+  legacy: '不活跃（已停用）',
+  undo: '恢复为“不活跃”',
+  undoAll: '全部撤销',
+  undone: (n: number) => `已将 ${n} 位买家恢复为“不活跃”（已停用）。准备好后请选择当前状态。`,
+  skipped: (n: number) => `${n} 位未更改：状态已被修改或联系人已不存在。`,
 };
 export const leadReviewStrings: Record<Lang, LeadReviewStrings> = { en, bm, zh };

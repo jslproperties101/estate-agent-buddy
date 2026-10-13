@@ -26,6 +26,7 @@ import { COLLECTIONS, CollectionName, Conflict, Meta } from './types';
 import { isSampleKey } from './sample';
 import { hash53, recordHash } from './hash';
 import { applyChoices, merge3 } from './merge';
+import { syncFiles, FileSyncOptions } from './filesync';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -87,16 +88,16 @@ export async function membership(cfg: SyncConfig, s: Session, fetchFn: FetchFn =
 type Rec = Record<string, unknown>;
 interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
 
-export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number }
+export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number }
 
 /** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
  *  "Synced" after the cloud really answered. */
-export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch): Promise<SyncResult> {
+export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch, opts: FileSyncOptions = {}): Promise<SyncResult> {
   if (!configured(cfg)) throw new SyncError('not-configured');
   if (!store.getState().meta.syncSession) throw new SyncError('not-signed-in');
   if (store.syncing) return { pushed: 0, pulled: 0, removed: 0, conflicts: 0 };   // one sync at a time
   store.setSyncing(true);
-  try { return await syncOnce(store, cfg, fetchFn); } finally { store.setInflight(store.getState().meta.dirty, false); store.setSyncing(false); }
+  try { return await syncOnce(store, cfg, fetchFn, opts); } finally { store.setInflight(store.getState().meta.dirty, false); store.setSyncing(false); }
 }
 
 const split = (key: string): [CollectionName, string] => { const i = key.indexOf(':'); return [key.slice(0, i) as CollectionName, key.slice(i + 1)]; };
@@ -253,7 +254,7 @@ async function pushAll(store: Store, cfg: SyncConfig, session: Session, ws: stri
   return again;
 }
 
-async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn): Promise<SyncResult> {
+async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: FileSyncOptions): Promise<SyncResult> {
   const start = metaNow(store);
   if (!start.syncSession) throw new SyncError('not-signed-in');
   let session = await fresh(cfg, start.syncSession, fetchFn);
@@ -285,6 +286,11 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn): Promis
     again = (await pushAll(store, cfg, session, ws, fetchFn, tally)) || again;
   }
   tally.conflicts = (metaNow(store).conflicts ?? []).length;
+  // Pictures and documents go after the records they belong to. One bad file never fails the sync.
+  try {
+    const f = await syncFiles(store, cfg, session, ws, fetchFn, opts);
+    tally.filesUp = f.uploaded; tally.filesDown = f.downloaded; tally.filesFailed = f.failed;
+  } catch { tally.filesFailed = (tally.filesFailed ?? 0) + 1; }
   // "Synced" needs a finished sync. Whatever is still waiting (an edit made during the upload, a record that is in
   // conflict) keeps its own waiting/conflict state and the overall line will not say Synced.
   patchMeta(store, () => ({ lastSync: Date.now(), syncError: undefined }));

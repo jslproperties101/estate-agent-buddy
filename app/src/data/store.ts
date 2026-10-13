@@ -34,7 +34,7 @@ export interface Draft { form: string; recordKey?: string; baseHash?: string; sa
 export type FileStatus = 'local' | 'pending' | 'uploaded' | 'failed' | 'missing' | 'denied';
 export interface FileEntry {
   id: string; status: FileStatus; bytes: number; mime?: string; sha256?: string; addedAt: number;
-  tries?: number; nextTry?: number; lastError?: string; removedAt?: number; uploadedAt?: number;
+  tries?: number; nextTry?: number; lastError?: string; removedAt?: number; uploadedAt?: number; cloudDeleted?: boolean;
 }
 
 /** Newest first; at most this many earlier versions are kept for each record. */
