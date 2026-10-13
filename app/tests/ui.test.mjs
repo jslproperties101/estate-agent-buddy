@@ -2089,7 +2089,7 @@ test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync
   await p2.reload(); await p2.waitForSelector('nav.grid');
   assert.equal(await p2.getByTestId('owner-unknown').count(), 0, 'no ownership warning for a new phone');
   for (let i = 0; i < 80 && !seen2.some(r => /eab_push_records/.test(r)); i++) await p2.waitForTimeout(250);   // up to 20 s: a slow machine needs longer than a fixed second
-  assert.ok(seen2.some(r => /eab_push_records/.test(r)), 'the offline records go to the first team');
+  assert.ok(seen2.some(r => /eab_push_records/.test(r)), `the offline records go to the first team (requests seen: ${seen2.join(' | ') || 'none'}; online=${await p2.evaluate(() => navigator.onLine)}; screen: ${(await p2.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 160)})`);
   await ctx2.close();
 });
 
