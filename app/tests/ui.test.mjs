@@ -1992,6 +1992,83 @@ test('U56 a phone last used by Phase 1 (real records, no remembered team) asks w
   await page.context().close();
 });
 
+test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync time still asks whose records they are; a genuinely new phone does not', async () => {
+  const SB = 'https://sync-test.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const seen = [];
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    seen.push(`${req.method()} ${u.pathname}`);
+    const body = u.pathname === '/rest/v1/rpc/eab_my_membership' ? [{ workspace_id: 'ws-B', workspace_name: 'Team B', role: 'owner' }]
+      : u.pathname === '/rest/v1/rpc/eab_push_records' ? JSON.parse(req.postData()).rows.map(r => ({ collection: r.collection, id: r.id, status: 'ok', rev: 1 })) : [];
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  const sess = { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'b@x.c', userId: 'uB', workspaceId: 'ws-B', workspaceName: 'Team B', role: 'owner' };
+  const writeMeta = (meta, withRecord) => page.evaluate(async ([SBURL, meta, withRecord]) => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    if (withRecord) await put('records', 'c:contacts:a1', { id: 'a1', created: 1, updated: 5, name: 'Phase One Buyer', roles: ['buyer'] });
+    await put('records', 's:meta', meta);
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'anon' });
+    db.close();
+  }, [SB, meta, withRecord]);
+
+  // A. What Phase 1 left behind: a record, an unsent edit, signed out, never completed a sync (no lastSync), no Phase 2 marker.
+  await writeMeta({ fired: [], dirty: ['contacts:a1'], tombstones: [] }, true);
+  await page.reload(); await page.getByTestId('login').waitFor();                      // first start of this version: signed out, so the login screen
+  const readMeta = () => page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('s:meta'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
+  const stored = await readMeta();                                                      // written by the real first start
+  assert.equal(stored.lastSync, undefined); assert.equal(stored.syncWorkspaceId, undefined);
+  assert.equal(stored.ownerChecked, true); assert.equal(stored.ownerUnknown, true, 'the first start noticed existing records with no owner');
+  assert.deepEqual(stored.dirty, ['contacts:a1'], 'the unsent edit is still waiting');
+  await writeMeta({ ...stored, syncSession: sess }, false);                              // team B signs in
+  await page.reload();
+  await page.getByTestId('owner-unknown').waitFor();
+  assert.equal(await page.locator('nav.grid').count(), 0); assert.equal(await page.getByText('Phase One Buyer').count(), 0);
+  await shot(page, '56-owner-unknown-no-lastsync', true);
+  await page.waitForTimeout(600);
+  assert.ok(!seen.some(r => /eab_push_records|eab_records|eab_files|storage/.test(r)), `nothing sent or loaded: ${seen}`);
+  await page.getByTestId('owner-signout').click(); await page.getByTestId('login').waitFor();
+  const kept = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:a1'); g.onsuccess = () => { res(g.result?.name); r.result.close(); }; }; }));
+  assert.equal(kept, 'Phase One Buyer', 'signing out keeps the record');
+  await page.context().close();
+
+  // B. A genuinely new phone: opens empty, records entered offline, then signs in to its first team: no question.
+  const ctx2 = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const seen2 = [];
+  await ctx2.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    seen2.push(`${req.method()} ${u.pathname}`);
+    const body = u.pathname === '/rest/v1/rpc/eab_my_membership' ? [{ workspace_id: 'ws-B', workspace_name: 'Team B', role: 'owner' }]
+      : u.pathname === '/rest/v1/rpc/eab_push_records' ? JSON.parse(req.postData()).rows.map(r => ({ collection: r.collection, id: r.id, status: 'ok', rev: 1 })) : [];
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
+  });
+  const p2 = await ctx2.newPage();
+  await p2.goto(base); await p2.waitForSelector('nav.grid'); await chooseStart(p2, 'empty');       // first start: empty database
+  await tile(p2, 'Buyer List'); await p2.getByRole('button', { name: 'New buyer' }).click();
+  await p2.locator('[data-field="name"]').fill('Entered Offline'); await p2.getByTestId('save-contact').click(); await p2.getByTestId('contact-detail').waitFor();
+  await p2.evaluate(async SBURL => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const get = (k) => new Promise(res => { const g = db.transaction('records').objectStore('records').get(k); g.onsuccess = () => res(g.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    const meta = (await get('s:meta')) ?? {};
+    await put('records', 's:meta', { ...meta, syncSession: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'b@x.c', userId: 'uB', workspaceId: 'ws-B', workspaceName: 'Team B', role: 'owner' } });
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'anon' });
+    db.close();
+  }, SB);
+  await p2.reload(); await p2.waitForSelector('nav.grid');
+  assert.equal(await p2.getByTestId('owner-unknown').count(), 0, 'no ownership warning for a new phone');
+  await p2.waitForTimeout(1000);
+  assert.ok(seen2.some(r => /eab_push_records/.test(r)), 'the offline records go to the first team');
+  await ctx2.close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

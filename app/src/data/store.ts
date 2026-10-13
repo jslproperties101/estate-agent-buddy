@@ -86,10 +86,17 @@ export class Store {
     for (const { key, value } of await backend.listLocal('base:')) store.bases.set(key.slice(5), value as CloudBase);
     for (const { key, value } of await backend.listLocal('draft:')) store.drafts.set(key.slice(6), value as Draft);
     for (const { key, value } of await backend.listLocal('file:')) store.fileEntries.set(key.slice(5), value as FileEntry);
-    // Once, on the first start that knows about owners: a phone that is still signed in learns whose records it holds
-    // (an older version never wrote this down). A phone signed out by an older version cannot be told; sync.ts handles it.
+    // Once, on the first start that knows about owners. (1) A phone still signed in learns whose records it holds.
+    // (2) A database that ALREADY holds real records, waiting edits or waiting deletions when this first start happens was
+    // used by an older version; if no team can be established for it, that is remembered (`ownerUnknown`) and the person
+    // is asked after the next sign-in. A phone that opens EMPTY here is genuinely new: what it records later belongs to
+    // the first team it joins. Nothing is cleared, reset or adopted on the way.
     const m = state.meta;
-    if (!m.ownerChecked) store.setSingleton('meta', { ownerChecked: true, ...(m.syncWorkspaceId || !m.syncSession?.workspaceId ? {} : { syncWorkspaceId: m.syncSession.workspaceId }) });
+    if (!m.ownerChecked) {
+      const owner = m.syncWorkspaceId ?? m.syncSession?.workspaceId;
+      const hadRealData = m.dirty.length > 0 || m.tombstones.length > 0 || COLLECTIONS.some(c => (state[c] as unknown as { sample?: boolean }[]).some(r => !r.sample));
+      store.setSingleton('meta', { ownerChecked: true, ...(owner ? { syncWorkspaceId: owner } : hadRealData ? { ownerUnknown: true } : {}) });
+    }
     return store;
   }
 

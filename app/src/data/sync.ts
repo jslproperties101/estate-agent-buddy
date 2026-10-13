@@ -101,20 +101,19 @@ export function holdsOtherWorkspaceData(state: AppState, sessionWorkspaceId: str
   return holdsRealData(state);
 }
 
-/** True when real records are on this phone, it HAS been synced before (an older version recorded `lastSync`), yet nothing
- *  says which team those records belong to (an older version never wrote the owner down and the account was signed out).
- *  The app cannot verify the owner, so the person must say before anything is sent or shown. A phone that has never synced
- *  (no `lastSync`) is treated as new: records entered before the first sign-in belong to whoever signs in first. If an
- *  older phone somehow lost `lastSync`, that is the one case this cannot detect. */
+/** True when real records are on this phone and nothing says which team they belong to, and either an older version
+ *  synced it before (`lastSync`) or the database already held real records when this version first started (`ownerUnknown`,
+ *  set in Store.open). The app cannot verify the owner, so the person must say before anything is sent or shown. A phone
+ *  that opened empty at its first start is new: what it records later belongs to the first team it joins. */
 export function ownerUnknownWithData(state: AppState, sessionWorkspaceId: string | undefined): boolean {
   const m = state.meta;
-  return !m.syncWorkspaceId && !!sessionWorkspaceId && !!m.lastSync && holdsRealData(state);
+  return !m.syncWorkspaceId && !!sessionWorkspaceId && (!!m.lastSync || !!m.ownerUnknown) && holdsRealData(state);
 }
 
 /** The person says the records on this phone belong to the team they are signed in to. Nothing is changed or removed. */
 export function confirmOwner(store: Store): void {
   const ws = store.getState().meta.syncSession?.workspaceId;
-  if (ws) store.setSingleton('meta', { syncWorkspaceId: ws });
+  if (ws) store.setSingleton('meta', { syncWorkspaceId: ws, ownerUnknown: undefined });
 }
 
 interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }

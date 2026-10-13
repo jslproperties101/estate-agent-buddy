@@ -190,10 +190,62 @@ test('W8b the one-time step never adopts a team that signed in later: restarting
   assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true);
 });
 
-test('W9 genuinely new phones are unchanged: never synced (no lastSync), or only sample data, signs in to the first team without a question', async () => {
-  const neverSynced = await legacyPhone({ lastSync: undefined });
-  assert.equal(ownerUnknownWithData(neverSynced.getState(), 'wsB'), false);
+test('W9 a phone with only sample data (or nothing) has nothing to protect: no question', async () => {
   const sampleOnly = await phone(new FakeCloud(), 'x@x.c');
   sampleOnly.store.setSingleton('meta', { lastSync: 5 });
   assert.equal(ownerUnknownWithData(sampleOnly.store.getState(), 'wsB'), false, 'no real records: nothing to protect');
+});
+
+test('W10 Phase 1 phone with real records, NO owner and NO lastSync (signed out before any sync completed): the new team neither receives nor supplies records before the question is answered', async () => {
+  const store = await legacyPhone({ lastSync: undefined });
+  const m0 = store.getState().meta;
+  assert.equal(m0.lastSync, undefined); assert.equal(m0.syncWorkspaceId, undefined);
+  assert.equal(m0.ownerUnknown, true, 'the first start noticed the database was not empty and had no owner');
+  assert.equal(m0.ownerChecked, true);
+  const { cloudB, sessionB, rowsBefore } = await joinTeamB();
+  store.setSingleton('meta', { syncSession: sessionB });
+  assert.equal(ownerUnknownWithData(store.getState(), 'wsB'), true, 'the question comes first');
+  const before = cloudB.log.length;
+  await assert.rejects(() => syncNow(store, cfg, cloudB.fetch), (e: unknown) => e instanceof SyncError && e.code === 'owner-unknown');
+  assert.ok(!cloudB.log.slice(before).some(l => /eab_records|eab_push_records|eab_files|storage/.test(l)), 'nothing requested or sent');
+  assert.equal(JSON.stringify([...cloudB.rows.entries()]), rowsBefore, 'team B untouched');
+  const m = store.getState().meta;
+  assert.deepEqual(m.dirty, ['contacts:c2']); assert.deepEqual(m.tombstones, ['contacts:gone']);
+  assert.deepEqual(store.getState().contacts.map(c => c.id).sort(), ['c1', 'c2']);
+  assert.equal(m.syncWorkspaceId, undefined, 'the signed-in team was not adopted'); assert.equal(m.lastSeq ?? 0, 0, 'sync position not reset or moved');
+  // answering "yes" then lets it sync, and the marker is cleared
+  confirmOwner(store);
+  assert.equal(store.getState().meta.ownerUnknown, undefined);
+  await syncNow(store, cfg, cloudB.fetch);
+  assert.ok(cloudB.rows.get('wsB|contacts|c2'), 'only now does the record go to team B');
+});
+
+test('W10b the question survives a restart (the marker is stored, not only in memory)', async () => {
+  const b = new MemoryBackend();
+  await seed(b, contact('c1', 'Old record'));
+  await b.put('s:meta', { fired: [], dirty: [], tombstones: [] });                        // Phase 1 phone: records, nothing else
+  const first = await Store.open(b); await first.flush();
+  const again = await Store.open(b);                                                       // restarted
+  assert.equal(again.getState().meta.ownerUnknown, true);
+  again.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 1e6, email: 'b@x.c', userId: 'uB', workspaceId: 'wsB', workspaceName: 'Team B', role: 'owner' } });
+  assert.equal(ownerUnknownWithData(again.getState(), 'wsB'), true);
+});
+
+test('W11 a genuinely NEW phone opens empty, records are entered offline, then it joins its first team: no question, records go up', async () => {
+  const cloud = new FakeCloud(); cloud.ws = 'wsB';
+  const b = new MemoryBackend();
+  const fresh = await Store.open(b);                                                       // first ever start: empty database
+  assert.equal(fresh.getState().meta.ownerChecked, true); assert.equal(fresh.getState().meta.ownerUnknown, undefined);
+  fresh.upsert('contacts', contact('mine', 'Entered offline'));
+  fresh.upsert('contacts', contact('mine2', 'Also offline'));
+  fresh.remove('contacts', 'mine2');
+  await fresh.flush();
+  const restarted = await Store.open(b);                                                   // closed and reopened before signing in
+  assert.equal(restarted.getState().meta.ownerUnknown, undefined, 'not mistaken for an older phone');
+  const user = cloud.addUser('b@x.c');
+  restarted.setSingleton('meta', { syncSession: { accessToken: `tok-${user.id}`, refreshToken: 'r', expiresAt: Date.now() + 1e6, email: 'b@x.c', userId: user.id, workspaceId: 'wsB', workspaceName: 'Team B', role: 'owner' } });
+  assert.equal(ownerUnknownWithData(restarted.getState(), 'wsB'), false);
+  await syncNow(restarted, cfg, cloud.fetch);
+  assert.equal(cloud.rows.get('wsB|contacts|mine')?.rev, 1, 'its first team receives the records');
+  assert.equal(restarted.getState().meta.syncWorkspaceId, 'wsB');
 });

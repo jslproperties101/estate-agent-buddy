@@ -257,6 +257,8 @@ export interface Meta {
   syncWorkspaceId?: string;
   /** Set once by the first start of a version that knows whose records a phone holds (see Store.open). */
   ownerChecked?: boolean;
+  /** Set at that first start when the database ALREADY held real records but no team could be established for them. */
+  ownerUnknown?: boolean;
   /** Position in the cloud's own change order (not a clock) up to which this phone has taken changes. */
   lastSeq?: number;
   /** Changes that could not be joined automatically. Both versions are kept; nothing is sent for these records
