@@ -3684,6 +3684,32 @@ test('U93 buyer requirements: a buyer\'s page lists what they want and the prope
   await page.context().close();
 });
 
+test('U94 follow-up reminder: a quiet buyer is listed in Notifications, the setting can turn it off, and the buyer is not changed', async () => {
+  const page = await phone();
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => {
+      const tx = r.result.transaction('records', 'readwrite'); const old = Date.now() - 45 * 86400000;
+      tx.objectStore('records').put({ id: 'fq1', created: old, updated: old, name: 'Quiet Buyer', roles: ['buyer'], leadStatus: 'warm' }, 'c:contacts:fq1');
+      tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await page.getByTestId('top-notifications').click();
+  await page.getByTestId('notif-followup').waitFor();
+  assert.match(await page.getByTestId('notif-followup').innerText(), /Contacts to follow up[\s\S]*1 contact has had no interaction for 30 days or more[\s\S]*Quiet Buyer/);
+  await home(page);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.locator('[data-testid="followup-setting"] button[data-days="0"]').click();
+  await home(page);
+  await page.getByTestId('top-notifications').click();
+  await page.getByTestId('notif-empty-system').waitFor();
+  assert.equal(await page.getByTestId('notif-followup').count(), 0);
+  const kept = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:contacts:fq1'); g.onsuccess = () => res(g.result); }; }));
+  assert.equal(kept.leadStatus, 'warm', 'the reminder changed nothing about the buyer');
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);

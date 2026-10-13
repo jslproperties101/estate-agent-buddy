@@ -7,6 +7,8 @@ import { BUILD } from '../native/updates';
 import { bugStrings } from '../bugreport/strings';
 import { MapsCheck } from '../maps/MapsCheck';
 import { BackupCard } from '../backup/BackupUI';
+import { followStrings } from '../contacts/followStrings';
+import { DEFAULT_FOLLOW_UP_DAYS, FOLLOW_UP_CHOICES } from '../domain/followup';
 import { Lang, LANGS, strings } from '../i18n';
 import { useApp, useStore } from '../data/useStore';
 import { Go } from '../nav';
@@ -247,6 +249,13 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <button className="btn primary" data-testid="open-bug-report" onClick={() => go({ name: 'bugReport', from: 'settings' })}>{bugStrings[lang].open}</button>
       </div>
       <BackupCard lang={lang} />
+      <div className="card stack-sm" data-testid="followup-setting">
+        <div className="card-title">{followStrings[lang].settingTitle}</div>
+        <small className="muted">{followStrings[lang].settingHelp}</small>
+        <div className="seg" role="group" aria-label={followStrings[lang].settingTitle}>
+          {FOLLOW_UP_CHOICES.map(d => <button key={d} data-days={d} aria-pressed={(s.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS) === d} onClick={() => store.setSingleton('settings', { followUpDays: d })}>{d === 0 ? followStrings[lang].off : followStrings[lang].days(d)}</button>)}
+        </div>
+      </div>
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>

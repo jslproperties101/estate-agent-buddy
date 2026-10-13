@@ -70,6 +70,8 @@ import { backupDue, driveUsable, runDriveBackup } from './backup/drive';
 import { backupStrings } from './backup/strings';
 import { STALE_MS } from './backup/BackupUI';
 import { leadReviewStrings } from './data/leadReviewStrings';
+import { followStrings } from './contacts/followStrings';
+import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 
 /** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
  *  card: it lives inside Agent Profile. News is no longer a card: News / Announcements is a section of Notifications.
@@ -515,7 +517,9 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
   const draftCount = store.allDrafts().length;
   const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
-  const systemEmpty = soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
+  const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
+  const follow = followUpDue(state.contacts, now, followDays);
+  const systemEmpty = follow.length === 0 && soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -538,6 +542,17 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
           <button className="link-row" data-testid="notif-adverts" onClick={() => go({ name: 'adSummary' })}>
             <strong>📣 {adStrings[lang].attention} ({adAttn.length})</strong><small className="muted">{adStrings[lang].summaryTitle}</small>
           </button>
+        )}
+        {follow.length > 0 && (
+          <div className="stack-sm" data-testid="notif-followup">
+            <strong>{followStrings[lang].title}</strong>
+            <small className="muted">{followStrings[lang].notice(follow.length, followDays)}</small>
+            {follow.slice(0, 5).map(x => (
+              <button key={x.contact.id} className="link-row" data-testid="followup-row" onClick={() => go({ name: 'contactDetail', id: x.contact.id })}>
+                <strong>{x.contact.name}</strong><small className="muted">{x.contact.lastInteraction ? followStrings[lang].quiet(x.quietDays) : followStrings[lang].never}</small>
+              </button>
+            ))}
+          </div>
         )}
         {driveStale && (
           <button className="link-row" data-testid="notif-drive" onClick={() => go({ name: 'settings' })}>

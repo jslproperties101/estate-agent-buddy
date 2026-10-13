@@ -273,6 +273,8 @@ export interface Settings {
   mapType?: 'roadmap' | 'satellite' | 'hybrid';
   /** The new-user choice on first start: sample data or a clean workspace (asked once per phone). */
   startChoice?: 'sample' | 'empty';
+  /** Remind about contacts with no interaction for this many days; 0 = off. Default 30. Never changes a contact. */
+  followUpDays?: number;
 }
 
 export interface CustomOption { value: string; added: number; used: number }
