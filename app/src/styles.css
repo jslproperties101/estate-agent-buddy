@@ -273,7 +273,7 @@ label.btn { position: relative; cursor: pointer; }
 .toast { position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: 696px; margin: 0 auto; background: #1E1B15; color: var(--ink); border: 1px solid var(--gold-lo); border-radius: 14px; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 8px; z-index: 30; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 .toast span { flex: 1; font-size: 15px; }
 .toast button { background: transparent; color: var(--gold-hi); border: 0; font-weight: 800; min-height: 44px; min-width: 44px; }
-.alerts { position: fixed; left: 12px; right: 12px; bottom: 84px; max-width: 696px; margin: 0 auto; z-index: 25; max-height: 45vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.alerts { position: fixed; left: 12px; right: 12px; bottom: 84px; max-width: 696px; margin: 0 auto; z-index: 18; max-height: 45vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .alert { box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 .alert { background: #221B0E; border: 1px solid var(--gold); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 

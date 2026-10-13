@@ -3449,6 +3449,33 @@ test('U88 Advert tracker: a platform that is not in the list can be typed; a bla
   await page.context().close();
 });
 
+test('U89 a reminder banner never sits on top of an open dialog, so the dialog buttons can always be pressed', async () => {
+  // Found in Stage 7: the banner (above the dialogs) covered the Download PDF button whenever a reminder was showing.
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Calendar');
+  const soon = new Date(Date.now() + 10 * 60000);
+  const two = n => String(n).padStart(2, '0');
+  await page.getByRole('button', { name: '+ Appointment' }).click();
+  await page.locator('[data-field="title"]').fill('Banner cover check');
+  await page.locator('[data-field="date"]').fill(`${soon.getFullYear()}-${two(soon.getMonth() + 1)}-${two(soon.getDate())}`);
+  await page.locator('[data-field="time"]').fill(`${two(soon.getHours())}:${two(soon.getMinutes())}`);
+  await page.locator('[data-field="status"]').selectOption('scheduled');
+  await page.getByTestId('reminders').getByRole('button', { name: '15 min before' }).click();
+  await page.getByTestId('save-appt').click();
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await page.waitForSelector('[data-testid="reminder-alerts"]');
+  await tile(page, 'Property Calculator');
+  await page.getByTestId('calc-pdf').dispatchEvent('click');
+  await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
+  assert.equal(await page.getByTestId('reminder-alerts').count(), 1, 'the banner is still there');
+  for (const id of ['pdf-download', 'pdf-share', 'pdf-close']) {
+    const hit = await page.getByTestId(id).evaluate(b => { const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!e && b.contains(e); });
+    assert.ok(hit, `${id} is not covered by the reminder banner`);
+  }
+  await page.context().close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
