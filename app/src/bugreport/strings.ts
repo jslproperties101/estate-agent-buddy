@@ -1,5 +1,6 @@
 // Easy Bug Report text, in three languages. The English wording of the intro is the approved wording, word for word.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   settingsItem: 'Easy Bug Report',
@@ -106,4 +107,4 @@ const zh: BugStrings = {
     badImage: '该文件无法用作截图。请选择 PNG 或 JPG 图片。',
   },
 };
-export const bugStrings: Record<Lang, BugStrings> = { en, bm, zh };
+export const bugStrings: Record<Lang, BugStrings> = titled3({ en, bm, zh });

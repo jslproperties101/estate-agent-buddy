@@ -1,5 +1,6 @@
 // GPS Assistance text (House Shopping and Map), in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   houseShopping: 'House Shopping',
@@ -197,4 +198,4 @@ const zh: GpsStrings = {
   needLocation: '预览路线需要您当前的位置。',
 };
 
-export const gpsStrings: Record<Lang, GpsStrings> = { en, bm, zh };
+export const gpsStrings: Record<Lang, GpsStrings> = titled3({ en, bm, zh });

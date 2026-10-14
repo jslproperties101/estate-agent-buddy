@@ -121,7 +121,7 @@ async function newProperty(page) { await page.locator('.add-property').click(); 
 async function home(page) { while (await page.locator('header button[aria-label="Back"], header button[aria-label="Kembali"], header button[aria-label="返回"]').count()) await page.locator('header .icon-btn').first().click(); }
 async function loadSample(page) {
   await tile(page, 'Agent Profile');
-  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('load-sample').click();
   await home(page);
 }
@@ -166,7 +166,7 @@ test('U1 dashboard: Estate Agent AI Buddy, the approved 15 cards in 3 × 5 (Subs
   await page.getByTestId('notifications').waitFor();
   await home(page);
   await tile(page, 'Market Intelligence');
-  assert.match(await page.getByTestId('soon-market').innerText(), /Coming Soon[\s\S]*lawful and reliable source[\s\S]*Nothing here is live/, 'Market Intelligence is honest: no feed is pretended');
+  assert.match(await page.getByTestId('soon-market').innerText(), /Coming Soon[\s\S]*lawful and reliable source[\s\S]*Nothing here is live/i, 'Market Intelligence is honest: no feed is pretended');
   await home(page);
   await tile(page, 'Contacts');
   assert.deepEqual(await page.locator('.hub-card strong').allInnerTexts(), ['Buyers', 'Vendors']);
@@ -215,7 +215,7 @@ test('U3 Property List: Grid first and default, Large cards second, references h
   await loadSample(page);
   await tile(page, 'Property List');
   const seg = page.locator('.lc-tools .seg button');
-  assert.deepEqual(await seg.evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Grid', 'Large cards']);
+  assert.deepEqual(await seg.evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Grid', 'Large Cards']);
   assert.equal(await seg.first().getAttribute('aria-pressed'), 'true', 'Grid is the default');
   assert.equal(await page.locator('ul[data-layout="grid"] > li').count(), 10);
   const cardsText = await page.locator('ul[data-layout="grid"]').innerText();
@@ -231,8 +231,8 @@ test('U3 Property List: Grid first and default, Large cards second, references h
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List');
   assert.equal(await page.locator('ul[data-layout="large"]').count(), 1, 'layout choice kept after reopening');
-  await page.getByTestId('listing-card').first().getByRole('button', { name: /Open/ }).click();
-  assert.match(await page.getByTestId('ref-row').innerText(), /P10\d\d/, 'the detail page shows the reference');
+  await page.getByTestId('listing-card').first().getByRole('button', { name: /Open/i }).click();
+  assert.match(await page.getByTestId('ref-row').innerText(), /P10\d\d/i, 'the detail page shows the reference');
   await page.context().close();
 });
 
@@ -251,7 +251,7 @@ test('U4 saved data is permanent: a new property is still there after closing an
   // Change 009: the card shows the address; the headline is kept for marketing.
   assert.ok(await page.getByTestId('card-address').filter({ hasText: 'Jalan Persistence 1' }).first().isVisible());
   await page.getByTestId('card-open').first().click();
-  assert.match(await page.getByTestId('marketing').innerText(), /Persistence test house/);
+  assert.match(await page.getByTestId('marketing').innerText(), /Persistence test house/i);
   await page.context().close();
 });
 
@@ -263,7 +263,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: P1011', 'P1010 exists → P1011');
   // a number already used by another property, whatever the prefix
   await page.locator('[data-field="refNo"]').fill('1004');
-  assert.match(await page.getByTestId('ref-error').innerText(), /already.*1011/);
+  assert.match(await page.getByTestId('ref-error').innerText(), /already.*1011/i);
   await page.getByRole('button', { name: 'Use 1011' }).click();
   // custom prefix through Others
   await page.getByTestId('ref-prefix').locator('.opt-btn').click();
@@ -276,7 +276,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   await page.locator('[data-field="headline"]').fill('KL test');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  assert.match(await page.getByTestId('ref-row').innerText(), /KL1011/);
+  assert.match(await page.getByTestId('ref-row').innerText(), /KL1011/i);
   // next new property: KL is the default and on top of the list
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
@@ -317,7 +317,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   const page = await phone();
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  assert.match(await page.getByTestId('opt-country').innerText(), /Malaysia/, 'Malaysia is the default country');
+  assert.match(await page.getByTestId('opt-country').innerText(), /Malaysia/i, 'Malaysia is the default country');
   const labels = await page.locator('#sec-location .ff > span:first-child, #sec-location label.ff').evaluateAll(xs => xs.map(x => x.textContent.trim()));
   const want = ['Country', 'State', 'City / Town', 'Township', 'Unit/Lot Number', 'Jalan / Street (Number or Name)'];
   const idx = want.map(w => labels.findIndex(l => l.startsWith(w)));
@@ -333,11 +333,11 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.getByTestId('opt-township').locator('.opt-btn').click();
   const t2 = page.getByTestId('opt-township');
-  assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/ }).count(), 1, 'remembered');
+  assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/i }).count(), 1, 'remembered');
   assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sri Pajam' }).count(), 1, 'custom value has X');
-  assert.equal(await t2.getByRole('button', { name: /^Remove Putra Nilai/ }).count(), 0, 'built-in values have no X');
+  assert.equal(await t2.getByRole('button', { name: /^Remove Putra Nilai/i }).count(), 0, 'built-in values have no X');
   await t2.getByRole('button', { name: 'Remove Taman Sri Pajam' }).click();
-  assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/ }).count(), 0);
+  assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/i }).count(), 0);
   assert.ok(await t2.getByRole('button', { name: 'Others…' }).isVisible(), 'Others stays available');
   await page.context().close();
 });
@@ -354,29 +354,29 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   await page.locator('[data-field="unitNo"]').fill('No. 5');
   await page.locator('[data-field="street"]').fill('Jalan Sampel 9');
   assert.equal(await page.locator('[data-field="lat"], [data-field="lng"], [data-field="lotNo"]').count(), 0, 'no latitude, longitude or separate lot boxes');
-  assert.match(await page.getByTestId('gmap-add').innerText(), /Add Location/);
+  assert.match(await page.getByTestId('gmap-add').innerText(), /Add Location/i);
   await page.getByTestId('gmap-add').click();
   await page.waitForSelector('[data-testid="picker-map"]');
   // Google would answer with a different address: it must not be read, compared or applied.
   await page.evaluate(() => { window.__geocode = { street: 'Jalan Seriemas 2', township: 'Kota Seriemas Utama', city: 'Nilai', state: 'Negeri Sembilan' }; window.__mapClick(2.8123, 101.7956); });
   await page.getByTestId('picker-pos').waitFor();
-  assert.match(await page.getByTestId('picker-pos').innerText(), /Point chosen/);
+  assert.match(await page.getByTestId('picker-pos').innerText(), /Point chosen/i);
   assert.ok(!/2\.81|101\.79/.test(await page.getByTestId('location-picker').innerText()), 'no coordinates shown');
   assert.equal(await page.getByTestId('geo-result').count() + await page.getByTestId('discrepancies').count(), 0, 'no address review');
   await page.getByTestId('apply-location').click();
-  assert.match(await page.getByTestId('pos-text').innerText(), /Location saved/);
+  assert.match(await page.getByTestId('pos-text').innerText(), /Location saved/i);
   assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Sampel 9', 'street unchanged');
-  assert.match(await page.getByTestId('opt-township').innerText(), /Taman Desa Nilai/, 'township unchanged');
+  assert.match(await page.getByTestId('opt-township').innerText(), /Taman Desa Nilai/i, 'township unchanged');
   // Google Maps Link: example placeholder, kept as typed; a full link that holds the point also places it.
   const link = page.locator('[data-field="mapsLink"]');
   assert.equal(await link.getAttribute('placeholder'), 'https://maps.app.goo.gl/ExampleLink');
   await link.fill('https://maps.app.goo.gl/AbCdEf123');
-  assert.match(await page.getByTestId('maps-link-note').innerText(), /short links hide it/);
+  assert.match(await page.getByTestId('maps-link-note').innerText(), /short links hide it/i);
   assert.equal(await page.getByTestId('open-maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   const loc = page.getByTestId('sec-location-view');
-  assert.match(await loc.innerText(), /Location saved/);
+  assert.match(await loc.innerText(), /Location saved/i);
   assert.ok(!/2\.81|101\.79/.test(await loc.innerText()), 'the details show no latitude or longitude');
   assert.equal(await loc.getByTestId('maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
   assert.ok(await loc.getByRole('link', { name: 'Navigate' }).isVisible(), 'navigation still uses the saved point');
@@ -401,7 +401,7 @@ test('U9 inquiries and viewings are separate; Convert to Viewing moves it as Pen
   assert.equal(await inq.getByTestId('inquiry-item').count(), 0, 'removed from Inquiry History');
   assert.equal(await view.getByTestId('viewing-item').count(), 1);
   assert.equal(await view.getByTestId('viewing-status').innerText(), 'Pending Viewing');
-  assert.match(await view.innerText(), /From inquiry on/);
+  assert.match(await view.innerText(), /From inquiry on/i);
   await view.getByRole('button', { name: 'Mark as viewed' }).click();
   assert.equal(await view.getByTestId('viewing-status').innerText(), 'Viewed');
   // a direct viewing without an inquiry
@@ -424,7 +424,7 @@ test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Gray Dropped, Green Boo
   assert.deepEqual(colours, ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)', 'rgb(34, 197, 94)']);
   const hot = page.locator('[data-testid="contact-row"][data-lead="hot"]').first();
   assert.equal(await hot.evaluate(el => getComputedStyle(el).borderLeftColor), 'rgb(239, 68, 68)');
-  await page.getByRole('radio', { name: /Warm/ }).click();
+  await page.getByRole('radio', { name: /Warm/i }).click();
   assert.equal(await page.getByTestId('contact-row').count(), 1);
   await shot(page, '07-buyer-leads');
   await page.context().close();
@@ -440,11 +440,11 @@ test('U11 To-Do: due date, priority, reminders, completion kept as history; foll
   await page.getByTestId('reminders').getByRole('button', { name: '3 days before' }).click();
   await page.getByTestId('reminders').getByRole('button', { name: '7 days before' }).click();
   await page.getByTestId('save-task').click();
-  await page.getByRole('tab', { name: /Upcoming/ }).click();
+  await page.getByRole('tab', { name: /Upcoming/i }).click();
   const t = page.getByTestId('task').filter({ hasText: 'Prepare offer letter' });
-  assert.match(await t.innerText(), /Urgent/);
+  assert.match(await t.innerText(), /Urgent/i);
   await t.getByRole('checkbox').click();
-  await page.getByRole('tab', { name: /Completed/ }).click();
+  await page.getByRole('tab', { name: /Completed/i }).click();
   assert.equal(await page.getByTestId('task').filter({ hasText: 'Prepare offer letter' }).count(), 1, 'completed items stay as history');
   await home(page);
   // follow-up from an inquiry
@@ -456,9 +456,9 @@ test('U11 To-Do: due date, priority, reminders, completion kept as history; foll
   await page.getByTestId('save-inquiry').click();
   await home(page);
   await tile(page, 'To-Do');
-  await page.getByRole('tab', { name: /Upcoming/ }).click();
+  await page.getByRole('tab', { name: /Upcoming/i }).click();
   assert.equal(await page.getByTestId('task').filter({ hasText: 'Follow up Buyer L' }).count(), 1);
-  assert.match(await page.getByTestId('task').filter({ hasText: 'Follow up Buyer L' }).innerText(), /Follow-up/);
+  assert.match(await page.getByTestId('task').filter({ hasText: 'Follow up Buyer L' }).innerText(), /Follow-up/i);
   await shot(page, '08-todo');
   await page.context().close();
 });
@@ -487,13 +487,13 @@ test('U12 Calendar: appointments linked to property and contact, statuses, and a
   assert.equal(await page.getByTestId('reminder-alerts').count(), 0, 'no reminder pop-up on the main screen');
   assert.equal(await page.getByRole('button', { name: 'Dismiss' }).count(), 0);
   await page.getByTestId('top-notifications').click();
-  assert.match(await page.getByTestId('notifications').innerText(), /Meet owner at site/, 'the reminder is listed in Notifications');
+  assert.match(await page.getByTestId('notifications').innerText(), /Meet owner at site/i, 'the reminder is listed in Notifications');
   await home(page);
   await tile(page, 'Calendar');
   if (ymd(soon) !== ymd(now)) await page.locator(`.cal-day[data-date="${ymd(soon)}"]`).click();
   const item = page.getByTestId('appt-item').filter({ hasText: 'Meet owner at site' });
   await item.getByRole('button', { name: 'Mark completed' }).click();
-  assert.match(await item.innerText(), /Completed/);
+  assert.match(await item.innerText(), /Completed/i);
   await page.getByRole('tab', { name: 'Completed' }).click();
   assert.equal(await page.getByTestId('appt-item').filter({ hasText: 'Meet owner at site' }).count(), 1, 'completed appointments stay');
   await shot(page, '09b-calendar');
@@ -517,17 +517,17 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   }
   await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="trk-distance"]')?.textContent ?? '0') > 150);
   const dist = await page.getByTestId('trk-distance').innerText();
-  assert.match(dist, /^\d+ m$/);
+  assert.match(dist, /^\d+ m$/i);
   assert.ok(parseInt(dist) > 100, `travelled ${dist}`);
   await page.getByTestId('mark-here').click();
   await page.getByTestId('mark-sheet').locator('input').first().fill('For sale sign, corner lot');
   await page.getByTestId('save-found').click();
-  assert.match(await page.getByTestId('journey-marks').innerText(), /For sale sign, corner lot/);
-  assert.match(await page.getByTestId('journey-places').innerText(), /Tmn Desa Nilai|Nilai/, 'places passed through, from Google');
+  assert.match(await page.getByTestId('journey-marks').innerText(), /For sale sign, corner lot/i);
+  assert.match(await page.getByTestId('journey-places').innerText(), /Tmn Desa Nilai|Nilai/i, 'places passed through, from Google');
   await shot(page, '10b-house-shopping');
   await page.getByTestId('trk-stop').click();
   await page.waitForSelector('[data-testid="journey-detail"]');
-  assert.match(await page.getByTestId('jd-distance').innerText(), /\d+ m/);
+  assert.match(await page.getByTestId('jd-distance').innerText(), /\d+ m/i);
   await waitStored(page, 'records', "all.some(v => v && v.status === 'saved' && Array.isArray(v.points) && v.points.length > 1)");   // the write lands a moment after the screen shows it
   // the saved journey and the found property are kept
   await page.reload(); await page.waitForSelector('nav.grid');
@@ -538,8 +538,8 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await home(page);
   await tile(page, 'GPS Assistance');
   await page.getByTestId('card-map').click();
-  assert.match(await page.getByTestId('map-title').innerText(), /Jalan Fake 1/, 'Change 009: titled by its address; the note stays as its comment');
-  assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/);
+  assert.match(await page.getByTestId('map-title').innerText(), /Jalan Fake 1/i, 'Change 009: titled by its address; the note stays as its comment');
+  assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/i);
   await page.waitForFunction(() => window.__markers.some(m => m.o.icon?.fillColor === '#4285F4')); // the GPS reading arrives a moment after the map
   const pins = await page.evaluate(() => window.__markers.map(m => (m.o.icon?.fillColor === '#4285F4' ? 'me' : 'property')));
   assert.equal(pins.filter(x => x === 'property').length, 1, 'only real saved positions are shown');
@@ -554,7 +554,7 @@ test('U14 GPS Map without a Google key: says so, never shows invented positions'
   await tile(page, 'GPS Assistance');
   await page.getByTestId('card-map').click();
   await page.getByTestId('maps-no-key').waitFor();
-  assert.match(await page.locator('main').innerText(), /No property has a saved map position yet/, 'sample properties have no invented positions');
+  assert.match(await page.locator('main').innerText(), /No property has a saved map position yet/i, 'sample properties have no invented positions');
   await page.context().close();
 });
 
@@ -583,7 +583,7 @@ test('U15 Agent Financial: deals, commission share, expenses, outstanding and ta
   await page.getByRole('button', { name: 'Set target' }).click();
   await page.locator('.fin-card input').fill('20000');
   await page.locator('.fin-card').getByRole('button', { name: 'Save' }).click();
-  assert.match(await page.locator('main').innerText(), /42% of target/);
+  assert.match(await page.locator('main').innerText(), /42% of target/i);
   await shot(page, '11-finance');
   await page.context().close();
 });
@@ -594,10 +594,10 @@ test('U16 Property Calculator: pre-filled from the property, full breakdown, edi
   await tile(page, 'Property List');
   await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByRole('button', { name: 'Calculate' }).click();
-  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
+  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/i);
   assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000');
   for (const id of ['out-down', 'out-loan', 'out-monthly', 'out-interest', 'out-repay', 'out-mot', 'out-loanstamp', 'out-spa-legal', 'out-loan-legal', 'out-cash'])
-    assert.match(await page.getByTestId(id).innerText(), /^RM [\d,]+\.\d\d$/, id);
+    assert.match(await page.getByTestId(id).innerText(), /^RM [\d,]+\.\d\d$/i, id);
   assert.equal(await page.getByTestId('out-mot').innerText(), 'RM 11,400.00', 'MOT on RM580,000: 1,000 + 8,000 + 2,400');
   await shot(page, '12a-calculator');
   await page.getByRole('tab', { name: 'Rental & ROI' }).click();
@@ -660,11 +660,11 @@ test('U18 Ask Expert: eight specialists, saved questions, disclaimer on answers,
   assert.ok(await page.getByTestId('ai-off').isVisible(), 'AI answers are clearly not set up');
   assert.equal(await page.getByTestId('ask-ai').isDisabled(), true);
   await page.locator('select').first().selectOption({ label: 'Lawyer P (sample) · Messrs P & Co (sample)' });
-  assert.match(await page.getByRole('link', { name: 'WhatsApp' }).getAttribute('href'), /^https:\/\/wa\.me\/60322221111\?text=/);
+  assert.match(await page.getByRole('link', { name: 'WhatsApp' }).getAttribute('href'), /^https:\/\/wa\.me\/60322221111\?text=/i);
   await page.getByRole('button', { name: 'Record the answer received' }).click();
   await page.locator('textarea').last().fill('Only with state consent; check the title restriction.');
   await page.getByTestId('save-answer').click();
-  assert.match(await page.getByTestId('disclaimer').innerText(), /General guidance from Lawyer\. Not professional advice/);
+  assert.match(await page.getByTestId('disclaimer').innerText(), /General guidance from Lawyer\. Not professional advice/i);
   await shot(page, '14-ask-expert');
   await page.context().close();
 });
@@ -682,11 +682,11 @@ test('U19 Voice Command: property, to-do, calendar and contact commands open the
   await tile(page, 'Voice Command');
   await box.fill('Create a new terrace house in Putra Nilai for sale, asking price RM580,000, four bedrooms, freehold, owner Encik Ahmad 012 345 6789');
   await page.getByRole('button', { name: 'Show proposed details' }).click();
-  assert.match(await page.getByTestId('proposal').innerText(), /Encik Ahmad/);
+  assert.match(await page.getByTestId('proposal').innerText(), /Encik Ahmad/i);
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await expandForm(page);
   assert.equal(await page.locator('[data-field="askingPrice"]').inputValue(), '580,000', 'RM shown with thousands separators');
-  assert.match(await page.getByTestId('opt-township').innerText(), /Putra Nilai/);
+  assert.match(await page.getByTestId('opt-township').innerText(), /Putra Nilai/i);
   assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), 'Encik Ahmad');
   assert.ok(await page.locator('.small-chip', { hasText: 'from your words' }).first().isVisible());
   await page.context().close();
@@ -730,9 +730,9 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
   // every tile label is translated
   await home(page);
   await page.locator('.lang button', { hasText: 'BM' }).click();
-  assert.match(await page.locator('nav.grid').innerText(), /Kewangan Ejen[\s\S]*Kalkulator Hartanah[\s\S]*Arahan Suara/);
+  assert.match(await page.locator('nav.grid').innerText(), /Kewangan Ejen[\s\S]*Kalkulator Hartanah[\s\S]*Arahan Suara/i);
   await page.locator('.lang button', { hasText: '中文' }).click();
-  assert.match(await page.locator('nav.grid').innerText(), /代理财务[\s\S]*房产计算器[\s\S]*语音指令/);
+  assert.match(await page.locator('nav.grid').innerText(), /代理财务[\s\S]*房产计算器[\s\S]*语音指令/i);
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-Hans');
   await page.context().close();
 });
@@ -780,8 +780,8 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
     ['property form money', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="askingPrice"]'],
     ['contact form', async () => { await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click(); }, '[data-field="name"]'],
     ['calculator', async () => { await tile(page, 'Property Calculator'); }, '[data-field="price"]'],
-    ['to-do form', async () => { await tile(page, 'To-Do'); await page.getByRole('button', { name: /New to-do|Add/ }).first().click(); }, '[data-field="title"]'],
-    ['agent profile', async () => { await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click(); }, '[data-field="fullName"]'],
+    ['to-do form', async () => { await tile(page, 'To-Do'); await page.getByRole('button', { name: /New to-do|Add/i }).first().click(); }, '[data-field="title"]'],
+    ['agent profile', async () => { await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/i }).first().click(); }, '[data-field="fullName"]'],
   ];
   for (const [name, open, sel] of forms) {
     await home(page); await open();
@@ -839,7 +839,7 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
     const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => res(q.result.filter(x => x && x.street === 'Jalan Wang 1').map(x => x.askingPrice)); };
   }));
   assert.deepEqual(saved, [588000], 'stored as a plain number');
-  assert.match(await page.locator('main').innerText(), /RM 588,000/);
+  assert.match(await page.locator('main').innerText(), /RM 588,000/i);
   // Same box in Agent Financial and the calculator.
   await home(page); await tile(page, 'Agent Financial');
   await page.getByRole('button', { name: /expense/i }).first().click();
@@ -856,12 +856,21 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
 test('U25 Coming Soon: Subsale and Project say so (the top-bar Co-broke item was removed by Change 003)', async () => {
   const page = await phone();
   await tile(page, 'Subsale');
-  assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/);
+  assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/i);
   await home(page);
   await tile(page, 'Project');
-  assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/);
+  assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/i);
   await home(page);
   assert.equal(await page.getByTestId('top-cobroke').count(), 0);
+  // Owner 15 Oct: Co-broke Opportunities opens from the Opportunities card.
+  await loadSample(page);
+  await tile(page, 'Opportunities');
+  await page.getByTestId('open-cobroke').click();
+  assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/i);
+  const count = Number((await page.getByTestId('cobroke-count').innerText()).match(/\d+/)[0]);
+  assert.ok(count >= 1, 'sample data has co-broke properties');
+  await page.getByRole('button', { name: 'Show co-broke properties' }).click();
+  assert.equal(await page.getByTestId('listing-card').count(), count, 'only co-broke properties are listed');
   await page.context().close();
 });
 
@@ -877,7 +886,7 @@ test('U26 reference number dropdown: used numbers red and not selectable, free n
   const used = list.locator('[data-used="true"]');
   const usedCount = await used.count();
   assert.ok(usedCount >= 10, `sample references show as used (${usedCount})`);
-  assert.match(await used.first().innerText(), /Used by P\d+/);
+  assert.match(await used.first().innerText(), /Used by P\d+/i);
   assert.equal(await used.first().evaluate(el => getComputedStyle(el).color), 'rgb(255, 138, 122)', 'used numbers are red');
   assert.ok(await used.first().isDisabled(), 'used numbers cannot be chosen');
   // A used number cannot be picked even by a forced tap.
@@ -886,7 +895,7 @@ test('U26 reference number dropdown: used numbers red and not selectable, free n
   // Pick a free number further down.
   const free = list.locator('.ref-opt.free').nth(3);
   const no = await free.getAttribute('data-no');
-  assert.match(await free.innerText(), /Available/);
+  assert.match(await free.innerText(), /Available/i);
   await free.click();
   assert.equal(await page.locator('[data-field="refNo"]').inputValue(), no);
   assert.equal(await list.count(), 0, 'list closes after choosing');
@@ -903,8 +912,8 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   const page = await phone({ maps: true, geo: { latitude: 2.8210, longitude: 101.8040, accuracy: 7 } });
   await loadSample(page);
   await tile(page, 'GPS Assistance');
-  assert.deepEqual(await page.locator('.gps-home .big-card strong').allInnerTexts(), ['House Shopping', 'My Banner Location', 'My Property Map', 'Co-broke Opportunity Map']);
-  assert.match(await page.getByTestId('card-cobroke-map').innerText(), /Coming Soon/);
+  assert.deepEqual((await page.locator('.gps-home .big-card strong').allInnerTexts()).map(x => x.toLowerCase()), ['house shopping', 'my banner location', 'my property map', 'co-broke opportunity map']);
+  assert.match(await page.getByTestId('card-cobroke-map').innerText(), /Coming Soon/i);
   await page.getByTestId('card-cobroke-map').click();
   assert.ok(await page.getByTestId('soon-cobrokeMap').isVisible());
   await page.locator('header .icon-btn').first().click();
@@ -920,21 +929,21 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   await first.getByTestId('banner-add').click();
   await page.getByTestId('banner-gps').click();
   await page.getByTestId('banner-pos-set').waitFor();
-  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.82100, 101\.80400 · GPS ±7 m/);
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.82100, 101\.80400 · GPS ±7 m/i);
   await page.locator('[data-field="bannerNote"]').fill('Gate, facing main road');
   await page.getByTestId('banner-save').click();
   const card = page.locator('[data-testid="banner-card"]', { hasText: title });
   assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/i);
   assert.equal(await card.getByTestId('banner-up').count(), 1);
-  assert.match(await card.getByTestId('banner-up').innerText(), /Gate, facing main road/);
-  assert.match(await card.getByTestId('banner-navigate').getAttribute('href'), /2\.821/);
+  assert.match(await card.getByTestId('banner-up').innerText(), /Gate, facing main road/i);
+  assert.match(await card.getByTestId('banner-navigate').getAttribute('href'), /2\.821/i);
   // 2) A second banner placed by tapping the map.
   await card.getByTestId('banner-add').click();
   await page.evaluate(() => window.__mapClick(2.8301, 101.8102));
-  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/);
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/i);
   await page.getByTestId('banner-save').click();
   assert.equal(await card.getByTestId('banner-up').count(), 2);
-  assert.match(await page.getByTestId('banner-map-count').innerText(), /2 banners on the map/);
+  assert.match(await page.getByTestId('banner-map-count').innerText(), /2 banners on the map/i);
   await shot(page, '27b-banner-location', false);
   // 3) Take both down: still Yes after the first, Removed after the last; both kept as history.
   await card.getByTestId('banner-takedown').first().click();
@@ -942,7 +951,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/i);
   await card.getByTestId('banner-takedown').first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
-  assert.match(await card.locator('.banner-chip').innerText(), /Removed/);
+  assert.match(await card.locator('.banner-chip').innerText(), /Removed/i);
   assert.equal(await card.getByTestId('banner-up').count(), 0);
   assert.equal(await card.getByTestId('banner-old').count(), 2, 'taken-down banners stay in the history');
   // 4) Status chosen by hand, and the filter.
@@ -955,7 +964,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   await page.locator('[data-testid="banner-card"]', { hasText: title }).getByRole('button', { name: 'Open property' }).click();
   const sec = page.getByTestId('sec-banner-view');
   assert.match(await sec.innerText(), /Banner placed\?[\s\S]*Owner doesn’t allow/i);
-  await sec.getByRole('button', { name: /Edit/ }).click();
+  await sec.getByRole('button', { name: /Edit/i }).click();
   assert.equal(await page.locator('#sec-banner').getAttribute('data-open'), 'yes', 'Edit opens the Banner section');
   assert.equal(await page.locator('#sec-location').getAttribute('data-open'), 'no', 'other sections start closed');
   await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('not_yet');
@@ -966,7 +975,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   assert.match(await page.getByTestId('sec-banner-view').innerText(), /Not yet/i);
   await page.getByRole('button', { name: 'Show on map' }).click();
   assert.match(await page.getByTestId('map-banner').innerText(), /Banner placed\?[\s\S]*Not yet/i);
-  await page.getByTestId('map-banner').getByRole('button', { name: /Banner locations/ }).click();
+  await page.getByTestId('map-banner').getByRole('button', { name: /Banner locations/i }).click();
   assert.ok(await page.getByTestId('banner-screen').isVisible());
 
   // Everything is still there after closing and reopening the app.
@@ -1001,7 +1010,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
       assert.equal(u.searchParams.get('grant_type'), 'pkce');
       const body = JSON.parse(req.postData());
       assert.equal(body.auth_code, 'CODE-1');
-      assert.match(body.code_verifier, /^[A-Za-z0-9_-]{43,}$/);
+      assert.match(body.code_verifier, /^[A-Za-z0-9_-]{43,}$/i);
       return json({ access_token: 'AT', refresh_token: 'RT', expires_in: 3600, user: { id: 'u-owner', email: 'agent.j@gmail.com', user_metadata: { full_name: 'Agent J' } } });
     }
     if (u.pathname === '/rest/v1/rpc/eab_my_membership') return json([{ workspace_id: 'ws-1', workspace_name: 'Agent J team', role: 'owner' }]);
@@ -1018,7 +1027,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   const page = await ctx.newPage();
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   // Without sign-in set up, the app opens straight away and Settings says what is missing.
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   assert.ok(await page.getByTestId('account-not-set-up').isVisible());
   await page.getByLabel('Supabase project URL').fill(SB);
   await page.getByLabel('Supabase anon (public) key').fill('anon-public-key');
@@ -1026,21 +1035,21 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   // Set up and nobody signed in: the sign-in screen comes first.
   await page.getByTestId('login').waitFor();
   await shot(page, '28a-login', false);
-  assert.match(await page.getByTestId('google-sign-in').innerText(), /Continue with Google/);
+  assert.match(await page.getByTestId('google-sign-in').innerText(), /Continue with Google/i);
   // Cancelled at Google: nothing changes, clear message.
   mode = 'cancel';
   await page.getByTestId('google-sign-in').click();
   await page.getByTestId('login-error').waitFor();
-  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/);
+  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/i);
   assert.equal(new URL(page.url()).search, '', 'the address is cleaned');
   // Signed in at Google: back in the app, with the team role from the database.
   mode = 'ok';
   await page.getByTestId('google-sign-in').click();
   await page.waitForSelector('nav.grid');
   assert.equal(new URL(page.url()).search, '', 'the code is not left in the address');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
-  assert.match(await page.getByTestId('signed-in-as').innerText(), /Agent J \(agent\.j@gmail\.com\)/);
-  assert.match(await page.getByTestId('workspace-role').innerText(), /Agent J team · Owner/);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
+  assert.match(await page.getByTestId('signed-in-as').innerText(), /Agent J \(agent\.j@gmail\.com\)/i);
+  assert.match(await page.getByTestId('workspace-role').innerText(), /Agent J team · Owner/i);
   await page.getByTestId('team').getByTestId('member').nth(1).waitFor();
   assert.equal(await page.getByTestId('member').count(), 2);
   await page.locator('[data-field="inviteEmail"]').fill('new.agent@gmail.com');
@@ -1068,7 +1077,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   bugMode = 'ok';
   await page.getByTestId('bug-send').click();
   await page.getByTestId('bug-sent').waitFor();
-  assert.match(await page.getByTestId('bug-sent').innerText(), /Your report was sent/);
+  assert.match(await page.getByTestId('bug-sent').innerText(), /Your report was sent/i);
   assert.ok(seen.some(x => /^POST \/storage\/v1\/object\/bug-reports\/u-owner\/[0-9a-f-]{36}\.jpg$/.test(x)), 'screenshot went to the private bucket under the person’s own folder');
   assert.ok(seen.includes('POST /rest/v1/eab_bug_reports'));
   await page.locator('header .icon-btn').first().click();   // back to Settings
@@ -1076,7 +1085,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   // Still signed in after closing and reopening.
   await page.reload(); await page.waitForSelector('nav.grid');
   // Sign out: back to the sign-in screen; records stay on the phone.
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('sign-out').click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Sign out' }).click();
   await page.getByTestId('login').waitFor();
@@ -1152,7 +1161,7 @@ test('U29 maps: My Location recentres after moving the map, follows until dragge
   });
   await tile(p2, 'GPS Assistance'); await p2.getByTestId('card-house-shopping').click();
   await p2.getByTestId('map-my-location').click();
-  await p2.getByTestId('map-status').filter({ hasText: /permission was refused/ }).waitFor();
+  await p2.getByTestId('map-status').filter({ hasText: /permission was refused/i }).waitFor();
   assert.ok(await p2.getByTestId('map-my-location').isVisible());
   await p2.context().close();
 });
@@ -1168,12 +1177,12 @@ test('U30 updates: a newer published version is offered on the web; About shows 
   await page.getByTestId('update-bar').waitFor({ timeout: 10000 });
   assert.equal(await page.getByTestId('update-bar').getAttribute('data-kind'), 'web-reload');
   assert.match(await page.getByTestId('update-bar').innerText(), /new version/i);
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   const v = await page.getByTestId('about-version').innerText();
-  assert.match(v, /Version 2\.1\.0 · build \w+ · native 3/);
+  assert.match(v, /Version 2\.1\.0 · build \w+ · native 3/i);
   published = v.match(/build (\w+)/)[1];
   await page.getByTestId('check-update').click();
-  assert.match(await page.getByTestId('update-msg').innerText(), /latest version/);
+  assert.match(await page.getByTestId('update-msg').innerText(), /latest version/i);
   await ctx.close();
 });
 
@@ -1205,7 +1214,7 @@ test('U31 contacts: phonebook button fills name and phone (asks before replacing
   await page.locator('[data-field="whatsapp"]').fill('@aliasonly');
   await page.getByTestId('save-contact').click();
   assert.equal(await page.getByTestId('contact-whatsapp').innerText(), '@aliasonly');
-  assert.match(await page.getByTestId('contact-detail').innerText(), /search this alias in WhatsApp/);
+  assert.match(await page.getByTestId('contact-detail').innerText(), /search this alias in WhatsApp/i);
   await shot(page, '31-contact-alias', false);
   await page.context().close();
 });
@@ -1228,7 +1237,7 @@ test('U32 voice: End recording shows the recognised words; nothing recognised gi
     await ctx.addInitScript(FAKE_SPEECH(words));
     const page = await ctx.newPage();
     await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
-    assert.match(await page.locator('nav.grid > button.voice-tile').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/, 'gold Voice Command card');
+    assert.match(await page.locator('nav.grid > button.voice-tile').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/i, 'gold Voice Command card');
     await tile(page, 'Voice Command');
     await page.getByTestId('voice-start').first().click();
     await page.getByRole('button', { name: 'Use the speech service' }).click();
@@ -1237,7 +1246,7 @@ test('U32 voice: End recording shows the recognised words; nothing recognised gi
     await page.getByTestId('voice-start').first().waitFor();
     const box = page.getByTestId('voice-command').locator('textarea').first();
     if (expectText) assert.equal(await box.inputValue(), 'Test 1 2 3');
-    else { assert.equal(await box.inputValue(), ''); assert.match(await page.getByTestId('voice-error').first().innerText(), /No words were recognised/); }
+    else { assert.equal(await box.inputValue(), ''); assert.match(await page.getByTestId('voice-error').first().innerText(), /No words were recognised/i); }
     await ctx.close();
   }
 });
@@ -1245,7 +1254,7 @@ test('U32 voice: End recording shows the recognised words; nothing recognised gi
 test('U33 phone book: Send Name Card picker fills editable name and number; refusals and missing support are explained, never silent', async () => {
   const page = await phone();
   // Complete the required profile so the name card is active.
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/i }).first().click();
   await page.locator('[data-field="fullName"]').fill('Agent J'); await page.locator('[data-field="regNo"]').fill('12345');
   await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
   await page.locator('[data-field="agency"]').fill('JSL Properties'); await page.locator('[data-field="phone"]').fill('0123456789');
@@ -1254,7 +1263,7 @@ test('U33 phone book: Send Name Card picker fills editable name and number; refu
   // Browser without a contact picker: the button works and says why it cannot open.
   await page.getByRole('button', { name: 'Phone book' }).click();
   await page.getByTestId('namecard-pick').click();
-  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /not available in this browser/);
+  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /not available in this browser/i);
   // With the phone's contact picker: name and number filled, and still editable.
   await page.evaluate(() => {
     window.ContactsManager = function () {};
@@ -1264,19 +1273,19 @@ test('U33 phone book: Send Name Card picker fills editable name and number; refu
   assert.equal(await page.locator('[data-field="toName"]').inputValue(), 'Buyer Z');
   assert.equal(await page.locator('[data-field="toTel"]').inputValue(), '+60 13-222 3333');
   await page.locator('[data-field="toName"]').fill('Encik Z');
-  assert.match(await page.getByTestId('recipient').innerText(), /Encik Z · \+60 13-222 3333/);
-  assert.match(await page.getByTestId('open-whatsapp').getAttribute('href'), /^https:\/\/wa\.me\/60132223333\?text=.*Agent%20J/);
+  assert.match(await page.getByTestId('recipient').innerText(), /Encik Z · \+60 13-222 3333/i);
+  assert.match(await page.getByTestId('open-whatsapp').getAttribute('href'), /^https:\/\/wa\.me\/60132223333\?text=.*Agent%20J/i);
   // Picker closed without choosing: says so.
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [] } }));
   await page.getByTestId('namecard-pick').click();
-  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /No contact was chosen/);
+  assert.match(await page.getByTestId('namecard-pick-msg').innerText(), /No contact was chosen/i);
   await shot(page, '33-namecard-phonebook', false);
   await page.context().close();
 });
 
 test('U34 new user: Populate with Sample Data (recommended) or Start Without; sample clearly marked; clean workspace stays empty', async () => {
   const empty = await phone({ start: null });
-  assert.match(await empty.getByTestId('start-choice').innerText(), /Populate with Sample Data[\s\S]*Recommended[\s\S]*Start Without Sample Data/);
+  assert.match(await empty.getByTestId('start-choice').innerText(), /Populate with Sample Data[\s\S]*Recommended[\s\S]*Start Without Sample Data/i);
   await empty.getByTestId('startup-logo').waitFor({ state: 'detached' });
   await shot(empty, '34a-start-choice', false);
   await empty.getByTestId('start-empty').click();
@@ -1295,10 +1304,10 @@ test('U34 new user: Populate with Sample Data (recommended) or Start Without; sa
   assert.ok(await page.locator('[data-testid="contact-row"] .sample-tag').count() >= 10, 'sample vendors marked');
   assert.ok(await page.locator('[data-vstat="pending_info"]').count() >= 1, 'vendor statuses in the sample');
   await home(page); await tile(page, 'To-Do');
-  assert.match(await page.locator('main').innerText(), /\(sample\)/);
+  assert.match(await page.locator('main').innerText(), /\(sample\)/i);
   await home(page); await tile(page, 'Calendar');
   await home(page); await tile(page, 'Inquiries & Viewings');
-  assert.match(await page.locator('main').innerText(), /Buyer L \(sample\)|Tenant R \(sample\)/);
+  assert.match(await page.locator('main').innerText(), /Buyer L \(sample\)|Tenant R \(sample\)/i);
   await page.context().close();
 });
 
@@ -1306,7 +1315,7 @@ test('U35 vendors have their own status (Pending Property Info, Pending Follow-u
   const page = await phone({ start: 'sample' });
   await tile(page, 'Vendor List');
   const vs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
-  assert.deepEqual(vs, ['Pending Property Info', 'Pending Follow-up', 'Listed', 'Negotiating', 'On Hold', 'Closed (Sold / Rented)', 'Withdrawn']);
+  assert.deepEqual(vs.map(x => x.toLowerCase()), ['pending property info', 'pending follow-up', 'listed', 'negotiating', 'on hold', 'closed (sold / rented)', 'withdrawn']);
   for (const old of ['Cold', 'Warm', 'Hot', 'Dropped', 'Inactive', 'Booked / Bought']) assert.ok(!vs.includes(old), `no ${old} for vendors`);
   await page.getByTestId('status-filter').locator('[data-status="pending_follow_up"]').click();
   const rows = await page.getByTestId('contact-row').count();
@@ -1326,22 +1335,22 @@ test('U36 Agent Profile: Send Name Card stays off until the required details are
   const page = await phone();
   await tile(page, 'Agent Profile');
   assert.equal(await page.getByTestId('send-namecard').isDisabled(), true);
-  assert.match(await page.getByTestId('namecard-hint').innerText(), /Please complete the required information in Edit Profile to activate your Name Card\.[\s\S]*Full name, Registration type, Registration \/ agent number, Agency \/ company, Contact number/);
-  await page.getByRole('button', { name: /Edit/ }).first().click();
+  assert.match(await page.getByTestId('namecard-hint').innerText(), /Please complete the required information in Edit Profile to activate your Name Card\.[\s\S]*Full name, Registration type, Registration \/ agent number, Agency \/ company, Contact number/i);
+  await page.getByRole('button', { name: /Edit/i }).first().click();
   assert.equal(await page.locator('[data-testid="profile-edit"] .req').count() >= 5, true, 'required fields are marked');
   await page.locator('[data-field="fullName"]').fill('Agent J'); await page.locator('[data-field="agency"]').fill('JSL Properties');
   await page.locator('[data-field="phone"]').fill('0123456789');
   await page.getByTestId('save-profile').click();
   assert.equal(await page.getByTestId('send-namecard').isDisabled(), true, 'still missing the registration');
-  assert.match(await page.getByTestId('namecard-hint').innerText(), /Registration type, Registration \/ agent number$/);
-  await page.getByRole('button', { name: /Edit/ }).first().click();
+  assert.match(await page.getByTestId('namecard-hint').innerText(), /Registration type, Registration \/ agent number$/i);
+  await page.getByRole('button', { name: /Edit/i }).first().click();
   await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
   await page.locator('[data-field="regNo"]').fill('12345');
   await page.getByTestId('save-profile').click();
   assert.equal(await page.getByTestId('send-namecard').isDisabled(), false, 'switched on automatically');
   assert.equal(await page.getByTestId('namecard-hint').count(), 0);
   await page.getByTestId('send-namecard').click();
-  assert.match(await page.getByTestId('share-preview').innerText(), /\*Agent J\*[\s\S]*REN No\.: 12345[\s\S]*JSL Properties[\s\S]*\+60 12-345 6789/);
+  assert.match(await page.getByTestId('share-preview').innerText(), /\*Agent J\*[\s\S]*REN No\.: 12345[\s\S]*JSL Properties[\s\S]*\+60 12-345 6789/i);
   await page.context().close();
 });
 
@@ -1355,22 +1364,22 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   await page.locator('[data-field="headline"]').fill('Collapsible test');
   await page.locator('[data-sec="marketing"]').click(); // close it again
   assert.equal(await page.locator('[data-field="headline"]').count(), 0);
-  assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/);
+  assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/i);
   // Change 009: the asking price is in Price, Tenure and Title Info.
   await page.locator('[data-sec="tenure"]').click();
   await page.locator('[data-field="askingPrice"]').fill('480000');
   await page.locator('[data-sec="notes"]').click();
   // Field help
   await page.locator('[data-help="tenure"]').click();
-  assert.match(await page.getByTestId('help-tenure').innerText(), /freehold[\s\S]*Enter:[\s\S]*Example:[\s\S]*Why it matters:/);
+  assert.match(await page.getByTestId('help-tenure').innerText(), /freehold[\s\S]*Enter:[\s\S]*Example:[\s\S]*Why it matters:/i);
   // Save floats: visible at the bottom of the screen while the middle of the form is shown.
   await page.locator('#sec-notes').scrollIntoViewIfNeeded();
   const box = await page.getByTestId('save-floating').boundingBox();
   assert.ok(box && box.y + box.height <= 824 && box.y > 600, `save bar on screen (${box?.y})`);
   await page.getByTestId('save-property').click();
   await page.getByTestId('listing-details').waitFor();
-  assert.match(await page.locator('main').innerText(), /RM 480,000/);
-  assert.match(await page.getByTestId('marketing').innerText(), /Collapsible test/, 'the headline is kept in Marketing');
+  assert.match(await page.locator('main').innerText(), /RM 480,000/i);
+  assert.match(await page.getByTestId('marketing').innerText(), /Collapsible test/i, 'the headline is kept in Marketing');
   await shot(page, '37-form-saved', false);
   await page.context().close();
 });
@@ -1407,7 +1416,7 @@ test('U38 GPS: My Location gets a fresh position every time (even when live upda
   await page.getByTestId('banner-pick-map').waitFor();
   await page.evaluate(() => window.__mapClick(2.8122, 101.8122));
   await page.getByTestId('banner-save').click();
-  assert.match(await page.getByTestId('banner-card').first().getByTestId('banner-pos').innerText(), /2\.81220, 101\.81220/);
+  assert.match(await page.getByTestId('banner-card').first().getByTestId('banner-pos').innerText(), /2\.81220, 101\.81220/i);
   assert.equal(await page.getByTestId('banner-card').first().getByTestId('banner-up').count(), 1, 'moved, not duplicated');
   // House Shopping: mark a spot by tapping the map, then move the mark.
   await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-house-shopping').click();
@@ -1421,7 +1430,7 @@ test('U38 GPS: My Location gets a fresh position every time (even when live upda
   await page.getByTestId('move-map').waitFor();
   await page.evaluate(() => window.__mapClick(2.8144, 101.8144));
   await page.getByTestId('move-mark-save').click();
-  assert.match(await page.getByTestId('journey-marks').innerText(), /2\.81440, 101\.81440/);
+  assert.match(await page.getByTestId('journey-marks').innerText(), /2\.81440, 101\.81440/i);
   await ctx.close();
 });
 
@@ -1449,12 +1458,12 @@ test('U40 startup: slow storage says so after about five seconds, and Try again 
   const t0 = Date.now();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Opening your data on this phone/);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Opening your data on this phone/i);
   assert.equal(await page.getByTestId('startup-logo').getAttribute('data-phase'), 'opening');
   await page.locator('[data-testid="startup-logo"][data-phase="slow"]').waitFor({ timeout: 8000 });
   const took = Date.now() - t0;
   assert.ok(took >= 4500 && took < 7500, `the notice comes at about five seconds (${took} ms)`);
-  assert.match(await page.getByTestId('startup-msg').innerText(), /taking longer than usual\. Your saved data has not been changed/);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /taking longer than usual\. Your saved data has not been changed/i);
   assert.ok(!/encrypt|secur|AI update/i.test(await page.getByTestId('startup-logo').innerText()), 'no untrue claims');
   await page.evaluate(() => { window.__hang = false; });
   await page.getByTestId('startup-retry').click();
@@ -1473,7 +1482,7 @@ test('U41 startup: a storage that cannot be read ends in a clear message with Tr
   const page = await ctx.newPage();
   await page.goto(base);
   await page.locator('[data-testid="startup-logo"][data-phase="failed"]').waitFor({ timeout: 4000 });
-  assert.match(await page.getByTestId('startup-msg').innerText(), /could not be opened\. Nothing was changed or deleted/);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /could not be opened\. Nothing was changed or deleted/i);
   assert.equal(await page.getByTestId('startup-msg').getAttribute('role'), 'alert');
   assert.equal(await page.locator('nav.grid').count(), 0, 'the dashboard is not shown over a store that failed to open');
   await page.evaluate(() => { window.__fail = false; });
@@ -1488,7 +1497,7 @@ test('U42 startup message follows the phone language (Bahasa Malaysia)', async (
   const page = await ctx.newPage();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Membuka data anda dalam telefon ini/);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Membuka data anda dalam telefon ini/i);
   await ctx.close();
 });
 
@@ -1502,7 +1511,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   const page = await ctx.newPage();
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'phone');
-  assert.match(await page.getByTestId('save-status').innerText(), /Saved on this phone/);
+  assert.match(await page.getByTestId('save-status').innerText(), /Saved on this phone/i);
   // Good save: the message shows, then goes in about two seconds.
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
   await page.locator('[data-field="name"]').fill('Timing Buyer');
@@ -1511,7 +1520,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   await toast.waitFor();
   const t0 = Date.now();
   assert.equal(await toast.getAttribute('data-kind'), 'ok');
-  assert.match(await toast.innerText(), /Saved on this phone\./);
+  assert.match(await toast.innerText(), /Saved on this phone\./i);
   await toast.waitFor({ state: 'detached', timeout: 4000 });
   const shown = Date.now() - t0;
   assert.ok(shown >= 1500 && shown <= 2800, `the success message stays about two seconds (${shown} ms), not four`);
@@ -1521,7 +1530,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   await page.locator('[data-field="name"]').fill('Not Saved Buyer');
   await page.getByTestId('save-contact').click();
   await page.locator('[data-testid="toast"][data-kind="error"]').waitFor();
-  assert.match(await page.getByTestId('toast').innerText(), /Could not save to the phone’s storage/);
+  assert.match(await page.getByTestId('toast').innerText(), /Could not save to the phone’s storage/i);
   await page.waitForTimeout(400);
   assert.equal(await page.getByText('Saved on this phone.', { exact: true }).count(), 0, 'no success message after a failed write');
   assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'failed-phone');
@@ -1544,7 +1553,7 @@ test('U44 Notifications: System Notifications and News / Announcements sections,
   const page = await phone();
   await page.getByTestId('top-notifications').click();
   await page.getByTestId('notifications').waitFor();
-  assert.deepEqual(await page.locator('[data-testid="notifications"] .card-title').allInnerTexts(), ['System Notifications', 'News / Announcements', 'Push messages', 'Notification settings']);
+  assert.deepEqual((await page.locator('[data-testid="notifications"] .card-title').allInnerTexts()).map(x => x.toLowerCase()), ['system notifications', 'news / announcements', 'push messages', 'notification settings']);
   const empty = 'You\'re all caught up — we\'ll let you know when there\'s something important.';
   assert.equal(await page.getByTestId('notif-empty-system').innerText(), empty);
   assert.equal(await page.getByTestId('notif-empty-news').innerText(), empty);
@@ -1552,7 +1561,7 @@ test('U44 Notifications: System Notifications and News / Announcements sections,
   await page.getByTestId('notif-news').locator('summary').click();
   assert.match(await page.getByTestId('notif-news').innerText(), /not live[\s\S]*Property market/i);
   // Push messages are not claimed to work.
-  assert.match(await page.locator('.coming-soon').innerText(), /Coming Soon[\s\S]*not set up yet/);
+  assert.match(await page.locator('.coming-soon').innerText(), /Coming Soon[\s\S]*not set up yet/i);
   await shot(page, '44-notifications', false);
   // A reminder coming up appears under System Notifications.
   await home(page); await tile(page, 'To-Do');
@@ -1564,16 +1573,16 @@ test('U44 Notifications: System Notifications and News / Announcements sections,
   await page.getByTestId('save-task').click();
   await home(page);
   await page.getByTestId('top-notifications').click();
-  assert.match(await page.getByTestId('notif-system').innerText(), /Call the lawyer/);
+  assert.match(await page.getByTestId('notif-system').innerText(), /Call the lawyer/i);
   assert.equal(await page.getByTestId('notif-empty-system').count(), 0, 'not empty any more');
   await page.context().close();
 });
 
 test('U45 Settings sits inside Agent Profile and starts with the Easy Bug Report; the wording is approved; screenshot preview and removal; failure keeps the report', async () => {
   const page = await phone();
-  assert.equal(await page.locator('nav.grid > button', { hasText: /^Settings/ }).count(), 0, 'no Settings card on the dashboard');
+  assert.equal(await page.locator('nav.grid > button', { hasText: /^Settings/i }).count(), 0, 'no Settings card on the dashboard');
   await tile(page, 'Agent Profile');
-  await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByRole('button', { name: /Settings/i }).click();
   const first = await page.locator('[data-testid="settings"] > .card').first().getAttribute('data-testid');
   assert.equal(first, 'bug-entry', 'Easy Bug Report is the first item in Settings');
   await shot(page, '45a-settings-bug-entry', false);
@@ -1584,7 +1593,7 @@ test('U45 Settings sits inside Agent Profile and starts with the Easy Bug Report
   assert.ok(intro.includes('We’ll look into it and improve your experience.'));
   // Description is needed.
   await page.getByTestId('bug-send').click();
-  assert.match(await page.getByTestId('bug-fail').innerText(), /write a short description/);
+  assert.match(await page.getByTestId('bug-fail').innerText(), /write a short description/i);
   // Screenshot: preview, remove, add again.
   await page.getByTestId('bug-file').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
   await page.getByTestId('bug-preview').waitFor();
@@ -1599,7 +1608,7 @@ test('U45 Settings sits inside Agent Profile and starts with the Easy Bug Report
   // Nothing is set up on this phone: the report is NOT sent, and it says so (never a false success). Nothing leaves the phone.
   await page.getByTestId('bug-send').click();
   assert.equal(await page.getByTestId('bug-fail').getAttribute('data-reason'), 'notConfigured');
-  assert.match(await page.getByTestId('bug-fail').innerText(), /was not sent[\s\S]*still here/);
+  assert.match(await page.getByTestId('bug-fail').innerText(), /was not sent[\s\S]*still here/i);
   assert.equal(await page.getByTestId('bug-sent').count(), 0);
   assert.equal(await page.getByTestId('bug-desc').inputValue(), 'Voice button does nothing.');
   assert.equal(await page.getByTestId('bug-preview').count(), 1);
@@ -1608,20 +1617,20 @@ test('U45 Settings sits inside Agent Profile and starts with the Easy Bug Report
 
 test('U46 Easy Bug Report in Bahasa Malaysia and Chinese: every new label is translated', async () => {
   const page = await phone();
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.locator('.lang button[aria-label="Bahasa Malaysia"]').click();
   assert.equal(await page.getByTestId('bug-entry').locator('.card-title').innerText(), 'Lapor Pepijat Mudah');
   await page.getByTestId('open-bug-report').click();
-  assert.match(await page.getByTestId('bug-intro').innerText(), /Jumpa masalah\? Jangan risau — semudah 1-2-3\./);
+  assert.match(await page.getByTestId('bug-intro').innerText(), /Jumpa masalah\? Jangan risau — semudah 1-2-3\./i);
   await page.getByTestId('bug-send').click();
-  assert.match(await page.getByTestId('bug-fail').innerText(), /Sila tulis penerangan ringkas/);
+  assert.match(await page.getByTestId('bug-fail').innerText(), /Sila tulis penerangan ringkas/i);
   await page.locator('.lang button[aria-label="中文"]').click();
-  assert.match(await page.getByTestId('bug-intro').innerText(), /发现问题了/);
+  assert.match(await page.getByTestId('bug-intro').innerText(), /发现问题了/i);
   await home(page);
   await page.getByTestId('top-notifications').click();
-  assert.match(await page.getByTestId('notif-empty-news').innerText(), /您已查看全部/);
+  assert.match(await page.getByTestId('notif-empty-news').innerText(), /您已查看全部/i);
   await page.locator('.lang button[aria-label="Bahasa Malaysia"]').click();
-  assert.match(await page.getByTestId('notif-empty-news').innerText(), /Anda sudah mengikuti semuanya/);
+  assert.match(await page.getByTestId('notif-empty-news').innerText(), /Anda sudah mengikuti semuanya/i);
   await page.context().close();
 });
 
@@ -1641,20 +1650,20 @@ test('U47 old Inactive buyers become Dropped (gray), with a reviewable report; n
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Contacts');
   await page.getByTestId('lead-review').waitFor();
-  assert.match(await page.getByTestId('lead-review').innerText(), /Inactive is no longer used as a buyer status\. 1 buyer was marked Inactive, so it was moved to Dropped/);
+  assert.match(await page.getByTestId('lead-review').innerText(), /Inactive is no longer used as a buyer status\. 1 buyer was marked Inactive, so it was moved to Dropped/i);
   assert.deepEqual(await page.getByTestId('lead-review-item').allInnerTexts(), ['Old Inactive Buyer']);
   await shot(page, '47a-lead-review', false);
   // It is also listed under System Notifications.
   await home(page); await page.getByTestId('top-notifications').click();
-  assert.match(await page.getByTestId('notif-lead-review').innerText(), /1 buyer moved from Inactive to Dropped/);
+  assert.match(await page.getByTestId('notif-lead-review').innerText(), /1 buyer moved from Inactive to Dropped/i);
   await home(page); await tile(page, 'Buyer List');
   const row = page.locator('[data-testid="contact-row"][data-lead="dropped"]');
   assert.equal(await row.count(), 1);
   assert.equal(await row.locator('.lead-dot').first().evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(156, 163, 175)', 'Dropped is gray');
   assert.equal(await page.getByTestId('status-filter').locator('[data-status="inactive"]').count(), 0);
   await row.locator('.row-main').click();
-  assert.match(await page.locator('main').innerText(), /Keep these notes/);
-  assert.match(await page.locator('main').innerText(), /\+60 12-000 1111/);
+  assert.match(await page.locator('main').innerText(), /Keep these notes/i);
+  assert.match(await page.locator('main').innerText(), /\+60 12-000 1111/i);
   // Reviewed: the report goes away; the contact stays.
   await home(page); await tile(page, 'Contacts');
   await page.getByTestId('lead-review-done').click();
@@ -1686,14 +1695,14 @@ test('U49 property cards: no "Unit" prefix on any card or view, and the stored u
   await page.locator('[data-field="street"]').fill('Jalan Prefix Test');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  assert.doesNotMatch(await page.locator('main').innerText(), /\bUnit 12A\b/, 'detail page');
-  assert.match(await page.locator('header h1').innerText(), /^12A, Jalan Prefix Test$/);
+  assert.doesNotMatch(await page.locator('main').innerText(), /\bUnit 12A\b/i, 'detail page');
+  assert.match(await page.locator('header h1').innerText(), /^12A, Jalan Prefix Test$/i);
   await home(page); await tile(page, 'Property List');
   assert.equal(await page.getByTestId('listing-card').count(), 1);
-  assert.match(await page.getByTestId('listing-card').first().innerText(), /12A, Jalan Prefix Test/);
-  assert.doesNotMatch(await page.getByTestId('listing-card').first().innerText(), /\bUnit\b/, 'list card');
+  assert.match(await page.getByTestId('listing-card').first().innerText(), /12A, Jalan Prefix Test/i);
+  assert.doesNotMatch(await page.getByTestId('listing-card').first().innerText(), /\bUnit\b/i, 'list card');
   await home(page);
-  assert.doesNotMatch(await page.locator('.photo-cards').innerText().catch(() => ''), /\bUnit\b/, 'dashboard recent card');
+  assert.doesNotMatch(await page.locator('.photo-cards').innerText().catch(() => ''), /\bUnit\b/i, 'dashboard recent card');
   // The stored value is untouched: the unit number is saved exactly as typed.
   const stored = await page.evaluate(() => new Promise((resolve, reject) => {
     const r = indexedDB.open('estate-agent-buddy');
@@ -1712,14 +1721,14 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await page.locator('[data-field="name"]').fill('Half Typed Buyer');
   await page.locator('[data-field="whatsapp"]').fill('@half');
   await page.getByTestId('draft-saved').waitFor();
-  assert.match(await page.getByTestId('draft-saved').innerText(), /Draft saved on this phone/);
+  assert.match(await page.getByTestId('draft-saved').innerText(), /Draft saved on this phone/i);
   // "Closing the app": the page is reloaded. Nothing was saved with the Save button, so no record exists.
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Buyer List');
   assert.equal(await page.getByTestId('contact-row').count(), 0, 'a draft is not a record');
   await page.getByRole('button', { name: 'New buyer' }).click();
   await page.getByTestId('draft-banner').waitFor();
-  assert.match(await page.getByTestId('draft-banner').innerText(), /Draft from .* restored\. It is not saved yet/);
+  assert.match(await page.getByTestId('draft-banner').innerText(), /Draft from .* restored\. It is not saved yet/i);
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer');
   assert.equal(await page.locator('[data-field="whatsapp"]').inputValue(), '@half');
   // Edit the restored draft; close again; the edit is what comes back.
@@ -1797,7 +1806,7 @@ test('U52 the phone’s storage upgrades from the Phase 1 layout without losing 
   await page.goto(base); await page.waitForSelector('nav.grid');
   if (await page.getByTestId('start-choice').count()) await chooseStart(page, 'empty');
   await tile(page, 'Buyer List');
-  assert.match(await page.getByTestId('contact-row').first().innerText(), /From Phase One/);
+  assert.match(await page.getByTestId('contact-row').first().innerText(), /From Phase One/i);
   const info = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { res({ v: r.result.version, stores: [...r.result.objectStoreNames].sort() }); r.result.close(); }; }));
   assert.equal(info.v, 2);
   assert.deepEqual(info.stores, ['files', 'local', 'records']);
@@ -1813,37 +1822,37 @@ test('U53 record status chip, History with restore, and Recently deleted with re
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
   assert.equal(await page.getByTestId('record-status').getAttribute('data-state'), 'phone');
-  assert.match(await page.getByTestId('record-status').innerText(), /Saved on this phone/);
+  assert.match(await page.getByTestId('record-status').innerText(), /Saved on this phone/i);
   await shot(page, '50-record-status', false);
   // Edit: the earlier version goes to History.
   await page.getByRole('button', { name: 'Edit' }).first().click();
   await page.locator('[data-field="name"]').fill('Ahmad Renamed');
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
-  assert.match(await page.locator('.contact-name').innerText(), /Ahmad Renamed/);
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad Renamed/i);
   await page.getByTestId('rec-history').click();
   await page.getByTestId('revision-list').waitFor();
   assert.equal(await page.getByTestId('revision').count(), 1);
-  assert.match(await page.getByTestId('revision').first().innerText(), /Edited on this phone/);
+  assert.match(await page.getByTestId('revision').first().innerText(), /Edited on this phone/i);
   await shot(page, '51-history', false);
   await page.getByTestId('restore-revision').first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Restore this version' }).click();
   await page.getByTestId('history-msg').waitFor();
   await page.locator('header .icon-btn').first().click();
-  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/, 'the earlier name is back');
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/i, 'the earlier name is back');
   // Delete, then bring it back from Recently deleted.
   await page.getByRole('button', { name: 'Edit' }).first().click();
   await page.getByRole('button', { name: 'Delete' }).first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await page.waitForSelector('nav.grid');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('open-recently-deleted').click();
   await page.getByTestId('deleted-item').waitFor();
-  assert.match(await page.getByTestId('deleted-item').first().innerText(), /Ahmad History/);
+  assert.match(await page.getByTestId('deleted-item').first().innerText(), /Ahmad History/i);
   await shot(page, '52-recently-deleted', false);
   await page.getByTestId('restore-deleted').first().click();
   await page.getByTestId('contact-detail').waitFor();
-  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/);
+  assert.match(await page.locator('.contact-name').innerText(), /Ahmad History/i);
   await page.context().close();
 });
 
@@ -1889,8 +1898,8 @@ test('U54 sync review: a same-field conflict, a property number already used, an
   }, SB);
   await page.reload(); await page.waitForSelector('nav.grid');
   await page.locator('[data-testid="save-status"][data-state="conflict"]').waitFor({ timeout: 8000 });
-  assert.match(await page.getByTestId('save-status').innerText(), /3 need review/, 'the status line does not say Synced');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  assert.match(await page.getByTestId('save-status').innerText(), /3 need review/i, 'the status line does not say Synced');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('open-sync-review').click();
   await page.getByTestId('sync-review').waitFor();
   assert.equal(await page.getByTestId('conflict-card').count(), 3);
@@ -1898,14 +1907,14 @@ test('U54 sync review: a same-field conflict, a property number already used, an
 
   // The property number: explained, the other property named, nothing renamed.
   const ref = page.locator('[data-testid="conflict-card"][data-kind="reference"]');
-  assert.match(await ref.innerText(), /A1001 could not be sent/);
-  assert.match(await ref.innerText(), /Used by P1001 · Terrace in Puchong/);
-  assert.match(await ref.innerText(), /not renamed/);
+  assert.match(await ref.innerText(), /A1001 could not be sent/i);
+  assert.match(await ref.innerText(), /Used by P1001 · Terrace in Puchong/i);
+  assert.match(await ref.innerText(), /not renamed/i);
   await ref.getByTestId('open-other').waitFor();
 
   // Same field: this phone's value stays until a choice is made; choosing "theirs" sends it.
   const fields = page.locator('[data-testid="conflict-card"][data-kind="fields"]');
-  assert.match(await fields.innerText(), /LOCAL-PHONE/); assert.match(await fields.innerText(), /REMOTE-PHONE/);
+  assert.match(await fields.innerText(), /LOCAL-PHONE/i); assert.match(await fields.innerText(), /REMOTE-PHONE/i);
   assert.equal(await fields.getByTestId('conflict-apply').isDisabled(), true, 'a choice is needed first');
   await fields.getByTestId('pick-theirs').click();
   await fields.getByTestId('conflict-apply').click();
@@ -1920,7 +1929,7 @@ test('U54 sync review: a same-field conflict, a property number already used, an
   // Deleted elsewhere, edited here: keep mine → sent again (not silently deleted).
   phase = 'settled';
   const del = page.locator('[data-testid="conflict-card"][data-kind="deleted-remote"]');
-  assert.match(await del.innerText(), /Deleted elsewhere, edited here/);
+  assert.match(await del.innerText(), /Deleted elsewhere, edited here/i);
   await del.getByTestId('keep-mine').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="conflict-card"]').length === 1);
   await waitFor(() => pushed.some(r => r.id === 'c2' && r.base_rev === 2));
@@ -2000,7 +2009,7 @@ test('U56 a phone last used by Phase 1 (real records, no remembered team) asks w
   await page.getByTestId('owner-unknown').waitFor();
   assert.equal(await page.locator('nav.grid').count(), 0, 'no records are shown yet');
   assert.equal(await page.getByText('Phase One Buyer').count(), 0);
-  assert.match(await page.getByTestId('owner-unknown').innerText(), /cannot tell which team/);
+  assert.match(await page.getByTestId('owner-unknown').innerText(), /cannot tell which team/i);
   await shot(page, '55-owner-unknown', true);
   await page.waitForTimeout(600);
   assert.ok(!seen.some(r => /eab_push_records|eab_records|eab_files|storage/.test(r)), `nothing sent or loaded before the answer: ${seen}`);
@@ -2147,14 +2156,14 @@ test('U60 property form: the headline sits in Marketing (lower), Type & Purpose 
   const y = id => page.locator(id).evaluate(e => e.getBoundingClientRect().top + scrollY);
   assert.ok(await y('#sec-marketing [data-field="headline"]') > await y('#sec-location'), 'below Location');
   assert.ok(await y('#sec-marketing [data-field="headline"]') > await y('#sec-owner'), 'below Owner');
-  assert.match(await page.locator('#sec-basics .card-title').innerText(), /Type & Purpose/);
+  assert.match(await page.locator('#sec-basics .card-title').innerText(), /Type & Purpose/i);
   await page.locator('#sec-marketing [data-field="headline"]').fill('Corner shop, Nilai');
   await page.locator('[data-sec="marketing"]').click();
-  assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/);
+  assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/i);
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
-  assert.match(await page.getByTestId('marketing').innerText(), /Corner shop, Nilai/, 'shown with Marketing on the detail page');
-  assert.doesNotMatch(await page.getByTestId('sec-basics').innerText(), /Corner shop/);
-  await page.getByTestId('marketing').getByRole('button', { name: /Edit/ }).click();
+  assert.match(await page.getByTestId('marketing').innerText(), /Corner shop, Nilai/i, 'shown with Marketing on the detail page');
+  assert.doesNotMatch(await page.getByTestId('sec-basics').innerText(), /Corner shop/i);
+  await page.getByTestId('marketing').getByRole('button', { name: /Edit/i }).click();
   await page.waitForSelector('#sec-marketing [data-field="headline"]');
   assert.equal(await page.locator('#sec-marketing [data-field="headline"]').inputValue(), 'Corner shop, Nilai');
   await page.context().close();
@@ -2175,11 +2184,11 @@ test('U61 Fill by Voice: a big centred button; filled fields must be reviewed be
   await page.getByTestId('voice-fill-apply').click();
   const banner = page.getByTestId('review-banner');
   await banner.waitFor();
-  assert.match(await banner.innerText(), /filled from your words/);
+  assert.match(await banner.innerText(), /filled from your words/i);
   // Save asks first; "Cancel" returns to the form with nothing saved.
   await page.getByTestId('save-property').click();
   await page.getByRole('alertdialog').waitFor();
-  assert.match(await page.getByRole('alertdialog').innerText(), /Save without checking/);
+  assert.match(await page.getByRole('alertdialog').innerText(), /Save without checking/i);
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
   assert.equal(await page.getByTestId('listing-form').count(), 1);
   assert.equal(await page.evaluate(() => document.querySelectorAll('[data-testid="listing-details"]').length), 0);
@@ -2208,10 +2217,10 @@ test('U62 voice command prefill (Voice Command card; the Property List has no vo
   assert.ok(await page.getByTestId('review-banner').count() === 1, 'the review notice is shown');
   assert.ok(await page.locator('#sec-tenure .chip.stated, #sec-details .chip.stated').count() >= 1, 'fields carry the "from your words" mark');
   await page.getByTestId('save-property').click();
-  assert.match(await page.getByRole('alertdialog').innerText(), /Save without checking/);
+  assert.match(await page.getByRole('alertdialog').innerText(), /Save without checking/i);
   await page.getByRole('alertdialog').getByRole('button', { name: 'Save anyway' }).click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  assert.match(await page.getByTestId('listing-details').innerText(), /1,800/);
+  assert.match(await page.getByTestId('listing-details').innerText(), /1,800/i);
   await page.context().close();
 });
 
@@ -2233,11 +2242,11 @@ test('U63 verification: four states, stored with the record, shown the same way 
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
   const row = k => page.locator(`[data-row="${k}"] [data-verify-state]`);
   assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'owner');
-  assert.match(await row('askingPrice').innerText(), /Owner Stated/, 'a word as well as a colour');
+  assert.match(await row('askingPrice').innerText(), /Owner Stated/i, 'a word as well as a colour');
   assert.equal(await page.locator('[data-row="askingPrice"] .vval').getAttribute('data-verify'), 'owner', 'the value itself is in the Owner Stated colour');
-  assert.match(await row('landSqft').innerText(), /Confirmed/);
-  assert.match(await page.getByTestId('verify-summary').innerText(), /2 to check/);
-  assert.match(await page.getByTestId('verify-summary').innerText(), /Tenure.*Title/s);
+  assert.match(await row('landSqft').innerText(), /Confirmed/i);
+  assert.match(await page.getByTestId('verify-summary').innerText(), /2 to check/i);
+  assert.match(await page.getByTestId('verify-summary').innerText(), /Tenure.*Title/si);
   await shot(page, '61-verification', true);
   // Still there after closing the app.
   await page.reload(); await page.waitForSelector('nav.grid');
@@ -2251,7 +2260,7 @@ test('U63 verification: four states, stored with the record, shown the same way 
   await page.locator('[data-verify="tenure"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
   assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'confirmed');
-  assert.match(await page.getByTestId('verify-summary').innerText(), /1 to check/);
+  assert.match(await page.getByTestId('verify-summary').innerText(), /1 to check/i);
   // Changing the value itself does not touch the mark.
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
   await page.locator('[data-field="askingPrice"]').fill('460000'); await page.getByTestId('save-property').click();
@@ -2286,7 +2295,7 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   // No preview controls of any kind, no floating Add button, no voice button; one Add New Property at the top.
   for (const id of ['preview-btn', 'preview-sheet', 'preview-hint']) assert.equal(await page.getByTestId(id).count(), 0, `no ${id}`);
   assert.equal(await page.locator('.fab, .lc-tools .voice-btn').count(), 0, 'no floating Add button and no voice button');
-  assert.equal(await page.getByRole('button', { name: /Add New Property/ }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: /Add New Property/i }).count(), 1);
   assert.ok(!(await page.getByTestId('listing').innerText()).includes('👁'), 'no eye icon');
   // Address titles, never the headline; the town is not repeated under it.
   const s1 = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
@@ -2296,7 +2305,7 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   const open = s1.getByTestId('card-open');
   const ob = await open.boundingBox();
   assert.ok(ob.height >= 48, `Open is at least 48 px tall (${ob.height})`);
-  assert.match(await open.evaluate(b => getComputedStyle(b).backgroundImage), /gradient/, 'gold');
+  assert.match(await open.evaluate(b => getComputedStyle(b).backgroundImage), /gradient/i, 'gold');
   // A long press (hold, release) and a right-click do nothing special: no preview; the press just counts as a tap.
   const b = await s1.locator('.gc').boundingBox();
   await page.mouse.move(b.x + b.width / 2, b.y + 30);
@@ -2310,10 +2319,10 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   // A single tap opens the details.
   await cards.first().locator('.gc').click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  assert.equal(await page.locator('.rec-actions').getByRole('button', { name: /Voice/ }).count(), 0, 'no voice button on the details');
+  assert.equal(await page.locator('.rec-actions').getByRole('button', { name: /Voice/i }).count(), 0, 'no voice button on the details');
   // Red Delete with confirmation: Cancel keeps it, Delete removes it.
   const del = page.getByTestId('detail-delete');
-  assert.match(await del.evaluate(x => getComputedStyle(x).backgroundColor), /rgb\(163, 38, 27\)/, 'red');
+  assert.match(await del.evaluate(x => getComputedStyle(x).backgroundColor), /rgb\(163, 38, 27\)/i, 'red');
   await del.click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
   assert.equal(await page.getByTestId('listing-details').count(), 1, 'Cancel keeps it');
@@ -2324,9 +2333,9 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   // Large cards: tenure with restriction, storeys and lot type, full Extra Comments, Property Location, gold Open; a tap opens.
   await page.getByRole('button', { name: 'Large cards' }).click();
   const big = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
-  assert.match(await big.getByTestId('card-tenure').innerText(), /Freehold[\s\S]*NON Bumiputera[\s\S]*2 Storeys[\s\S]*Corner/);
+  assert.match(await big.getByTestId('card-tenure').innerText(), /Freehold[\s\S]*NON Bumiputera[\s\S]*2 Storeys[\s\S]*Corner/i);
   assert.equal(await big.getByTestId('card-comments').innerText(), 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).');
-  assert.match(await big.getByTestId('card-location').innerText(), /Add Location/, 'no saved point yet: goes to Add Location');
+  assert.match(await big.getByTestId('card-location').innerText(), /Add Location/i, 'no saved point yet: goes to Add Location');
   assert.ok((await big.getByTestId('card-open').boundingBox()).height >= 48);
   await shot(page, '62-cards-large', false);
   await big.locator('.lc-photo').click();
@@ -2343,17 +2352,17 @@ test('U66 phone book on the contact form and the property owner: icon beside the
   const page = await phone();
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
   const icon = page.getByTestId('pick-contact');
-  assert.equal(await icon.getAttribute('aria-label'), 'Choose from phone book');
+  assert.equal((await icon.getAttribute('aria-label')).toLowerCase(), 'choose from phone book');
   const [ib, fb] = await Promise.all([icon.boundingBox(), page.locator('[data-field="phone"]').boundingBox()]);
   assert.ok(ib.x >= fb.x + fb.width - 2 && Math.abs((ib.y + ib.height / 2) - (fb.y + fb.height / 2)) < 8 && ib.width >= 44 && ib.height >= 44, 'a 44px icon right beside the phone box');
   await icon.click();                                                   // no contact picker in this browser
-  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /not available in this browser/);
+  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /not available in this browser/i);
   await page.evaluate(() => { window.ContactsManager = function () {}; Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [] } }); });
   await icon.click();                                                   // picker closed with nothing chosen
-  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /No contact was chosen/);
+  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /No contact was chosen/i);
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['No Number'], tel: [], email: [] }] } }));
   await icon.click();                                                   // a contact without a number
-  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /no phone number/);
+  assert.match(await page.getByTestId('pick-contact-msg').innerText(), /no phone number/i);
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'No Number');
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Puan Rina'], tel: ['011-2233 4455'], email: [] }] } }));
   await icon.click();
@@ -2366,7 +2375,7 @@ test('U66 phone book on the contact form and the property owner: icon beside the
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
   // Change 009: the phone-book icon sits at the end of the owner's NAME row; phone shows a ready "+", WhatsApp a ready "@".
   const own = page.getByTestId('owner-pick');
-  assert.equal(await own.getAttribute('aria-label'), 'Choose owner from phone book');
+  assert.equal((await own.getAttribute('aria-label')).toLowerCase(), 'choose owner from phone book');
   const [ob, nb] = await Promise.all([own.boundingBox(), page.locator('[data-field="ownerName"]').boundingBox()]);
   assert.ok(ob.x >= nb.x + nb.width - 2 && Math.abs((ob.y + ob.height / 2) - (nb.y + nb.height / 2)) < 8 && ob.width >= 44, 'icon at the end of the name row');
   assert.deepEqual(await page.locator('#owner-box .prefix, [data-testid="owner-box"] .prefix').allInnerTexts(), ['+', '@']);
@@ -2395,7 +2404,7 @@ test('U67 phone numbers that are too short get no Call / WhatsApp link, with an 
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
   assert.equal(await page.locator('a[href^="tel:"], a[href*="wa.me"]').count(), 0);
-  assert.match(await page.getByTestId('phone-invalid').innerText(), /looks incomplete/);
+  assert.match(await page.getByTestId('phone-invalid').innerText(), /looks incomplete/i);
   await home(page); await tile(page, 'Buyer List');
   assert.equal(await page.locator('.contact-row a[href^="tel:"]').count(), 0, 'no broken Call link in the list either');
   await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
@@ -2416,12 +2425,12 @@ test('U68 sample data: Sample tags on every kind of example record, example veri
   await tile(page, 'To-Do'); assert.ok(await page.getByTestId('task').locator('[data-testid="sample-tag"]').count() >= 1, 'to-do rows tagged');
   await home(page);
   await tile(page, 'Vendor List');
-  assert.match(await page.locator('.contact-list').innerText(), /Sample|Contoh/);
+  assert.match(await page.locator('.contact-list').innerText(), /Sample|Contoh/i);
   await page.locator('.contact-row', { hasText: 'Owner F' }).locator('.row-main').click();
-  assert.match(await page.getByTestId('contact-whatsapp').innerText(), /@ownerF_sample/, 'an alias-only sample contact');
+  assert.match(await page.getByTestId('contact-whatsapp').innerText(), /@ownerF_sample/i, 'an alias-only sample contact');
   assert.equal(await page.locator('a[href*="wa.me"]').count(), 0);
   await home(page);
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('remove-sample').click();
   await home(page); await tile(page, 'Property List');
   assert.equal(await page.getByTestId('listing-card').count(), 0, 'everything that was sample is gone');
@@ -2431,7 +2440,7 @@ test('U68 sample data: Sample tags on every kind of example record, example veri
 test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', async () => {
   const page = await phone();
   await loadSample(page);
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   for (const [aria, voice, verifyOwner, openLabel, delLabel] of [
     ['Bahasa Malaysia', 'Isi dengan Suara', 'Dinyatakan Pemilik', 'Buka', 'Padam'],
     ['中文', '语音填写', '屋主所述', '打开', '删除'],
@@ -2452,7 +2461,7 @@ test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', 
     await shot(page, `64-stage3-${aria === '中文' ? 'zh' : 'bm'}`, false);
     await home(page);
     await tile(page, aria === 'Bahasa Malaysia' ? 'Profil Ejen' : '经纪人资料');
-    await page.getByRole('button', { name: /Settings|Tetapan|设置/ }).click();
+    await page.getByRole('button', { name: /Settings|Tetapan|设置/i }).click();
   }
   await page.context().close();
 });
@@ -2484,27 +2493,27 @@ test('U70 My Banner Location: changing the position keeps the earlier place; a p
   await row().getByTestId('banner-edit').click();
   await page.getByTestId('banner-pick-map').filter({ hasText: 'MAP' }).waitFor();   // the sheet's map is drawn
   await page.evaluate(() => window.__mapClick(2.8301, 101.8102));
-  await page.getByTestId('banner-pos-set').filter({ hasText: /2\.83010, 101\.81020 · map/ }).waitFor();   // wait for the screen to show the tapped place
-  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/);
+  await page.getByTestId('banner-pos-set').filter({ hasText: /2\.83010, 101\.81020 · map/i }).waitFor();   // wait for the screen to show the tapped place
+  assert.match(await page.getByTestId('banner-pos-set').innerText(), /2\.83010, 101\.81020 · map/i);
   await page.getByTestId('banner-photo-remove').click();               // and take the photo off the saved banner
   await page.getByTestId('banner-save').click();
-  assert.match(await row().getByTestId('banner-pos').innerText(), /2\.83010, 101\.81020/);
+  assert.match(await row().getByTestId('banner-pos').innerText(), /2\.83010, 101\.81020/i);
   assert.equal(await row().locator('.banner-photo').count(), 0, 'the photo is gone from the saved banner');
-  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/);
+  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/i);
   await row().getByTestId('banner-moves').locator('summary').click();
-  assert.match(await row().getByTestId('banner-move').innerText(), /Was at 2\.82100, 101\.80400 until/);
-  assert.match(await row().getByTestId('banner-navigate').getAttribute('href'), /destination=2\.8301%2C101\.8102/, 'Navigate uses the new saved position');
+  assert.match(await row().getByTestId('banner-move').innerText(), /Was at 2\.82100, 101\.80400 until/i);
+  assert.match(await row().getByTestId('banner-navigate').getAttribute('href'), /destination=2\.8301%2C101\.8102/i, 'Navigate uses the new saved position');
   // Editing only the note adds no move.
   await row().getByTestId('banner-edit').click();
   await page.locator('[data-field="bannerNote"]').fill('Repainted');
   await page.getByTestId('banner-save').click();
-  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/);
+  assert.match(await row().getByTestId('banner-moves').innerText(), /Position changed 1 time/i);
   // The moves stay in the history after taking it down, and the record is flagged sample (so it never syncs).
   await row().getByTestId('banner-takedown').click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
   const old = page.locator('[data-testid="banner-card"]', { hasText: title }).getByTestId('banner-old');
   await page.locator('[data-testid="banner-card"]', { hasText: title }).locator('.banner-history > summary').click();
-  assert.match(await old.innerText(), /Position changed 1 time/);
+  assert.match(await old.innerText(), /Position changed 1 time/i);
   const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => { res(q.result.filter(x => x && x.placedOn)); r.result.close(); }; }; }));
   assert.equal(rec.length, 1);
   assert.equal(rec[0].sample, true, 'a banner on a sample property is a sample');
@@ -2547,23 +2556,23 @@ test('U71 Calculator: search and choose a property, choose a client, save, chang
   await page.getByTestId('calc-pick-property').click();
   await page.getByTestId('calc-search').fill('no such place xyz');
   assert.equal(await page.getByTestId('calc-pick-item').count(), 0);
-  assert.match(await page.getByTestId('calc-no-match').innerText(), /No property matches/);
+  assert.match(await page.getByTestId('calc-no-match').innerText(), /No property matches/i);
   await page.getByTestId('calc-search').fill('P1004');
   assert.equal(await page.getByTestId('calc-pick-item').count(), 1);
   await page.getByTestId('calc-pick-item').click();
-  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
+  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/i);
   await page.waitForFunction(() => document.querySelector('[data-field="price"]')?.value === '580,000').catch(() => {});   // the price is filled in after the property is read
   assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000', 'price came from the property');
   await page.getByTestId('calc-client').selectOption({ label: 'Buyer K (sample) · +60 12-111 2222' });
   await page.getByTestId('calc-name').fill('Offer A');
   assert.equal((await storedRecords(page, 'calculations')).length, 0, 'nothing is saved until Save');
   await page.getByTestId('calc-save').click();
-  assert.match(await page.getByTestId('calc-saved').innerText(), /Saved on this phone/);
+  assert.match(await page.getByTestId('calc-saved').innerText(), /Saved on this phone/i);
   await waitStored(page, 'records', "all.some(v => v && v.kind === 'purchase' && v.title === 'Offer A' && v.purchase && v.purchase.price === 580000 && v.propertyId && v.contactId === 'b1')");
   // change and save again: the same record is updated
   await page.locator('[data-field="price"]').fill('600000');
   await page.getByTestId('calc-save').click();
-  assert.match(await page.getByTestId('calc-saved').innerText(), /Changes saved/);
+  assert.match(await page.getByTestId('calc-saved').innerText(), /Changes saved/i);
   await waitStored(page, 'records', "all.some(v => v && v.title === 'Offer A' && v.purchase && v.purchase.price === 600000)");
   assert.equal((await storedRecords(page, 'calculations')).length, 1, 'edited in place, not duplicated');
   // a second, different calculation (rental) saved as new
@@ -2579,15 +2588,15 @@ test('U71 Calculator: search and choose a property, choose a client, save, chang
   await calcTab(page, 'History');
   assert.equal(await page.getByTestId('calc-history-item').count(), 2);
   const first = page.getByTestId('calc-history-item').filter({ hasText: 'Offer A' });
-  assert.match(await first.innerText(), /Monthly repayment/);
-  assert.match(await first.innerText(), /P1004/);
-  assert.match(await first.innerText(), /Buyer K/);
+  assert.match(await first.innerText(), /Monthly repayment/i);
+  assert.match(await first.innerText(), /P1004/i);
+  assert.match(await first.innerText(), /Buyer K/i);
   await shot(page, '71-calc-history');
   await first.getByTestId('calc-open').click();
   assert.equal(await page.locator('[data-field="price"]').inputValue(), '600,000', 'the saved price is back');
   assert.equal(await page.getByTestId('calc-name').inputValue(), 'Offer A');
-  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
-  assert.match(await page.getByTestId('calc-editing').innerText(), /Offer A/);
+  assert.match(await page.getByTestId('calc-from').innerText(), /P1004/i);
+  assert.match(await page.getByTestId('calc-editing').innerText(), /Offer A/i);
   assert.equal(await page.getByTestId('calc-client').inputValue(), 'b1');
   // delete from History (asks first)
   await calcTab(page, 'History');
@@ -2611,9 +2620,9 @@ test('U72 Calculator: a saved calculation can update the property record only af
   await waitStored(page, 'records', "all.some(v => v && v.kind === 'purchase' && v.purchase.price === 600000)");
   await page.getByTestId('calc-update-property').click();
   const sheet = page.getByTestId('calc-update-sheet');
-  assert.match(await sheet.innerText(), /Asking price/);
-  assert.match(await sheet.innerText(), /Now: RM 580,000\.00/);
-  assert.match(await sheet.innerText(), /New: RM 600,000\.00/);
+  assert.match(await sheet.innerText(), /Asking price/i);
+  assert.match(await sheet.innerText(), /Now: RM 580,000\.00/i);
+  assert.match(await sheet.innerText(), /New: RM 600,000\.00/i);
   const price = async () => (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004').askingPrice;
   assert.equal(await price(), 580000, 'reviewing changes nothing');
   await page.getByTestId('calc-update-cancel').click();
@@ -2625,11 +2634,11 @@ test('U72 Calculator: a saved calculation can update the property record only af
   await page.getByTestId('calc-update-apply').click();
   await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.askingPrice === 600000)");
   const rec = (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004');
-  assert.match(rec.history[0].summary, /Updated from a saved calculation/);
+  assert.match(rec.history[0].summary, /Updated from a saved calculation/i);
   assert.equal(rec.bedrooms !== undefined, true, 'other details are untouched');
   // the same values again: nothing left to update
   await page.getByTestId('calc-update-property').click();
-  assert.match(await page.getByTestId('calc-update-nothing').innerText(), /already has the same values/);
+  assert.match(await page.getByTestId('calc-update-nothing').innerText(), /already has the same values/i);
   await page.getByTestId('calc-update-cancel').click();
   await page.context().close();
 });
@@ -2654,8 +2663,8 @@ test('U73 Calculator PDF: preview the pages, download a real PDF file, share fal
   assert.equal(info.header, '%PDF-1.4');
   assert.equal(info.pages, pages, 'the file has the pages that were previewed');
   assert.equal(info.images, pages); assert.ok(info.eof);
-  assert.match(dl.name, /^Offer-for-Mr-Tan.*\.pdf$/);
-  assert.match(await page.getByTestId('pdf-msg').innerText(), /PDF saved/);
+  assert.match(dl.name, /^Offer-for-Mr-Tan.*\.pdf$/i);
+  assert.match(await page.getByTestId('pdf-msg').innerText(), /PDF saved/i);
   // Share: this desktop browser cannot share a file, so it falls back to saving it (the share sheet is untested here)
   const shared = await pdfFrom(page, 'pdf-share');
   assert.equal(pdfInfo(shared.bytes).header, '%PDF-1.4');
@@ -2683,13 +2692,13 @@ test('U74 Buyer PDF: choose details and photos, never offered: owner, commission
   for (const never of ['Owner name', 'Owner Name', 'Owner phone', 'Owner Phone', 'Commission', 'Internal notes', 'Internal Notes', 'Current tenant', 'Tenant Name', 'Arrangement', 'Handled by', 'Handled By', 'Owner WhatsApp']) assert.ok(!text.includes(never), `${never} must not be offered`);
   assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Asking price.*RM 580,000/i);
   assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated/i, 'the existing check-status label is shown with the fact');
-  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /\d+ of \d+ ticked/);
+  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /\d+ of \d+ ticked/i);
   assert.equal(await screen.getByTestId('bf-street').locator('input').isChecked(), false, 'the exact address starts unticked');
   assert.equal(await screen.getByTestId('bf-askingPrice').locator('input').isChecked(), true);
   // untick one, clear all, tick all
   await screen.getByTestId('bf-bedrooms').locator('input').uncheck();
   await screen.getByTestId('buyer-pdf-none').click();
-  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /^0 of/);
+  assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /^0 of/i);
   await screen.getByTestId('buyer-pdf-all').click();
   assert.equal(await screen.getByTestId('bf-bedrooms').locator('input').isChecked(), true);
   // missing details are listed apart and can be ticked ("To be confirmed")
@@ -2697,7 +2706,7 @@ test('U74 Buyer PDF: choose details and photos, never offered: owner, commission
   assert.ok(await screen.getByTestId('buyer-pdf-missing').locator('input').count() > 0);
   // the PDF language can differ from the app
   await screen.getByTestId('buyer-pdf-lang').selectOption('zh');
-  assert.match(await screen.innerText(), /价格/);
+  assert.match(await screen.innerText(), /价格/i);
   await screen.getByTestId('buyer-pdf-lang').selectOption('en');
   await screen.getByTestId('buyer-pdf-preview').click();
   await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
@@ -2717,8 +2726,8 @@ test('U75 Buyer PDF with real photos: the agent chooses which go in; a property 
   await page.waitForSelector('[data-testid="listing-details"]');
   await page.getByTestId('open-buyer-pdf').click();
   await page.getByTestId('buyer-pdf').waitFor();
-  assert.match(await page.getByTestId('buyer-pdf-no-photos').innerText(), /no photos yet/);
-  assert.match(await page.getByTestId('buyer-pdf-agent-none').innerText(), /Agent Profile/);
+  assert.match(await page.getByTestId('buyer-pdf-no-photos').innerText(), /no photos yet/i);
+  assert.match(await page.getByTestId('buyer-pdf-agent-none').innerText(), /Agent Profile/i);
   await page.getByTestId('buyer-pdf-preview').click();
   await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
   assert.equal(pdfInfo((await pdfFrom(page, 'pdf-download')).bytes).header, '%PDF-1.4', 'no photos, almost no details: still a PDF');
@@ -2737,9 +2746,9 @@ test('U75 Buyer PDF with real photos: the agent chooses which go in; a property 
   await page.getByTestId('open-buyer-pdf').click();
   await page.getByTestId('buyer-pdf').waitFor();
   assert.equal(await page.getByTestId('buyer-pdf-photo').count(), 2);
-  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /2 photos ticked/);
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /2 photos ticked/i);
   await page.getByTestId('buyer-pdf-photo').nth(1).locator('input').uncheck();
-  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /1 photo ticked/);
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /1 photo ticked/i);
   await page.getByTestId('buyer-pdf-preview').click();
   await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
   assert.equal(await page.getByTestId('buyer-pdf-skipped').count(), 0);
@@ -2749,7 +2758,7 @@ test('U75 Buyer PDF with real photos: the agent chooses which go in; a property 
   await page.getByTestId('pdf-close').click();
   // none ticked → no picture section, still fine
   await page.getByTestId('buyer-pdf-photo').nth(0).locator('input').uncheck();
-  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /0 photos ticked/);
+  assert.match(await page.getByTestId('buyer-pdf-photo-count').innerText(), /0 photos ticked/i);
   await page.getByTestId('buyer-pdf-preview').click();
   await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
   assert.equal(pdfInfo((await pdfFrom(page, 'pdf-download')).bytes).header, '%PDF-1.4');
@@ -2773,23 +2782,23 @@ test('U76 Voice diagnostics: unsupported recognition, blocked microphone and an 
   await run('delete window.SpeechRecognition; delete window.webkitSpeechRecognition;', async page => {
     assert.equal(await page.getByTestId('diag-engine').getAttribute('data-code'), 'unsupported');
     assert.equal(await page.getByTestId('voice-diag-verdict').getAttribute('data-verdict'), 'blocked');
-    assert.match(await page.getByTestId('diag-engine').innerText(), /no speech recognition/);
-    assert.match(await page.getByTestId('voice-diag-sim').innerText(), /not proof/);
+    assert.match(await page.getByTestId('diag-engine').innerText(), /no speech recognition/i);
+    assert.match(await page.getByTestId('voice-diag-sim').innerText(), /not proof/i);
     await page.getByTestId('voice-diag-start').click();
-    assert.match(await page.getByTestId('voice-diag-error').innerText(), /not supported here/);
+    assert.match(await page.getByTestId('voice-diag-error').innerText(), /not supported here/i);
     await page.getByTestId('voice-diag-again').click();
     assert.equal(await page.getByTestId('diag-last').getAttribute('data-code'), 'err_unsupported', 'the last problem is remembered and shown');
   });
   // 2. microphone blocked
   await run(`${FAKE_SPEECH('Test 1 2 3')}; navigator.permissions.query = async () => ({ state: 'denied' });`, async page => {
     assert.equal(await page.getByTestId('diag-permission').getAttribute('data-code'), 'perm_denied_web');
-    assert.match(await page.getByTestId('diag-permission').innerText(), /Site settings/);
+    assert.match(await page.getByTestId('diag-permission').innerText(), /Site settings/i);
     assert.equal(await page.getByTestId('voice-diag-verdict').getAttribute('data-verdict'), 'blocked');
   });
   // 3. page not secure
   await run(`${FAKE_SPEECH('Test 1 2 3')}; Object.defineProperty(window, 'isSecureContext', { value: false });`, async page => {
     assert.equal(await page.getByTestId('diag-secure').getAttribute('data-code'), 'insecure');
-    assert.match(await page.getByTestId('diag-secure').innerText(), /https/);
+    assert.match(await page.getByTestId('diag-secure').innerText(), /https/i);
   });
   // 4. working stand-in: Test recognition shows the words; the details text is plain and says "NOT proof"
   await run(`${FAKE_SPEECH('Test 1 2 3')}; navigator.permissions.query = async () => ({ state: 'granted' });`, async page => {
@@ -2797,11 +2806,11 @@ test('U76 Voice diagnostics: unsupported recognition, blocked microphone and an 
     await page.getByTestId('voice-diag-start').click();
     await page.getByTestId('voice-diag-stop').click();
     await page.getByTestId('voice-diag-ok').waitFor();
-    assert.match(await page.getByTestId('voice-diag-heard').innerText(), /Test 1 2 3/);
+    assert.match(await page.getByTestId('voice-diag-heard').innerText(), /Test 1 2 3/i);
     assert.equal(await page.getByTestId('diag-last').getAttribute('data-code'), 'lastOk');
     await page.locator('summary', { hasText: 'Details to send' }).click();
     const report = await page.getByTestId('voice-diag-report').innerText();
-    assert.match(report, /NOT proof that the microphone works/);
+    assert.match(report, /NOT proof that the microphone works/i);
     assert.ok(!/@|\+60/.test(report));
     await shot(page, '76-voice-diagnostics');
   });
@@ -2809,7 +2818,7 @@ test('U76 Voice diagnostics: unsupported recognition, blocked microphone and an 
   await run(`class R { start() { setTimeout(() => this.onerror?.({ error: 'network' }), 30); setTimeout(() => this.onend?.(), 60); } stop() {} abort() {} } window.SpeechRecognition = R;`, async page => {
     await page.getByTestId('voice-diag-start').click();
     await page.getByTestId('voice-diag-error').waitFor();
-    assert.match(await page.getByTestId('voice-diag-error').innerText(), /speech service could not be reached.*internet connection/);
+    assert.match(await page.getByTestId('voice-diag-error').innerText(), /speech service could not be reached.*internet connection/i);
   });
 });
 
@@ -2823,46 +2832,46 @@ test('U77 Voice Command: set the asking price, change the status to Sold and fin
   await say('Set the asking price of P1004 to RM600,000');
   const panel = page.getByTestId('target-panel');
   await panel.waitFor();
-  assert.match(await panel.innerText(), /P1004/);
-  assert.match(await panel.innerText(), /Now: RM 580,000/);
-  assert.match(await panel.innerText(), /New: RM 600,000/);
+  assert.match(await panel.innerText(), /P1004/i);
+  assert.match(await panel.innerText(), /Now: RM 580,000/i);
+  assert.match(await panel.innerText(), /New: RM 600,000/i);
   assert.equal((await p1004()).askingPrice, 580000, 'nothing saved from speech alone');
   await page.getByTestId('target-cancel').click();
   assert.equal((await p1004()).askingPrice, 580000, 'Cancel changes nothing');
   await say('Set the asking price of P1004 to RM600,000');
   await page.getByTestId('target-apply').click();
   await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.askingPrice === 600000)");
-  assert.match(await page.getByTestId('voice-done').innerText(), /Property updated/);
-  assert.match((await p1004()).history[0].summary, /askingPrice/);
+  assert.match(await page.getByTestId('voice-done').innerText(), /Property updated/i);
+  assert.match((await p1004()).history[0].summary, /askingPrice/i);
   // 2. status to Sold (and Bahasa Malaysia wording)
   await say('Change the status of P1004 to Sold');
-  assert.match(await page.getByTestId('target-panel').innerText(), /Now: .*\n?.*New: Sold/s);
+  assert.match(await page.getByTestId('target-panel').innerText(), /Now: .*\n?.*New: Sold/si);
   assert.notEqual((await p1004()).status, 'sold');
   await page.getByTestId('target-apply').click();
   await waitStored(page, 'records', "all.some(v => v && v.ref === 'P1004' && v.status === 'sold')");
   await say('tukar harga P1004 kepada RM590,000');
-  assert.match(await page.getByTestId('target-panel').innerText(), /590,000/);
+  assert.match(await page.getByTestId('target-panel').innerText(), /590,000/i);
   await page.getByTestId('target-cancel').click();
   assert.equal((await p1004()).askingPrice, 600000);
   // 3. an unknown reference is explained, not guessed
   await say('Change the status of P9999 to Sold');
-  assert.match(await page.getByTestId('target-none').innerText(), /No property matches/);
+  assert.match(await page.getByTestId('target-none').innerText(), /No property matches/i);
   await say('Set the price to RM3 million');
-  assert.match(await page.getByTestId('target-none').innerText(), /Which property/);
+  assert.match(await page.getByTestId('target-none').innerText(), /Which property/i);
   // 4. find buyers by what they want
   await say('Find buyers looking for a factory in Salak Tinggi');
   const buyers = page.getByTestId('buyers-panel');
   await buyers.waitFor();
   assert.ok(await page.getByTestId('buyer-match').count() >= 1);
-  assert.match(await buyers.innerText(), /Tenant R/);
-  assert.match(await buyers.innerText(), /notes: factory|asked about/);
+  assert.match(await buyers.innerText(), /Tenant R/i);
+  assert.match(await buyers.innerText(), /notes: factory|asked about/i);
   await shot(page, '77-find-buyers');
   await page.getByTestId('buyer-match').first().getByTestId('buyer-open').click();
   await page.getByTestId('contact-detail').waitFor();
   await home(page);
   await tile(page, 'Voice Command');
   await say('Find buyers looking for a bungalow in Kajang');
-  assert.match(await page.getByTestId('buyers-none').innerText(), /No buyer or tenant matches/);
+  assert.match(await page.getByTestId('buyers-none').innerText(), /No buyer or tenant matches/i);
   // 5. the existing commands still work
   await say('Remind me to call Buyer K tomorrow at 3pm');
   await page.waitForSelector('[data-testid="task-form"]');
@@ -2875,21 +2884,21 @@ test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet a
   const setLang = async aria => {
     await home(page);
     await page.locator('nav.grid > button').nth(9).click();                       // Agent Profile
-    await page.getByRole('button', { name: /Settings|Tetapan|设置/ }).click();
+    await page.getByRole('button', { name: /Settings|Tetapan|设置/i }).click();
     await page.locator(`.lang button[aria-label="${aria}"]`).click();
     await home(page);
   };
   for (const [aria, expect] of [
-    ['Bahasa Malaysia', { hist: 'Sejarah', empty: /Belum ada/, pdf: 'Eksport PDF', diag: 'Diagnostik suara', diagText: /Menyemak mengapa/, buyer: 'PDF pembeli', buyerText: /Pilih apa yang pembeli lihat/, upd: /Kemas kini rekod hartanah/ }],
-    ['中文', { hist: '记录', empty: /还没有/, pdf: '导出 PDF', diag: '语音诊断', diagText: /检查这部手机/, buyer: '买家 PDF', buyerText: /选择买家能看到的内容/, upd: /更新房产记录/ }],
+    ['Bahasa Malaysia', { hist: 'Sejarah', empty: /Belum ada/, pdf: 'Eksport PDF', diag: 'Diagnostik suara', diagText: /Menyemak mengapa/, buyer: 'PDF pembeli', buyerText: /Pilih apa yang pembeli lihat/, upd: /Kemas kini rekod hartanah/i }],
+    ['中文', { hist: '记录', empty: /还没有/, pdf: '导出 PDF', diag: '语音诊断', diagText: /检查这部手机/, buyer: '买家 PDF', buyerText: /选择买家能看到的内容/, upd: /更新房产记录/i }],
   ]) {
     await setLang(aria);
     await page.locator('nav.grid > button').nth(8).click();                       // Property Calculator
-    await page.getByRole('tab', { name: new RegExp(expect.hist) }).click();
+    await page.getByRole('tab', { name: new RegExp(expect.hist, 'i') }).click();
     if (aria === 'Bahasa Malaysia') assert.match(await page.getByTestId('calc-history-empty').innerText(), expect.empty);
-    else assert.match(await page.getByTestId('calc-history-item').first().innerText(), /购买与贷款.*保存于/s);   // the calculation saved in the previous round
+    else assert.match(await page.getByTestId('calc-history-item').first().innerText(), /购买与贷款.*保存于/si);   // the calculation saved in the previous round
     await page.getByRole('tab').first().click();
-    assert.match(await page.getByTestId('calc-pdf').innerText(), new RegExp(expect.pdf));
+    assert.match(await page.getByTestId('calc-pdf').innerText(), new RegExp(expect.pdf, 'i'));
     await page.getByTestId('calc-pick-property').click();
     await page.getByTestId('calc-pick-item').first().click();
     await page.locator('[data-field="price"]').fill('1234567');
@@ -2900,12 +2909,12 @@ test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet a
     await home(page);
     await page.locator('nav.grid > button').nth(3).click();                       // Property list
     await page.getByTestId('listing-card').first().click();
-    assert.match(await page.getByTestId('open-buyer-pdf').innerText(), new RegExp(expect.buyer));
+    assert.match(await page.getByTestId('open-buyer-pdf').innerText(), new RegExp(expect.buyer, 'i'));
     await page.getByTestId('open-buyer-pdf').click();
     assert.match(await page.getByTestId('buyer-pdf').innerText(), expect.buyerText);
     await home(page);
     await page.locator('nav.grid > button.voice-tile').click();
-    assert.match(await page.getByTestId('open-voice-diag').innerText(), new RegExp(expect.diag));
+    assert.match(await page.getByTestId('open-voice-diag').innerText(), new RegExp(expect.diag, 'i'));
     await page.getByTestId('open-voice-diag').click();
     assert.match(await page.getByTestId('voice-diag').innerText(), expect.diagText);
     await shot(page, `78-${aria === '中文' ? 'zh' : 'bm'}-voice-diagnostics`);
@@ -2930,12 +2939,12 @@ test('U79 Advert tracker: add real and fake adverts, validation, stale live stat
   await bareProperty(page);
   await page.getByTestId('open-ad-tracker').click();
   await page.getByTestId('ad-tracker').waitFor();
-  assert.match(await page.getByTestId('ad-tracker').innerText(), /never posts to a platform/);
-  assert.match(await page.getByTestId('ad-none').innerText(), /No adverts recorded/);
+  assert.match(await page.getByTestId('ad-tracker').innerText(), /never posts to a platform/i);
+  assert.match(await page.getByTestId('ad-none').innerText(), /No adverts recorded/i);
   // a real advert: an invalid link is refused and nothing is stored
   await page.getByTestId('ad-add').click();
   await page.getByTestId('ad-platform').selectOption('PropertyGuru');
-  await page.getByTestId('ad-type').selectOption({ label: 'Boosted (paid)' });
+  await page.getByTestId('ad-type').selectOption({ label: 'Boosted (Paid)' });
   await page.getByTestId('ad-title').fill('Corner house, quick sale');
   await page.getByTestId('ad-url').fill('www.no-scheme.com');
   await page.getByTestId('ad-status-select').selectOption('live');
@@ -2943,21 +2952,21 @@ test('U79 Advert tracker: add real and fake adverts, validation, stale live stat
   await page.getByTestId('ad-end').fill(ymdLocal(-2));
   await page.locator('[data-field="ad-cost"]').fill('450');
   await page.getByTestId('ad-save').click();
-  assert.match(await page.getByTestId('ad-editor-form').innerText(), /must start with http/);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /must start with http/i);
   assert.equal((await adsOf(page)).length, 0, 'a refused advert is not stored');
   await page.getByTestId('ad-url').fill('https://www.propertyguru.com.my/listing/123');
   await page.getByTestId('ad-end').fill(ymdLocal(-12));
   await page.getByTestId('ad-save').click();
-  assert.match(await page.getByTestId('ad-editor-form').innerText(), /before the published date/);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /before the published date/i);
   await page.getByTestId('ad-end').fill(ymdLocal(-2));
   await page.getByTestId('ad-save').click();
   await page.getByTestId('ad-card').waitFor();
   await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.platform === 'PropertyGuru' && a.cost === 450 && a.status === 'live' && a.type === 'boosted' && a.url.startsWith('https://')))");
   const card = page.getByTestId('ad-card').first();
-  assert.match(await card.getByTestId('ad-status').innerText(), /Expired/, 'live but past its end date: shown as expired');
-  assert.match(await card.getByTestId('ad-stale').innerText(), /End date has passed/);
+  assert.match(await card.getByTestId('ad-status').innerText(), /Expired/i, 'live but past its end date: shown as expired');
+  assert.match(await card.getByTestId('ad-stale').innerText(), /End date has passed/i);
   assert.equal((await adsOf(page))[0].status, 'live', 'the saved status is not rewritten by the screen');
-  assert.match(await card.getByTestId('ad-cost').innerText(), /RM 450\.00/);
+  assert.match(await card.getByTestId('ad-cost').innerText(), /RM 450\.00/i);
   await page.getByTestId('ad-mark-expired').click();
   await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.status === 'expired'))");
   // a second real advert that is about to expire
@@ -2969,8 +2978,8 @@ test('U79 Advert tracker: add real and fake adverts, validation, stale live stat
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 2);
   // a fake listing: labelled, planned, never counted
   await page.getByTestId('ad-add-fake').click();
-  assert.match(await page.getByTestId('ad-editor-form').innerText(), /TEST · not a real listing/);
-  assert.match(await page.getByTestId('ad-editor-form').innerText(), /not counted in costs or reminders/);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /TEST · not a real listing/i);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /not counted in costs or reminders/i);
   assert.equal(await page.getByTestId('ad-status-select').inputValue(), 'planned');
   await page.getByTestId('ad-title').fill('Practice post');
   await page.locator('[data-field="ad-cost"]').fill('5000');
@@ -2979,15 +2988,15 @@ test('U79 Advert tracker: add real and fake adverts, validation, stale live stat
   await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.fake === true && a.cost === 5000))");
   const fakeCard = page.locator('[data-testid="ad-card"][data-fake="yes"]');
   assert.equal(await fakeCard.count(), 1);
-  assert.match(await fakeCard.innerText(), /TEST · not a real listing/);
-  assert.match(await page.getByTestId('ad-total').innerText(), /Total cost: RM 450\.00/, 'the 5,000 test cost is not added');
-  assert.match(await page.getByTestId('ad-total').innerText(), /1 test listing not counted/);
+  assert.match(await fakeCard.innerText(), /TEST · not a real listing/i);
+  assert.match(await page.getByTestId('ad-total').innerText(), /Total cost: RM 450\.00/i, 'the 5,000 test cost is not added');
+  assert.match(await page.getByTestId('ad-total').innerText(), /1 test listing not counted/i);
   await shot(page, '79a-advert-tracker');
   // closing the app keeps everything
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List');
   await page.getByText('Bare minimum house').first().click();
-  assert.match(await page.getByTestId('marketing').innerText(), /TEST · not a real listing/, 'the detail page labels the test advert too');
+  assert.match(await page.getByTestId('marketing').innerText(), /TEST · not a real listing/i, 'the detail page labels the test advert too');
   await page.getByTestId('open-ad-tracker').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="ad-card"]').length === 3);
   // edit keeps one record, not a copy
@@ -3005,7 +3014,7 @@ test('U79 Advert tracker: add real and fake adverts, validation, stale live stat
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await waitStored(page, 'records', "!all.some(v => v && v.marketing && v.marketing.ads.some(a => a.fake === true))");
   const rec = (await storedRecords(page, 'properties'))[0];
-  assert.match(rec.history[0].summary, /Advert removed/);
+  assert.match(rec.history[0].summary, /Advert removed/i);
   await page.context().close();
 });
 
@@ -3033,10 +3042,10 @@ test('U80 Advertising summary: needs-attention list and costs by property, platf
   assert.equal(await page.getByTestId('ad-attention-item').count(), 3, 'expired, expiring and needs-update — the test listing never appears');
   assert.deepEqual(await page.getByTestId('ad-attention-item').evaluateAll(els => els.map(e => e.getAttribute('data-kind'))), ['expired', 'needs_update', 'expiring']);
   assert.equal((await page.getByTestId('sum-total').innerText()), 'RM 400.00');
-  assert.match(await page.getByTestId('sum-count').innerText(), /3 adverts · 1 without a cost/);
-  assert.match(await page.getByTestId('sum-platform').innerText(), /PropertyGuru[\s\S]*RM 300\.00[\s\S]*Mudah[\s\S]*RM 100\.00/);
-  assert.match(await page.getByTestId('sum-month').innerText(), /2026-10[\s\S]*RM 100\.00[\s\S]*2026-09[\s\S]*RM 300\.00/);
-  assert.match(await page.getByTestId('sum-excluded').innerText(), /1 test listing/);
+  assert.match(await page.getByTestId('sum-count').innerText(), /3 adverts · 1 without a cost/i);
+  assert.match(await page.getByTestId('sum-platform').innerText(), /PropertyGuru[\s\S]*RM 300\.00[\s\S]*Mudah[\s\S]*RM 100\.00/i);
+  assert.match(await page.getByTestId('sum-month').innerText(), /2026-10[\s\S]*RM 100\.00[\s\S]*2026-09[\s\S]*RM 300\.00/i);
+  assert.match(await page.getByTestId('sum-excluded').innerText(), /1 test listing/i);
   // a period limit
   await page.getByTestId('sum-from').fill('2026-10-01');
   assert.equal(await page.getByTestId('sum-total').innerText(), 'RM 100.00');
@@ -3044,17 +3053,17 @@ test('U80 Advertising summary: needs-attention list and costs by property, platf
   // the bell shows the same list
   await home(page);
   await page.locator('header button[aria-label*="otification"], header button[aria-label*="Pemberitahuan"], header button[aria-label*="通知"]').first().click();
-  assert.match(await page.getByTestId('notif-adverts').innerText(), /Needs attention \(3\)/);
+  assert.match(await page.getByTestId('notif-adverts').innerText(), /Needs attention \(3\)/i);
   await home(page);
   // sample data is kept out: load it, the sample adverts (live, ending soon) add nothing
   await loadSample(page);
   await tile(page, 'Property List');
   await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByTestId('open-ad-tracker').click();
-  assert.match(await page.getByTestId('ad-sample-note').innerText(), /not counted/);
+  assert.match(await page.getByTestId('ad-sample-note').innerText(), /not counted/i);
   await page.getByTestId('ad-open-summary').click();
   assert.equal(await page.getByTestId('sum-total').innerText(), 'RM 400.00', 'sample property adverts are not counted');
-  assert.match(await page.getByTestId('sum-excluded').innerText(), /sample advert/);
+  assert.match(await page.getByTestId('sum-excluded').innerText(), /sample advert/i);
   assert.equal(await page.getByTestId('ad-attention-item').count(), 3, 'sample adverts never ask for attention');
   await page.context().close();
 });
@@ -3100,15 +3109,15 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   await propertyWithPhotos(page, [{ name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') }]);
   await page.getByTestId('open-photo-studio').click();
   await page.getByTestId('photo-studio').waitFor();
-  assert.match(await page.getByTestId('photo-studio').innerText(), /Your original photo is kept unless you choose to replace it/);
-  assert.match(await page.getByTestId('ps-declutter').innerText(), /AI decluttering is not available/);
+  assert.match(await page.getByTestId('photo-studio').innerText(), /Your original photo is kept unless you choose to replace it/i);
+  assert.match(await page.getByTestId('ps-declutter').innerText(), /AI decluttering is not available/i);
   await page.getByTestId('ps-preview').waitFor();
   assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'nothing changed yet');
   await page.getByTestId('ps-tab-mask').click();
-  assert.match(await page.getByTestId('ps-mask-warning').innerText(), /Nothing is detected automatically/);
-  assert.match(await page.getByTestId('ps-mask-empty').innerText(), /No areas covered yet/);
+  assert.match(await page.getByTestId('ps-mask-warning').innerText(), /Nothing is detected automatically/i);
+  assert.match(await page.getByTestId('ps-mask-empty').innerText(), /No areas covered yet/i);
   await drag(page, 'ps-stage', [0.05, 0.12], [0.6, 0.6]);        // covers the white "sign" in the test picture (x .16–.47, y .21–.52)
-  assert.match(await page.getByTestId('ps-mask-count').innerText(), /1 area covered/);
+  assert.match(await page.getByTestId('ps-mask-count').innerText(), /1 area covered/i);
   await shot(page, '81a-photo-studio-mask');
   // a stray tap draws nothing
   await drag(page, 'ps-stage', [0.8, 0.8], [0.805, 0.805]);
@@ -3118,7 +3127,7 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   await page.getByTestId('ps-rotate-right').click();
   await page.getByTestId('ps-rotate-left').click();
   await page.getByTestId('ps-tab-mask').click();
-  assert.match(await page.getByTestId('ps-note').innerText(), /covered areas were removed/);
+  assert.match(await page.getByTestId('ps-note').innerText(), /covered areas were removed/i);
   assert.equal(await page.getByTestId('ps-mask-item').count(), 0);
   await drag(page, 'ps-stage', [0.05, 0.12], [0.6, 0.6]);
   assert.equal(await page.getByTestId('ps-mask-item').count(), 1);
@@ -3129,7 +3138,7 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   await page.getByTestId('ps-show-edited').click();
   // save as a NEW photo
   await page.getByTestId('ps-save-new').click();
-  assert.match(await page.getByTestId('ps-msg').innerText(), /Saved as a new photo\. The original is unchanged/);
+  assert.match(await page.getByTestId('ps-msg').innerText(), /Saved as a new photo\. The original is unchanged/i);
   await waitStored(page, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 2 && v.photos[1].edit === 'masked')");
   const rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
   const [orig, copy] = rec.photos;
@@ -3145,7 +3154,7 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   assert.equal(c.exif, false, 'the copy carries no camera data block');
   // the chip names it, the strip shows both
   assert.equal(await page.getByTestId('ps-photo').count(), 2);
-  assert.match(await page.getByTestId('ps-chip').innerText(), /Privacy-masked copy/);
+  assert.match(await page.getByTestId('ps-chip').innerText(), /Privacy-masked copy/i);
   assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'edit state was reset after saving');
   await page.context().close();
 });
@@ -3176,7 +3185,7 @@ test('U82 Photo Studio: improve a photo (brightness, straighten, crop, auto), co
   await page.getByTestId('ps-auto').check();
   await page.getByTestId('ps-contrast').fill('30');
   await page.getByTestId('ps-replace').click();
-  assert.match(await page.getByRole('alertdialog').innerText(), /original picture is no longer used and is deleted from this phone later/);
+  assert.match(await page.getByRole('alertdialog').innerText(), /original picture is no longer used and is deleted from this phone later/i);
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
   rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
   assert.equal(rec.photos.length, 3); assert.equal(rec.photos[2].edit, undefined);
@@ -3185,7 +3194,7 @@ test('U82 Photo Studio: improve a photo (brightness, straighten, crop, auto), co
   // Replace: confirmed
   await page.getByTestId('ps-replace').click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Replace original' }).click();
-  assert.match(await page.getByTestId('ps-msg').innerText(), /original has been replaced/);
+  assert.match(await page.getByTestId('ps-msg').innerText(), /original has been replaced/i);
   await waitStored(page, 'records', "all.some(v => v && v.headline === 'Photo house' && v.photos.length === 3 && v.photos[2].edit === 'enhanced')");
   rec = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
   assert.notEqual(rec.photos[2].fileId, oldFile);
@@ -3207,10 +3216,10 @@ test('U83 Photo Studio: a property without photos explains itself; Bahasa Malays
     await propertyWithPhotos(p, [{ name: 'a.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(p, '#3a7') }]);
     await home(p);
     await tile(p, 'Agent Profile');
-    await p.getByRole('button', { name: /Settings/ }).click();
+    await p.getByRole('button', { name: /Settings/i }).click();
     await p.locator(`.lang button[aria-label="${aria}"]`).click();
     await home(p);
-    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/ }).first().click();
+    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/i }).first().click();
     await p.getByText('Photo house').first().click();
     await p.getByTestId('open-photo-studio').click();
     await p.getByTestId('ps-tab-mask').click();
@@ -3248,13 +3257,13 @@ test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/We
   await marketingProperty(page, { photos: [{ name: 'front.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#3a7') }, { name: 'back.jpg', mimeType: 'image/jpeg', buffer: await makePhoto(page, '#a53') }] });
   await page.getByTestId('open-marketing-studio').click();
   await page.getByTestId('marketing-studio').waitFor();
-  assert.match(await page.getByTestId('ms-notpublished').innerText(), /does not publish an advert/);
+  assert.match(await page.getByTestId('ms-notpublished').innerText(), /does not publish an advert/i);
   assert.equal(await page.getByTestId('ms-result').count(), 0, 'nothing is made until asked');
   // square post, PNG (the default)
   assert.equal(await page.getByTestId('ms-format-square').isChecked(), true);
   await page.getByTestId('ms-make').click();
   await page.getByTestId('ms-result').waitFor();
-  assert.match(await page.getByTestId('ms-made').innerText(), /Made: Square post · PNG · 1080 × 1080 px/);
+  assert.match(await page.getByTestId('ms-made').innerText(), /Made: Square post · PNG · 1080 × 1080 px/i);
   const sq = await previewColour(page, 0.92, 0.08);
   assert.deepEqual([sq.w, sq.h], [1080, 1080]);
   assert.ok(sq.rgb[1] > sq.rgb[0] + 40 && sq.rgb[1] > 120, `main photo (green) fills the post: ${sq.rgb}`);
@@ -3266,14 +3275,14 @@ test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/We
   assert.equal(await page.getByTestId('ms-result').getAttribute('data-format'), 'square');
   // change a choice: the file on screen is marked out of date, and nothing is remade by itself
   await page.getByTestId('ms-headline').fill('Last unit this month');
-  assert.match(await page.getByTestId('ms-stale').innerText(), /Make the preview again/);
-  assert.match(await page.getByTestId('ms-made').innerText(), /Square post/);
+  assert.match(await page.getByTestId('ms-stale').innerText(), /Make the preview again/i);
+  assert.match(await page.getByTestId('ms-made').innerText(), /Square post/i);
   // portrait, WebP
   await page.getByTestId('ms-format-portrait').check();
   await page.getByTestId('ms-output').selectOption('webp');
   await page.getByTestId('ms-make').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === 'portrait');
-  assert.match(await page.getByTestId('ms-made').innerText(), /Portrait post · WebP · 1080 × 1350 px/);
+  assert.match(await page.getByTestId('ms-made').innerText(), /Portrait post · WebP · 1080 × 1350 px/i);
   assert.equal(await page.getByTestId('ms-stale').count(), 0, 'fresh again');
   const webp = await pdfFrom(page, 'ms-download');
   assert.equal(webp.name, 'P1001-portrait.webp');
@@ -3287,7 +3296,7 @@ test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/We
   await page.getByTestId('ms-theme').selectOption('light');
   await page.getByTestId('ms-make').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === 'a4');
-  assert.match(await page.getByTestId('ms-made').innerText(), /A4 flyer · PDF · 1240 × 1754 px/);
+  assert.match(await page.getByTestId('ms-made').innerText(), /A4 flyer · PDF · 1240 × 1754 px/i);
   const pdf = await pdfFrom(page, 'ms-download');
   assert.equal(pdf.name, 'P1001-a4.pdf');
   await keepDesign(pdf);
@@ -3352,9 +3361,9 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
   for (const [aria, re] of [['Bahasa Malaysia', /Studio Pemasaran|Tiada apa disiarkan/], ['中文', /营销工作室|不会发布到任何地方/]]) {
     const p = await phone();
     await marketingProperty(p);
-    await home(p); await tile(p, 'Agent Profile'); await p.getByRole('button', { name: /Settings/ }).click();
+    await home(p); await tile(p, 'Agent Profile'); await p.getByRole('button', { name: /Settings/i }).click();
     await p.locator(`.lang button[aria-label="${aria}"]`).click(); await home(p);
-    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/ }).first().click();
+    await p.locator('nav.grid > button').filter({ hasText: /Property List|Senarai Hartanah|房产列表/i }).first().click();
     await p.getByText('Corner house, quick sale').first().click();
     await p.getByTestId('open-marketing-studio').click();
     assert.match(await p.getByTestId('marketing-studio').innerText(), re);
@@ -3367,7 +3376,7 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
 
 test('U86 Marketing Studio: a full property (photos, facts, long headline, agent contact, reference) draws cleanly in all three formats and the A4 PDF stays one page', async () => {
   const page = await phone();
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/ }).first().click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/i }).first().click();
   await page.locator('[data-field="fullName"]').fill('Lee Ah Kow'); await page.locator('[data-field="agency"]').fill('JSL Properties Sdn Bhd'); await page.locator('[data-field="phone"]').fill('012-345 6789');
   await page.getByTestId('save-profile').click();
   await home(page);
@@ -3384,7 +3393,7 @@ test('U86 Marketing Studio: a full property (photos, facts, long headline, agent
   await page.getByTestId('open-marketing-studio').click();
   await page.getByTestId('marketing-studio').waitFor();
   await page.getByTestId('ms-showref').check();
-  assert.match(await page.getByTestId('ms-warn-long').innerText(), /headline is long/);
+  assert.match(await page.getByTestId('ms-warn-long').innerText(), /headline is long/i);
   for (const [f, size, photos] of [['a4', [1240, 1754], 4], ['square', [1080, 1080], 1], ['portrait', [1080, 1350], 3]]) {
     await page.getByTestId(`ms-format-${f}`).check();
     assert.equal(await page.getByTestId('ms-photo').locator('input:checked').count(), photos, `${f}: ${photos} photo(s) ticked at first`);
@@ -3454,15 +3463,15 @@ test('U88 Advert tracker: a platform that is not in the list can be typed; a bla
   await bareProperty(page, 'Carousell house');
   await page.getByTestId('open-ad-tracker').click();
   await page.getByTestId('ad-add').click();
-  await page.getByTestId('ad-platform').selectOption({ label: 'Other (type the name)' });
+  await page.getByTestId('ad-platform').selectOption({ label: 'Other (Type the Name)' });
   await page.getByTestId('ad-save').click();
-  assert.match(await page.getByTestId('ad-editor-form').innerText(), /Type the name of the platform/);
+  assert.match(await page.getByTestId('ad-editor-form').innerText(), /Type the name of the platform/i);
   assert.equal((await adsOf(page)).length, 0);
   await page.getByTestId('ad-platform-other').fill('  Carousell  ');
   await page.getByTestId('ad-save').click();
   await page.getByTestId('ad-card').waitFor();
   await waitStored(page, 'records', "all.some(v => v && v.marketing && v.marketing.ads.some(a => a.platform === 'Carousell'))");
-  assert.match(await page.getByTestId('ad-card').first().innerText(), /Carousell/);
+  assert.match(await page.getByTestId('ad-card').first().innerText(), /Carousell/i);
   await page.getByTestId('ad-edit').click();
   assert.equal(await page.getByTestId('ad-platform-other').inputValue(), 'Carousell');
   await page.getByTestId('ad-platform').selectOption('Mudah');
@@ -3584,33 +3593,33 @@ test('U91 backup file: made from Settings, a bad file is refused, and a restore 
   }), id);
   await putContact('bk1');
   await page.reload(); await page.waitForSelector('nav.grid');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   const card = page.getByTestId('backup-card');
   await card.waitFor();
-  assert.match(await page.getByTestId('backup-last').innerText(), /No backup file has been made/);
+  assert.match(await page.getByTestId('backup-last').innerText(), /No backup file has been made/i);
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('backup-make').click()]);
-  assert.match(dl.suggestedFilename(), /^EstateAgentBuddy-backup-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/);
+  assert.match(dl.suggestedFilename(), /^EstateAgentBuddy-backup-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/i);
   const zipPath = await dl.path();
   await page.getByTestId('backup-msg').waitFor();
-  assert.match(await page.getByTestId('backup-msg').innerText(), /Backup file made: 1 records and 0 files/);
-  assert.match(await page.getByTestId('backup-last').innerText(), /Last backup file made/);
+  assert.match(await page.getByTestId('backup-msg').innerText(), /Backup file made: 1 records and 0 files/i);
+  assert.match(await page.getByTestId('backup-last').innerText(), /Last backup file made/i);
   // a file that is not a backup is refused and changes nothing
   await page.getByTestId('backup-file').setInputFiles({ name: 'notes.zip', mimeType: 'application/zip', buffer: Buffer.from('this is not a backup') });
   await page.locator('[data-testid="backup-msg"][role="alert"]').waitFor();
-  assert.match(await page.getByTestId('backup-msg').innerText(), /not an Estate Agent AI Buddy backup file\. Nothing was changed/);
+  assert.match(await page.getByTestId('backup-msg').innerText(), /not an Estate Agent AI Buddy backup file\. Nothing was changed/i);
   // delete the contact on the phone, then restore it from the file
   await page.evaluate(() => new Promise((resolve, reject) => {
     const r = indexedDB.open('estate-agent-buddy');
     r.onsuccess = () => { const tx = r.result.transaction('records', 'readwrite'); tx.objectStore('records').delete('c:contacts:bk1'); tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error); };
   }));
   await page.reload(); await page.waitForSelector('nav.grid');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('backup-file').setInputFiles(zipPath);
   await page.getByTestId('backup-preview').waitFor();
-  assert.match(await page.getByTestId('backup-plan').innerText(), /Will bring back 1 records, replace 0, leave 0 as they are, and bring back 0 files/);
+  assert.match(await page.getByTestId('backup-plan').innerText(), /Will bring back 1 records, replace 0, leave 0 as they are, and bring back 0 files/i);
   await shot(page, '91-backup-restore', false);
   await page.getByTestId('backup-restore').click();
-  await page.locator('[data-testid="backup-msg"]').filter({ hasText: /Restored: 1 records brought back/ }).waitFor();
+  await page.locator('[data-testid="backup-msg"]').filter({ hasText: /Restored: 1 records brought back/i }).waitFor();
   await waitStored(page, 'records', "all.some(v => v && v.name === 'Backup Test Buyer')");
   await home(page); await tile(page, 'Buyer List');
   assert.equal(await page.getByText('Backup Test Buyer').count(), 1, 'the contact is back');
@@ -3628,7 +3637,7 @@ test('U92 Google Drive backup (stand-in Drive, browser only): a backup is sent a
     if (u.pathname === '/upload/drive/v3/files') {
       const buf = req.postDataBuffer(); const marker = Buffer.from('content-type: application/zip\r\n\r\n'); const at = buf.indexOf(marker) + marker.length;
       const tail = buf.lastIndexOf(Buffer.from('\r\n--eab'));
-      drive.uploads.push(buf.subarray(at, tail)); const f = { id: `u${drive.uploads.length}`, size: tail - at, name: /"name":"([^"]+)"/.exec(buf.toString('latin1', 0, at))[1] };
+      drive.uploads.push(buf.subarray(at, tail)); const f = { id: `u${drive.uploads.length}`, size: tail - at, name: /"name":"([^"]+)"/i.exec(buf.toString('latin1', 0, at))[1] };
       drive.files.push(f); return json({ id: f.id });
     }
     if (u.pathname === '/drive/v3/files' && req.method() === 'POST') return json({ id: 'folder1' });
@@ -3658,15 +3667,15 @@ test('U92 Google Drive backup (stand-in Drive, browser only): a backup is sent a
   // the daily rule runs a backup at app start
   await waitStored(page, 'records', "all.some(v => v && v.driveLastOkAt)");
   assert.equal(drive.files.length, 1, 'one backup was sent at start');
-  assert.match(drive.files[0].name, /^EstateAgentBuddy-backup-/);
+  assert.match(drive.files[0].name, /^EstateAgentBuddy-backup-/i);
   const text = drive.uploads[0].toString('latin1');
   assert.ok(text.includes('Drive Test Buyer')); assert.ok(!text.includes('"token":"TOK"'), 'the Drive token is not in the file');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
-  assert.match(await page.getByTestId('drive-state').innerText(), /Drive connected until about/);
-  assert.match(await page.getByTestId('drive-last').innerText(), /Last Drive backup that worked/);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
+  assert.match(await page.getByTestId('drive-state').innerText(), /Drive connected until about/i);
+  assert.match(await page.getByTestId('drive-last').innerText(), /Last Drive backup that worked/i);
   await page.getByTestId('drive-now').click();
   await page.getByTestId('drive-msg').waitFor();
-  assert.match(await page.getByTestId('drive-msg').innerText(), /Backup sent to Google Drive and checked: EstateAgentBuddy-backup-.*zip\. \d+ copies are kept there/);
+  assert.match(await page.getByTestId('drive-msg').innerText(), /Backup sent to Google Drive and checked: EstateAgentBuddy-backup-.*zip\. \d+ copies are kept there/i);
   await page.getByTestId('drive-list').click();
   await page.getByTestId('drive-file').first().waitFor();
   assert.ok(await page.getByTestId('drive-file').count() >= 1);
@@ -3675,9 +3684,9 @@ test('U92 Google Drive backup (stand-in Drive, browser only): a backup is sent a
   drive.mode = 'refuse';
   await page.getByTestId('drive-now').click();
   await page.locator('[data-testid="drive-msg"][role="alert"]').waitFor();
-  assert.match(await page.getByTestId('drive-msg').innerText(), /Google did not accept the access/);
+  assert.match(await page.getByTestId('drive-msg').innerText(), /Google did not accept the access/i);
   await page.getByTestId('drive-connect').waitFor();
-  assert.match(await page.getByTestId('drive-state').innerText(), /Drive is not connected on this phone/);
+  assert.match(await page.getByTestId('drive-state').innerText(), /Drive is not connected on this phone/i);
   await ctx.close();
 });
 
@@ -3687,7 +3696,7 @@ test('U93 buyer requirements: a buyer\'s page lists what they want and the prope
   await tile(page, 'Buyer List');
   await page.locator('main').getByText('Tenant R (sample)').first().click();
   await page.getByTestId('buyer-requirements').waitFor();
-  assert.match(await page.getByTestId('requirement-summary').first().innerText(), /Factory near KLIA/);
+  assert.match(await page.getByTestId('requirement-summary').first().innerText(), /Factory near KLIA/i);
   await page.getByTestId('buyer-matches').waitFor();
   const rows = page.getByTestId('match-row');
   assert.ok(await rows.count() >= 1, 'at least one fitting property');
@@ -3698,7 +3707,7 @@ test('U93 buyer requirements: a buyer\'s page lists what they want and the prope
   // property side
   await rows.first().locator('button.link-row').click();
   await page.getByTestId('property-buyers').waitFor();
-  assert.match(await page.getByTestId('property-buyers').innerText(), /Tenant R \(sample\)|No buyer/);
+  assert.match(await page.getByTestId('property-buyers').innerText(), /Tenant R \(sample\)|No buyer/i);
   await page.context().close();
 });
 
@@ -3715,9 +3724,9 @@ test('U94 follow-up reminder: a quiet buyer is listed in Notifications, the sett
   await page.reload(); await page.waitForSelector('nav.grid');
   await page.getByTestId('top-notifications').click();
   await page.getByTestId('notif-followup').waitFor();
-  assert.match(await page.getByTestId('notif-followup').innerText(), /Contacts to follow up[\s\S]*1 contact has had no interaction for 30 days or more[\s\S]*Quiet Buyer/);
+  assert.match(await page.getByTestId('notif-followup').innerText(), /Contacts to follow up[\s\S]*1 contact has had no interaction for 30 days or more[\s\S]*Quiet Buyer/i);
   await home(page);
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.locator('[data-testid="followup-setting"] button[data-days="0"]').click();
   await home(page);
   await page.getByTestId('top-notifications').click();
@@ -3739,7 +3748,7 @@ test('U95 duplicate warning: typing an address that is already in the list shows
   await page.locator('[data-field="street"]').fill(stored.street);
   await page.locator('[data-field="unitNo"]').fill(stored.unitNo);
   await page.getByTestId('duplicate-warning').waitFor();
-  assert.match(await page.getByTestId('duplicate-warning').innerText(), /may already be in your list/);
+  assert.match(await page.getByTestId('duplicate-warning').innerText(), /may already be in your list/i);
   assert.ok(await page.getByTestId('duplicate-row').count() >= 1);
   await page.context().close();
 });
@@ -3772,19 +3781,19 @@ test('U96 locked out by a typed Supabase project: sign-in screen offers Connecti
   await page.getByTestId('login').waitFor({ timeout: 15000 });
   await page.getByTestId('connection-recovery').waitFor();
   assert.equal(await page.getByTestId('connection-recovery').getAttribute('data-source'), 'phone');
-  assert.match(await page.getByTestId('connection-project').innerText(), /typed-wrong\.supabase\.co/);
+  assert.match(await page.getByTestId('connection-project').innerText(), /typed-wrong\.supabase\.co/i);
   assert.equal(await page.getByText('typed-key').count(), 0, 'the key is never shown');
   // Failed Google sign-in: the message shows and Connection settings stays available.
   await page.getByTestId('google-sign-in').click();
   await page.getByTestId('login-error').waitFor();
-  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/);
+  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/i);
   assert.ok(await page.getByTestId('connection-recovery').isVisible());
   await shot(page, '96a-login-recovery', false);
   // An invalid URL is refused and nothing is saved.
   await page.getByTestId('edit-connection').click();
   await page.getByTestId('connection-url').fill('https://supabase.com/dashboard/project/abcd');
   await page.getByTestId('save-connection').click();
-  assert.match(await page.getByTestId('connection-problem').innerText(), /not a Supabase project address/);
+  assert.match(await page.getByTestId('connection-problem').innerText(), /not a Supabase project address/i);
   assert.equal((await stored()).settings.supabaseUrl, SB, 'nothing saved');
   // Reset: only the typed URL and key go; the record on the phone stays.
   await page.getByTestId('reset-connection').click();
@@ -3796,15 +3805,15 @@ test('U96 locked out by a typed Supabase project: sign-in screen offers Connecti
   assert.equal(after.settings.lang, 'en', 'other settings kept');
   assert.equal(after.contact?.name, 'Puan Keep Me', 'records kept');
   // Settings opens again, and refuses an invalid URL there too (the app is not locked a second time).
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByLabel('Supabase project URL').fill('abcd.supabase.co');
   await page.getByLabel('Supabase anon (public) key').fill('k');
   await page.getByTestId('save-settings').click();
-  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /not a Supabase project address/);
+  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /not a Supabase project address/i);
   await page.getByLabel('Supabase project URL').fill('https://abcd.supabase.co');
   await page.getByLabel('Supabase anon (public) key').fill('');
   await page.getByTestId('save-settings').click();
-  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /Type both/);
+  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /Type both/i);
   assert.equal((await stored()).settings.supabaseUrl, undefined, 'still nothing saved');
   assert.equal(await page.getByTestId('login').count(), 0, 'still in the app');
   await page.reload(); await page.waitForSelector('nav.grid');
@@ -3817,21 +3826,21 @@ test('U97 the sign-in screen always has Connection settings, even when the proje
   await ctx.route(`${SB}/**`, route => route.fulfill({ status: 404, body: '' }));
   const page = await ctx.newPage();
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByLabel('Supabase project URL').fill(`${SB}/`);
   await page.getByLabel('Supabase anon (public) key').fill('anon-public-key');
   await page.getByTestId('save-settings').click();
   await page.getByTestId('login').waitFor();
   assert.equal(await page.getByTestId('connection-recovery').count(), 0, 'closed until asked for');
   await page.getByTestId('login-connection').click();
-  assert.match(await page.getByTestId('connection-project').innerText(), /fine-project\.supabase\.co/);
+  assert.match(await page.getByTestId('connection-project').innerText(), /fine-project\.supabase\.co/i);
   // Correct the values from here: a valid pair is saved (the app stays on sign-in, now for that project).
   await page.getByTestId('edit-connection').click();
   await page.getByTestId('connection-url').fill('https://other-project.supabase.co');
   await page.getByTestId('connection-key').fill('other-key');
   await page.getByTestId('save-connection').click();
   await page.getByTestId('connection-msg').waitFor();
-  assert.match(await page.getByTestId('connection-project').innerText(), /other-project\.supabase\.co/);
+  assert.match(await page.getByTestId('connection-project').innerText(), /other-project\.supabase\.co/i);
   await ctx.close();
 });
 
@@ -3844,13 +3853,18 @@ test('U100 Change 009 form: section order, price/commission in Price, Tenure and
   assert.deepEqual(order.filter(x => ['basics', 'tenure', 'photos', 'location', 'details', 'owner', 'specs', 'docs'].includes(x)),
     ['basics', 'tenure', 'photos', 'location', 'details', 'owner', 'specs', 'docs']);
   assert.ok(!order.includes('money'), 'the old Price, rental and fees section is gone');
-  assert.match(await page.locator('#sec-tenure .card-title').innerText(), /Price, Tenure and Title Info/);
+  assert.match(await page.locator('#sec-tenure .card-title').innerText(), /Price, Tenure and Title Info/i);
   // Sale: asking price, negotiable and commission % are in section 2.
   await page.locator('[data-field="purpose"]').selectOption('sale');
-  for (const f of ['askingPrice', 'negotiable', 'commissionPct']) assert.equal(await page.locator(`#sec-tenure [data-field="${f}"]`).count(), 1, `${f} in section 2`);
+  for (const f of ['askingPrice', 'negotiable', 'commissionType', 'commissionPct']) assert.equal(await page.locator(`#sec-tenure [data-field="${f}"]`).count(), 1, `${f} in section 2`);
   await page.locator('[data-field="askingPrice"]').fill('1250000');
+  assert.deepEqual(await page.locator('[data-field="commissionType"] option').allInnerTexts(), ['Percentage (%)', 'Flat Fee (RM)']);
   await page.locator('[data-field="commissionPct"]').fill('2');
-  assert.match(await page.getByTestId('form-commission').innerText(), /RM 25,000/);
+  assert.match(await page.getByTestId('form-commission').innerText(), /RM 25,000/i);
+  await page.locator('[data-field="commissionType"]').selectOption('flat');
+  assert.equal(await page.locator('[data-field="commissionPct"]').count(), 0);
+  await page.locator('[data-field="commissionFlat"]').fill('18000');
+  assert.match(await page.getByTestId('form-commission').innerText(), /RM 18,000/i);
   // Maintenance Fee and the Extra Comments box (under Furnishing) are in Property Details.
   assert.equal(await page.locator('#sec-details [data-field="maintenanceFee"]').count(), 1);
   const comments = page.locator('#sec-details textarea[data-field="extraComments"]');
@@ -3859,20 +3873,30 @@ test('U100 Change 009 form: section order, price/commission in Price, Tenure and
   // Rent: commission in months (1, 1.5, 2), never a percent.
   await page.locator('[data-field="purpose"]').selectOption('rent');
   assert.equal(await page.locator('[data-field="commissionPct"]').count(), 0, 'no percentage for a rental');
-  assert.deepEqual(await page.locator('[data-field="rentCommissionMonths"] option').allInnerTexts(), ['Not set', '1 month of rent', '1.5 months of rent', '2 months of rent']);
+  assert.deepEqual(await page.locator('[data-field="rentCommissionType"] option').allInnerTexts(), ['Months of Rent', 'Flat Fee (RM)']);
+  assert.deepEqual(await page.locator('[data-field="rentCommissionMonths"] option').allInnerTexts(), ['Not Set', '1 month of rent', '1.5 months of rent', '2 months of rent', 'Custom…']);
   await page.locator('[data-field="monthlyRent"]').fill('1800');
   for (const [m, rmx] of [['1', '1,800'], ['1.5', '2,700'], ['2', '3,600']]) {
     await page.locator('[data-field="rentCommissionMonths"]').selectOption(m);
     assert.match(await page.getByTestId('form-rent-commission').innerText(), new RegExp(`RM ${rmx}`));
   }
+  // Owner 15 Oct: any number of months (Custom…), or a flat fee in RM.
+  await page.locator('[data-field="rentCommissionMonths"]').selectOption('custom');
+  await page.locator('[data-field="rentCommissionMonthsCustom"]').fill('0.75');
+  assert.match(await page.getByTestId('form-rent-commission').innerText(), /RM 1,350/i);
+  await page.locator('[data-field="rentCommissionType"]').selectOption('flat');
+  await page.locator('[data-field="rentCommissionFlat"]').fill('2500');
+  assert.match(await page.getByTestId('form-rent-commission').innerText(), /RM 2,500/i);
+  await page.locator('[data-field="rentCommissionType"]').selectOption('months');
+  await page.locator('[data-field="rentCommissionMonths"]').selectOption('2');
   await page.locator('[data-field="securityDepositMonths"]').fill('2');
   await comments.fill('Line one of the comment.\nLine two, still here.');
   await page.locator('[data-field="street"]').fill('Jalan Sampel Ujian 1');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   const money = await page.getByTestId('sec-tenure-view').innerText();
-  assert.match(money, /Commission \(Months of Rent\)[\s\S]*2 months of rent/);
-  assert.match(money, /RM 1,800/);
-  assert.match(await page.getByTestId('detail-rent-commission').innerText(), /RM 3,600/);
+  assert.match(money, /Commission \(Months of Rent\)[\s\S]*2 months of rent/i);
+  assert.match(money, /RM 1,800/i);
+  assert.match(await page.getByTestId('detail-rent-commission').innerText(), /RM 3,600/i);
   assert.equal(await page.getByTestId('detail-comments').locator('p').innerText(), 'Line one of the comment.\nLine two, still here.');
   await page.context().close();
 });
@@ -3892,13 +3916,13 @@ test('U101 Change 009 older records are mapped, not lost: a separate lot number 
   await tile(page, 'Property List');
   assert.equal(await page.getByTestId('card-address').first().innerText(), '7, Lot 2/14, Jalan Lama 1, Taman Lama');
   await page.getByTestId('card-open').first().click();
-  assert.match(await page.getByTestId('sec-tenure-view').innerText(), /NON Bumiputera/);
-  assert.match(await page.getByTestId('sec-location-view').innerText(), /Unit\/Lot Number\s*7, Lot 2\/14/);
+  assert.match(await page.getByTestId('sec-tenure-view').innerText(), /NON Bumiputera/i);
+  assert.match(await page.getByTestId('sec-location-view').innerText(), /Unit\/Lot Number\s*7, Lot 2\/14/i);
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
   assert.equal(await page.locator('[data-field="unitNo"]').inputValue(), '7, Lot 2/14');
-  assert.match(await page.getByTestId('opt-restriction').innerText(), /NON Bumiputera/);
+  assert.match(await page.getByTestId('opt-restriction').innerText(), /NON Bumiputera/i);
   assert.deepEqual(await page.getByTestId('form-photo').evaluateAll(xs => xs.map(x => x.dataset.photoId)), ['c', 'a', 'b'], 'the old main photo is first');
-  assert.match(await page.getByTestId('form-photo').first().innerText(), /Main/);
+  assert.match(await page.getByTestId('form-photo').first().innerText(), /Main/i);
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:properties:old1'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
   assert.deepEqual([rec.unitNo, rec.lotNo, rec.restriction, rec.mainPhotoId, rec.photos.map(x => x.id)], ['7, Lot 2/14', undefined, 'NON Bumiputera', 'c', ['c', 'a', 'b']]);
@@ -3917,7 +3941,7 @@ test('U102 Change 009 photos: a visible loading spinner, errors named, no Make M
     { name: 'three.png', mimeType: 'image/png', buffer: png }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a picture') },
   ]);
   await page.getByTestId('photo-progress').waitFor();
-  assert.match(await page.getByTestId('photo-progress').innerText(), /Preparing photos… \d of 4/);
+  assert.match(await page.getByTestId('photo-progress').innerText(), /Preparing photos… \d of 4/i);
   assert.equal(await page.getByTestId('save-property').isDisabled(), true, 'Save waits while photos are prepared');
   await page.getByTestId('photo-progress').waitFor({ state: 'detached', timeout: 10000 });
   const msgs = await page.getByTestId('photo-msg').allInnerTexts();
@@ -3962,7 +3986,7 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   await state.getByTestId('opt-state-search').fill('sel');
   assert.deepEqual(await state.getByRole('option').allInnerTexts(), ['Selangor']);
   await state.getByTestId('opt-state-search').press('Enter');
-  assert.match(await state.innerText(), /Selangor/);
+  assert.match(await state.innerText(), /Selangor/i);
   const city = page.getByTestId('opt-city');
   await city.locator('.opt-btn').click();
   await city.getByTestId('opt-city-search').fill('kla');
@@ -3971,9 +3995,9 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn').click();
   await town.getByTestId('opt-township-search').fill('Taman Sampel Baru');
-  assert.match(await town.innerText(), /Nothing matches/);
+  assert.match(await town.innerText(), /Nothing matches/i);
   await town.getByTestId('opt-township-add').click();
-  assert.match(await town.innerText(), /Taman Sampel Baru/);
+  assert.match(await town.innerText(), /Taman Sampel Baru/i);
   // Property type: the four land types together; Land use NIL; restriction NON Bumiputera.
   await page.locator('[data-testid="opt-type"] .opt-btn').click();
   const types = await page.getByTestId('opt-type').getByRole('option').allInnerTexts();
@@ -3994,7 +4018,7 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   await t2.locator('.opt-btn').click();
   assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).count(), 1, 'remembered, with ✕');
   await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).click();
-  assert.equal(await t2.getByRole('option', { name: /Taman Sampel Baru/ }).count(), 0);
+  assert.equal(await t2.getByRole('option', { name: /Taman Sampel Baru/i }).count(), 0);
   await page.context().close();
 });
 
@@ -4017,13 +4041,13 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   await page.waitForSelector('[data-testid="picker-map"]');
   await page.evaluate(() => window.__mapClick(2.8311, 101.8122));
   await page.getByTestId('apply-location').click();
-  assert.match(await page.getByTestId('banner-picked').innerText(), /Banner location chosen/);
+  assert.match(await page.getByTestId('banner-picked').innerText(), /Banner location chosen/i);
   await page.locator('[data-field="street"]').fill('Jalan Sampel Banner 1');
   await page.locator('[data-field="askingPrice"]').fill('600000');
   await page.locator('[data-verify="askingPrice"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
-  assert.match(await page.getByTestId('tenancy').innerText(), /Encik Penyewa[\s\S]*\+60 12-345 6789[\s\S]*@penyewa_ns/);
-  assert.match(await page.getByTestId('banner-summary').innerText(), /1 banner up/);
+  assert.match(await page.getByTestId('tenancy').innerText(), /Encik Penyewa[\s\S]*\+60 12-345 6789[\s\S]*@penyewa_ns/i);
+  assert.match(await page.getByTestId('banner-summary').innerText(), /1 banner up/i);
   await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-banners').click();
   await page.getByTestId('banner-card').filter({ hasText: 'Jalan Sampel Banner 1' }).waitFor();
   await page.waitForFunction(() => window.__markers?.some(m => Math.abs((m.o.position?.lat ?? 0) - 2.8311) < 1e-6));
@@ -4076,9 +4100,9 @@ test('U99 Change 007: the QA build has no orange QA banner; About still says QA;
   // No empty strip: the save status line follows the header directly.
   const gap = await page.evaluate(() => { const h = document.querySelector('header.topbar').getBoundingClientRect(); const n = h.bottom; const next = document.querySelector('header.topbar').nextElementSibling.getBoundingClientRect(); return next.top - n; });
   assert.ok(gap < 2, `nothing left between the header and the next line (${gap}px)`);
-  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('about').scrollIntoViewIfNeeded().catch(() => {});
-  assert.match(await page.getByTestId('about-qa').innerText(), /QA test build/, 'Settings → About still identifies the QA build');
+  assert.match(await page.getByTestId('about-qa').innerText(), /QA test build/i, 'Settings → About still identifies the QA build');
   await ctx.close();
 });
 

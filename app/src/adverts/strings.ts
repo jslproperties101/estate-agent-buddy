@@ -1,5 +1,6 @@
 // Advertising & Listing Tracker text in English, Bahasa Malaysia and Simplified Chinese (BM and 中文 are drafts for the owner to check).
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Advert tracker', summaryTitle: 'Advertising summary', open: 'Advert tracker',
@@ -74,4 +75,4 @@ const zh: AdStrings = {
   testsOut: (n: number) => `${n} 个测试刊登未计入`,
   noProperty: '这个房产已不存在。', optional: '可选', screenshotHelp: '已上线广告的截图。与记录一同保存在本手机。',
 };
-export const adStrings: Record<Lang, AdStrings> = { en, bm, zh };
+export const adStrings: Record<Lang, AdStrings> = titled3({ en, bm, zh });

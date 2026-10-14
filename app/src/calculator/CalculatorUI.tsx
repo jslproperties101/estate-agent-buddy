@@ -63,7 +63,7 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
   const [s, setS] = useState<SaleInput>({ salePrice: price0, purchasePrice: 0, purchaseCosts: 0, holdingYears: 6, outstandingLoan: 0, commissionPct: prop?.commissionPct ?? 2, commissionSst: true, earlySettlementPenalty: 0, otherSaleCosts: 0 });
   // Commission tab: a sale uses price × %; a rent-only property's commission is months of rent (Change 009), so the
   // amount starts as rent × months at 100% instead of treating the months as a percentage.
-  const rentBase = (l?: Listing) => (l?.purpose === 'rent' && l.rentCommissionMonths !== undefined ? rentCommissionRm(l) : undefined);
+  const rentBase = (l?: Listing) => (l?.purpose === 'rent' ? rentCommissionRm(l) : l?.commissionType === 'flat' ? l.commissionFlat : undefined);
   const [cv, setCv] = useState(() => { const rb = rentBase(prop); return rb !== undefined ? { value: rb, pct: 100, sst: true } : { value: prop?.askingPrice ?? prop?.monthlyRent ?? 0, pct: prop?.commissionPct ?? 2, sst: true }; });
   /** Choosing a property fills the price, rent, maintenance fee and commission from it (the agent can still edit them). */
   function chooseProperty(l: Listing | undefined) {

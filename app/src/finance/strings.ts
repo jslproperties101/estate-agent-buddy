@@ -1,5 +1,6 @@
 // Agent Financial text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Agent Financial',
@@ -77,4 +78,4 @@ const zh: FinanceStrings = {
   required: '请先填写金额。',
 };
 
-export const financeStrings: Record<Lang, FinanceStrings> = { en, bm, zh };
+export const financeStrings: Record<Lang, FinanceStrings> = titled3({ en, bm, zh });

@@ -1,6 +1,7 @@
 // Text for Settings → Backup and restore, in three languages. The wording never says "safe" or "backed up to the cloud":
 // a file handed to the phone's share sheet or downloads folder is the owner's to keep, and a restore says exactly what changed.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Backup and restore',
@@ -195,4 +196,4 @@ const zh: S = {
   driveNone: 'Drive 上没有找到备份。',
 };
 
-export const backupStrings: Record<Lang, S> = { en, bm, zh };
+export const backupStrings: Record<Lang, S> = titled3({ en, bm, zh });

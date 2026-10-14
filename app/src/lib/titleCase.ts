@@ -41,3 +41,34 @@ export function titleCaseMap<T extends Record<string, unknown>>(map: T, lang: La
   for (const [k, v] of Object.entries(map)) out[k] = typeof v === 'string' ? titleCase(v, lang) : v;
   return out as T;
 }
+
+/** Is this text a short label (a field name, button, heading, menu or dropdown value) rather than a sentence?
+ *  Labels start with a capital, have at most 6 words and do not end like a sentence (. ! … : ;). Fragments that start in
+ *  lower case ("beds", "/ month", "from your words"), codes ("en", "ms-MY"), links and addresses are left alone. */
+export function isLabel(text: string): boolean {
+  const t = text.trim();
+  if (!t || t.length > 50 || /[\n{}@]|https?:/.test(t)) return false;
+  if (!/^\p{Lu}/u.test(t)) return false;
+  if (/[.!…:;]$/.test(t)) return false;
+  return t.split(/\s+/).length <= 6;
+}
+
+/** A copy of one language's string table with every short label in Title Case (Change 009 follow-up, owner 15 Oct:
+ *  "whole app including labels and text field names except long sentences"). Nested groups are followed; lists (often
+ *  words the voice parser looks for) and functions (counts and sentences) are left as they are. */
+export function titleTable<T>(table: T, lang: Lang): T {
+  if (!MINOR[lang]) return table;
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return isLabel(v) ? titleCase(v, lang) : v;
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const out: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) out[k] = walk(x);
+      return out;
+    }
+    return v;
+  };
+  return walk(table) as T;
+}
+
+/** The three languages of a string table, English and Malay labels in Title Case, Chinese unchanged. */
+export const titled3 = <T>(t: { en: T; bm: T; zh: T }): { en: T; bm: T; zh: T } => ({ en: titleTable(t.en, 'en'), bm: titleTable(t.bm, 'bm'), zh: t.zh });

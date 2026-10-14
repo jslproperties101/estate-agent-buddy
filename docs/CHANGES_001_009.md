@@ -14,7 +14,7 @@ Status words: DONE (built and covered by automated tests) · BLOCKED · DESIGN O
 | 006 Four-layer backup | **DESIGN ONLY** — nothing implemented | — | — |
 | 007 Remove the orange QA banner | DONE; About still says QA; save/sync line kept; no gap | `src/App.tsx`, `src/styles.css`, `docs/QA.md` | U99 (builds a real QA bundle) |
 | 008 Single tap; no long press / preview eye | DONE (the only long-press and preview code was the Property List) | `src/listing/ListingUI.tsx` | U65 |
-| 009 Property List cards | DONE | `src/listing/ListingUI.tsx`, `src/styles.css` | U65, U104 |
+| 009 Property List cards | DONE (grid cards kept short, owner 15 Oct) | `src/listing/ListingUI.tsx`, `src/styles.css` | U65, U104 |
 | 009 Form fields, dropdowns, Title Case | DONE (see notes) | `src/listing/model.ts`, `strings.ts`, `ListingForm.tsx`, `src/ui/OptionSelect.tsx`, `src/lib/titleCase.ts`, `src/domain/places.ts` | C9-1, C9-8, C9-9, U7, U101, U103 |
 | 009 Photos | DONE | `ListingForm.tsx` (`addPhotos`, `reorder`, `dragProps`), `model.ts` (`orderedPhotos`, `movePhoto`) | C9-5, U102 |
 | 009 Location / Google Maps link | DONE | `ListingForm.tsx`, `src/maps/LocationPicker.tsx` (`pointOnly`), `model.ts` (`parseMapsLink`) | C9-6, U8, U29 |
@@ -43,3 +43,11 @@ Nothing is rewritten in bulk. Older records are mapped when shown, and when the 
 
 ## Not changed
 Change 006 (backup architecture), Supabase settings, migrations, Google Drive, production data, main, deployment.
+
+## Owner answers, 15 Oct 2026 (applied)
+1. Logo: in the app only; the phone's home-screen icon stays as it is.
+2. Co-broke Opportunities opens from the Opportunities card (`App.tsx`; U25).
+3. Commission: sale = Percentage (%) or Flat Fee (RM); rent = Months of Rent (1, 1.5, 2 or Custom…) or Flat Fee (RM). Only the chosen kind is kept on save; Agent Financial and the calculator never read months or a flat fee as a percentage (`model.ts` `commissionRm`/`rentCommissionRm`, `FinanceUI.tsx` `dealStart`, `calculator/saved.ts`; C9-12, U100).
+4. Grid (small) cards show only photo, price, address, type and status; Large cards keep tenure, restriction, storeys, lot type and Extra Comments.
+5. Town list kept as the best-effort starting list.
+6. Title Case across the whole app (English and Malay): every string table passes through `titled3` (`src/lib/titleCase.ts`). A text is treated as a label when it starts with a capital, has at most 6 words and does not end like a sentence; sentences, help text, fragments ("beds", "/ month"), codes, links, word lists and counted messages are unchanged. Chinese is unchanged (C9-13).

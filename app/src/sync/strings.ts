@@ -1,5 +1,6 @@
 // Text for the data-safety screens (sync review, history, recently deleted, drafts, file status), in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   unkTitle: 'Whose records are on this phone?',
@@ -122,4 +123,4 @@ const zh: SyncStrings = {
   untitled: '未命名', noValue: '未设置', unknownRecord: '记录',
   continueDraft: '继续', draftFor: what => `草稿：${what}`, newOne: '新建',
 };
-export const syncStrings: Record<Lang, SyncStrings> = { en, bm, zh };
+export const syncStrings: Record<Lang, SyncStrings> = titled3({ en, bm, zh });

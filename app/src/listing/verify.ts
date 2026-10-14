@@ -9,7 +9,7 @@ export type VerifyState = (typeof VERIFY_STATES)[number];
 
 /** The facts an agent is expected to double-check before relying on them or sharing the listing. */
 export const VERIFIABLE_FIELDS = [
-  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionPct', 'rentCommissionMonths',
+  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionPct', 'commissionFlat', 'rentCommissionMonths', 'rentCommissionFlat',
   'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction',
   'landSqft', 'builtUpSqft', 'bedrooms', 'bathrooms', 'floors', 'parking', 'furnishing',
   'condition', 'availability', 'ownerName', 'ownerPhone',

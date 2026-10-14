@@ -1,5 +1,6 @@
 // Text for the "Inactive moved to Dropped" report, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Status review',
@@ -38,4 +39,4 @@ const zh: LeadReviewStrings = {
   undone: (n: number) => `已将 ${n} 位买家恢复为“不活跃”（已停用）。准备好后请选择当前状态。`,
   skipped: (n: number) => `${n} 位未更改：状态已被修改或联系人已不存在。`,
 };
-export const leadReviewStrings: Record<Lang, LeadReviewStrings> = { en, bm, zh };
+export const leadReviewStrings: Record<Lang, LeadReviewStrings> = titled3({ en, bm, zh });

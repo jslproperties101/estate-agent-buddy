@@ -17,7 +17,7 @@ import {
   Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
   FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
   rm, yearsRemaining, commissionRm, rentCommissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
-  ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, parseMapsLink, RENT_COMMISSION_MONTHS,
+  ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, parseMapsLink, RENT_COMMISSION_MONTHS, SALE_COMMISSION_TYPES, RENT_COMMISSION_TYPES,
 } from './model';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
@@ -51,7 +51,7 @@ import { FakeBadge } from '../adverts/AdTrackerUI';
 const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'availability', 'tenancy', 'owner', 'specs', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
 const SECTION_KEYS: Record<string, string[]> = {
   basics: ['type', 'purpose'],
-  tenure: ['askingPrice', 'negotiable', 'commissionPct', 'monthlyRent', 'rentCommissionMonths', 'securityDepositMonths', 'utilityDepositMonths',
+  tenure: ['askingPrice', 'negotiable', 'commissionPct', 'commissionFlat', 'monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat', 'securityDepositMonths', 'utilityDepositMonths',
     'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
   location: ['country', 'state', 'city', 'township', 'unitNo', 'street', 'mapsLink', 'lat'],
   details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'extraComments', 'maintenanceFee'],
@@ -125,6 +125,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [bannerPicker, setBannerPicker] = useState(false);
   const [bannerPick, setBannerPick] = useState<{ lat: number; lng: number } | null>(null);
   const [tenantPick, setTenantPick] = useState<PickedContact | null>(null);
+  // A months value that is not 1, 1.5 or 2 is shown in the "Custom…" box.
+  const [monthsCustom, setMonthsCustom] = useState(d.rentCommissionMonths !== undefined && !(RENT_COMMISSION_MONTHS as readonly number[]).includes(d.rentCommissionMonths));
   const allOpen = SECTION_IDS.every(x => open.has(x));
   const toggle = (sid: string) => setOpen(o => { const n = new Set(o); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const addedFiles = useRef<string[]>([]);
@@ -401,8 +403,11 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     if (refProblem) { setRefErr(refText(refProblem)); setOpen(o => new Set([...o, 'basics'])); setTimeout(() => document.getElementById('sec-basics')?.scrollIntoView({ block: 'start' }), 0); return; }
     const clean: Listing = { ...d, refNo, ref: makeRef(d.refPrefix!, refNo!), refPrefix: d.refPrefix!.toUpperCase() };
     for (const k of ALL_FORM_FIELDS) if (!vf.has(k)) delete clean[k];
-    if (!forSale(clean)) { delete clean.askingPrice; delete clean.negotiable; delete clean.commissionPct; }
-    if (!forRent(clean)) { delete clean.monthlyRent; delete clean.rentCommissionMonths; delete clean.securityDepositMonths; delete clean.utilityDepositMonths; }
+    if (!forSale(clean)) { delete clean.askingPrice; delete clean.negotiable; delete clean.commissionPct; delete clean.commissionFlat; delete clean.commissionType; }
+    if (!forRent(clean)) { delete clean.monthlyRent; delete clean.rentCommissionMonths; delete clean.rentCommissionFlat; delete clean.rentCommissionType; delete clean.securityDepositMonths; delete clean.utilityDepositMonths; }
+    // Only the commission of the chosen kind is kept, so an old figure of the other kind can never be used by mistake.
+    if (clean.commissionType === 'flat') delete clean.commissionPct; else { delete clean.commissionFlat; delete clean.commissionType; }
+    if (clean.rentCommissionType === 'flat') delete clean.rentCommissionMonths; else { delete clean.rentCommissionFlat; delete clean.rentCommissionType; }
     // One Unit/Lot Number (Change 009); the first photo is the main photo.
     delete clean.lotNo;
     clean.mainPhotoId = clean.photos[0]?.id;
@@ -418,7 +423,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     // Marks that no longer apply go with the field they described (an empty field keeps its mark: "Unknown" is meaningful).
     if (next.verification) {
       const dropped = (k: string) => (ALL_FORM_FIELDS as readonly string[]).includes(k) && !vf.has(k as FormField)
-        || (['askingPrice', 'commissionPct'].includes(k) && !forSale(clean)) || (['monthlyRent', 'rentCommissionMonths'].includes(k) && !forRent(clean))
+        || (['askingPrice', 'commissionPct', 'commissionFlat'].includes(k) && !forSale(clean)) || (['monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat'].includes(k) && !forRent(clean))
+        || (k === 'commissionPct' && clean.commissionPct === undefined) || (k === 'commissionFlat' && clean.commissionFlat === undefined)
+        || (k === 'rentCommissionMonths' && clean.rentCommissionMonths === undefined) || (k === 'rentCommissionFlat' && clean.rentCommissionFlat === undefined)
         || (k === 'leaseExpiryYear' && d.tenure !== 'leasehold') || ((k === 'ownerName' || k === 'ownerPhone') && !!linked);
       let v = next;
       for (const k of Object.keys(next.verification)) if (dropped(k)) v = withVerification(v, k, undefined);
@@ -541,25 +548,46 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       <Sec id="tenure" title={`2 · ${s.sec.tenure}`} testId="sec-tenure-form" {...secProps('tenure')}>
         {saleMode && <>
           {Text({ k: 'askingPrice', money: true })}
+          {Select({ k: 'negotiable', options: ['yes', 'no'], labels: s.negotiable })}
+          {/* Sale commission (owner, 15 Oct): a percentage of the price, or a flat fee in RM. */}
           <div className="two">
-            {Select({ k: 'negotiable', options: ['yes', 'no'], labels: s.negotiable })}
-            {Text({ k: 'commissionPct', numeric: true })}
+            <label className="ff">{s.l.commissionType}
+              <select data-field="commissionType" value={d.commissionType ?? 'pct'} onChange={e => set('commissionType', e.target.value as Listing['commissionType'])}>
+                {SALE_COMMISSION_TYPES.map(x => <option key={x} value={x}>{x === 'pct' ? s.n9.typePct : s.n9.typeFlat}</option>)}
+              </select>
+            </label>
+            {(d.commissionType ?? 'pct') === 'pct' ? Text({ k: 'commissionPct', numeric: true }) : Text({ k: 'commissionFlat', money: true })}
           </div>
           {comm !== undefined && <small className="muted" data-testid="form-commission">{s.commission(rm(comm))}</small>}
         </>}
         {rentMode && <>
           {Text({ k: 'monthlyRent', money: true })}
-          {withVp('rentCommissionMonths', (
-            <label className="ff" key="rentCommissionMonths">
-              <span>{s.l.rentCommissionMonths}<FieldHelp lang={lang} topic="commissionPct" label={s.l.rentCommissionMonths} /></span>
-              <select data-field="rentCommissionMonths" value={d.rentCommissionMonths ?? ''} onChange={e => set('rentCommissionMonths', e.target.value ? Number(e.target.value) : undefined)}>
+          {/* Rental commission (owner, 15 Oct): months of rent (1, 1.5, 2 or any number typed), or a flat fee in RM. Never a %. */}
+          <label className="ff">{s.l.rentCommissionType}
+            <select data-field="rentCommissionType" value={d.rentCommissionType ?? 'months'} onChange={e => set('rentCommissionType', e.target.value as Listing['rentCommissionType'])}>
+              {RENT_COMMISSION_TYPES.map(x => <option key={x} value={x}>{x === 'months' ? s.n9.typeMonths : s.n9.typeFlat}</option>)}
+            </select>
+          </label>
+          {(d.rentCommissionType ?? 'months') === 'months' ? withVp('rentCommissionMonths', (
+            <div className="ff" key="rentCommissionMonths">
+              <label htmlFor="rent-months">{s.l.rentCommissionMonths}<FieldHelp lang={lang} topic="commissionPct" label={s.l.rentCommissionMonths} /></label>
+              <select id="rent-months" data-field="rentCommissionMonths" value={monthsCustom ? 'custom' : d.rentCommissionMonths ?? ''}
+                onChange={e => {
+                  if (e.target.value === 'custom') { setMonthsCustom(true); return; }
+                  setMonthsCustom(false); set('rentCommissionMonths', e.target.value ? Number(e.target.value) : undefined);
+                }}>
                 <option value="">{s.notSet}</option>
                 {RENT_COMMISSION_MONTHS.map(m => <option key={m} value={m}>{s.n9.rentMonths(m)}</option>)}
-                {d.rentCommissionMonths !== undefined && !(RENT_COMMISSION_MONTHS as readonly number[]).includes(d.rentCommissionMonths) && <option value={d.rentCommissionMonths}>{s.n9.rentMonths(d.rentCommissionMonths)}</option>}
+                <option value="custom">{s.n9.customMonths}</option>
               </select>
+              {monthsCustom && (
+                <input data-field="rentCommissionMonthsCustom" inputMode="decimal" aria-label={s.n9.monthsInput} placeholder={s.n9.monthsInput}
+                  value={raw.rentMonths ?? (d.rentCommissionMonths ?? '')}
+                  onChange={e => { setRaw(r => ({ ...r, rentMonths: e.target.value })); const n = num(e.target.value); set('rentCommissionMonths', n !== undefined && n > 0 && n <= 24 ? n : undefined); }} />
+              )}
               <small className="muted">{s.n9.rentCommissionHint}</small>
-            </label>
-          ))}
+            </div>
+          )) : Text({ k: 'rentCommissionFlat', money: true })}
           {rentComm !== undefined && <small className="muted" data-testid="form-rent-commission">{s.n9.rentCommission(rm(rentComm))}</small>}
           {pair(Text({ k: 'securityDepositMonths', numeric: true }), Text({ k: 'utilityDepositMonths', numeric: true }))}
           {depositRm ? <small className="muted" data-testid="form-deposit">{s.depositRm(rm(depositRm))}</small> : null}

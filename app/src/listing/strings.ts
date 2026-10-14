@@ -1,6 +1,6 @@
 // Property List screen text in English, Bahasa Malaysia and Chinese (BM and Chinese are drafts for checking).
 import type { Lang } from '../i18n';
-import { titleCase, titleCaseMap } from '../lib/titleCase';
+import { titleCase, titleCaseMap, titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Property List',
@@ -83,7 +83,7 @@ const en = {
   l: {
     bannerStatus: 'Banner placed?',
     ref: 'Reference', refPrefix: 'Prefix', refNo: 'Number', headline: 'Headline (short title)', type: 'Property type',
-    country: 'Country', state: 'State', city: 'City / town', township: 'Township', lotNo: 'Unit/Lot Number', street: 'Jalan / street (number or name)', unitNo: 'Unit/Lot Number', mapsLink: 'Google Maps Link', extraComments: 'Extra Comments', rentCommissionMonths: 'Commission (months of rent)', ownerWhatsapp: 'Owner WhatsApp ID / alias', tenantPhone: 'Tenant phone', tenantWhatsapp: 'Tenant WhatsApp ID / alias',
+    country: 'Country', state: 'State', city: 'City / town', township: 'Township', lotNo: 'Unit/Lot Number', street: 'Jalan / street (number or name)', unitNo: 'Unit/Lot Number', mapsLink: 'Google Maps Link', extraComments: 'Extra Comments', rentCommissionMonths: 'Commission (months of rent)', commissionType: 'Commission type', rentCommissionType: 'Rental commission type', commissionFlat: 'Commission (RM, flat fee)', rentCommissionFlat: 'Rental commission (RM, flat fee)', ownerWhatsapp: 'Owner WhatsApp ID / alias', tenantPhone: 'Tenant phone', tenantWhatsapp: 'Tenant WhatsApp ID / alias',
     lat: 'Map position', bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', floors: 'Storeys', parking: 'Parking bays', landSqft: 'Land area (sq ft)', builtUpSqft: 'Built-up (sq ft)',
     frontageFt: 'Frontage (ft)', depthFt: 'Depth (ft)', lotType: 'Lot type', furnishing: 'Furnishing',
     ceilingFt: 'Ceiling height (ft)', powerKva: 'Power supply (kVA)', loadingBays: 'Loading bays', specs: 'Other specifications',
@@ -154,6 +154,7 @@ const en = {
     whatsappPh: 'alias', phonePh: '60 12-345 6789', fromContacts: 'Saved contacts', suggestionUse: 'Use',
     tenantTitle: 'Tenant',
     extraCommentsTitle: 'Extra Comments',
+    typePct: 'Percentage (%)', typeMonths: 'Months of rent', typeFlat: 'Flat fee (RM)', customMonths: 'Custom…', monthsInput: 'Number of months',
   },
   preview: {
     button: 'Preview', title: 'Preview', open: 'Open details', del: 'Delete', cancel: 'Cancel', hint: 'Tip: press and hold a card, or tap Preview, for a quick look.',
@@ -291,7 +292,7 @@ const bm: ListingStrings = {
   l: {
     bannerStatus: 'Banner dipasang?',
     ref: 'Rujukan', refPrefix: 'Awalan', refNo: 'Nombor', headline: 'Tajuk ringkas', type: 'Jenis hartanah',
-    country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', lotNo: 'Nombor Unit/Lot', street: 'Jalan (nombor atau nama)', unitNo: 'Nombor Unit/Lot', mapsLink: 'Pautan Google Maps', extraComments: 'Komen Tambahan', rentCommissionMonths: 'Komisen (bulan sewa)', ownerWhatsapp: 'ID / alias WhatsApp pemilik', tenantPhone: 'Telefon penyewa', tenantWhatsapp: 'ID / alias WhatsApp penyewa',
+    country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', lotNo: 'Nombor Unit/Lot', street: 'Jalan (nombor atau nama)', unitNo: 'Nombor Unit/Lot', mapsLink: 'Pautan Google Maps', extraComments: 'Komen Tambahan', rentCommissionMonths: 'Komisen (bulan sewa)', commissionType: 'Jenis komisen', rentCommissionType: 'Jenis komisen sewaan', commissionFlat: 'Komisen (RM, yuran tetap)', rentCommissionFlat: 'Komisen sewaan (RM, yuran tetap)', ownerWhatsapp: 'ID / alias WhatsApp pemilik', tenantPhone: 'Telefon penyewa', tenantWhatsapp: 'ID / alias WhatsApp penyewa',
     lat: 'Kedudukan peta', bedrooms: 'Bilik tidur', bathrooms: 'Bilik air', floors: 'Tingkat', parking: 'Petak parkir', landSqft: 'Keluasan tanah (kps)', builtUpSqft: 'Keluasan binaan (kps)',
     frontageFt: 'Lebar hadapan (kaki)', depthFt: 'Kedalaman (kaki)', lotType: 'Jenis lot', furnishing: 'Perabot',
     ceilingFt: 'Ketinggian siling (kaki)', powerKva: 'Bekalan elektrik (kVA)', loadingBays: 'Ruang muat turun', specs: 'Spesifikasi lain',
@@ -361,6 +362,7 @@ const bm: ListingStrings = {
     whatsappPh: 'alias', phonePh: '60 12-345 6789', fromContacts: 'Kenalan tersimpan', suggestionUse: 'Guna',
     tenantTitle: 'Penyewa',
     extraCommentsTitle: 'Komen Tambahan',
+    typePct: 'Peratusan (%)', typeMonths: 'Bulan sewa', typeFlat: 'Yuran tetap (RM)', customMonths: 'Lain-lain…', monthsInput: 'Bilangan bulan',
   },
   preview: {
     button: 'Pratonton', title: 'Pratonton', open: 'Buka butiran', del: 'Padam', cancel: 'Batal', hint: 'Petua: tekan dan tahan kad, atau ketik Pratonton, untuk melihat sekilas.',
@@ -497,7 +499,7 @@ const zh: ListingStrings = {
   l: {
     bannerStatus: '已挂横幅？',
     ref: '编号', refPrefix: '前缀', refNo: '号码', headline: '标题（简短）', type: '房产类型',
-    country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', lotNo: '单位/地段号', street: '街道（门牌或路名）', unitNo: '单位/地段号', mapsLink: 'Google 地图链接', extraComments: '补充说明', rentCommissionMonths: '佣金（几个月租金）', ownerWhatsapp: '业主 WhatsApp ID / 别名', tenantPhone: '租户电话', tenantWhatsapp: '租户 WhatsApp ID / 别名',
+    country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', lotNo: '单位/地段号', street: '街道（门牌或路名）', unitNo: '单位/地段号', mapsLink: 'Google 地图链接', extraComments: '补充说明', rentCommissionMonths: '佣金（几个月租金）', commissionType: '佣金方式', rentCommissionType: '出租佣金方式', commissionFlat: '佣金（RM，固定费用）', rentCommissionFlat: '出租佣金（RM，固定费用）', ownerWhatsapp: '业主 WhatsApp ID / 别名', tenantPhone: '租户电话', tenantWhatsapp: '租户 WhatsApp ID / 别名',
     lat: '地图位置', bedrooms: '卧室', bathrooms: '浴室', floors: '楼层', parking: '车位', landSqft: '土地面积（平方尺）', builtUpSqft: '建筑面积（平方尺）',
     frontageFt: '门面宽度（尺）', depthFt: '深度（尺）', lotType: '单位位置', furnishing: '家具',
     ceilingFt: '天花板高度（尺）', powerKva: '电力供应 (kVA)', loadingBays: '装卸区', specs: '其他规格',
@@ -567,6 +569,7 @@ const zh: ListingStrings = {
     whatsappPh: '别名', phonePh: '60 12-345 6789', fromContacts: '已保存的联系人', suggestionUse: '使用',
     tenantTitle: '租户',
     extraCommentsTitle: '补充说明',
+    typePct: '百分比（%）', typeMonths: '几个月租金', typeFlat: '固定费用（RM）', customMonths: '自定义…', monthsInput: '月数',
   },
   preview: {
     button: '预览', title: '预览', open: '打开详情', del: '删除', cancel: '取消', hint: '提示：长按卡片或点击“预览”可快速查看。',
@@ -636,7 +639,7 @@ function titled(o: ListingStrings, lang: Lang): ListingStrings {
   };
 }
 const source: Record<Lang, ListingStrings> = { en, bm, zh };
-export const listingStrings: Record<Lang, ListingStrings> = { en: titled(source.en, 'en'), bm: titled(source.bm, 'bm'), zh: source.zh };
+export const listingStrings: Record<Lang, ListingStrings> = titled3({ en: titled(source.en, 'en'), bm: titled(source.bm, 'bm'), zh: source.zh });
 
 /** Display name of a type, title type, restriction or country value in the chosen language (custom values as typed). */
 export const typeLabel = (s: ListingStrings, v?: string) => (v ? s.types[v] ?? v : '');

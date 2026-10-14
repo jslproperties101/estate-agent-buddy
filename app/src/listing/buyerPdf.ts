@@ -10,6 +10,7 @@ import { listingStrings, ListingStrings, typeLabel } from './strings';
 import { isVerifiable, shownState } from './verify';
 import { fmtDate, monthText } from '../lib/dates';
 import type { Doc, Block } from '../lib/pdf';
+import { titled3 } from '../lib/titleCase';
 
 export type BuyerGroup = 'basics' | 'location' | 'size' | 'money' | 'tenure' | 'condition' | 'features';
 export const BUYER_GROUPS: BuyerGroup[] = ['basics', 'location', 'size', 'money', 'tenure', 'condition', 'features'];
@@ -34,7 +35,7 @@ export const BUYER_KEYS: { key: keyof Listing; group: BuyerGroup; /** ticked at 
 
 /** Never offered in a buyer PDF, whatever the agent ticks. */
 export const NEVER_SHARED: string[] = [
-  'ownerName', 'ownerPhone', 'ownerWhatsapp', 'vendorId', 'commissionPct', 'rentCommissionMonths', 'arrangement', 'arrangementNote', 'notes', 'handledBy', 'tenancy', 'documents',
+  'ownerName', 'ownerPhone', 'ownerWhatsapp', 'vendorId', 'commissionPct', 'commissionFlat', 'commissionType', 'rentCommissionMonths', 'rentCommissionFlat', 'rentCommissionType', 'arrangement', 'arrangementNote', 'notes', 'handledBy', 'tenancy', 'documents',
   'marketing', 'history', 'filledFrom', 'verification', 'lat', 'lng', 'placeId', 'geoSource', 'geoAccuracy', 'photos',
 ];
 
@@ -196,4 +197,4 @@ const zh: BuyerStrings = {
   disclaimer: '资料由代理提供，不作保证。请在作决定前核实详情并咨询专业意见。',
   footer: '房产资料', fileName: '房产', noProperty: '这个房产已不存在。',
 };
-export const buyerStrings: Record<Lang, BuyerStrings> = { en, bm, zh };
+export const buyerStrings: Record<Lang, BuyerStrings> = titled3({ en, bm, zh });

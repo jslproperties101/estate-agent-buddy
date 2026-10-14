@@ -1,6 +1,7 @@
 // Startup screen text, in three languages. Only steps that really happen are described here: there is no "encrypting",
 // "security check" or "AI update" message because the app does none of those at startup.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   opening: 'Opening your data on this phone…',
@@ -27,4 +28,4 @@ const zh: StartupStrings = {
   appName: 'Estate Agent AI Buddy',
 };
 
-export const startupStrings: Record<Lang, StartupStrings> = { en, bm, zh };
+export const startupStrings: Record<Lang, StartupStrings> = titled3({ en, bm, zh });

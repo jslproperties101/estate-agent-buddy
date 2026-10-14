@@ -1,3 +1,4 @@
+import { titled3 } from './lib/titleCase';
 // Screen text shared across the app, in English, Bahasa Malaysia and Chinese (Simplified).
 // Each feature keeps its own text next to its screens (for example listing/strings.ts); all follow the same shape.
 // The Bahasa Malaysia and Chinese wording is a first draft for the owner to check.
@@ -426,4 +427,4 @@ const zh: Strings = {
   },
 };
 
-export const strings: Record<Lang, Strings> = { en, bm, zh };
+export const strings: Record<Lang, Strings> = titled3({ en, bm, zh });

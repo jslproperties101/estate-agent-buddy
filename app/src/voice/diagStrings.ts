@@ -1,6 +1,7 @@
 // Voice diagnostics text in English, Bahasa Malaysia and Simplified Chinese: one short finding and, where it helps, what to do.
 import type { Lang } from '../i18n';
 import type { Check, Diagnosis } from './diagnostics';
+import { titled3 } from '../lib/titleCase';
 
 interface Msg { t: string; fix?: string }
 type Msgs = Record<string, Msg>;
@@ -122,7 +123,7 @@ const zh: Msgs = {
   lastNone: { t: '本次使用中尚未试过语音。' },
 };
 
-export const diagMessages: Record<Lang, Msgs> = { en, bm, zh };
+export const diagMessages: Record<Lang, Msgs> = titled3({ en, bm, zh });
 
 export function diagMessage(lang: Lang, c: Check): Msg {
   const m = diagMessages[lang][c.code] ?? diagMessages.en[c.code] ?? { t: c.code };

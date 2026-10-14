@@ -14,8 +14,9 @@ import { Change, applyChanges, currentValue } from '../listing/commands';
 import { parseTargetedUpdate, Targeted } from '../listing/targeted';
 import { parseBuyerQuery, findBuyers, BuyerMatch, BuyerQuery } from './buyerSearch';
 import { LEAD_COLOURS } from '../data/types';
+import { titled3 } from '../lib/titleCase';
 
-export const voiceCommandStrings = {
+export const voiceCommandStrings = titled3( {
   en: {
     intro: 'Say or type what you want to do. The app shows what it understood and opens it for you to check before anything is saved.',
     can: 'You can say, for example',
@@ -79,7 +80,7 @@ export const voiceCommandStrings = {
       buyers: '符合的买家和租客', buyersNone: '没有符合的买家或租客。买家是根据他们的备注和所询问的房产来匹配的。', buyersHow: '根据每位买家的备注，以及他们询问或看过的房产来匹配。联系前请逐一核对。', open: '打开', want: '想找', lead: '客户级别',
     },
   },
-};
+});
 
 type Panel =
   | { kind: 'target'; result: Targeted; text: string }

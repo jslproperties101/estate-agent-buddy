@@ -1,5 +1,6 @@
 // Text for the "this property may already be in your list" warning, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'This may already be in your list',
@@ -20,4 +21,4 @@ const zh: DupStrings = {
   address: '相同的街道和单位',
   lot: '同一地区的相同地段',
 };
-export const dupStrings: Record<Lang, DupStrings> = { en, bm, zh };
+export const dupStrings: Record<Lang, DupStrings> = titled3({ en, bm, zh });

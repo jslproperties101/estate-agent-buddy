@@ -44,12 +44,12 @@ test('BP3 missing information is left out unless the agent ticks it, and then sh
   const l = full({ monthlyRent: undefined, furnishing: undefined });
   const fields = buyerFields(l, 'en', 2026);
   const base = buildBuyerDoc({ ...input(l), selected: defaultSelection(fields) });
-  assert.ok(!text(base).includes('Monthly Rent') && !text(base).includes('To be confirmed'));
+  assert.ok(!text(base).includes('Monthly Rent') && !text(base).includes('To Be Confirmed'));
   const withMissing = buildBuyerDoc({ ...input(l), selected: { ...defaultSelection(fields), monthlyRent: true, furnishing: true } });
   const rows = (withMissing.blocks.filter(b => b.t === 'rows') as Extract<Block, { t: 'rows' }>[]).flatMap(b => b.rows);
   const rent = rows.find(r => r.k.startsWith('Monthly Rent'))!;
-  assert.deepEqual([rent.v, rent.warn], ['To be confirmed', true]);
-  assert.equal(rows.find(r => r.k === 'Furnishing')?.v, 'To be confirmed');
+  assert.deepEqual([rent.v, rent.warn], ['To Be Confirmed', true]);
+  assert.equal(rows.find(r => r.k === 'Furnishing')?.v, 'To Be Confirmed');
 });
 
 test('BP4 a record with almost nothing, no photos and no agent still makes a document and lays out on a page', () => {

@@ -2,6 +2,7 @@
 import type { Lang } from '../i18n';
 import { fmtDateTime } from '../lib/dates';
 import type { DraftHandle } from './useDraft';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   restored: (t: string) => `Draft from ${t} restored. It is not saved yet: press Save to keep it.`,
@@ -22,7 +23,7 @@ const zh: S = {
   changed: '您编辑时此记录已被更新（例如来自另一部手机）。如果保存，这些更新将被替换；之前的版本仍保留在历史记录中。',
   useDraft: '使用我的草稿', discard: '放弃草稿', saved: '草稿已保存在本手机', discardAsk: '放弃此草稿？',
 };
-export const draftStrings: Record<Lang, S> = { en, bm, zh };
+export const draftStrings: Record<Lang, S> = titled3({ en, bm, zh });
 
 export function DraftBanner({ lang, draft }: { lang: Lang; draft: DraftHandle }) {
   const s = draftStrings[lang];

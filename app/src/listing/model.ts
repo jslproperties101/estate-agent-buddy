@@ -48,8 +48,12 @@ export const LAND_USES: LandUse[] = ['building', 'industry', 'agriculture', 'nil
 export const RESTRICTIONS = ['NON Bumiputera', 'Bumiputera lot', 'Malay reserve'] as const;
 export const LEGACY_RESTRICTIONS: Record<string, string> = { 'No restriction': 'NON Bumiputera' };
 export const restrictionValue = (v?: string) => (v ? LEGACY_RESTRICTIONS[v] ?? v : undefined);
-/** Rental commission choices, in months of rent (Change 009). Never a percentage. */
+/** Rental commission choices, in months of rent (Change 009); any other number of months can be typed. Never a percentage. */
 export const RENT_COMMISSION_MONTHS = [1, 1.5, 2] as const;
+export type SaleCommissionType = 'pct' | 'flat';
+export type RentCommissionType = 'months' | 'flat';
+export const SALE_COMMISSION_TYPES: SaleCommissionType[] = ['pct', 'flat'];
+export const RENT_COMMISSION_TYPES: RentCommissionType[] = ['months', 'flat'];
 export const TITLE_TYPES = ['Individual title', 'Strata title', 'Master title'] as const;
 export const DOC_CATEGORIES: DocCategory[] = ['title', 'brochure', 'floorplan', 'correspondence', 'transaction', 'other'];
 /** Title documents and owner correspondence can hold personal details: kept on this phone only. */
@@ -154,11 +158,19 @@ export interface Listing {
   purpose?: Purpose;
   askingPrice?: number;
   negotiable?: Negotiable;
+  /** How the sale commission is set (owner, 15 Oct): a percentage of the asking price (default) or a flat fee in RM. */
+  commissionType?: SaleCommissionType;
   /** Sale commission, a percentage of the asking price. */
   commissionPct?: number;
+  /** Sale commission as a flat fee (RM). */
+  commissionFlat?: number;
   monthlyRent?: number;
-  /** Rental commission, in months of rent (1, 1.5 or 2). Never a percentage. */
+  /** How the rental commission is set: months of rent (default) or a flat fee in RM. Never a percentage. */
+  rentCommissionType?: RentCommissionType;
+  /** Rental commission, in months of rent (1, 1.5, 2 or any number the agent types). */
   rentCommissionMonths?: number;
+  /** Rental commission as a flat fee (RM). */
+  rentCommissionFlat?: number;
   securityDepositMonths?: number;
   utilityDepositMonths?: number;
   maintenanceFee?: number;
@@ -197,12 +209,18 @@ export { rm, rm2, rmShort } from '../lib/money';
 export const sqft = (n?: number) => (n === undefined ? '' : Math.round(n).toLocaleString('en-US') + ' sq ft');
 export const landText = (n?: number) => (n === undefined ? '' : n >= 43560 ? `${(n / 43560).toFixed(2)} acres (${sqft(n)})` : sqft(n));
 
-/** Sale commission in RM: asking price × percentage. Only for sale listings. */
-export const commissionRm = (l: Pick<Listing, 'askingPrice' | 'commissionPct' | 'purpose'>) =>
-  forSale(l) && l.askingPrice !== undefined && l.commissionPct !== undefined ? Math.round(l.askingPrice * l.commissionPct) / 100 : undefined;
-/** Rental commission in RM: monthly rent × months (1, 1.5 or 2). Only for rental listings; never a percentage. */
-export const rentCommissionRm = (l: Pick<Listing, 'monthlyRent' | 'rentCommissionMonths' | 'purpose'>) =>
-  forRent(l) && l.monthlyRent !== undefined && l.rentCommissionMonths !== undefined ? Math.round(l.monthlyRent * l.rentCommissionMonths * 100) / 100 : undefined;
+/** Sale commission in RM: asking price × percentage, or the flat fee. Only for sale listings. */
+export function commissionRm(l: Pick<Listing, 'askingPrice' | 'commissionPct' | 'purpose'> & Partial<Pick<Listing, 'commissionType' | 'commissionFlat'>>): number | undefined {
+  if (!forSale(l)) return undefined;
+  if (l.commissionType === 'flat') return l.commissionFlat;
+  return l.askingPrice !== undefined && l.commissionPct !== undefined ? Math.round(l.askingPrice * l.commissionPct) / 100 : undefined;
+}
+/** Rental commission in RM: monthly rent × months, or the flat fee. Only for rental listings; never a percentage. */
+export function rentCommissionRm(l: Pick<Listing, 'monthlyRent' | 'rentCommissionMonths' | 'purpose'> & Partial<Pick<Listing, 'rentCommissionType' | 'rentCommissionFlat'>>): number | undefined {
+  if (!forRent(l)) return undefined;
+  if (l.rentCommissionType === 'flat') return l.rentCommissionFlat;
+  return l.monthlyRent !== undefined && l.rentCommissionMonths !== undefined ? Math.round(l.monthlyRent * l.rentCommissionMonths * 100) / 100 : undefined;
+}
 
 export const forRent = (l: Pick<Listing, 'purpose'>) => l.purpose === 'rent' || l.purpose === 'sale_or_rent';
 export const forSale = (l: Pick<Listing, 'purpose'>) => l.purpose !== 'rent';

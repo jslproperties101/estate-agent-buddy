@@ -2,6 +2,7 @@
 // "Saved on this phone" and "Synced" are different statements: the first is true after every save, the second only
 // after the cloud has answered.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   label: 'Save status',
@@ -56,4 +57,4 @@ const zh: SaveStrings = {
   },
 };
 
-export const saveStrings: Record<Lang, SaveStrings> = { en, bm, zh };
+export const saveStrings: Record<Lang, SaveStrings> = titled3({ en, bm, zh });

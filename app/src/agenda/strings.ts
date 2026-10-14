@@ -1,5 +1,6 @@
 // To-Do, Calendar, Inquiry History and Viewing History text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   inq: {
@@ -128,4 +129,4 @@ const zh: AgendaStrings = {
   activity: { title: '询问与看房' },
 };
 
-export const agendaStrings: Record<Lang, AgendaStrings> = { en, bm, zh };
+export const agendaStrings: Record<Lang, AgendaStrings> = titled3({ en, bm, zh });

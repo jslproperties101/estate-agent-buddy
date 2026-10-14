@@ -1,5 +1,6 @@
 // Property Calculator text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const enBase = {
   title: 'Property Calculator',
@@ -195,4 +196,4 @@ const zhX: CalcX = {
 const en: CalcStrings = { ...enBase, x: enX };
 const bm: CalcStrings = { ...bmBase, x: bmX };
 const zh: CalcStrings = { ...zhBase, x: zhX };
-export const calcStrings: Record<Lang, CalcStrings> = { en, bm, zh };
+export const calcStrings: Record<Lang, CalcStrings> = titled3({ en, bm, zh });

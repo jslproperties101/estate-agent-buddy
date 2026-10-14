@@ -1,5 +1,6 @@
 // Marketing Studio text in English, Bahasa Malaysia and Simplified Chinese (BM and 中文 are drafts for the owner to check).
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Marketing Studio', open: 'Marketing Studio',
@@ -86,4 +87,4 @@ const zh: MarketingStrings = {
   },
   noProperty: '这个房产已不存在。', untitled: '房产', fileBase: '房产',
 };
-export const marketingStrings: Record<Lang, MarketingStrings> = { en, bm, zh };
+export const marketingStrings: Record<Lang, MarketingStrings> = titled3({ en, bm, zh });

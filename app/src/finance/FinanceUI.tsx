@@ -12,10 +12,12 @@ import { DEAL_STATUSES, Deal, Expense, Income } from '../data/types';
 import { summarise, monthlyIncome, myCommission, commissionFrom, EXPENSE_CATEGORIES, INCOME_SOURCES, Period } from '../domain/finance';
 import { rm, cardTitle, Listing, rentCommissionRm } from '../listing/model';
 
-/** A new deal's starting value and commission from its property. A rent-only property's commission is months of rent
- *  (Change 009): the amount is rent × months and no percentage is set, so months are never read as a percentage. */
+/** A new deal's starting value and commission from its property. A rent-only property's commission is months of rent or a
+ *  flat fee, and a sale's may be a flat fee (owner, 15 Oct): then the amount is set and no percentage, so neither is ever
+ *  read as a percentage. */
 export function dealStart(p?: Listing): Pick<Deal, 'value' | 'commissionPct' | 'commission'> {
   if (p?.purpose === 'rent') return { value: p.monthlyRent ?? 0, commissionPct: undefined, commission: rentCommissionRm(p) ?? 0 };
+  if (p?.commissionType === 'flat') return { value: p.askingPrice ?? 0, commissionPct: undefined, commission: p.commissionFlat ?? 0 };
   return { value: p?.askingPrice ?? p?.monthlyRent ?? 0, commissionPct: p?.commissionPct, commission: 0 };
 }
 import { ym, ymd, fmtDate, localeOf } from '../lib/dates';

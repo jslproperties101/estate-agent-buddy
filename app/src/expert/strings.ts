@@ -1,5 +1,6 @@
 // Ask Expert text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Ask Expert',
@@ -77,4 +78,4 @@ const zh: ExpertStrings = {
   deleteQ: '删除此问题及其回答？',
 };
 
-export const expertStrings: Record<Lang, ExpertStrings> = { en, bm, zh };
+export const expertStrings: Record<Lang, ExpertStrings> = titled3({ en, bm, zh });

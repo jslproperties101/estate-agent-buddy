@@ -1,5 +1,6 @@
 // Sign-in, account and team text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   welcome: 'Sign in to Estate Agent AI Buddy',
@@ -191,4 +192,4 @@ const zh: AuthStrings = {
   },
 };
 
-export const authStrings: Record<Lang, AuthStrings> = { en, bm, zh };
+export const authStrings: Record<Lang, AuthStrings> = titled3({ en, bm, zh });

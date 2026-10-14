@@ -148,3 +148,26 @@ test('C9-11 contact boxes: "+" and "@" are display prefixes; stored values never
   assert.equal(aliasValue('ali ns'), '@alins');
   assert.equal(aliasValue('  '), undefined);
 });
+
+test('C9-12 owner 15 Oct: sale commission % or flat RM; rental commission months (any number) or flat RM; neither is read as a percent', async () => {
+  assert.equal(commissionRm({ purpose: 'sale', askingPrice: 800_000, commissionType: 'flat', commissionFlat: 15_000, commissionPct: 3 }), 15_000, 'flat wins, the % is ignored');
+  assert.equal(commissionRm({ purpose: 'sale', askingPrice: 800_000, commissionType: 'pct', commissionPct: 2.5 }), 20_000);
+  assert.equal(rentCommissionRm({ purpose: 'rent', monthlyRent: 2000, rentCommissionType: 'flat', rentCommissionFlat: 2500, rentCommissionMonths: 2 }), 2500);
+  assert.equal(rentCommissionRm({ purpose: 'rent', monthlyRent: 2000, rentCommissionMonths: 0.75 }), 1500, 'a custom number of months');
+  assert.deepEqual(dealStart(L({ purpose: 'sale', askingPrice: 800_000, commissionType: 'flat', commissionFlat: 15_000 })), { value: 800_000, commissionPct: undefined, commission: 15_000 });
+  assert.deepEqual(dealStart(L({ purpose: 'rent', monthlyRent: 2000, rentCommissionType: 'flat', rentCommissionFlat: 2500 })), { value: 2000, commissionPct: undefined, commission: 2500 });
+  const calc = { kind: 'commission', commission: { value: 15000, pct: 100, sst: true } } as never;
+  assert.deepEqual(proposeUpdates(calc, { purpose: 'sale', commissionType: 'flat', askingPrice: 1 }), [], 'no % written onto a flat-fee sale');
+});
+
+test('C9-13 Title Case across the app: short labels only; sentences, fragments, codes, lists and functions are untouched', async () => {
+  const { isLabel, titleTable } = await import('../src/lib/titleCase');
+  const { strings } = await import('../src/i18n');
+  assert.ok(isLabel('Save settings') && isLabel('Banner placed?'));
+  for (const no of ['No contact was chosen.', 'beds', '/ month', 'en', 'ms-MY', 'Opening phone book…', 'https://maps.app.goo.gl/x', 'Enter:', 'One two three four five six seven'])
+    assert.equal(isLabel(no), false, no);
+  const t = titleTable({ a: 'Save settings', b: 'Every field is optional.', list: ['near me'], f: (n: number) => `${n} items`, nested: { x: 'Check for updates' } }, 'en');
+  assert.deepEqual([t.a, t.b, t.list, t.f(2), t.nested.x], ['Save Settings', 'Every field is optional.', ['near me'], '2 items', 'Check for Updates']);
+  assert.equal(strings.en.update.check, 'Check for Updates');
+  assert.equal(strings.zh.update.check, '检查更新', 'Chinese unchanged');
+});

@@ -195,7 +195,7 @@ test('CE2 the calculator PDF document holds the property, client, inputs, result
   const c = mk('purchase', { propertyId: 'p1', contactId: 'k1', title: 'Offer for Mr Tan' });
   const doc = buildCalculationDoc(c, { lang: 'en', property: prop({ type: 'condo', township: 'Putra Nilai' }), contact: { name: 'Mr Tan' }, agent: { fullName: 'Agent Lee', agency: 'Lee Realty' }, now: Date.UTC(2026, 9, 14) });
   const text = JSON.stringify(doc.blocks);
-  for (const must of ['Offer for Mr Tan', 'P1001', 'Prepared for Mr Tan', 'Monthly repayment', 'Estimated total cash required', 'Rates used', 'Estimates for discussion only', 'Agent Lee']) assert.ok(text.includes(must), must);
+  for (const must of ['Offer for Mr Tan', 'P1001', 'Prepared for Mr Tan', 'Monthly repayment', 'Estimated total cash required', 'Rates used', 'Estimates for discussion only', 'Agent Lee']) assert.ok(text.toLowerCase().includes(must.toLowerCase()), must);
   assert.ok(doc.footer && doc.footer.includes('Estimate only'));
   const noLinks = buildCalculationDoc(mk('rental'), { lang: 'zh', now: 0 });
   assert.ok(JSON.stringify(noLinks.blocks).includes('结果'), 'Chinese headings');

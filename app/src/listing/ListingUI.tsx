@@ -231,8 +231,6 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
                 <span className="gc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</span>
                 <span className="gc-meta">{typeOnly(l, s) || '—'}</span>
                 <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
-                <TenureLine l={l} s={s} />
-                {l.extraComments && <span className="gc-comments pre" data-testid="card-comments">{l.extraComments}</span>}
               </button>
               <div className="gc-actions">
                 <LocationButton l={l} s={s} go={go} className="gc-loc" />
@@ -386,10 +384,12 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
       {/* Change 009: one section for price, commission, rent and deposits with tenure and title. */}
       <SectionCard title={s.sec.tenure} onEdit={edit('tenure')} editLabel={EL} testId="sec-tenure-view">
-        {hasAny(l.askingPrice, l.monthlyRent, l.tenure, l.titleType, l.landUse, l.restriction, l.commissionPct, l.rentCommissionMonths) ? (
+        {hasAny(l.askingPrice, l.monthlyRent, l.tenure, l.titleType, l.landUse, l.restriction, l.commissionPct, l.commissionFlat, l.rentCommissionMonths, l.rentCommissionFlat) ? (
           <dl className="dl">
-            {forSale(l) && <>{numRow('askingPrice', rm)}{row('negotiable', l.negotiable && s.negotiable[l.negotiable])}{row('commissionPct', l.commissionPct !== undefined ? `${l.commissionPct}%` : undefined)}</>}
-            {forRent(l) && <>{numRow('monthlyRent', rm)}{numRow('rentCommissionMonths', s.n9.rentMonths)}{numRow('securityDepositMonths', s.months)}{numRow('utilityDepositMonths', s.months)}</>}
+            {forSale(l) && <>{numRow('askingPrice', rm)}{row('negotiable', l.negotiable && s.negotiable[l.negotiable])}
+              {l.commissionType === 'flat' ? numRow('commissionFlat', rm) : row('commissionPct', l.commissionPct !== undefined ? `${l.commissionPct}%` : undefined)}</>}
+            {forRent(l) && <>{numRow('monthlyRent', rm)}{l.rentCommissionType === 'flat' ? numRow('rentCommissionFlat', rm) : numRow('rentCommissionMonths', s.n9.rentMonths)}
+              {numRow('securityDepositMonths', s.months)}{numRow('utilityDepositMonths', s.months)}</>}
             {row('tenure', l.tenure && s.tenure[l.tenure])}{row('leaseExpiryYear', l.leaseExpiryYear)}
             {yrs !== undefined && <div className="dl-row"><dt /><dd className="ok-text">{s.yearsLeft(yrs)}</dd></div>}
             {row('titleType', l.titleType && (s.titleTypes[l.titleType] ?? l.titleType))}{row('landUse', l.landUse && s.landUse[l.landUse])}{row('restriction', restriction && (s.restrictions[restriction] ?? restriction))}

@@ -70,7 +70,7 @@ test('MK4 a ticked detail with no value is left off the design and reported; wit
   assert.equal(c.noPrice, true);
   assert.equal(c.prices.length, 0);
   assert.ok(!c.facts.some(f => f.key === 'bathrooms'));
-  assert.ok(!JSON.stringify(c).includes('To be confirmed'), 'nothing invented as a placeholder on the artwork');
+  assert.ok(!JSON.stringify(c).includes('To Be Confirmed'), 'nothing invented as a placeholder on the artwork');
 });
 
 test('MK5 only facts the record marks Confirmed go without a *; others are marked, listed, and the design gets a footnote', () => {

@@ -1,5 +1,6 @@
 // Photo Studio text in English, Bahasa Malaysia and Simplified Chinese (BM and 中文 are drafts for the owner to check).
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Photo Studio', open: 'Photo Studio',
@@ -62,4 +63,4 @@ const zh: PhotoStrings = {
   privacyNote: '保存的副本是重新绘制的，因此拍摄地点等相机隐藏数据不会带入其中。',
   declutter: 'AI 清理杂物功能不可用。它需要联网的 AI 服务和您的明确同意，目前尚未选择或批准任何服务。',
 };
-export const photoStrings: Record<Lang, PhotoStrings> = { en, bm, zh };
+export const photoStrings: Record<Lang, PhotoStrings> = titled3({ en, bm, zh });

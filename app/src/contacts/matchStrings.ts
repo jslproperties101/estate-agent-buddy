@@ -1,6 +1,7 @@
 // Text for "What this buyer wants" and the buyer ↔ property matches, in three languages.
 import type { Lang } from '../i18n';
 import type { Level, CriterionKey, Verdict } from '../domain/matching';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'What this buyer wants',
@@ -99,4 +100,4 @@ const zh: S = {
   wa: (name, what) => `${name} 您好，我有一个可能适合您需求的房产：${what}。您想看看吗？`,
 };
 
-export const matchStrings: Record<Lang, S> = { en, bm, zh };
+export const matchStrings: Record<Lang, S> = titled3({ en, bm, zh });

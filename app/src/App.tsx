@@ -75,7 +75,7 @@ import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 /** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
  *  card: it lives inside Agent Profile. News is no longer a card: News / Announcements is a section of Notifications.
  *  Subsale, Project and Market Intelligence are honest Coming Soon screens (`soon`): nothing on them pretends to work.
- *  Co-broke Opportunities (Coming Soon) and Notifications stay in the top bar. */
+ *  Notifications stays in the top bar; Co-broke Opportunities (Coming Soon) opens from the Opportunities card (owner, 15 Oct). */
 export const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
   { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
   { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
@@ -368,7 +368,16 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'home': return <Home lang={lang} go={go} />;
     case 'notifications': return <Notifications lang={lang} go={go} />;
     case 'contactsHome': return <ContactsHome lang={lang} go={go} />;
-    case 'opportunities': return <section className="card stack-sm" data-testid="opportunities"><h2>{t.notBuilt}</h2><p>{t.opportunitiesBody}</p></section>;
+    case 'opportunities': return (
+      <section className="stack" data-testid="opportunities">
+        {/* Change 003 follow-up (owner, 15 Oct): Co-broke Opportunities lives here now that the top-bar item is gone. */}
+        <button className="card big-card link-card" data-testid="open-cobroke" onClick={() => go({ name: 'cobroke' })}>
+          <strong>{t.cobrokeTop}</strong><small className="muted">{t.cobrokePage.intro}</small>
+          <span className="badge soon-badge fit">{t.comingSoon}</span>
+        </button>
+        <div className="card stack-sm"><h2>{t.notBuilt}</h2><p>{t.opportunitiesBody}</p></div>
+      </section>
+    );
     case 'listing': return <PropertyListing key={JSON.stringify(s.filters ?? {})} lang={lang} go={go} initial={s.filters} />;
     case 'listingDetail': return <ListingDetails key={s.id} lang={lang} id={s.id} go={go} />;
     case 'listingForm': return <ListingForm key={`${s.id ?? 'new'}-${s.section ?? ''}`} lang={lang} id={s.id} prefill={s.prefill} section={s.section} back={back}

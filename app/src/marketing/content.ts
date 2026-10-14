@@ -10,6 +10,7 @@ import type { Profile } from '../data/types';
 import type { Listing } from '../listing/model';
 import { listingStrings } from '../listing/strings';
 import { BuyerField, buyerFields, AgentChoice, agentLines, publicTitle } from '../listing/buyerPdf';
+import { titled3 } from '../lib/titleCase';
 
 export type FormatId = 'a4' | 'square' | 'portrait';
 export type OutputId = 'pdf' | 'png' | 'jpg' | 'webp';
@@ -132,8 +133,8 @@ export function marketingFileName(ref: string | undefined, fallback: string, for
   return `${base}-${format}.${output}`;
 }
 
-const posterWords = {
+const posterWords = titled3( {
   en: { untitled: 'Property', footnote: '* Not yet verified. Please confirm before relying on it.', disclaimer: 'Information supplied by the agent and not guaranteed. Please verify before you decide.', sample: 'SAMPLE · not a real property' },
   bm: { untitled: 'Hartanah', footnote: '* Belum disahkan. Sila sahkan sebelum bergantung padanya.', disclaimer: 'Maklumat dibekalkan oleh ejen dan tidak dijamin. Sila sahkan sebelum membuat keputusan.', sample: 'CONTOH · bukan hartanah sebenar' },
   zh: { untitled: '房产', footnote: '* 尚未核实，请确认后再依赖。', disclaimer: '资料由代理提供，不作保证。请在决定前核实。', sample: '示例 · 非真实房产' },
-};
+});

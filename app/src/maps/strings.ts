@@ -1,5 +1,6 @@
 // Text for Google Maps features (location picker, property map, House Shopping map), in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   addFromMap: 'Add from Google Map',
@@ -152,4 +153,4 @@ const zh: MapStrings = {
   field: { country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', street: '街道' },
 };
 
-export const mapStrings: Record<Lang, MapStrings> = { en, bm, zh };
+export const mapStrings: Record<Lang, MapStrings> = titled3({ en, bm, zh });

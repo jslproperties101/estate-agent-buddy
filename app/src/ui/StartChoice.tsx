@@ -6,8 +6,9 @@ import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { isEmptyWorkspace, loadSampleInto } from '../data/sample';
 import { IconLogo } from '../icons';
+import { titled3 } from '../lib/titleCase';
 
-const T = {
+const T = titled3( {
   en: {
     title: 'Welcome to Estate Agent AI Buddy',
     body: 'How would you like to start?',
@@ -29,7 +30,7 @@ const T = {
     sampleSub: '示例房产、买家、卖家、待办、日历活动、询问和看房，全部标有“示例”，让您了解各项功能如何运作。可随时在 设置 → 示例数据 中删除。示例数据只保存在本机，不会发送给您的团队。',
     empty: '不使用示例数据开始', emptySub: '干净、空白的工作区，用于真实工作。以后仍可在设置中添加示例数据。',
   },
-};
+});
 
 /** Shown when this is a new, empty workspace and the choice was never made on this phone. */
 export function needsStartChoice(state: ReturnType<ReturnType<typeof useApp>['store']['getState']>): boolean {

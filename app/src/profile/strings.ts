@@ -1,5 +1,6 @@
 // Profile, Digital Name Card and Settings text, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Agent Profile',
@@ -157,4 +158,4 @@ const zh: ProfileStrings = {
   version: '版本',
 };
 
-export const profileStrings: Record<Lang, ProfileStrings> = { en, bm, zh };
+export const profileStrings: Record<Lang, ProfileStrings> = titled3({ en, bm, zh });

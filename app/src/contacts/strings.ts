@@ -1,5 +1,6 @@
 // Vendor List and Buyer List text, in three languages. Both lists are views of one contact list.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   vendors: 'Vendors', buyers: 'Buyers', contacts: 'Contacts',
@@ -113,4 +114,4 @@ const zh: ContactStrings = {
   aliasOnly: (alias: string) => `WhatsApp：${alias}（在 WhatsApp 中搜索此别名）`,
 };
 
-export const contactStrings: Record<Lang, ContactStrings> = { en, bm, zh };
+export const contactStrings: Record<Lang, ContactStrings> = titled3({ en, bm, zh });

@@ -6,8 +6,9 @@
 import { ReactNode, useState } from 'react';
 import { Lang } from '../i18n';
 import { PickedContact, pickPhoneContacts, phonebookProblem, PhonebookProblem } from '../lib/phonebook';
+import { titled3 } from '../lib/titleCase';
 
-const T = {
+const T = titled3( {
   en: {
     label: 'Choose from phone book', opening: 'Opening phone book…', none: 'No contact was chosen.', noPhone: 'This contact has no phone number. Type the number.',
     problem: {
@@ -35,7 +36,7 @@ const T = {
       failed: '无法打开通讯录。请再试一次，或手动输入。',
     } as Record<PhonebookProblem, string>,
   },
-};
+});
 
 type Msg = { text: string; error: boolean } | null;
 

@@ -1,5 +1,6 @@
 // Text for the "contacts to follow up" reminder, in three languages.
 import type { Lang } from '../i18n';
+import { titled3 } from '../lib/titleCase';
 
 const en = {
   title: 'Contacts to follow up',
@@ -32,4 +33,4 @@ const zh: FollowStrings = {
   off: '关闭',
   days: d => `${d} 天`,
 };
-export const followStrings: Record<Lang, FollowStrings> = { en, bm, zh };
+export const followStrings: Record<Lang, FollowStrings> = titled3({ en, bm, zh });

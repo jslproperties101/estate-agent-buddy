@@ -820,3 +820,6 @@ label.btn { position: relative; cursor: pointer; }
 @keyframes eab-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 .busy-line { display: flex; align-items: center; gap: 10px; }
+/* Opportunities → Co-broke Opportunities card (owner, 15 Oct). */
+.link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--ink); min-height: 88px; border: 1px solid var(--gold-lo); cursor: pointer; }
+.link-card strong { color: var(--gold-hi); font-size: 18px; }
