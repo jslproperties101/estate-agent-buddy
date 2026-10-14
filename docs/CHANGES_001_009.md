@@ -7,7 +7,7 @@ Status words: DONE (built and covered by automated tests) · BLOCKED · DESIGN O
 | Change | Status | Where in the code | Automated tests |
 |---|---|---|---|
 | 001 First-start sample-data popup higher | DONE (placement only; timing and actions unchanged) | `src/styles.css` `.start-scrim` | U98 (384×824 and 320×568) |
-| 002 / 002a Replace the red-bordered logo | **BLOCKED** | — | — |
+| 002 / 002a Replace the red-bordered logo | DONE with the artwork the owner supplied on 15 Oct (`assets/brand/logo-002a-source.jpg`): header, sign-in and first-start logo. Launcher icon and splash unchanged | `src/brand/logo-256.webp`, `logo-512.webp`, `assets/brand/logo.png`, `src/icons.tsx` | BR5 (byte check that launcher/splash files are unchanged), U1, U28, U98 |
 | 003 Remove the top-middle "Soon" item | DONE | `src/App.tsx` header (Co-broke button removed) | U1, U25 |
 | 004 Remove the main-screen To-Do popup | DONE; due reminders are now listed in Notifications ("Due in the last 24 hours"), the bell still counts them, phone notifications unchanged | `src/App.tsx` Shell + Notifications | U9 (reminder test), U89 |
 | 005 Old preview popup | SUPERSEDED by 008/009 — not built | — | U65 asserts it is absent |
@@ -33,7 +33,7 @@ Nothing is rewritten in bulk. Older records are mapped when shown, and when the 
 - New optional fields: `mapsLink`, `extraComments`, `rentCommissionMonths`, `ownerWhatsapp`, `tenancy.tenantPhone`, `tenancy.tenantWhatsapp`. No Supabase migration is needed: records are stored as JSON.
 
 ## Decisions to confirm with the owner
-1. **002 logo**: the red-bordered reference and the 002a logo file were not in the material provided to Claude (the consolidated .docx has no images). Nothing was changed. Needed: the exact logo file and the screenshot showing which logo is marked.
+1. **002 logo**: done with the supplied artwork. It replaces the in-app logo that had the red border (header, sign-in, first-start choice). The phone's launcher icon (home-screen icon) was left as it is: say if that should change too (it needs a new APK).
 2. **003**: removing the top-bar item removes the only entry to the Co-broke Opportunities list screen (the GPS "Co-broke Opportunity Map" Coming Soon card is unchanged). Keep it unreachable, or add an entry elsewhere?
 3. **Rental commission**: fixed choices 1, 1.5 and 2 months. A custom value was not added.
 4. **Grid cards** also show tenure/restriction, storeys/lot type and the full Extra Comments, so the 3-column grid cards can be tall.
