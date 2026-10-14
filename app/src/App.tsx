@@ -53,11 +53,10 @@ import { StoredImage } from './ui/common';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
   IconBack, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconCobroke, IconSubsale, IconMarket,
+  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconSubsale, IconMarket,
 } from './icons';
 import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
-import { BUILD } from './native/updates';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, holdsOtherWorkspaceData, ownerUnknownWithData } from './data/sync';
@@ -265,9 +264,6 @@ function Shell() {
             ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
             : <h1>{title}</h1>}
           {screen.name === 'home' && <>
-            <button className="icon-btn top-btn cobroke-btn" onClick={() => go({ name: 'cobroke' })} aria-label={`${t.cobrokeTop} (${t.comingSoon})`} title={`${t.cobrokeTop} · ${t.comingSoon}`} data-testid="top-cobroke">
-              <IconCobroke /><span className="top-soon" aria-hidden="true">{t.soonShort}</span>
-            </button>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
               <IconBell />{notifCount > 0 && <span className="top-badge" aria-hidden="true">{notifCount > 9 ? '9+' : notifCount}</span>}
             </button>
@@ -277,26 +273,8 @@ function Shell() {
           </div>
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
-        {BUILD.qa && <div className="proto-bar qa-bar" role="status" data-testid="qa-bar">QA · {BUILD.sha} · {t.update.qaOff(BUILD.sha)}</div>}
         <UpdateBanner lang={lang} />
         <SaveStatus lang={lang} />
-
-        {alerts.length > 0 && (
-          <div className="alerts" role="status" data-testid="reminder-alerts">
-            {alerts.map(a => {
-              const r = reminderText(a, state, lang);
-              return (
-                <div key={a.key} className="alert">
-                  <span>🔔 <strong>{r.title}</strong> · {r.body}</span>
-                  <div className="row-wrap">
-                    <button className="btn small primary" onClick={() => { setAlerts(x => x.filter(y => y.key !== a.key)); go(a.kind === 'task' ? { name: 'taskForm', id: a.id } : { name: 'apptForm', id: a.id }); }}>{t.reminders.openItem}</button>
-                    <button className="btn small secondary" onClick={() => setAlerts(x => x.filter(y => y.key !== a.key))}>{t.reminders.dismiss}</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <main className="content">
           <ScreenView screen={screen} lang={lang} go={go} back={back} />
@@ -501,6 +479,9 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const sync = useSaveState();
   const now = Date.now();
   const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
+  // Change 004: the main screen no longer pops up due reminders; the ones from the last 24 hours (to-dos not done,
+  // appointments still scheduled) are listed here instead, so none is missed.
+  const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30);
   const adAttn = attention(state.properties, ymd(new Date()));
   const perm = permission();
   const waiting = state.meta.dirty.length;
@@ -519,7 +500,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
   const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
   const follow = followUpDue(state.contacts, now, followDays);
-  const systemEmpty = follow.length === 0 && soon.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
+  const systemEmpty = follow.length === 0 && soon.length === 0 && recent.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -562,6 +543,21 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         )}
         {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}
         {syncLine && <div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div>}
+        {recent.length > 0 && <>
+          <strong>{t.notif.recent}</strong>
+          <ul className="notif-list" data-testid="notif-recent">
+            {recent.map(r => {
+              const x = reminderText(r, state, lang);
+              return (
+                <li key={r.key}>
+                  <button className="link-row" onClick={() => go(r.kind === 'task' ? { name: 'taskForm', id: r.id } : { name: 'apptForm', id: r.id })}>
+                    <strong>🔔 {x.title}</strong><small className="muted">{fmtDateTime(r.at, lang)} · {x.body}</small>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>}
         {soon.length > 0 && (
           <ul className="notif-list">
             {soon.map(r => {

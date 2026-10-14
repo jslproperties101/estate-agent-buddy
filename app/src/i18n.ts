@@ -28,7 +28,7 @@ const en = {
   soonShort: 'Soon',
   cobrokeTop: 'Co-broke Opportunities',
   notif: {
-    upcoming: 'Coming up (next 7 days)', none: 'No reminders in the next 7 days.', recent: 'Earlier today',
+    upcoming: 'Coming up (next 7 days)', none: 'No reminders in the next 7 days.', recent: 'Due in the last 24 hours',
     push: 'Push messages', pushBody: 'Messages from your agency or team (for example new co-broke listings) will appear here. Push messages are not set up yet.',
     settings: 'Notification settings',
     system: 'System Notifications', newsTitle: 'News / Announcements',
@@ -41,7 +41,7 @@ const en = {
   },
   c: {
     save: 'Save', cancel: 'Cancel', edit: 'Edit', delete: 'Delete', add: 'Add', close: 'Close', search: 'Search', open: 'Open',
-    yes: 'Yes', no: 'No', notSet: 'Not set', others: 'Others…', othersHint: 'Type a new value', addValue: 'Add', use: 'Use',
+    yes: 'Yes', no: 'No', notSet: 'Not set', others: 'Others…', othersHint: 'Type a new value', addValue: 'Add', noMatch: 'Nothing matches. Tap Add to keep what you typed.', use: 'Use',
     removeValue: (x: string) => `Remove ${x}`, savedByYou: 'Saved by you', call: 'Call', whatsapp: 'WhatsApp', done: 'Done', undo: 'Undo',
     deleteQ: 'Delete this record?', deleteBody: 'This cannot be undone.', deleted: 'Deleted.', saved: 'Saved on this phone.', optional: 'optional',
     sample: 'Sample', none: 'None', all: 'All', today: 'Today', tomorrow: 'Tomorrow', property: 'Property', contact: 'Contact',
@@ -168,7 +168,7 @@ const bm: Strings = {
   soonShort: 'Segera',
   cobrokeTop: 'Peluang Co-broke',
   notif: {
-    upcoming: 'Akan datang (7 hari)', none: 'Tiada peringatan dalam 7 hari akan datang.', recent: 'Awal hari ini',
+    upcoming: 'Akan datang (7 hari)', none: 'Tiada peringatan dalam 7 hari akan datang.', recent: 'Tiba masa dalam 24 jam lalu',
     push: 'Mesej tolak (push)', pushBody: 'Mesej daripada agensi atau pasukan anda (contohnya senarai co-broke baharu) akan dipaparkan di sini. Mesej push belum disediakan.',
     settings: 'Tetapan pemberitahuan',
     system: 'Pemberitahuan Sistem', newsTitle: 'Berita / Pengumuman',
@@ -181,7 +181,7 @@ const bm: Strings = {
   },
   c: {
     save: 'Simpan', cancel: 'Batal', edit: 'Ubah', delete: 'Padam', add: 'Tambah', close: 'Tutup', search: 'Cari', open: 'Buka',
-    yes: 'Ya', no: 'Tidak', notSet: 'Belum ditetapkan', others: 'Lain-lain…', othersHint: 'Taip nilai baharu', addValue: 'Tambah', use: 'Guna',
+    yes: 'Ya', no: 'Tidak', notSet: 'Belum ditetapkan', others: 'Lain-lain…', othersHint: 'Taip nilai baharu', addValue: 'Tambah', noMatch: 'Tiada padanan. Tekan Tambah untuk menyimpan yang ditaip.', use: 'Guna',
     removeValue: (x: string) => `Buang ${x}`, savedByYou: 'Disimpan oleh anda', call: 'Telefon', whatsapp: 'WhatsApp', done: 'Selesai', undo: 'Buat asal',
     deleteQ: 'Padam rekod ini?', deleteBody: 'Tindakan ini tidak boleh dibuat asal.', deleted: 'Dipadam.', saved: 'Disimpan dalam telefon ini.', optional: 'pilihan',
     sample: 'Contoh', none: 'Tiada', all: 'Semua', today: 'Hari ini', tomorrow: 'Esok', property: 'Hartanah', contact: 'Kenalan',
@@ -306,7 +306,7 @@ const zh: Strings = {
   soonShort: '即将',
   cobrokeTop: '联合代理机会',
   notif: {
-    upcoming: '即将到来（7 天内）', none: '未来 7 天没有提醒。', recent: '今天较早',
+    upcoming: '即将到来（7 天内）', none: '未来 7 天没有提醒。', recent: '过去 24 小时内到期',
     push: '推送消息', pushBody: '来自您的公司或团队的消息（例如新的联合代理盘源）将显示在这里。推送消息尚未设置。',
     settings: '通知设置',
     system: '系统通知', newsTitle: '新闻 / 公告',
@@ -319,7 +319,7 @@ const zh: Strings = {
   },
   c: {
     save: '保存', cancel: '取消', edit: '编辑', delete: '删除', add: '添加', close: '关闭', search: '搜索', open: '打开',
-    yes: '是', no: '否', notSet: '未设置', others: '其他…', othersHint: '输入新的选项', addValue: '添加', use: '使用',
+    yes: '是', no: '否', notSet: '未设置', others: '其他…', othersHint: '输入新的选项', addValue: '添加', noMatch: '没有匹配项。点“添加”保存您输入的内容。', use: '使用',
     removeValue: (x: string) => `删除 ${x}`, savedByYou: '您保存的', call: '致电', whatsapp: 'WhatsApp', done: '完成', undo: '撤销',
     deleteQ: '删除这条记录？', deleteBody: '此操作无法撤销。', deleted: '已删除。', saved: '已保存在本手机。', optional: '可选',
     sample: '示例', none: '无', all: '全部', today: '今天', tomorrow: '明天', property: '房产', contact: '联系人',

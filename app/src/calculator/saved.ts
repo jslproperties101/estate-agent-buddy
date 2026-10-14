@@ -153,12 +153,15 @@ export interface PropertyUpdate { key: PropertyUpdateKey; current: number | unde
 
 /** Values from this calculation that differ from the property record. Only values the agent actually entered
  *  (greater than zero) are offered. Nothing is changed here: the screen shows these for the agent to tick and confirm. */
-export function proposeUpdates(c: Calculation, prop: Pick<Listing, 'askingPrice' | 'monthlyRent' | 'maintenanceFee' | 'commissionPct'>): PropertyUpdate[] {
+export function proposeUpdates(c: Calculation, prop: Pick<Listing, 'askingPrice' | 'monthlyRent' | 'maintenanceFee' | 'commissionPct'> & Partial<Pick<Listing, 'purpose'>>): PropertyUpdate[] {
   const wanted: [PropertyUpdateKey, number | undefined][] = [];
+  // A percentage is a sale commission only: a rental's commission is in months of rent (Change 009), so a percentage
+  // from the calculator is never written onto a rent-only property.
+  const rentOnly = prop.purpose === 'rent';
   if (c.kind === 'purchase') wanted.push(['askingPrice', c.purchase.price]);
   else if (c.kind === 'rental') wanted.push(['monthlyRent', c.rental.monthlyRent], ['maintenanceFee', c.rental.maintenanceMonthly]);
-  else if (c.kind === 'sale') wanted.push(['askingPrice', c.sale.salePrice], ['commissionPct', c.sale.commissionPct]);
-  else wanted.push(['commissionPct', c.commission.pct]);
+  else if (c.kind === 'sale') wanted.push(['askingPrice', c.sale.salePrice], ...(rentOnly ? [] : [['commissionPct', c.sale.commissionPct] as [PropertyUpdateKey, number]]));
+  else if (!rentOnly) wanted.push(['commissionPct', c.commission.pct]);
   return wanted
     .filter(([k, v]) => typeof v === 'number' && Number.isFinite(v) && v > 0 && v !== prop[k])
     .map(([k, v]) => ({ key: k, current: prop[k], proposed: v as number }));

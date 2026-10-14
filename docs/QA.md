@@ -14,7 +14,7 @@ The QA APK installs **beside** the real app and cannot touch it.
 
 How it is built: CI builds the QA leg only on branches whose name contains `qa`, with `EAB_QA=1`. `scripts/verify-apk.mjs` then opens the APK and fails the build if the package, name, icons, splash, bundle commit/QA flag or `autoUpdate:false` are wrong.
 
-Identify it on the phone: an orange bar at the top shows `QA · <commit>`, and Settings → About shows the commit and "QA test build".
+Identify it on the phone: the app name on the phone is **EAB QA**, and Agent Profile → Settings → About shows the commit and "QA test build". (The orange QA bar under the header was removed by Change 007; QA isolation itself is unchanged.)
 
 Both builds use the same debug signing key; they coexist only because the package names differ. QA data starts empty: it does not read the real app's records.
 

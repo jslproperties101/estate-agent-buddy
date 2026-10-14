@@ -5,9 +5,9 @@
 // check / Unknown / Not marked), and anything not confirmed is marked, so unverified facts cannot pass as confirmed.
 import type { Lang } from '../i18n';
 import type { Profile } from '../data/types';
-import { Listing, rm, landText, sqft, placeName, yearsRemaining, thisYear } from './model';
+import { Listing, rm, landText, sqft, placeName, yearsRemaining, thisYear, unitLot, restrictionValue } from './model';
 import { listingStrings, ListingStrings, typeLabel } from './strings';
-import { isVerifiable, verifyStateOf } from './verify';
+import { isVerifiable, shownState } from './verify';
 import { fmtDate, monthText } from '../lib/dates';
 import type { Doc, Block } from '../lib/pdf';
 
@@ -18,7 +18,7 @@ export const BUYER_GROUPS: BuyerGroup[] = ['basics', 'location', 'size', 'money'
 export const BUYER_KEYS: { key: keyof Listing; group: BuyerGroup; /** ticked at first when it has a value */ on: boolean }[] = [
   { key: 'ref', group: 'basics', on: true }, { key: 'type', group: 'basics', on: true }, { key: 'purpose', group: 'basics', on: true }, { key: 'status', group: 'basics', on: false },
   { key: 'township', group: 'location', on: true }, { key: 'city', group: 'location', on: true }, { key: 'state', group: 'location', on: true },
-  { key: 'street', group: 'location', on: false }, { key: 'lotNo', group: 'location', on: false }, { key: 'unitNo', group: 'location', on: false },
+  { key: 'street', group: 'location', on: false }, { key: 'unitNo', group: 'location', on: false },
   { key: 'bedrooms', group: 'size', on: true }, { key: 'bathrooms', group: 'size', on: true }, { key: 'floors', group: 'size', on: true }, { key: 'parking', group: 'size', on: true },
   { key: 'landSqft', group: 'size', on: true }, { key: 'builtUpSqft', group: 'size', on: true }, { key: 'frontageFt', group: 'size', on: true }, { key: 'depthFt', group: 'size', on: true },
   { key: 'lotType', group: 'size', on: true }, { key: 'furnishing', group: 'size', on: true }, { key: 'ceilingFt', group: 'size', on: true }, { key: 'powerKva', group: 'size', on: true },
@@ -34,7 +34,7 @@ export const BUYER_KEYS: { key: keyof Listing; group: BuyerGroup; /** ticked at 
 
 /** Never offered in a buyer PDF, whatever the agent ticks. */
 export const NEVER_SHARED: string[] = [
-  'ownerName', 'ownerPhone', 'vendorId', 'commissionPct', 'arrangement', 'arrangementNote', 'notes', 'handledBy', 'tenancy', 'documents',
+  'ownerName', 'ownerPhone', 'ownerWhatsapp', 'vendorId', 'commissionPct', 'rentCommissionMonths', 'arrangement', 'arrangementNote', 'notes', 'handledBy', 'tenancy', 'documents',
   'marketing', 'history', 'filledFrom', 'verification', 'lat', 'lng', 'placeId', 'geoSource', 'geoAccuracy', 'photos',
 ];
 
@@ -44,7 +44,8 @@ const has = (v: unknown) => v !== undefined && v !== null && String(v).trim() !=
 
 /** How one detail is written for buyers. Returns undefined when the record has no value (nothing is invented). */
 export function valueOf(l: Listing, key: keyof Listing, s: ListingStrings, lang: Lang, year = thisYear()): string | undefined {
-  const v = l[key];
+  // One Unit/Lot Number (Change 009): older records with a separate lot number show both together.
+  const v = key === 'unitNo' ? unitLot(l) : key === 'restriction' ? restrictionValue(l.restriction) : l[key];
   if (!has(v)) return undefined;
   switch (key) {
     case 'type': return typeLabel(s, String(v));
@@ -55,7 +56,7 @@ export function valueOf(l: Listing, key: keyof Listing, s: ListingStrings, lang:
     case 'builtUpSqft': return sqft(Number(v));
     case 'frontageFt': case 'depthFt': case 'ceilingFt': return `${v} ft`;
     case 'powerKva': return `${v} kVA`;
-    case 'securityDepositMonths': case 'utilityDepositMonths': return `${v} ${s.months}`;
+    case 'securityDepositMonths': case 'utilityDepositMonths': return s.months(Number(v));
     case 'tenure': return s.tenure[String(v)] ?? String(v);
     case 'leaseExpiryYear': { const y = yearsRemaining(l, year); return y !== undefined ? `${v} (${s.yearsLeft(y)})` : String(v); }
     case 'titleType': return s.titleTypes[String(v)] ?? String(v);
@@ -78,8 +79,9 @@ export function buyerFields(l: Listing, lang: Lang, year = thisYear()): BuyerFie
     const value = valueOf(l, key, s, lang, year);
     const field: BuyerField = { key, group, label: s.l[key as string] ?? String(key), value, on: on && value !== undefined };
     if (value !== undefined && isVerifiable(String(key))) {
-      const st = verifyStateOf(l, String(key));
-      field.status = st ? s.verify[st] : s.verify.none;
+      // Not marked = Need to check (Change 009): nothing is presented as confirmed unless it was marked so.
+      const st = shownState(l, String(key)) ?? 'check';
+      field.status = s.verify[st];
       field.confirmed = st === 'confirmed';
     }
     return field;

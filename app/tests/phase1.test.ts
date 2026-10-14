@@ -171,7 +171,7 @@ test('P12 old Inactive buyers become Dropped with a reviewable report, the origi
 // ---------- E. property cards ----------
 test('P13 property card titles no longer start with the word "Unit"; the stored unit number is untouched', () => {
   const l = { id: 'p', created: 0, updated: 0, photos: [], unitNo: '7', lotNo: '2/14', street: 'Jalan A', township: 'Nilai' };
-  assert.equal(title(l as never), '7, Jalan A, Nilai');
+  assert.equal(title(l as never), '7, Lot 2/14, Jalan A, Nilai', 'Change 009: an older separate lot number shows with the unit');
   assert.equal(l.unitNo, '7');
   assert.equal(title({ ...l, unitNo: undefined } as never), 'Lot 2/14, Jalan A, Nilai');
   assert.ok(!title({ ...l, unitNo: 'B-12-3' } as never).startsWith('Unit'));

@@ -1,6 +1,8 @@
 // "Add from Google Map" in the property form: pick the spot, read the address from Google, then check each part
 // against the saved dropdown values. Differences are shown with Use existing / Add new / Enter another, and a new
 // dropdown value is saved only when the agent chooses it and taps "Use this location".
+// pointOnly (Change 009: Add Location, and a banner's location): only the map point is chosen and saved. The address is
+// not read from Google, not compared and never changed.
 import { useEffect, useMemo, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -24,16 +26,17 @@ export interface LocationResult { lat: number; lng: number; placeId?: string; fi
 
 type Choice = { kind: 'existing' | 'google' | 'typed' | 'empty'; value?: string };
 
-export function LocationPicker({ lang, current, onApply, onCancel }: {
+export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, title, start }: {
   lang: Lang; current: Listing; onApply: (r: LocationResult) => void; onCancel: () => void;
+  pointOnly?: boolean; title?: string; start?: { lat: number; lng: number };
 }) {
   const { state, store } = useApp();
   const m = mapStrings[lang];
   const c = strings[lang].c;
   const ls = listingStrings[lang];
   const { maps, status } = useGoogleMaps(lang);
-  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(
-    typeof current.lat === 'number' && typeof current.lng === 'number' ? { lat: current.lat, lng: current.lng } : null);
+  const [pos, setPos] = useState<{ lat: number; lng: number } | null>(start ??
+    (typeof current.lat === 'number' && typeof current.lng === 'number' ? { lat: current.lat, lng: current.lng } : null));
   const [geo, setGeo] = useState<GeocodeResult | null>(null);
   const [reading, setReading] = useState(false);
   const [noAddress, setNoAddress] = useState(false);
@@ -48,7 +51,7 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
 
   async function readAt(lat: number, lng: number) {
     setPos({ lat, lng }); setChoices({}); setTyping({}); setNoAddress(false);
-    if (!maps) return;
+    if (!maps || pointOnly) return;
     setReading(true);
     try {
       const r = await reverseGeocode(maps, lat, lng);
@@ -90,6 +93,7 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
 
   function apply() {
     if (!pos) return;
+    if (pointOnly) { onApply({ lat: pos.lat, lng: pos.lng, fields: {} }); return; }
     const fields: Partial<Record<FieldKey, string>> = {};
     for (const f of FIELDS) {
       const chk = checks[f.key];
@@ -123,7 +127,7 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
   return (
     <div className="sheet-scrim" role="presentation">
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="lp-t" data-testid="location-picker">
-        <div className="between"><h2 id="lp-t">{m.pickTitle}</h2><button className="btn small secondary" onClick={onCancel}>{c.close}</button></div>
+        <div className="between"><h2 id="lp-t">{title ?? m.pickTitle}</h2><button className="btn small secondary" onClick={onCancel}>{c.close}</button></div>
         <MapsNotice lang={lang} status={status} />
         {maps && (
           <>
@@ -135,7 +139,7 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
                     <li key={i}><button type="button" onClick={async () => {
                       setSugs([]); setQ(s.text);
                       const r = await s.select().catch(() => null);
-                      if (r) { setPos({ lat: r.lat, lng: r.lng }); setGeo(r); setChoices({}); setNoAddress(false); }
+                      if (r) { setPos({ lat: r.lat, lng: r.lng }); if (!pointOnly) setGeo(r); setChoices({}); setNoAddress(false); }
                     }}><strong>{s.text}</strong>{s.secondary && <small className="muted"> {s.secondary}</small>}</button></li>
                   ))}
                 </ul>
@@ -148,7 +152,8 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
               onMapClick={(lat, lng) => void readAt(lat, lng)} onMarkerDrag={(_, lat, lng) => void readAt(lat, lng)} />
             <button className="btn secondary" onClick={locate} disabled={locating} data-testid="picker-gps">📍 {locating ? m.locatingMe : m.myLocation}</button>
             {gpsErr && <p className="error" role="alert">{gpsErr === 'denied' ? m.meDenied : m.check.gpsOff}</p>}
-            {pos && <small className="ok-text" data-testid="picker-pos">{ls.position(pos.lat.toFixed(5), pos.lng.toFixed(5))}</small>}
+            {pos && <small className="ok-text" data-testid="picker-pos">{pointOnly ? `✓ ${ls.n9.pointChosen}` : ls.position(pos.lat.toFixed(5), pos.lng.toFixed(5))}</small>}
+            {pointOnly && <small className="muted" data-testid="point-only-note">{ls.n9.pointOnlyNote}</small>}
           </>
         )}
         {reading && <p className="muted" role="status">{m.reading}</p>}
@@ -210,7 +215,7 @@ export function LocationPicker({ lang, current, onApply, onCancel }: {
         {geo && unresolved.length > 0 && <p className="warn-text" role="status">{m.needChoice}</p>}
         <div className="two sheet-actions">
           <button className="btn secondary" onClick={onCancel}>{c.cancel}</button>
-          <button className="btn primary" disabled={!pos || reading || unresolved.length > 0} onClick={apply} data-testid="apply-location">{m.apply}</button>
+          <button className="btn primary" disabled={!pos || reading || unresolved.length > 0} onClick={apply} data-testid="apply-location">{pointOnly ? ls.n9.usePoint : m.apply}</button>
         </div>
       </div>
     </div>

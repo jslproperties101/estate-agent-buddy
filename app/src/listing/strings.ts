@@ -1,5 +1,6 @@
 // Property List screen text in English, Bahasa Malaysia and Chinese (BM and Chinese are drafts for checking).
 import type { Lang } from '../i18n';
+import { titleCase, titleCaseMap } from '../lib/titleCase';
 
 const en = {
   title: 'Property List',
@@ -32,7 +33,7 @@ const en = {
     'Warehouse': 'Warehouse', 'Industrial land': 'Industrial land', 'Agricultural land': 'Agricultural land', 'Development land': 'Development land',
   } as Record<string, string>,
   titleTypes: { 'Individual title': 'Individual title', 'Strata title': 'Strata title', 'Master title': 'Master title' } as Record<string, string>,
-  restrictions: { 'No restriction': 'No restriction', 'Bumiputera lot': 'Bumiputera lot', 'Malay reserve': 'Malay reserve' } as Record<string, string>,
+  restrictions: { 'NON Bumiputera': 'NON Bumiputera', 'No restriction': 'NON Bumiputera', 'Bumiputera lot': 'Bumiputera lot', 'Malay reserve': 'Malay reserve' } as Record<string, string>,
   countries: { Malaysia: 'Malaysia', Singapore: 'Singapore', Brunei: 'Brunei', Indonesia: 'Indonesia', Thailand: 'Thailand' } as Record<string, string>,
   tenure: { freehold: 'Freehold', leasehold: 'Leasehold' } as Record<string, string>,
   lotType: { intermediate: 'Intermediate', corner: 'Corner', end: 'End lot', single: 'Standalone' } as Record<string, string>,
@@ -45,7 +46,7 @@ const en = {
   availability: { immediate: 'Available now', from_date: 'Available from', tenanted: 'Tenanted', under_construction: 'Under construction', not_available: 'Not available' } as Record<string, string>,
   condition: { new: 'New', good: 'Good', renovated: 'Renovated', needs_repair: 'Needs repair', bare: 'Bare / shell' } as Record<string, string>,
   furnishing: { unfurnished: 'Unfurnished', partly: 'Partly furnished', fully: 'Fully furnished' } as Record<string, string>,
-  landUse: { building: 'Building', industry: 'Industry', agriculture: 'Agriculture' } as Record<string, string>,
+  landUse: { building: 'Building', industry: 'Industry', agriculture: 'Agriculture', nil: 'NIL' } as Record<string, string>,
   docCat: { title: 'Title documents', brochure: 'Brochures', floorplan: 'Floor plans', correspondence: 'Owner correspondence and screenshots', transaction: 'Rental or sales documents', other: 'Other documents' } as Record<string, string>,
   adStatus: { planned: 'Planned', live: 'Live', needs_update: 'Needs update', paused: 'Paused', expired: 'Expired' } as Record<string, string>,
   banner: { yes: 'Yes, placed', no: 'No', not_yet: 'Not yet', not_allowed: 'Owner doesn’t allow', removed: 'Removed', unset: 'Not set' } as Record<string, string>,
@@ -58,7 +59,7 @@ const en = {
   availableFrom: (m: string) => `Available from ${m}`,
   tenantedUntil: (m: string) => `Tenanted until ${m}`,
   sec: {
-    basics: 'Type & Purpose', tenure: 'Tenure & Title', photos: 'Photos', location: 'Location', details: 'Property details',
+    basics: 'Type & Purpose', tenure: 'Price, Tenure and Title Info', photos: 'Photos', location: 'Location', details: 'Property details',
     building: 'Building specifications', land: 'Land', money: 'Price, rental and fees', tenancy: 'Tenancy', availability: 'Availability and condition',
     status: 'Listing status', owner: 'Owner / vendor', arrangement: 'Listing arrangement and status', marketing: 'Marketing and advertising', banner: 'Banner',
     notes: 'Internal notes', docs: 'Documents', history: 'Change history', missing: 'Still missing', reference: 'Reference',
@@ -82,7 +83,7 @@ const en = {
   l: {
     bannerStatus: 'Banner placed?',
     ref: 'Reference', refPrefix: 'Prefix', refNo: 'Number', headline: 'Headline (short title)', type: 'Property type',
-    country: 'Country', state: 'State', city: 'City / town', township: 'Township', lotNo: 'Lot number', street: 'Jalan / street (number or name)', unitNo: 'Unit number',
+    country: 'Country', state: 'State', city: 'City / town', township: 'Township', lotNo: 'Unit/Lot Number', street: 'Jalan / street (number or name)', unitNo: 'Unit/Lot Number', mapsLink: 'Google Maps Link', extraComments: 'Extra Comments', rentCommissionMonths: 'Commission (months of rent)', ownerWhatsapp: 'Owner WhatsApp ID / alias', tenantPhone: 'Tenant phone', tenantWhatsapp: 'Tenant WhatsApp ID / alias',
     lat: 'Map position', bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', floors: 'Storeys', parking: 'Parking bays', landSqft: 'Land area (sq ft)', builtUpSqft: 'Built-up (sq ft)',
     frontageFt: 'Frontage (ft)', depthFt: 'Depth (ft)', lotType: 'Lot type', furnishing: 'Furnishing',
     ceilingFt: 'Ceiling height (ft)', powerKva: 'Power supply (kVA)', loadingBays: 'Loading bays', specs: 'Other specifications',
@@ -91,7 +92,7 @@ const en = {
     tenure: 'Tenure', leaseExpiryYear: 'Lease expiry year', titleType: 'Title type', landUse: 'Category of land use', restriction: 'Restriction',
     purpose: 'Sale or rent', askingPrice: 'Asking price (RM)', negotiable: 'Negotiable?', commissionPct: 'Commission (%)',
     monthlyRent: 'Monthly rent (RM)', securityDepositMonths: 'Security deposit (months)', utilityDepositMonths: 'Utility deposit (months)', maintenanceFee: 'Maintenance / service fee (RM per month)',
-    tenant: 'Current tenant', tStart: 'Tenancy start', tEnd: 'Tenancy end', tRent: 'Current rent (RM per month)', tNotes: 'Tenancy notes',
+    tenant: 'Tenant name', tStart: 'Tenancy start', tEnd: 'Tenancy end', tRent: 'Current rent (RM per month)', tNotes: 'Tenancy notes',
     availability: 'Availability', availableFrom: 'Available from', condition: 'Condition', features: 'Special features',
     arrangement: 'Arrangement', arrangementNote: 'Referrer or co-broke agency',
     status: 'Status', handledBy: 'Handled by', notes: 'Internal notes',
@@ -135,6 +136,25 @@ const en = {
     aria: (f: string) => `Check status: ${f}`, summary: (n: number) => `${n} to check`,
     help: 'Confirmed: you checked it yourself or from a document. Owner stated: the owner told you, not checked. Need to check: look into it before relying on it. Unknown: nobody knows yet.',
   } as { label: string; none: string; confirmed: string; owner: string; check: string; unknown: string; aria: (f: string) => string; summary: (n: number) => string; help: string },
+  /** Change 009 wording. */
+  n9: {
+    addLocation: 'Add Location', propertyLocation: 'Property Location', locationSaved: 'Location saved', noLocation: 'No location yet. Use Add Location, your current location, or paste a Google Maps link.',
+    mapsLinkPh: 'https://maps.app.goo.gl/ExampleLink', mapsLinkHint: 'Paste the link from Google Maps → Share. The example above is not a real place.',
+    openMapsLink: 'Open Google Maps Link', linkPosition: 'Map point taken from the link.', linkNoPosition: 'This link does not show the point itself (short links hide it). It is saved and opens as typed; use Add Location to put the property on the app’s map.',
+    del: 'Delete', deleteQ: 'Delete this property?',
+    photosBusy: (done: number, total: number) => `Preparing photos… ${done} of ${total}`, photoFailed: (name: string) => `Could not add ${name}: it is not a picture this phone can open.`,
+    photosDone: (n: number) => `${n} photo${n === 1 ? '' : 's'} added.`, dragHint: 'Drag ⠿ to change the order. The first photo is the main photo.',
+    moveEarlier: (n: number) => `Move photo ${n} earlier`, moveLater: (n: number) => `Move photo ${n} later`, dragLabel: (n: number) => `Drag photo ${n}`,
+    chooseBannerLocation: 'Choose Location', bannerLocationNew: 'Banner location chosen. It is saved to My Banner Map when you save the property.',
+    bannerLocationSaved: (n: number) => `${n} banner location${n === 1 ? '' : 's'} saved on My Banner Map.`, bannerPickTitle: 'Where is the banner?',
+    rentCommission: (rm: string) => `Commission about ${rm}`, rentMonths: (n: number) => `${n} month${n === 1 ? '' : 's'} of rent`,
+    rentCommissionHint: 'For rentals the commission is counted in months of rent, not a percentage.',
+    saleCommissionLabel: 'Commission (%) for the sale', rentCommissionLabel: 'Commission for the rental (months of rent)',
+    pointOnlyNote: 'Only the map point is saved. The address you typed is not changed.', pointChosen: 'Point chosen on the map.', usePoint: 'Use this point',
+    whatsappPh: 'alias', phonePh: '60 12-345 6789', fromContacts: 'Saved contacts', suggestionUse: 'Use',
+    tenantTitle: 'Tenant',
+    extraCommentsTitle: 'Extra Comments',
+  },
   preview: {
     button: 'Preview', title: 'Preview', open: 'Open details', del: 'Delete', cancel: 'Cancel', hint: 'Tip: press and hold a card, or tap Preview, for a quick look.',
     deleteQ: 'Delete this property?', close: 'Close preview',
@@ -221,7 +241,7 @@ const bm: ListingStrings = {
     'Warehouse': 'Gudang', 'Industrial land': 'Tanah industri', 'Agricultural land': 'Tanah pertanian', 'Development land': 'Tanah pembangunan',
   },
   titleTypes: { 'Individual title': 'Hakmilik individu', 'Strata title': 'Hakmilik strata', 'Master title': 'Hakmilik induk' },
-  restrictions: { 'No restriction': 'Tiada sekatan', 'Bumiputera lot': 'Lot Bumiputera', 'Malay reserve': 'Rizab Melayu' },
+  restrictions: { 'NON Bumiputera': 'NON Bumiputera', 'No restriction': 'NON Bumiputera', 'Bumiputera lot': 'Lot Bumiputera', 'Malay reserve': 'Rizab Melayu' },
   countries: { Malaysia: 'Malaysia', Singapore: 'Singapura', Brunei: 'Brunei', Indonesia: 'Indonesia', Thailand: 'Thailand' },
   tenure: { freehold: 'Pegangan bebas', leasehold: 'Pajakan' },
   lotType: { intermediate: 'Lot tengah', corner: 'Lot tepi', end: 'Lot hujung', single: 'Sendirian' },
@@ -234,7 +254,7 @@ const bm: ListingStrings = {
   availability: { immediate: 'Ada sekarang', from_date: 'Ada mulai', tenanted: 'Sedang disewa', under_construction: 'Dalam pembinaan', not_available: 'Tiada' },
   condition: { new: 'Baharu', good: 'Baik', renovated: 'Diubah suai', needs_repair: 'Perlu dibaiki', bare: 'Kosong / asas' },
   furnishing: { unfurnished: 'Tanpa perabot', partly: 'Separa berperabot', fully: 'Berperabot penuh' },
-  landUse: { building: 'Bangunan', industry: 'Perusahaan', agriculture: 'Pertanian' },
+  landUse: { building: 'Bangunan', industry: 'Perusahaan', agriculture: 'Pertanian', nil: 'NIL' },
   docCat: { title: 'Dokumen hakmilik', brochure: 'Brosur', floorplan: 'Pelan lantai', correspondence: 'Surat-menyurat pemilik dan tangkapan skrin', transaction: 'Dokumen sewa atau jual', other: 'Dokumen lain' },
   adStatus: { planned: 'Dirancang', live: 'Aktif', needs_update: 'Perlu dikemas kini', paused: 'Dihentikan sementara', expired: 'Tamat' },
   banner: { yes: 'Ya, dipasang', no: 'Tidak', not_yet: 'Belum', not_allowed: 'Pemilik tidak benarkan', removed: 'Ditanggalkan', unset: 'Belum ditetapkan' },
@@ -247,7 +267,7 @@ const bm: ListingStrings = {
   availableFrom: (m: string) => `Ada mulai ${m}`,
   tenantedUntil: (m: string) => `Disewa hingga ${m}`,
   sec: {
-    basics: 'Jenis & Tujuan', tenure: 'Pegangan & Hakmilik', photos: 'Foto', location: 'Lokasi', details: 'Butiran hartanah',
+    basics: 'Jenis & Tujuan', tenure: 'Maklumat Harga, Pegangan dan Hakmilik', photos: 'Foto', location: 'Lokasi', details: 'Butiran hartanah',
     building: 'Spesifikasi bangunan', land: 'Tanah', money: 'Harga, sewa dan yuran', tenancy: 'Penyewaan', availability: 'Ketersediaan dan keadaan',
     status: 'Status senarai', owner: 'Pemilik / penjual', arrangement: 'Susunan dan status senarai', marketing: 'Pemasaran dan iklan', banner: 'Banner',
     notes: 'Catatan dalaman', docs: 'Dokumen', history: 'Sejarah perubahan', missing: 'Masih tiada', reference: 'Rujukan',
@@ -271,7 +291,7 @@ const bm: ListingStrings = {
   l: {
     bannerStatus: 'Banner dipasang?',
     ref: 'Rujukan', refPrefix: 'Awalan', refNo: 'Nombor', headline: 'Tajuk ringkas', type: 'Jenis hartanah',
-    country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', lotNo: 'Nombor lot', street: 'Jalan (nombor atau nama)', unitNo: 'Nombor unit',
+    country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', lotNo: 'Nombor Unit/Lot', street: 'Jalan (nombor atau nama)', unitNo: 'Nombor Unit/Lot', mapsLink: 'Pautan Google Maps', extraComments: 'Komen Tambahan', rentCommissionMonths: 'Komisen (bulan sewa)', ownerWhatsapp: 'ID / alias WhatsApp pemilik', tenantPhone: 'Telefon penyewa', tenantWhatsapp: 'ID / alias WhatsApp penyewa',
     lat: 'Kedudukan peta', bedrooms: 'Bilik tidur', bathrooms: 'Bilik air', floors: 'Tingkat', parking: 'Petak parkir', landSqft: 'Keluasan tanah (kps)', builtUpSqft: 'Keluasan binaan (kps)',
     frontageFt: 'Lebar hadapan (kaki)', depthFt: 'Kedalaman (kaki)', lotType: 'Jenis lot', furnishing: 'Perabot',
     ceilingFt: 'Ketinggian siling (kaki)', powerKva: 'Bekalan elektrik (kVA)', loadingBays: 'Ruang muat turun', specs: 'Spesifikasi lain',
@@ -280,7 +300,7 @@ const bm: ListingStrings = {
     tenure: 'Pegangan', leaseExpiryYear: 'Tahun tamat pajakan', titleType: 'Jenis hakmilik', landUse: 'Kategori kegunaan tanah', restriction: 'Sekatan',
     purpose: 'Jual atau sewa', askingPrice: 'Harga diminta (RM)', negotiable: 'Boleh runding?', commissionPct: 'Komisen (%)',
     monthlyRent: 'Sewa bulanan (RM)', securityDepositMonths: 'Deposit sekuriti (bulan)', utilityDepositMonths: 'Deposit utiliti (bulan)', maintenanceFee: 'Yuran penyelenggaraan (RM sebulan)',
-    tenant: 'Penyewa semasa', tStart: 'Mula sewa', tEnd: 'Tamat sewa', tRent: 'Sewa semasa (RM sebulan)', tNotes: 'Catatan penyewaan',
+    tenant: 'Nama penyewa', tStart: 'Mula sewa', tEnd: 'Tamat sewa', tRent: 'Sewa semasa (RM sebulan)', tNotes: 'Catatan penyewaan',
     availability: 'Ketersediaan', availableFrom: 'Ada mulai', condition: 'Keadaan', features: 'Ciri istimewa',
     arrangement: 'Susunan', arrangementNote: 'Perujuk atau agensi co-broke',
     status: 'Status', handledBy: 'Dikendalikan oleh', notes: 'Catatan dalaman',
@@ -323,6 +343,24 @@ const bm: ListingStrings = {
     label: 'Status semakan', none: 'Belum ditanda', confirmed: 'Disahkan', owner: 'Dinyatakan pemilik', check: 'Perlu disemak', unknown: 'Tidak diketahui',
     aria: (f: string) => `Status semakan: ${f}`, summary: (n: number) => `${n} perlu disemak`,
     help: 'Disahkan: anda sendiri menyemaknya atau daripada dokumen. Dinyatakan pemilik: pemilik memberitahu, belum disemak. Perlu disemak: selidik dahulu sebelum bergantung padanya. Tidak diketahui: belum ada yang tahu.',
+  },
+  n9: {
+    addLocation: 'Tambah Lokasi', propertyLocation: 'Lokasi Hartanah', locationSaved: 'Lokasi disimpan', noLocation: 'Belum ada lokasi. Guna Tambah Lokasi, lokasi semasa anda, atau tampal pautan Google Maps.',
+    mapsLinkPh: 'https://maps.app.goo.gl/ExampleLink', mapsLinkHint: 'Tampal pautan daripada Google Maps → Kongsi. Contoh di atas bukan tempat sebenar.',
+    openMapsLink: 'Buka Pautan Google Maps', linkPosition: 'Titik peta diambil daripada pautan.', linkNoPosition: 'Pautan ini tidak menunjukkan titiknya (pautan pendek menyembunyikannya). Ia disimpan dan dibuka seperti ditaip; guna Tambah Lokasi untuk meletakkan hartanah pada peta aplikasi.',
+    del: 'Padam', deleteQ: 'Padam hartanah ini?',
+    photosBusy: (done: number, total: number) => `Menyediakan foto… ${done} daripada ${total}`, photoFailed: (name: string) => `Tidak dapat menambah ${name}: ia bukan gambar yang boleh dibuka oleh telefon ini.`,
+    photosDone: (n: number) => `${n} foto ditambah.`, dragHint: 'Seret ⠿ untuk menukar susunan. Foto pertama ialah foto utama.',
+    moveEarlier: (n: number) => `Alih foto ${n} ke depan`, moveLater: (n: number) => `Alih foto ${n} ke belakang`, dragLabel: (n: number) => `Seret foto ${n}`,
+    chooseBannerLocation: 'Pilih Lokasi', bannerLocationNew: 'Lokasi banner dipilih. Ia disimpan ke Peta Banner Saya apabila anda menyimpan hartanah.',
+    bannerLocationSaved: (n: number) => `${n} lokasi banner disimpan pada Peta Banner Saya.`, bannerPickTitle: 'Di mana banner itu?',
+    rentCommission: (rm: string) => `Komisen kira-kira ${rm}`, rentMonths: (n: number) => `${n} bulan sewa`,
+    rentCommissionHint: 'Untuk sewaan, komisen dikira dalam bulan sewa, bukan peratusan.',
+    saleCommissionLabel: 'Komisen (%) untuk jualan', rentCommissionLabel: 'Komisen untuk sewaan (bulan sewa)',
+    pointOnlyNote: 'Hanya titik peta disimpan. Alamat yang anda taip tidak diubah.', pointChosen: 'Titik dipilih pada peta.', usePoint: 'Guna titik ini',
+    whatsappPh: 'alias', phonePh: '60 12-345 6789', fromContacts: 'Kenalan tersimpan', suggestionUse: 'Guna',
+    tenantTitle: 'Penyewa',
+    extraCommentsTitle: 'Komen Tambahan',
   },
   preview: {
     button: 'Pratonton', title: 'Pratonton', open: 'Buka butiran', del: 'Padam', cancel: 'Batal', hint: 'Petua: tekan dan tahan kad, atau ketik Pratonton, untuk melihat sekilas.',
@@ -409,7 +447,7 @@ const zh: ListingStrings = {
     'Warehouse': '仓库', 'Industrial land': '工业地', 'Agricultural land': '农业地', 'Development land': '发展地',
   },
   titleTypes: { 'Individual title': '独立地契', 'Strata title': '分层地契', 'Master title': '总地契' },
-  restrictions: { 'No restriction': '无限制', 'Bumiputera lot': '土著保留单位', 'Malay reserve': '马来保留地' },
+  restrictions: { 'NON Bumiputera': '非土著（NON Bumiputera）', 'No restriction': '非土著（NON Bumiputera）', 'Bumiputera lot': '土著保留单位', 'Malay reserve': '马来保留地' },
   countries: { Malaysia: '马来西亚', Singapore: '新加坡', Brunei: '文莱', Indonesia: '印度尼西亚', Thailand: '泰国' },
   tenure: { freehold: '永久地契', leasehold: '租赁地契' },
   lotType: { intermediate: '中间单位', corner: '角头单位', end: '尾端单位', single: '独立单位' },
@@ -422,7 +460,7 @@ const zh: ListingStrings = {
   availability: { immediate: '现可入住', from_date: '可入住日期', tenanted: '已有租户', under_construction: '建造中', not_available: '不可用' },
   condition: { new: '全新', good: '良好', renovated: '已装修', needs_repair: '需维修', bare: '毛坯' },
   furnishing: { unfurnished: '无家具', partly: '部分家具', fully: '全套家具' },
-  landUse: { building: '建筑', industry: '工业', agriculture: '农业' },
+  landUse: { building: '建筑', industry: '工业', agriculture: '农业', nil: 'NIL（无）' },
   docCat: { title: '地契文件', brochure: '宣传册', floorplan: '平面图', correspondence: '屋主往来信息与截图', transaction: '租赁或买卖文件', other: '其他文件' },
   adStatus: { planned: '计划中', live: '刊登中', needs_update: '需更新', paused: '已暂停', expired: '已过期' },
   banner: { yes: '是，已挂', no: '否', not_yet: '尚未', not_allowed: '业主不允许', removed: '已拆除', unset: '未设置' },
@@ -435,7 +473,7 @@ const zh: ListingStrings = {
   availableFrom: (m: string) => `${m} 起可入住`,
   tenantedUntil: (m: string) => `租约至 ${m}`,
   sec: {
-    basics: '类型与用途', tenure: '地契与产权', photos: '照片', location: '地点', details: '房产详情',
+    basics: '类型与用途', tenure: '价格、地契与产权信息', photos: '照片', location: '地点', details: '房产详情',
     building: '建筑规格', land: '土地', money: '价格、租金与费用', tenancy: '租约', availability: '可用性与状况',
     status: '挂牌状态', owner: '屋主 / 卖家', arrangement: '委托方式与状态', marketing: '营销与广告', banner: '横幅',
     notes: '内部备注', docs: '文件', history: '修改记录', missing: '尚缺资料', reference: '编号',
@@ -459,7 +497,7 @@ const zh: ListingStrings = {
   l: {
     bannerStatus: '已挂横幅？',
     ref: '编号', refPrefix: '前缀', refNo: '号码', headline: '标题（简短）', type: '房产类型',
-    country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', lotNo: '地段号', street: '街道（门牌或路名）', unitNo: '单位号',
+    country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', lotNo: '单位/地段号', street: '街道（门牌或路名）', unitNo: '单位/地段号', mapsLink: 'Google 地图链接', extraComments: '补充说明', rentCommissionMonths: '佣金（几个月租金）', ownerWhatsapp: '业主 WhatsApp ID / 别名', tenantPhone: '租户电话', tenantWhatsapp: '租户 WhatsApp ID / 别名',
     lat: '地图位置', bedrooms: '卧室', bathrooms: '浴室', floors: '楼层', parking: '车位', landSqft: '土地面积（平方尺）', builtUpSqft: '建筑面积（平方尺）',
     frontageFt: '门面宽度（尺）', depthFt: '深度（尺）', lotType: '单位位置', furnishing: '家具',
     ceilingFt: '天花板高度（尺）', powerKva: '电力供应 (kVA)', loadingBays: '装卸区', specs: '其他规格',
@@ -468,7 +506,7 @@ const zh: ListingStrings = {
     tenure: '地契', leaseExpiryYear: '租约到期年份', titleType: '地契类型', landUse: '土地用途类别', restriction: '限制',
     purpose: '出售或出租', askingPrice: '开价 (RM)', negotiable: '可议价？', commissionPct: '佣金 (%)',
     monthlyRent: '月租 (RM)', securityDepositMonths: '押金（月）', utilityDepositMonths: '水电押金（月）', maintenanceFee: '管理费（每月 RM）',
-    tenant: '现任租户', tStart: '租约开始', tEnd: '租约结束', tRent: '现租金（每月 RM）', tNotes: '租约备注',
+    tenant: '租户姓名', tStart: '租约开始', tEnd: '租约结束', tRent: '现租金（每月 RM）', tNotes: '租约备注',
     availability: '可用性', availableFrom: '可入住日期', condition: '状况', features: '特色',
     arrangement: '委托方式', arrangementNote: '介绍人或联合代理公司',
     status: '状态', handledBy: '负责人', notes: '内部备注',
@@ -511,6 +549,24 @@ const zh: ListingStrings = {
     label: '核实状态', none: '未标记', confirmed: '已确认', owner: '屋主所述', check: '需要核实', unknown: '未知',
     aria: (f: string) => `核实状态：${f}`, summary: (n: number) => `${n} 项需核实`,
     help: '已确认：您亲自或凭文件核实。屋主所述：屋主告知，尚未核实。需要核实：使用前先查证。未知：目前没有人知道。',
+  },
+  n9: {
+    addLocation: '添加位置', propertyLocation: '房产位置', locationSaved: '位置已保存', noLocation: '尚无位置。请用“添加位置”、当前位置，或粘贴 Google 地图链接。',
+    mapsLinkPh: 'https://maps.app.goo.gl/ExampleLink', mapsLinkHint: '粘贴 Google 地图 → 分享 中的链接。上面的示例不是真实地点。',
+    openMapsLink: '打开 Google 地图链接', linkPosition: '地图点取自链接。', linkNoPosition: '此链接没有显示具体的点（短链接会隐藏）。链接会按原样保存并打开；请用“添加位置”把房产放到应用的地图上。',
+    del: '删除', deleteQ: '删除此房产？',
+    photosBusy: (done: number, total: number) => `正在处理照片…… ${done} / ${total}`, photoFailed: (name: string) => `无法添加 ${name}：这不是本手机能打开的图片。`,
+    photosDone: (n: number) => `已添加 ${n} 张照片。`, dragHint: '拖动 ⠿ 调整顺序。第一张照片就是主照片。',
+    moveEarlier: (n: number) => `把第 ${n} 张照片前移`, moveLater: (n: number) => `把第 ${n} 张照片后移`, dragLabel: (n: number) => `拖动第 ${n} 张照片`,
+    chooseBannerLocation: '选择位置', bannerLocationNew: '已选择横幅位置。保存房产时会保存到“我的横幅地图”。',
+    bannerLocationSaved: (n: number) => `已在“我的横幅地图”保存 ${n} 个横幅位置。`, bannerPickTitle: '横幅在哪里？',
+    rentCommission: (rm: string) => `佣金约 ${rm}`, rentMonths: (n: number) => `${n} 个月租金`,
+    rentCommissionHint: '出租的佣金按几个月租金计算，不是百分比。',
+    saleCommissionLabel: '出售佣金（%）', rentCommissionLabel: '出租佣金（几个月租金）',
+    pointOnlyNote: '只保存地图上的点，不会更改您输入的地址。', pointChosen: '已在地图上选好点。', usePoint: '使用此点',
+    whatsappPh: '别名', phonePh: '60 12-345 6789', fromContacts: '已保存的联系人', suggestionUse: '使用',
+    tenantTitle: '租户',
+    extraCommentsTitle: '补充说明',
   },
   preview: {
     button: '预览', title: '预览', open: '打开详情', del: '删除', cancel: '取消', hint: '提示：长按卡片或点击“预览”可快速查看。',
@@ -566,7 +622,21 @@ const zh: ListingStrings = {
   },
 };
 
-export const listingStrings: Record<Lang, ListingStrings> = { en, bm, zh };
+/** Change 009: short labels, section names and dropdown values in Title Case (English and Bahasa Malaysia). Help text and
+ *  sentences are left in normal sentence case; Chinese is unchanged. */
+function titled(o: ListingStrings, lang: Lang): ListingStrings {
+  const t = <T extends Record<string, unknown>>(m: T) => titleCaseMap(m, lang);
+  const v = o.verify;
+  return {
+    ...o, l: t(o.l), sec: t(o.sec), kf: t(o.kf), f: t(o.f), types: t(o.types), titleTypes: t(o.titleTypes), restrictions: t(o.restrictions),
+    tenure: t(o.tenure), lotType: t(o.lotType), status: t(o.status), negotiable: t(o.negotiable), category: t(o.category), purpose: t(o.purpose),
+    purposeFilter: t(o.purposeFilter), arrangement: t(o.arrangement), availability: t(o.availability), condition: t(o.condition),
+    furnishing: t(o.furnishing), landUse: t(o.landUse), docCat: t(o.docCat), adStatus: t(o.adStatus), banner: t(o.banner),
+    verify: { ...v, label: titleCase(v.label, lang), confirmed: titleCase(v.confirmed, lang), owner: titleCase(v.owner, lang), check: titleCase(v.check, lang), unknown: titleCase(v.unknown, lang) },
+  };
+}
+const source: Record<Lang, ListingStrings> = { en, bm, zh };
+export const listingStrings: Record<Lang, ListingStrings> = { en: titled(source.en, 'en'), bm: titled(source.bm, 'bm'), zh: source.zh };
 
 /** Display name of a type, title type, restriction or country value in the chosen language (custom values as typed). */
 export const typeLabel = (s: ListingStrings, v?: string) => (v ? s.types[v] ?? v : '');

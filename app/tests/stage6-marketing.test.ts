@@ -46,12 +46,12 @@ test('MK3 headline: the agent\'s words first, then the property\'s advert title,
   assert.equal(make(l, { headline: '  Last unit! Call now  ' }).headline, 'Last unit! Call now');
   assert.equal(make(l).headline, 'Renovated corner terrace');
   const noHeadline = make(rec({ headline: undefined }));
-  assert.equal(noHeadline.headline, 'Terrace house, Bandar Baru Nilai', 'type and area only');
+  assert.equal(noHeadline.headline, 'Terrace House, Bandar Baru Nilai', 'type and area only');
   assert.ok(!/Jalan Rahsia|12/.test(noHeadline.headline), 'never the street or unit number');
   assert.ok(!/stunning|luxury|dream|prime|must see/i.test(noHeadline.headline), noHeadline.headline);
   const fields = marketingFields(rec({ headline: undefined }), 'en');
   const noPlace = buildPosterContent({ lang: 'en', listing: rec({ headline: undefined }), fields, selected: { ...defaultMarketingSelection(fields), township: false, city: false, state: false } });
-  assert.equal(noPlace.headline, 'Terrace house', 'area unticked: type only');
+  assert.equal(noPlace.headline, 'Terrace House', 'area unticked: type only');
   assert.equal(make(rec({ headline: undefined, type: undefined })).headline, 'Bandar Baru Nilai');
   assert.equal(make(rec({ headline: undefined, type: undefined, township: undefined, city: undefined, state: undefined, ref: undefined })).headline, 'Property');
 });
@@ -66,7 +66,7 @@ test('MK4 a ticked detail with no value is left off the design and reported; wit
   const l = rec({ askingPrice: undefined, bathrooms: undefined });
   const fields = marketingFields(l, 'en');
   const c = buildPosterContent({ lang: 'en', listing: l, fields, selected: { ...defaultMarketingSelection(fields), bathrooms: true, askingPrice: true } });
-  assert.deepEqual(c.empty.sort(), ['Asking price (RM)', 'Bathrooms'].sort());
+  assert.deepEqual(c.empty.sort(), ['Asking Price (RM)', 'Bathrooms'].sort());
   assert.equal(c.noPrice, true);
   assert.equal(c.prices.length, 0);
   assert.ok(!c.facts.some(f => f.key === 'bathrooms'));
@@ -79,12 +79,12 @@ test('MK5 only facts the record marks Confirmed go without a *; others are marke
   assert.equal(ok.unverified.length, 0); assert.equal(ok.footnote, undefined);
   assert.ok([...ok.prices, ...ok.facts].every(f => !f.unverified));
   const un = make(rec({ verification: { ...allConfirmed, askingPrice: 'owner', bedrooms: 'check', tenure: 'unknown' } as Listing['verification'] }));
-  assert.deepEqual(un.unverified.sort(), ['Asking price (RM)', 'Bedrooms', 'Tenure'].sort());
+  assert.deepEqual(un.unverified.sort(), ['Asking Price (RM)', 'Bedrooms', 'Tenure'].sort());
   assert.match(un.footnote!, /^\* Not yet verified/);
   assert.equal(un.prices[0].unverified, true);
   assert.equal(un.facts.find(f => f.key === 'builtUpSqft')!.unverified, false);
   const unmarked = make(rec({ verification: {} }));
-  assert.ok(unmarked.unverified.includes('Asking price (RM)'), '"Not marked" counts as not confirmed');
+  assert.ok(unmarked.unverified.includes('Asking Price (RM)'), '"Not marked" counts as not confirmed');
 });
 
 test('MK6 price: asking price for a sale, rent per month for a rental; both when both are ticked; price formatted as RM', () => {
@@ -94,7 +94,7 @@ test('MK6 price: asking price for a sale, rent per month for a rental; both when
   assert.match(rent.prices[0].value, /RM 2,400/); assert.match(rent.prices[0].value, /month/);
   const both = make(rec({ purpose: 'sale_or_rent', monthlyRent: 2400 }));
   assert.equal(both.prices.length, 2);
-  assert.equal(both.ribbon, 'Sale or rent');
+  assert.equal(both.ribbon, 'Sale or Rent');
 });
 
 test('MK7 location line is township, city, state as ticked; the street is never part of it; unticking removes it', () => {
@@ -116,7 +116,7 @@ test('MK8 a sample property says so; the reference number is shown only when the
 test('MK9 the design follows the chosen language: Bahasa Malaysia and Chinese labels, ribbon and footnote', () => {
   const bm = make(rec({ verification: {} }), {}, 'bm');
   const zh = make(rec({ verification: {} }), {}, 'zh');
-  assert.equal(bm.ribbon, 'Untuk dijual'); assert.match(zh.ribbon!, /出售/);
+  assert.equal(bm.ribbon, 'Untuk Dijual'); assert.match(zh.ribbon!, /出售/);
   assert.match(bm.footnote!, /Belum disahkan/); assert.match(zh.footnote!, /尚未核实/);
   assert.ok(bm.facts.some(f => /Bilik tidur/i.test(f.label)), bm.facts.map(f => f.label).join());
   assert.ok(zh.facts.some(f => /卧室|睡房|房间/.test(f.label)), zh.facts.map(f => f.label).join());

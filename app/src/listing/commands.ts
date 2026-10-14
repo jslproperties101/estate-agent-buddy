@@ -140,10 +140,11 @@ export function readDetails(original: string, places: string[] = []): { changes:
   if (place) add(placeKey(place), place);
   const street = /\b((?:jalan|jln\.?|lorong|lrg\.?|persiaran)\s+[A-Za-z0-9][\w/ ]*?)(?=\s*(?:,|\.(?:\s|$)|$|\bin\b|\bdi\b|\bnear\b))/i.exec(original);
   if (street) add('street', street[1].replace(/^jln\.?/i, 'Jalan').replace(/^lrg\.?/i, 'Lorong').replace(/\s+/g, ' ').replace(/^\w/, c => c.toUpperCase()));
+  // One Unit/Lot Number field (Change 009): "unit 7" and "lot 2/14" both go there, together when both are said.
   const unit = /\bunit\s+(?:no\.?\s*|number\s+)?([A-Z]?-?\d[\w-]*)/i.exec(t);
-  if (unit) add('unitNo', unit[1].toUpperCase());
   const lot = /\blot\s+(?:no\.?\s*|number\s+)?([A-Z]?\d[\w/-]*)/i.exec(t);
-  if (lot) add('lotNo', lot[1].toUpperCase());
+  const unitLotText = [unit && unit[1].toUpperCase(), lot && `Lot ${lot[1].toUpperCase()}`].filter(Boolean).join(', ');
+  if (unitLotText) add('unitNo', unitLotText);
   const owner = /\b(?:owner|pemilik|tuan\s+rumah)\s+(?:is\s+|ialah\s+|named\s+|bernama\s+)?((?:(?:Mr|Mrs|Ms|Madam|Encik|En|Puan|Pn|Cik|Dato'?|Datuk|Dr)\.?\s+)?[A-Z][\w'.-]*(?:\s+(?:bin|binti|a\/l|a\/p|[A-Z][\w'.-]*)){0,4})/.exec(original);
   if (owner && !/^(?:Wants|Says|Is)\b/.test(owner[1])) add('ownerName', owner[1].trim());
   const phone = /(?:\+?6?0)1\d[\s-]?\d{3,4}[\s-]?\d{4}\b|\b0[3-9][\s-]?\d{3,4}[\s-]?\d{4}\b/.exec(t);

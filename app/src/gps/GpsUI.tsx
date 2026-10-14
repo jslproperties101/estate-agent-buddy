@@ -208,7 +208,7 @@ function JourneyLists({ lang, go, j, maps, onMoveMark }: { lang: Lang; go: Go; j
           const p = state.properties.find(x => x.id === m.propertyId);
           return (
             <div key={m.id} className="mark-row">
-              <span>📍 {p ? [p.ref, cardTitle(p)].filter(Boolean).join(' · ') : m.note || `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`}</span>
+              <span>📍 {p ? [p.ref, cardTitle(p), p.extraComments ?? p.headline].filter(Boolean).join(' · ') : m.note || `${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}`}</span>
               <small className="muted">{fmtDateTime(m.at, lang)}</small>
               <div className="row-wrap">
                 {p && <button className="btn small secondary" onClick={() => go({ name: 'listingDetail', id: p.id })}>{g.openProperty}</button>}
@@ -270,7 +270,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
     const no = nextNumber(state.properties);
     const p: Listing = {
       id: newId(), created: Date.now(), updated: Date.now(), photos: [], ref: makeRef(prefix, no), refPrefix: prefix, refNo: no,
-      type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), status: 'needs_check', country: DEFAULT_COUNTRY,
+      type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), extraComments: note.trim() || undefined, status: 'needs_check', country: DEFAULT_COUNTRY,
       lat: spot.lat, lng: spot.lng, geoSource: spot.source === 'gps' ? 'gps' : 'manual', geoAccuracy: spot.source === 'gps' ? spot.acc : undefined, askingPrice: price || undefined,
       history: [{ at: Date.now(), source: 'map', summary: 'House Shopping' }],
     };

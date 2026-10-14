@@ -15,16 +15,17 @@ export type Arrangement = 'direct' | 'referral' | 'cobroke' | 'other';
 export type Availability = 'immediate' | 'from_date' | 'tenanted' | 'under_construction' | 'not_available';
 export type Condition = 'new' | 'good' | 'renovated' | 'needs_repair' | 'bare';
 export type Furnishing = 'unfurnished' | 'partly' | 'fully';
-export type LandUse = 'building' | 'industry' | 'agriculture';
+export type LandUse = 'building' | 'industry' | 'agriculture' | 'nil';
 export type DocCategory = 'title' | 'brochure' | 'floorplan' | 'correspondence' | 'transaction' | 'other';
 export type AdStatus = 'planned' | 'live' | 'needs_update' | 'paused' | 'expired';
 /** Is a "For Sale / For Rent" banner up for this property? (owner, 12 Oct 2026) */
 export type BannerStatus = 'yes' | 'no' | 'not_yet' | 'not_allowed' | 'removed';
 
+/** Property types in the order shown. The land types sit together, Residential land with them (Change 009). */
 export const TYPES = [
-  'Terrace house', 'Semi-D house', 'Bungalow', 'Townhouse', 'Condo / apartment', 'Residential land', 'Shoplot', 'Office',
+  'Terrace house', 'Semi-D house', 'Bungalow', 'Townhouse', 'Condo / apartment', 'Shoplot', 'Office',
   'Terrace factory', 'Semi-D factory', 'Detached factory', 'Warehouse',
-  'Industrial land', 'Agricultural land', 'Development land',
+  'Residential land', 'Industrial land', 'Agricultural land', 'Development land',
 ] as const;
 export const CATEGORIES: Category[] = ['residential', 'commercial', 'industrial', 'agricultural', 'development'];
 export const TYPE_CATEGORY: Record<string, Category> = {
@@ -41,9 +42,14 @@ export const ARRANGEMENTS: Arrangement[] = ['direct', 'referral', 'cobroke', 'ot
 export const AVAILABILITY: Availability[] = ['immediate', 'from_date', 'tenanted', 'under_construction', 'not_available'];
 export const CONDITIONS: Condition[] = ['new', 'good', 'renovated', 'needs_repair', 'bare'];
 export const FURNISHING: Furnishing[] = ['unfurnished', 'partly', 'fully'];
-export const LAND_USES: LandUse[] = ['building', 'industry', 'agriculture'];
-/** Built-in restriction values; others can be typed and are remembered. */
-export const RESTRICTIONS = ['No restriction', 'Bumiputera lot', 'Malay reserve'] as const;
+export const LAND_USES: LandUse[] = ['building', 'industry', 'agriculture', 'nil'];
+/** Built-in restriction values; others can be typed and are remembered. "No restriction" was renamed "NON Bumiputera"
+ *  (Change 009); records saved with the old value show and edit as the new one (restrictionValue). */
+export const RESTRICTIONS = ['NON Bumiputera', 'Bumiputera lot', 'Malay reserve'] as const;
+export const LEGACY_RESTRICTIONS: Record<string, string> = { 'No restriction': 'NON Bumiputera' };
+export const restrictionValue = (v?: string) => (v ? LEGACY_RESTRICTIONS[v] ?? v : undefined);
+/** Rental commission choices, in months of rent (Change 009). Never a percentage. */
+export const RENT_COMMISSION_MONTHS = [1, 1.5, 2] as const;
 export const TITLE_TYPES = ['Individual title', 'Strata title', 'Master title'] as const;
 export const DOC_CATEGORIES: DocCategory[] = ['title', 'brochure', 'floorplan', 'correspondence', 'transaction', 'other'];
 /** Title documents and owner correspondence can hold personal details: kept on this phone only. */
@@ -62,7 +68,7 @@ export interface Photo {
   editedFrom?: string;
 }
 export interface Doc { id: string; category: DocCategory; name: string; fileId?: string; bytes?: number; mime?: string; added: number }
-export interface Tenancy { tenant?: string; start?: string; end?: string; rent?: number; notes?: string }
+export interface Tenancy { tenant?: string; start?: string; end?: string; rent?: number; notes?: string; /** Tenant's phone (+ format) and WhatsApp alias (Change 009). */ tenantPhone?: string; tenantWhatsapp?: string }
 /** What kind of advert it is (Stage 6). */
 export type AdType = 'listing' | 'featured' | 'boosted' | 'social' | 'other';
 export const AD_TYPES: AdType[] = ['listing', 'featured', 'boosted', 'social', 'other'];
@@ -97,9 +103,14 @@ export interface Listing {
   state?: string;
   city?: string;
   township?: string;
+  /** Older records only: since Change 009 one "Unit/Lot Number" field (unitNo) holds both. Shown through unitLot(). */
   lotNo?: string;
   street?: string;
+  /** "Unit/Lot Number": a unit, a house number or a lot, as typed. */
   unitNo?: string;
+  /** A Google Maps link typed or pasted by the agent (Change 009). Kept as typed; coordinates are taken from it only when
+   *  the link itself contains them (parseMapsLink). */
+  mapsLink?: string;
   /** Saved map position (from GPS, Google Maps or typed). Used by the map, navigation and House Shopping. */
   lat?: number;
   lng?: number;
@@ -117,6 +128,8 @@ export interface Listing {
   depthFt?: number;
   lotType?: LotType;
   furnishing?: Furnishing;
+  /** Extra Comments: long free text under Furnishing, shown in full on the card and in Property Details (Change 009). */
+  extraComments?: string;
   ceilingFt?: number;
   powerKva?: number;
   loadingBays?: number;
@@ -128,6 +141,8 @@ export interface Listing {
   // owner (quick details) and the linked contact record
   ownerName?: string;
   ownerPhone?: string;
+  /** Owner's WhatsApp ID / alias, typed in the property form; it moves to the vendor record when that is created. */
+  ownerWhatsapp?: string;
   vendorId?: string;
   // tenure and title
   tenure?: Tenure;
@@ -139,8 +154,11 @@ export interface Listing {
   purpose?: Purpose;
   askingPrice?: number;
   negotiable?: Negotiable;
+  /** Sale commission, a percentage of the asking price. */
   commissionPct?: number;
   monthlyRent?: number;
+  /** Rental commission, in months of rent (1, 1.5 or 2). Never a percentage. */
+  rentCommissionMonths?: number;
   securityDepositMonths?: number;
   utilityDepositMonths?: number;
   maintenanceFee?: number;
@@ -179,8 +197,12 @@ export { rm, rm2, rmShort } from '../lib/money';
 export const sqft = (n?: number) => (n === undefined ? '' : Math.round(n).toLocaleString('en-US') + ' sq ft');
 export const landText = (n?: number) => (n === undefined ? '' : n >= 43560 ? `${(n / 43560).toFixed(2)} acres (${sqft(n)})` : sqft(n));
 
-export const commissionRm = (l: Listing) =>
-  l.askingPrice !== undefined && l.commissionPct !== undefined ? (l.askingPrice * l.commissionPct) / 100 : undefined;
+/** Sale commission in RM: asking price × percentage. Only for sale listings. */
+export const commissionRm = (l: Pick<Listing, 'askingPrice' | 'commissionPct' | 'purpose'>) =>
+  forSale(l) && l.askingPrice !== undefined && l.commissionPct !== undefined ? Math.round(l.askingPrice * l.commissionPct) / 100 : undefined;
+/** Rental commission in RM: monthly rent × months (1, 1.5 or 2). Only for rental listings; never a percentage. */
+export const rentCommissionRm = (l: Pick<Listing, 'monthlyRent' | 'rentCommissionMonths' | 'purpose'>) =>
+  forRent(l) && l.monthlyRent !== undefined && l.rentCommissionMonths !== undefined ? Math.round(l.monthlyRent * l.rentCommissionMonths * 100) / 100 : undefined;
 
 export const forRent = (l: Pick<Listing, 'purpose'>) => l.purpose === 'rent' || l.purpose === 'sale_or_rent';
 export const forSale = (l: Pick<Listing, 'purpose'>) => l.purpose !== 'rent';
@@ -206,17 +228,92 @@ export const usablePhone = (raw?: string): boolean => phoneDigits(raw).length >=
 /** The place name shown on cards: township, else city. */
 export const placeName = (l: Pick<Listing, 'township' | 'city'>) => l.township || l.city || '';
 
-/** Address-style title: unit number or lot, street, then township. The unit number is shown as it was typed, without
- *  the word "Unit" in front (owner, 13 Oct 2026). The stored unitNo itself is never changed. */
-export function title(l: Listing): string {
-  const head = l.unitNo ? l.unitNo : l.lotNo ? `Lot ${l.lotNo}` : '';
-  return [head, l.street, placeName(l)].filter(Boolean).join(', ');
+/** The one "Unit/Lot Number" (Change 009). Older records may still hold a separate lot number: both are shown together. */
+export function unitLot(l: Pick<Listing, 'unitNo' | 'lotNo'>): string {
+  const u = l.unitNo?.trim() ?? '';
+  const lot = l.lotNo?.trim() ?? '';
+  if (!lot) return u;
+  const lotText = /^lot\b/i.test(lot) ? lot : `Lot ${lot}`;
+  if (!u) return lotText;
+  return u.toLowerCase().includes(lot.toLowerCase()) ? u : `${u}, ${lotText}`;
 }
-export const cardTitle = (l: Listing) => l.headline || title(l);
+
+/** Joins address parts, leaving out a part already contained in an earlier one (no "Nilai" twice). */
+function joinParts(parts: (string | undefined)[]): string {
+  const out: string[] = [];
+  for (const raw of parts) {
+    const p = raw?.trim();
+    if (!p) continue;
+    const low = p.toLowerCase();
+    if (out.some(x => x.toLowerCase().includes(low))) continue;
+    out.push(p);
+  }
+  return out.join(', ');
+}
+
+/** The card's address (Change 009): Unit/Lot Number and street together, then township and town, each once. */
+export function title(l: Listing): string {
+  return joinParts([unitLot(l), l.street, l.township, l.city]);
+}
+/** Cards and lists are titled by the address, never by the marketing headline (which stays for Marketing Studio). */
+export const cardTitle = (l: Listing) => title(l);
 
 /** Full address, in the agreed order from the most specific part. */
 export function addressLine(l: Listing): string {
-  return [l.unitNo && `Unit ${l.unitNo}`, l.lotNo && `Lot ${l.lotNo}`, l.street, l.township, l.city, l.state, l.country].filter(Boolean).join(', ');
+  return joinParts([unitLot(l), l.street, l.township, l.city, l.state, l.country]);
+}
+
+/** Photos in their saved order. The first is the main photo (Change 009). Older records that chose another main photo
+ *  show it first, so nothing they chose changes. */
+export function orderedPhotos(l: Pick<Listing, 'photos' | 'mainPhotoId'>): Photo[] {
+  const i = l.photos.findIndex(p => p.id === l.mainPhotoId);
+  if (i <= 0) return l.photos;
+  return [l.photos[i], ...l.photos.slice(0, i), ...l.photos.slice(i + 1)];
+}
+
+/** Moves one photo to another place; the first photo is then the main photo. */
+export function movePhoto(photos: Photo[], from: number, to: number): Photo[] {
+  if (from === to || from < 0 || to < 0 || from >= photos.length || to >= photos.length) return photos;
+  const next = [...photos];
+  const [p] = next.splice(from, 1);
+  next.splice(to, 0, p);
+  return next;
+}
+
+/** Coordinates written inside a full Google Maps link (…/@3.1,101.6,17z, ?q=3.1,101.6, ?query=…, !3d3.1!4d101.6).
+ *  Short share links (maps.app.goo.gl/…) hide them behind a redirect, so they give undefined: the link is still saved
+ *  and opened as typed, and the map position is chosen with Add Location. */
+export function parseMapsLink(raw?: string): { lat: number; lng: number } | undefined {
+  const s = raw?.trim();
+  if (!s) return undefined;
+  let url: URL;
+  try { url = new URL(s); } catch { return undefined; }
+  if (!/(^|\.)google\.[a-z.]+$|^goo\.gl$|^maps\.app\.goo\.gl$/i.test(url.hostname)) return undefined;
+  const ok = (a: number, b: number) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 && !(a === 0 && b === 0);
+  const text = decodeURIComponent(url.pathname + url.search + url.hash);
+  const d = /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(text);
+  if (d && ok(+d[1], +d[2])) return { lat: +d[1], lng: +d[2] };
+  for (const key of ['q', 'query', 'll', 'destination']) {
+    const v = url.searchParams.get(key);
+    const m = v && /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/.exec(v);
+    if (m && ok(+m[1], +m[2])) return { lat: +m[1], lng: +m[2] };
+  }
+  const at = /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(url.pathname);
+  if (at && ok(+at[1], +at[2])) return { lat: +at[1], lng: +at[2] };
+  return undefined;
+}
+
+/** A record as the form edits it (Change 009). Older values are mapped, never dropped:
+ *  - a separate lot number joins the one Unit/Lot Number field;
+ *  - "No restriction" shows as "NON Bumiputera";
+ *  - the main photo becomes the first photo. */
+export function forEditing(l: Listing): Listing {
+  const photos = orderedPhotos(l);
+  const out: Listing = { ...l, photos: [...photos], mainPhotoId: photos[0]?.id };
+  const ul = unitLot(l);
+  if (l.lotNo) { out.unitNo = ul || undefined; delete out.lotNo; }
+  if (l.restriction) out.restriction = restrictionValue(l.restriction);
+  return out;
 }
 
 export const hasPosition = (l: Pick<Listing, 'lat' | 'lng'>) =>
@@ -224,7 +321,7 @@ export const hasPosition = (l: Pick<Listing, 'lat' | 'lng'>) =>
 
 /** The main photo, or a drawn sample picture of the property type when there is no photo (same look on every card). */
 export function mainPhoto(l: Listing): Photo | undefined {
-  const p = l.photos.find(x => x.id === l.mainPhotoId) ?? l.photos[0];
+  const p = orderedPhotos(l)[0];
   if (p) return p;
   const scene = sceneForType(l.type);
   return { id: 'type-' + (scene ?? 'generic'), url: sceneUrl(scene ?? 'generic'), name: 'Sample picture', sample: true };
@@ -284,7 +381,7 @@ export function activeCount(f: Filters): number {
 export function applyFilters(list: Listing[], f: Filters): Listing[] {
   const q = f.location?.trim().toLowerCase();
   return list.filter(l => {
-    if (q && ![l.street, l.township, l.city, l.state, l.unitNo, l.lotNo, l.headline, l.ref].some(v => (v ?? '').toLowerCase().includes(q))) return false;
+    if (q && ![l.street, l.township, l.city, l.state, l.unitNo, l.lotNo, unitLot(l), l.headline, l.ref].some(v => (v ?? '').toLowerCase().includes(q))) return false;
     if (f.type && l.type !== f.type) return false;
     if (f.typeWord && !(l.type ?? '').toLowerCase().includes(f.typeWord.toLowerCase())) return false;
     if (f.category && categoryOf(l) !== f.category) return false;

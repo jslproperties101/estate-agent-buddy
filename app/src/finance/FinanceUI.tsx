@@ -10,7 +10,14 @@ import { Go } from '../nav';
 import { financeStrings } from './strings';
 import { DEAL_STATUSES, Deal, Expense, Income } from '../data/types';
 import { summarise, monthlyIncome, myCommission, commissionFrom, EXPENSE_CATEGORIES, INCOME_SOURCES, Period } from '../domain/finance';
-import { rm, cardTitle } from '../listing/model';
+import { rm, cardTitle, Listing, rentCommissionRm } from '../listing/model';
+
+/** A new deal's starting value and commission from its property. A rent-only property's commission is months of rent
+ *  (Change 009): the amount is rent × months and no percentage is set, so months are never read as a percentage. */
+export function dealStart(p?: Listing): Pick<Deal, 'value' | 'commissionPct' | 'commission'> {
+  if (p?.purpose === 'rent') return { value: p.monthlyRent ?? 0, commissionPct: undefined, commission: rentCommissionRm(p) ?? 0 };
+  return { value: p?.askingPrice ?? p?.monthlyRent ?? 0, commissionPct: p?.commissionPct, commission: 0 };
+}
 import { ym, ymd, fmtDate, localeOf } from '../lib/dates';
 import { ContactSelect, PropertySelect, Empty, Confirm, Tabs, SampleTag } from '../ui/common';
 import { OptionSelect } from '../ui/OptionSelect';
@@ -132,7 +139,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
   const prop0 = state.properties.find(x => x.id === propertyId);
   const [d, setD] = useState<Deal>(() => existing ?? {
     id: newId(), created: Date.now(), updated: Date.now(), propertyId, side: prop0?.purpose === 'rent' ? 'rent' : 'sale', date: ymd(new Date()),
-    value: prop0?.askingPrice ?? prop0?.monthlyRent ?? 0, commissionPct: prop0?.commissionPct, commission: 0, sharePct: 100, status: 'estimated',
+    ...dealStart(prop0), sharePct: 100, status: 'estimated',
   });
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [del, setDel] = useState(false);
@@ -156,7 +163,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
         <label className="ff">{f.f.title}<input value={d.title ?? ''} onChange={e => setD(x => ({ ...x, title: e.target.value || undefined }))} /></label>
         <PropertySelect lang={lang} label={f.f.property} value={d.propertyId} onChange={v => {
           const p = state.properties.find(x => x.id === v);
-          setD(x => ({ ...x, propertyId: v, value: x.value || p?.askingPrice || p?.monthlyRent || 0, commissionPct: x.commissionPct ?? p?.commissionPct }));
+          setD(x => { const st = dealStart(p); return { ...x, propertyId: v, value: x.value || st.value, commissionPct: x.commissionPct ?? st.commissionPct, commission: x.commission || st.commission }; });
         }} />
         <ContactSelect lang={lang} label={f.f.contact} roles={['buyer']} value={d.contactId} onChange={v => setD(x => ({ ...x, contactId: v }))} />
         <label className="ff">{f.f.side}

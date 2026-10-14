@@ -11,11 +11,24 @@ export const MY_STATES = [
   'Sabah', 'Sarawak', 'Selangor', 'Terengganu', 'Kuala Lumpur', 'Labuan', 'Putrajaya',
 ] as const;
 
-/** Towns and cities the agent works in most, grouped by state. Others are typed once and remembered. */
+/** Main towns and cities by state (Change 009: a useful starting list for type-to-search, not an official register).
+ *  Anything missing is typed once and remembered on this phone, with ✕ to remove it again. */
 export const MY_CITIES: Record<string, string[]> = {
-  'Negeri Sembilan': ['Seremban', 'Nilai', 'Mantin', 'Labu', 'Lenggeng', 'Pajam', 'Port Dickson', 'Rembau', 'Kuala Pilah', 'Bahau', 'Tampin'],
-  'Selangor': ['Sepang', 'Salak Tinggi', 'Cyberjaya', 'Dengkil', 'Banting', 'Kajang', 'Semenyih', 'Bangi', 'Shah Alam', 'Petaling Jaya', 'Subang Jaya', 'Puchong', 'Klang', 'Rawang'],
+  'Johor': ['Johor Bahru', 'Iskandar Puteri', 'Pasir Gudang', 'Kulai', 'Skudai', 'Batu Pahat', 'Muar', 'Kluang', 'Segamat', 'Pontian', 'Kota Tinggi', 'Mersing', 'Tangkak'],
+  'Kedah': ['Alor Setar', 'Sungai Petani', 'Kulim', 'Langkawi', 'Jitra', 'Baling', 'Pendang'],
+  'Kelantan': ['Kota Bharu', 'Pasir Mas', 'Tanah Merah', 'Machang', 'Kuala Krai', 'Gua Musang', 'Tumpat'],
+  'Melaka': ['Melaka', 'Ayer Keroh', 'Alor Gajah', 'Jasin', 'Masjid Tanah'],
+  'Negeri Sembilan': ['Seremban', 'Nilai', 'Senawang', 'Mantin', 'Labu', 'Lenggeng', 'Pajam', 'Port Dickson', 'Rembau', 'Rantau', 'Kuala Pilah', 'Bahau', 'Gemas', 'Tampin'],
+  'Pahang': ['Kuantan', 'Temerloh', 'Mentakab', 'Bentong', 'Raub', 'Pekan', 'Jerantut', 'Rompin', 'Cameron Highlands'],
+  'Perak': ['Ipoh', 'Taiping', 'Teluk Intan', 'Sitiawan', 'Lumut', 'Kampar', 'Batu Gajah', 'Kuala Kangsar', 'Seri Iskandar', 'Tanjung Malim', 'Parit Buntar'],
+  'Perlis': ['Kangar', 'Arau', 'Padang Besar'],
+  'Pulau Pinang': ['George Town', 'Butterworth', 'Bukit Mertajam', 'Seberang Jaya', 'Bayan Lepas', 'Balik Pulau', 'Nibong Tebal'],
+  'Sabah': ['Kota Kinabalu', 'Penampang', 'Putatan', 'Sandakan', 'Tawau', 'Lahad Datu', 'Keningau', 'Semporna'],
+  'Sarawak': ['Kuching', 'Kota Samarahan', 'Miri', 'Sibu', 'Bintulu', 'Sri Aman', 'Sarikei', 'Mukah'],
+  'Selangor': ['Sepang', 'Salak Tinggi', 'Cyberjaya', 'Dengkil', 'Banting', 'Kajang', 'Semenyih', 'Bangi', 'Seri Kembangan', 'Shah Alam', 'Petaling Jaya', 'Subang Jaya', 'Puchong', 'Klang', 'Port Klang', 'Ampang', 'Selayang', 'Rawang', 'Kuala Selangor'],
+  'Terengganu': ['Kuala Terengganu', 'Kuala Nerus', 'Kemaman', 'Dungun', 'Marang', 'Besut'],
   'Kuala Lumpur': ['Kuala Lumpur'],
+  'Labuan': ['Labuan'],
   'Putrajaya': ['Putrajaya'],
 };
 export const MY_TOWNSHIPS: Record<string, string[]> = {

@@ -157,15 +157,13 @@ test('U1 dashboard: Estate Agent AI Buddy, the approved 15 cards in 3 × 5 (Subs
   assert.equal(names.indexOf('Voice Command') + 1, 15, 'Voice Command is card 15');
   for (const gone of ['Buyer List', 'Vendor List', 'News', 'Settings', 'Co-broke']) assert.ok(!names.includes(gone), `no ${gone} card`);
   assert.equal(await page.locator('nav.grid > button.voice-tile').getAttribute('data-tile'), '15', 'the bright-gold Voice Command card is number 15');
-  // Top bar: Co-broke Opportunities (Coming Soon) and Notifications (the old Big News button).
-  assert.equal(await page.getByTestId('top-cobroke').getAttribute('aria-label'), 'Co-broke Opportunities (Coming Soon)');
+  // Top bar: Notifications only. Change 003 (owner): the top-middle "Soon" item (Co-broke) is removed; nothing else moves.
+  assert.equal(await page.getByTestId('top-cobroke').count(), 0, 'no Soon item in the top bar');
+  assert.equal(await page.locator('.top-soon').count(), 0);
   assert.equal(await page.getByTestId('top-notifications').getAttribute('aria-label'), 'Notifications');
   assert.equal(await page.getByText('BIG NEWS').count(), 0);
   await page.getByTestId('top-notifications').click();
   await page.getByTestId('notifications').waitFor();
-  await home(page);
-  await page.getByTestId('top-cobroke').click();
-  assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/);
   await home(page);
   await tile(page, 'Market Intelligence');
   assert.match(await page.getByTestId('soon-market').innerText(), /Coming Soon[\s\S]*lawful and reliable source[\s\S]*Nothing here is live/, 'Market Intelligence is honest: no feed is pretended');
@@ -243,13 +241,17 @@ test('U4 saved data is permanent: a new property is still there after closing an
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="headline"]').fill('Persistence test house');
+  await page.locator('[data-field="street"]').fill('Jalan Persistence 1');
   await page.locator('[data-field="askingPrice"]').fill('450000');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List');
   assert.equal(await page.getByTestId('listing-card').count(), 1);
-  assert.ok(await page.getByText('Persistence test house').first().isVisible());
+  // Change 009: the card shows the address; the headline is kept for marketing.
+  assert.ok(await page.getByTestId('card-address').filter({ hasText: 'Jalan Persistence 1' }).first().isVisible());
+  await page.getByTestId('card-open').first().click();
+  assert.match(await page.getByTestId('marketing').innerText(), /Persistence test house/);
   await page.context().close();
 });
 
@@ -268,7 +270,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   const list = page.getByTestId('ref-prefix').locator('.opt-list');
   assert.equal(await list.locator('.opt-x').count(), 0, 'built-in prefixes cannot be deleted');
   await list.getByRole('button', { name: 'Others…' }).click();
-  await list.locator('input').fill('kl');
+  await list.locator('.opt-new input').fill('kl');
   await list.getByRole('button', { name: 'Add' }).click();
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: KL1011');
   await page.locator('[data-field="headline"]').fill('KL test');
@@ -300,7 +302,7 @@ test('U6 detail page: each section has its own Edit button that opens the form a
   const pos = await page.locator('.sec-card .edit-mini').first().evaluate(b => { const r = b.getBoundingClientRect(), c = b.closest('.sec-card').getBoundingClientRect(); return { right: c.right - r.right, bottom: c.bottom - r.bottom }; });
   assert.ok(pos.right < 20 && pos.bottom < 20, 'Edit sits at the bottom right of its card');
   await shot(page, '04a-detail');
-  await page.getByRole('button', { name: 'Edit: Tenure & Title' }).click();
+  await page.getByRole('button', { name: 'Edit: Price, Tenure and Title Info' }).click();
   await page.waitForSelector('#sec-tenure');
   const top = await page.locator('#sec-tenure').evaluate(el => el.getBoundingClientRect().top);
   assert.ok(top >= -2 && top < 200, `the form opened at Tenure & Title (top ${top})`);
@@ -317,7 +319,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   assert.match(await page.getByTestId('opt-country').innerText(), /Malaysia/, 'Malaysia is the default country');
   const labels = await page.locator('#sec-location .ff > span:first-child, #sec-location label.ff').evaluateAll(xs => xs.map(x => x.textContent.trim()));
-  const want = ['Country', 'State', 'City / town', 'Township', 'Lot number', 'Jalan / street (number or name)'];
+  const want = ['Country', 'State', 'City / Town', 'Township', 'Unit/Lot Number', 'Jalan / Street (Number or Name)'];
   const idx = want.map(w => labels.findIndex(l => l.startsWith(w)));
   assert.ok(idx.every((x, i) => x >= 0 && (i === 0 || x > idx[i - 1])), `location order ${JSON.stringify(idx)}`);
   const town = page.getByTestId('opt-township');
@@ -340,49 +342,49 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.context().close();
 });
 
-test('U8 Add from Google Map: minor differences use saved values; real differences ask; new values saved only after confirming', async () => {
+test('U8 Change 009 Add Location: only the map point is saved, the typed address never changes; Google Maps Link kept and opened; no latitude/longitude boxes', async () => {
   const page = await phone({ maps: true });
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  // the property already has a township typed by the agent
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn').click();
   await town.getByRole('button', { name: 'Others…' }).click();
   await town.locator('.opt-new input').fill('Taman Desa Nilai');
   await town.getByRole('button', { name: 'Add' }).click();
+  await page.locator('[data-field="unitNo"]').fill('No. 5');
+  await page.locator('[data-field="street"]').fill('Jalan Sampel 9');
+  assert.equal(await page.locator('[data-field="lat"], [data-field="lng"], [data-field="lotNo"]').count(), 0, 'no latitude, longitude or separate lot boxes');
+  assert.match(await page.getByTestId('gmap-add').innerText(), /Add Location/);
   await page.getByTestId('gmap-add').click();
   await page.waitForSelector('[data-testid="picker-map"]');
-  await page.evaluate(() => { window.__geocode = { street: 'Jln BBN 3/1', township: 'Tmn. Desa Nilai', city: 'NILAI', state: 'N. Sembilan' }; window.__mapClick(2.8123, 101.7956); });
-  await page.waitForSelector('[data-testid="geo-result"]');
-  assert.match(await page.getByTestId('ok-township').innerText(), /Taman Desa Nilai/, '"Tmn. Desa Nilai" is the saved "Taman Desa Nilai"');
-  assert.match(await page.getByTestId('ok-city').innerText(), /Nilai/);
-  assert.match(await page.getByTestId('ok-state').innerText(), /Negeri Sembilan/);
-  assert.equal(await page.getByTestId('discrepancies').count(), 0);
+  // Google would answer with a different address: it must not be read, compared or applied.
+  await page.evaluate(() => { window.__geocode = { street: 'Jalan Seriemas 2', township: 'Kota Seriemas Utama', city: 'Nilai', state: 'Negeri Sembilan' }; window.__mapClick(2.8123, 101.7956); });
+  await page.getByTestId('picker-pos').waitFor();
+  assert.match(await page.getByTestId('picker-pos').innerText(), /Point chosen/);
+  assert.ok(!/2\.81|101\.79/.test(await page.getByTestId('location-picker').innerText()), 'no coordinates shown');
+  assert.equal(await page.getByTestId('geo-result').count() + await page.getByTestId('discrepancies').count(), 0, 'no address review');
   await page.getByTestId('apply-location').click();
-  assert.match(await page.getByTestId('pos-text').innerText(), /2\.81230, 101\.79560 \(from Google Maps\)/);
-  // a real difference: the agent chooses
-  await page.getByTestId('gmap-add').click();
-  await page.evaluate(() => { window.__geocode = { street: 'Jalan Seriemas 2', township: 'Kota Seriemas Utama', city: 'Nilai', state: 'Negeri Sembilan' }; window.__mapClick(2.80, 101.79); });
-  await page.waitForSelector('[data-testid="diff-township"]');
-  const diff = page.getByTestId('diff-township');
-  for (const b of ['Use existing', 'Add new', 'Enter another']) assert.ok(await diff.getByRole('button', { name: b }).isVisible(), b);
-  assert.equal(await page.getByTestId('apply-location').isDisabled(), true, 'cannot apply until the difference is decided');
-  await shot(page, '05-google-discrepancy');
-  // cancelling saves nothing
-  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
-  await page.getByTestId('opt-township').locator('.opt-btn').click();
-  assert.equal(await page.getByTestId('opt-township').getByRole('option', { name: /Kota Seriemas Utama/ }).count(), 0, 'nothing saved without confirmation');
-  await page.getByTestId('opt-township').locator('.opt-btn').click();
-  // add new after confirming
-  await page.getByTestId('gmap-add').click();
-  await page.evaluate(() => window.__mapClick(2.80, 101.79));
-  await page.waitForSelector('[data-testid="diff-township"]');
-  await page.getByTestId('diff-township').getByRole('button', { name: 'Add new' }).click();
-  if (await page.getByTestId('diff-street').count()) await page.getByTestId('diff-street').getByRole('button', { name: 'Add new' }).click();
-  await page.getByTestId('apply-location').click();
-  assert.match(await page.getByTestId('opt-township').innerText(), /Kota Seriemas Utama/);
-  await page.getByTestId('opt-township').locator('.opt-btn').click();
-  assert.equal(await page.getByTestId('opt-township').getByRole('option', { name: /Kota Seriemas Utama/ }).count(), 1, 'saved after the agent chose Add new');
+  assert.match(await page.getByTestId('pos-text').innerText(), /Location saved/);
+  assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Sampel 9', 'street unchanged');
+  assert.match(await page.getByTestId('opt-township').innerText(), /Taman Desa Nilai/, 'township unchanged');
+  // Google Maps Link: example placeholder, kept as typed; a full link that holds the point also places it.
+  const link = page.locator('[data-field="mapsLink"]');
+  assert.equal(await link.getAttribute('placeholder'), 'https://maps.app.goo.gl/ExampleLink');
+  await link.fill('https://maps.app.goo.gl/AbCdEf123');
+  assert.match(await page.getByTestId('maps-link-note').innerText(), /short links hide it/);
+  assert.equal(await page.getByTestId('open-maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
+  await page.getByTestId('save-property').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  const loc = page.getByTestId('sec-location-view');
+  assert.match(await loc.innerText(), /Location saved/);
+  assert.ok(!/2\.81|101\.79/.test(await loc.innerText()), 'the details show no latitude or longitude');
+  assert.equal(await loc.getByTestId('maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
+  assert.ok(await loc.getByRole('link', { name: 'Navigate' }).isVisible(), 'navigation still uses the saved point');
+  const stored = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const all = r.result.transaction('records').objectStore('records').getAll(); all.onsuccess = () => { res(all.result.find(x => x && x.street === 'Jalan Sampel 9')); r.result.close(); }; }; }));
+  assert.equal(stored.township, 'Taman Desa Nilai');
+  assert.equal(stored.mapsLink, 'https://maps.app.goo.gl/AbCdEf123');
+  assert.ok(Math.abs(stored.lat - 2.8123) < 1e-6 && Math.abs(stored.lng - 101.7956) < 1e-6, 'the point is kept for maps and GPS Assistance');
+  await shot(page, '05-location-saved');
   await page.context().close();
 });
 
@@ -390,7 +392,7 @@ test('U9 inquiries and viewings are separate; Convert to Viewing moves it as Pen
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   const inq = page.getByTestId('inquiry-history');
   const view = page.getByTestId('viewing-history');
   assert.equal(await inq.getByTestId('inquiry-item').count(), 1);
@@ -479,13 +481,14 @@ test('U12 Calendar: appointments linked to property and contact, statuses, and a
   await page.getByTestId('save-appt').click();
   // the reminder check runs on opening the app
   await page.reload(); await page.waitForSelector('nav.grid');
-  await page.waitForSelector('[data-testid="reminder-alerts"]');
-  assert.match(await page.getByTestId('reminder-alerts').innerText(), /Meet owner at site/);
-  await shot(page, '09a-reminder', false);
-  await page.locator('.alert', { hasText: 'Meet owner at site' }).getByRole('button', { name: 'Dismiss' }).click();
-  await page.reload(); await page.waitForSelector('nav.grid');
-  await page.waitForTimeout(300);
-  assert.equal(await page.locator('.alert', { hasText: 'Meet owner at site' }).count(), 0, 'a reminder is shown once');
+  // Change 004: no To-Do / reminder pop-up (Open / Dismiss) on the main screen; the reminder still counts on the bell and
+  // is listed in Notifications.
+  await page.waitForFunction(() => document.querySelector('[data-testid="top-notifications"] .top-badge'));
+  assert.equal(await page.getByTestId('reminder-alerts').count(), 0, 'no reminder pop-up on the main screen');
+  assert.equal(await page.getByRole('button', { name: 'Dismiss' }).count(), 0);
+  await page.getByTestId('top-notifications').click();
+  assert.match(await page.getByTestId('notifications').innerText(), /Meet owner at site/, 'the reminder is listed in Notifications');
+  await home(page);
   await tile(page, 'Calendar');
   if (ymd(soon) !== ymd(now)) await page.locator(`.cal-day[data-date="${ymd(soon)}"]`).click();
   const item = page.getByTestId('appt-item').filter({ hasText: 'Meet owner at site' });
@@ -535,7 +538,7 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   await home(page);
   await tile(page, 'GPS Assistance');
   await page.getByTestId('card-map').click();
-  assert.match(await page.getByTestId('map-title').innerText(), /For sale sign, corner lot/);
+  assert.match(await page.getByTestId('map-title').innerText(), /Jalan Fake 1/, 'Change 009: titled by its address; the note stays as its comment');
   assert.match(await page.getByTestId('navigate').getAttribute('href'), /^https:\/\/www\.google\.com\/maps\/dir\/\?api=1&destination=2\.82/);
   await page.waitForFunction(() => window.__markers.some(m => m.o.icon?.fillColor === '#4285F4')); // the GPS reading arrives a moment after the map
   const pins = await page.evaluate(() => window.__markers.map(m => (m.o.icon?.fillColor === '#4285F4' ? 'me' : 'property')));
@@ -589,7 +592,7 @@ test('U16 Property Calculator: pre-filled from the property, full breakdown, edi
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByRole('button', { name: 'Calculate' }).click();
   assert.match(await page.getByTestId('calc-from').innerText(), /P1004/);
   assert.equal(await page.locator('[data-field="price"]').inputValue(), '580,000');
@@ -850,22 +853,15 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await page.context().close();
 });
 
-test('U25 Coming Soon: Subsale, Project and Co-broke (top bar) say so; Co-broke lists real co-broke properties only', async () => {
+test('U25 Coming Soon: Subsale and Project say so (the top-bar Co-broke item was removed by Change 003)', async () => {
   const page = await phone();
   await tile(page, 'Subsale');
   assert.match(await page.getByTestId('soon-subsale').innerText(), /Coming Soon/);
   await home(page);
   await tile(page, 'Project');
   assert.match(await page.getByTestId('soon-project').innerText(), /Coming Soon/);
-  await home(page); await page.getByTestId('top-cobroke').click();
-  assert.match(await page.getByTestId('cobroke-soon').innerText(), /Coming Soon/, 'not pretending to be finished');
-  assert.match(await page.getByTestId('cobroke-count').innerText(), /^0 co-broke/);
-  await home(page); await loadSample(page);
-  await page.getByTestId('top-cobroke').click();
-  const count = Number((await page.getByTestId('cobroke-count').innerText()).match(/\d+/)[0]);
-  assert.ok(count >= 1, 'sample data has co-broke properties');
-  await page.getByRole('button', { name: 'Show co-broke properties' }).click();
-  assert.equal(await page.getByTestId('listing-card').count(), count, 'only co-broke properties are listed');
+  await home(page);
+  assert.equal(await page.getByTestId('top-cobroke').count(), 0);
   await page.context().close();
 });
 
@@ -928,7 +924,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   await page.locator('[data-field="bannerNote"]').fill('Gate, facing main road');
   await page.getByTestId('banner-save').click();
   const card = page.locator('[data-testid="banner-card"]', { hasText: title });
-  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/);
+  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/i);
   assert.equal(await card.getByTestId('banner-up').count(), 1);
   assert.match(await card.getByTestId('banner-up').innerText(), /Gate, facing main road/);
   assert.match(await card.getByTestId('banner-navigate').getAttribute('href'), /2\.821/);
@@ -943,7 +939,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   // 3) Take both down: still Yes after the first, Removed after the last; both kept as history.
   await card.getByTestId('banner-takedown').first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
-  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/);
+  assert.match(await card.locator('.banner-chip').innerText(), /Yes, placed/i);
   await card.getByTestId('banner-takedown').first().click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Mark taken down' }).click();
   assert.match(await card.locator('.banner-chip').innerText(), /Removed/);
@@ -953,24 +949,23 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   await card.locator('[data-field="bannerStatus"]').selectOption('not_allowed');
   await page.locator('[data-filter="not_allowed"]').click();
   assert.ok(await page.locator('[data-testid="banner-card"]', { hasText: title }).isVisible());
-  assert.ok((await page.getByTestId('banner-card').allInnerTexts()).every(t => /Owner doesn’t allow/.test(t)));
+  assert.ok((await page.getByTestId('banner-card').allInnerTexts()).every(t => /Owner doesn’t allow/i.test(t)));
 
   // Detail page shows the banner section; its Edit opens the form at Banner.
   await page.locator('[data-testid="banner-card"]', { hasText: title }).getByRole('button', { name: 'Open property' }).click();
   const sec = page.getByTestId('sec-banner-view');
-  assert.match(await sec.innerText(), /Banner placed\?[\s\S]*Owner doesn’t allow/);
+  assert.match(await sec.innerText(), /Banner placed\?[\s\S]*Owner doesn’t allow/i);
   await sec.getByRole('button', { name: /Edit/ }).click();
   assert.equal(await page.locator('#sec-banner').getAttribute('data-open'), 'yes', 'Edit opens the Banner section');
   assert.equal(await page.locator('#sec-location').getAttribute('data-open'), 'no', 'other sections start closed');
   await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('not_yet');
   // give the property a map position so it shows on My Property Map (open the closed Location section first)
   await page.locator('[data-sec="location"]').click();
-  await page.locator('[data-field="lat"]').fill('2.82');
-  await page.locator('[data-field="lng"]').fill('101.80');
+  await page.locator('[data-field="mapsLink"]').fill('https://www.google.com/maps/@2.82,101.80,17z');
   await page.getByTestId('save-property').click();
-  assert.match(await page.getByTestId('sec-banner-view').innerText(), /Not yet/);
+  assert.match(await page.getByTestId('sec-banner-view').innerText(), /Not yet/i);
   await page.getByRole('button', { name: 'Show on map' }).click();
-  assert.match(await page.getByTestId('map-banner').innerText(), /Banner placed\?[\s\S]*Not yet/);
+  assert.match(await page.getByTestId('map-banner').innerText(), /Banner placed\?[\s\S]*Not yet/i);
   await page.getByTestId('map-banner').getByRole('button', { name: /Banner locations/ }).click();
   assert.ok(await page.getByTestId('banner-screen').isVisible());
 
@@ -1097,7 +1092,8 @@ test('U29 maps: My Location recentres after moving the map, follows until dragge
   // A property with a saved position.
   await tile(page, 'Property List'); await newProperty(page);
   await page.locator('[data-field="street"]').fill('Jalan Peta 1');
-  await page.locator('[data-field="lat"]').fill('2.8300'); await page.locator('[data-field="lng"]').fill('101.8100');
+  // Change 009: no latitude/longitude boxes; a full Google Maps link that holds the point places the property.
+  await page.locator('[data-field="mapsLink"]').fill('https://www.google.com/maps/@2.8300,101.8100,17z');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-map').click();
   await page.waitForFunction(() => window.__markers?.some(m => m.o.icon?.fillColor === '#4285F4'));
@@ -1360,11 +1356,11 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   await page.locator('[data-sec="marketing"]').click(); // close it again
   assert.equal(await page.locator('[data-field="headline"]').count(), 0);
   assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/);
-  await page.locator('[data-sec="money"]').click();
+  // Change 009: the asking price is in Price, Tenure and Title Info.
+  await page.locator('[data-sec="tenure"]').click();
   await page.locator('[data-field="askingPrice"]').fill('480000');
   await page.locator('[data-sec="notes"]').click();
   // Field help
-  await page.locator('[data-sec="tenure"]').click();
   await page.locator('[data-help="tenure"]').click();
   assert.match(await page.getByTestId('help-tenure').innerText(), /freehold[\s\S]*Enter:[\s\S]*Example:[\s\S]*Why it matters:/);
   // Save floats: visible at the bottom of the screen while the middle of the form is shown.
@@ -1373,7 +1369,8 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   assert.ok(box && box.y + box.height <= 824 && box.y > 600, `save bar on screen (${box?.y})`);
   await page.getByTestId('save-property').click();
   await page.getByTestId('listing-details').waitFor();
-  assert.match(await page.locator('main').innerText(), /Collapsible test[\s\S]*RM 480,000/);
+  assert.match(await page.locator('main').innerText(), /RM 480,000/);
+  assert.match(await page.getByTestId('marketing').innerText(), /Collapsible test/, 'the headline is kept in Marketing');
   await shot(page, '37-form-saved', false);
   await page.context().close();
 });
@@ -2192,23 +2189,24 @@ test('U61 Fill by Voice: a big centred button; filled fields must be reviewed be
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   assert.equal(await page.getByRole('alertdialog').count(), 0);
-  assert.equal(await page.locator('[data-row="bedrooms"] dd').innerText(), '4', 'the reviewed voice details were saved');
+  assert.equal(await page.locator('[data-row="bedrooms"] dd .vval').innerText(), '4', 'the reviewed voice details were saved');
   // "Save anyway" also works, and a saved voice field is no longer waiting for review when the property is edited later.
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
   assert.equal(await page.getByTestId('review-banner').count(), 0, 'already saved after review: no repeated warning');
   await page.context().close();
 });
 
-test('U62 voice command prefill (from the Property List) opens the form for review: fields marked "from your words", Save asks first', async () => {
+test('U62 voice command prefill (Voice Command card; the Property List has no voice button since Change 009) opens the form for review: fields marked "from your words", Save asks first', async () => {
   const page = await phone();
   await tile(page, 'Property List');
-  await page.locator('.lc-tools .voice-btn').click();
+  assert.equal(await page.locator('.lc-tools .voice-btn').count(), 0, 'Change 009: no voice button in the Property List');
+  await home(page); await tile(page, 'Voice Command');
   await page.getByTestId('voice-cmd').locator('textarea').first().fill('Create a new terrace house in Putra Nilai for rent, rental RM1,800 per month, three bedrooms, two bathrooms.');
   await page.getByRole('button', { name: 'Show proposed details' }).click();
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await expandForm(page);
   assert.ok(await page.getByTestId('review-banner').count() === 1, 'the review notice is shown');
-  assert.ok(await page.locator('#sec-money .chip.stated, #sec-details .chip.stated').count() >= 1, 'fields carry the "from your words" mark');
+  assert.ok(await page.locator('#sec-tenure .chip.stated, #sec-details .chip.stated').count() >= 1, 'fields carry the "from your words" mark');
   await page.getByTestId('save-property').click();
   assert.match(await page.getByRole('alertdialog').innerText(), /Save without checking/);
   await page.getByRole('alertdialog').getByRole('button', { name: 'Save anyway' }).click();
@@ -2220,8 +2218,10 @@ test('U62 voice command prefill (from the Property List) opens the form for revi
 test('U63 verification: four states, stored with the record, shown the same way everywhere, kept after restart, clearable', async () => {
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
-  assert.equal(await page.locator('[data-verify="askingPrice"] option').count(), 5, 'not marked + the four states');
-  assert.deepEqual(await page.locator('[data-verify="askingPrice"] option').allInnerTexts(), ['Not marked', 'Confirmed', 'Owner stated', 'Need to check', 'Unknown']);
+  // Change 009: no "Not marked"; a fact without a mark shows as Need to Check.
+  assert.equal(await page.locator('[data-verify="askingPrice"] option').count(), 4, 'the four states only');
+  assert.deepEqual(await page.locator('[data-verify="askingPrice"] option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
+  assert.equal(await page.locator('[data-verify="askingPrice"]').inputValue(), 'check', 'unmarked = Need to Check');
   assert.equal(await page.locator('[data-verify="headline"]').count(), 0, 'only facts that need checking carry a state');
   await page.locator('[data-field="askingPrice"]').fill('450000');
   await page.locator('[data-verify="askingPrice"]').selectOption('owner');
@@ -2229,11 +2229,12 @@ test('U63 verification: four states, stored with the record, shown the same way 
   await page.locator('[data-verify="titleType"]').selectOption('unknown');     // an empty field can be "Unknown"
   await page.locator('[data-verify="landSqft"]').selectOption('confirmed');
   await page.locator('[data-field="landSqft"]').fill('1500');
-  assert.equal(await page.locator('[data-verify="askingPrice"]').getAttribute('aria-label'), 'Check status: Asking price (RM)');
+  assert.equal(await page.locator('[data-verify="askingPrice"]').getAttribute('aria-label'), 'Check status: Asking Price (RM)');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
   const row = k => page.locator(`[data-row="${k}"] [data-verify-state]`);
   assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'owner');
-  assert.match(await row('askingPrice').innerText(), /Owner stated/, 'a word as well as a colour');
+  assert.match(await row('askingPrice').innerText(), /Owner Stated/, 'a word as well as a colour');
+  assert.equal(await page.locator('[data-row="askingPrice"] .vval').getAttribute('data-verify'), 'owner', 'the value itself is in the Owner Stated colour');
   assert.match(await row('landSqft').innerText(), /Confirmed/);
   assert.match(await page.getByTestId('verify-summary').innerText(), /2 to check/);
   assert.match(await page.getByTestId('verify-summary').innerText(), /Tenure.*Title/s);
@@ -2247,7 +2248,7 @@ test('U63 verification: four states, stored with the record, shown the same way 
   assert.equal(await page.locator('[data-verify="askingPrice"]').inputValue(), 'owner');
   assert.equal(await page.locator('[data-verify="titleType"]').inputValue(), 'unknown');
   await page.locator('[data-verify="askingPrice"]').selectOption('confirmed');
-  await page.locator('[data-verify="tenure"]').selectOption('');
+  await page.locator('[data-verify="tenure"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
   assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'confirmed');
   assert.match(await page.getByTestId('verify-summary').innerText(), /1 to check/);
@@ -2276,56 +2277,65 @@ test('U64 verification marks of a field that no longer applies go with it (sale 
   await page.context().close();
 });
 
-test('U65 property cards: long-press opens a preview, tapping still opens the details, the Preview button is the alternative; delete asks first', async () => {
+test('U65 Change 008/009 property cards: a single tap opens; no long press, Preview, eye icon or preview sheet; address titles; gold Open; red Delete with confirmation on the details page', async () => {
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  const first = page.getByTestId('listing-card').first();
-  const count0 = await page.getByTestId('listing-card').count();
-  // normal tap → details
-  await first.locator('.gc').click();
+  const cards = page.getByTestId('listing-card');
+  const count0 = await cards.count();
+  // No preview controls of any kind, no floating Add button, no voice button; one Add New Property at the top.
+  for (const id of ['preview-btn', 'preview-sheet', 'preview-hint']) assert.equal(await page.getByTestId(id).count(), 0, `no ${id}`);
+  assert.equal(await page.locator('.fab, .lc-tools .voice-btn').count(), 0, 'no floating Add button and no voice button');
+  assert.equal(await page.getByRole('button', { name: /Add New Property/ }).count(), 1);
+  assert.ok(!(await page.getByTestId('listing').innerText()).includes('👁'), 'no eye icon');
+  // Address titles, never the headline; the town is not repeated under it.
+  const s1 = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
+  assert.equal(await s1.getByTestId('card-address').innerText(), 'No. 7, Lot 2/14, Jalan Sampel Industri 1, Kawasan Perindustrian Nilai');
+  assert.ok(!/Nilai/.test(await s1.locator('.gc-meta').first().innerText()), 'the line under the address is the type, not the town again');
+  // Open: larger and gold.
+  const open = s1.getByTestId('card-open');
+  const ob = await open.boundingBox();
+  assert.ok(ob.height >= 48, `Open is at least 48 px tall (${ob.height})`);
+  assert.match(await open.evaluate(b => getComputedStyle(b).backgroundImage), /gradient/, 'gold');
+  // A long press (hold, release) and a right-click do nothing special: no preview; the press just counts as a tap.
+  const b = await s1.locator('.gc').boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + 30);
+  await page.mouse.down({ button: 'right' }); await page.mouse.up({ button: 'right' });
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByTestId('preview-sheet').count() + await page.getByRole('dialog').count(), 0, 'right-click / context menu opens nothing');
+  await page.mouse.down(); await page.waitForTimeout(800); await page.mouse.up();
+  await page.waitForTimeout(300);
+  assert.equal(await page.getByTestId('preview-sheet').count() + await page.getByRole('dialog').count(), 0, 'a long press opens no preview or summary');
+  if (await page.getByTestId('listing-details').count()) { await home(page); await tile(page, 'Property List'); }
+  // A single tap opens the details.
+  await cards.first().locator('.gc').click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  await home(page); await tile(page, 'Property List');
-  // long press (mouse down, hold, release) → preview, and releasing does not open the details
-  const b = await first.locator('.gc').boundingBox();
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-  await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
-  await page.getByTestId('preview-sheet').waitFor();
-  assert.equal(await page.getByTestId('listing-details').count(), 0, 'long press does not also open the details');
-  assert.match(await page.getByTestId('preview-sheet').innerText(), /RM/);
-  await shot(page, '62-preview', false);
-  await page.getByTestId('preview-close').click();
-  assert.equal(await page.getByTestId('preview-sheet').count(), 0);
-  // a short press is just a tap
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(80); await page.mouse.up();
-  await page.waitForSelector('[data-testid="listing-details"]');
-  await home(page); await tile(page, 'Property List');
-  // the visible button (for people who cannot press and hold), keyboard Escape, then Open details
-  await page.getByTestId('preview-btn').first().click();
-  await page.getByTestId('preview-sheet').waitFor();
-  await page.keyboard.press('Escape');
-  assert.equal(await page.getByTestId('preview-sheet').count(), 0, 'Escape closes');
-  await page.getByTestId('preview-btn').first().click();
-  await page.getByTestId('preview-open').click();
-  await page.waitForSelector('[data-testid="listing-details"]');
-  await home(page); await tile(page, 'Property List');
-  // delete from the preview: Cancel keeps it, OK removes the property
-  await page.getByTestId('preview-btn').first().click();
-  await page.getByTestId('preview-delete').click();
+  assert.equal(await page.locator('.rec-actions').getByRole('button', { name: /Voice/ }).count(), 0, 'no voice button on the details');
+  // Red Delete with confirmation: Cancel keeps it, Delete removes it.
+  const del = page.getByTestId('detail-delete');
+  assert.match(await del.evaluate(x => getComputedStyle(x).backgroundColor), /rgb\(163, 38, 27\)/, 'red');
+  await del.click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
-  assert.equal(await page.getByTestId('listing-card').count(), count0);
-  await page.getByTestId('preview-sheet').waitFor();                  // Cancel returns to the preview
-  await page.getByTestId('preview-delete').click();
+  assert.equal(await page.getByTestId('listing-details').count(), 1, 'Cancel keeps it');
+  await del.click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-  assert.equal(await page.getByTestId('listing-card').count(), count0 - 1);
-  // large cards have the same two ways in
+  await page.getByTestId('listing').waitFor();
+  assert.equal(await cards.count(), count0 - 1);
+  // Large cards: tenure with restriction, storeys and lot type, full Extra Comments, Property Location, gold Open; a tap opens.
   await page.getByRole('button', { name: 'Large cards' }).click();
-  await page.getByTestId('preview-btn').first().click();
-  await page.getByTestId('preview-sheet').waitFor();
-  await page.getByTestId('preview-close').click();
-  const lb = await page.getByTestId('listing-card').first().locator('.lc-photo').boundingBox();
-  await page.mouse.move(lb.x + 20, lb.y + 20); await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
-  await page.getByTestId('preview-sheet').waitFor();
+  const big = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
+  assert.match(await big.getByTestId('card-tenure').innerText(), /Freehold[\s\S]*NON Bumiputera[\s\S]*2 Storeys[\s\S]*Corner/);
+  assert.equal(await big.getByTestId('card-comments').innerText(), 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).');
+  assert.match(await big.getByTestId('card-location').innerText(), /Add Location/, 'no saved point yet: goes to Add Location');
+  assert.ok((await big.getByTestId('card-open').boundingBox()).height >= 48);
+  await shot(page, '62-cards-large', false);
+  await big.locator('.lc-photo').click();
+  await page.waitForSelector('[data-testid="listing-details"]');
+  // Unrelated eye: the Inquiries & Viewings card keeps its icon and works.
+  await home(page);
+  assert.equal(await page.locator('nav.grid > button', { hasText: 'Inquiries & Viewings' }).locator('svg').count() >= 1, true);
+  await tile(page, 'Inquiries & Viewings');
+  assert.equal(await page.locator('main').count(), 1);
   await page.context().close();
 });
 
@@ -2354,16 +2364,22 @@ test('U66 phone book on the contact form and the property owner: icon beside the
   await home(page);
   // Property owner field
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
-  const own = page.getByTestId('pick-owner');
+  // Change 009: the phone-book icon sits at the end of the owner's NAME row; phone shows a ready "+", WhatsApp a ready "@".
+  const own = page.getByTestId('owner-pick');
   assert.equal(await own.getAttribute('aria-label'), 'Choose owner from phone book');
+  const [ob, nb] = await Promise.all([own.boundingBox(), page.locator('[data-field="ownerName"]').boundingBox()]);
+  assert.ok(ob.x >= nb.x + nb.width - 2 && Math.abs((ob.y + ob.height / 2) - (nb.y + nb.height / 2)) < 8 && ob.width >= 44, 'icon at the end of the name row');
+  assert.deepEqual(await page.locator('#owner-box .prefix, [data-testid="owner-box"] .prefix').allInnerTexts(), ['+', '@']);
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => { throw Object.assign(new Error('denied'), { name: 'NotAllowedError' }); } } }));
   await own.click();
-  assert.match(await page.getByTestId('pick-owner-msg').innerText(), /No contact was chosen|permission/i, 'a refusal is never silent');
+  assert.match(await page.getByTestId('owner-pick-msg').innerText(), /No contact was chosen|permission/i, 'a refusal is never silent');
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Encik Owner'], tel: ['012-999 8888'], email: [] }] } }));
   await own.click();
   assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), 'Encik Owner');
-  assert.equal(await page.locator('[data-field="ownerPhone"]').inputValue(), '+60 12-999 8888');
+  assert.equal(await page.locator('[data-field="ownerPhone"]').inputValue(), '60 12-999 8888', 'shown after the ready "+"');
   await page.locator('[data-field="ownerPhone"]').fill('013-111 2222');           // still editable
+  await page.locator('[data-field="ownerWhatsapp"]').fill('@@encik_owner');
+  assert.equal(await page.locator('[data-field="ownerWhatsapp"]').inputValue(), 'encik_owner', 'one "@", shown by the prefix');
   await page.evaluate(() => Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Other Person'], tel: ['016-555 6666'], email: [] }] } }));
   await own.click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
@@ -2394,7 +2410,7 @@ test('U67 phone numbers that are too short get no Call / WhatsApp link, with an 
 test('U68 sample data: Sample tags on every kind of example record, example verification marks and aliases, all removable and none real', async () => {
   const page = await phone();
   await loadSample(page);
-  await tile(page, 'Property List'); await page.getByTestId('listing-card').filter({ hasText: 'Corner semi-D factory' }).first().locator('.gc').click();
+  await tile(page, 'Property List'); await page.getByTestId('listing-card').filter({ hasText: 'No. 7, Lot 2/14' }).first().locator('.gc').click();
   assert.ok(await page.locator('[data-verify-state]').count() >= 2, 'sample property shows example verification marks');
   await home(page);
   await tile(page, 'To-Do'); assert.ok(await page.getByTestId('task').locator('[data-testid="sample-tag"]').count() >= 1, 'to-do rows tagged');
@@ -2416,19 +2432,19 @@ test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', 
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
-  for (const [aria, voice, verifyOwner, preview, openLabel] of [
-    ['Bahasa Malaysia', 'Isi dengan Suara', 'Dinyatakan pemilik', 'Pratonton', 'Buka butiran'],
-    ['中文', '语音填写', '屋主所述', '预览', '打开详情'],
+  for (const [aria, voice, verifyOwner, openLabel, delLabel] of [
+    ['Bahasa Malaysia', 'Isi dengan Suara', 'Dinyatakan Pemilik', 'Buka', 'Padam'],
+    ['中文', '语音填写', '屋主所述', '打开', '删除'],
   ]) {
     await page.locator(`.lang button[aria-label="${aria}"]`).click();
     await home(page);
     await page.locator('nav.grid > button').nth(0).waitFor();
-    // list → preview
+    // list → Open (gold) → details with Delete (Change 009)
     await page.locator('nav.grid > button', { hasText: aria === 'Bahasa Malaysia' ? 'Senarai Hartanah' : '房产列表' }).first().click();
-    assert.match(await page.getByTestId('preview-btn').first().getAttribute('aria-label'), new RegExp(preview));
-    await page.getByTestId('preview-btn').first().click();
-    assert.match(await page.getByTestId('preview-open').innerText(), new RegExp(openLabel));
-    await page.getByTestId('preview-close').click();
+    assert.equal(await page.getByTestId('card-open').first().innerText(), openLabel);
+    await page.getByTestId('card-open').first().click();
+    assert.match(await page.getByTestId('detail-delete').innerText(), new RegExp(delLabel));
+    await page.goBack(); await page.getByTestId('listing').waitFor();
     // form → voice button, verification choices
     await page.locator('.add-property').click(); await expandForm(page);
     assert.match(await page.getByTestId('voice-fill-btn').innerText(), new RegExp(voice));
@@ -2659,14 +2675,14 @@ test('U74 Buyer PDF: choose details and photos, never offered: owner, commission
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByTestId('open-buyer-pdf').click();
   const screen = page.getByTestId('buyer-pdf');
   await screen.waitFor();
   const text = await screen.innerText();
-  for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Current tenant', 'Arrangement', 'Handled by']) assert.ok(!text.includes(never), `${never} must not be offered`);
-  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Asking price.*RM 580,000/);
-  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated/, 'the existing check-status label is shown with the fact');
+  for (const never of ['Owner name', 'Owner Name', 'Owner phone', 'Owner Phone', 'Commission', 'Internal notes', 'Internal Notes', 'Current tenant', 'Tenant Name', 'Arrangement', 'Handled by', 'Handled By', 'Owner WhatsApp']) assert.ok(!text.includes(never), `${never} must not be offered`);
+  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Asking price.*RM 580,000/i);
+  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated/i, 'the existing check-status label is shown with the fact');
   assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /\d+ of \d+ ticked/);
   assert.equal(await screen.getByTestId('bf-street').locator('input').isChecked(), false, 'the exact address starts unticked');
   assert.equal(await screen.getByTestId('bf-askingPrice').locator('input').isChecked(), true);
@@ -2902,6 +2918,8 @@ async function bareProperty(page, name = 'Bare minimum house') {
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="headline"]').fill(name);
+  // Change 009: cards show the address, so the test property's street carries its name too.
+  await page.locator('[data-field="street"]').fill(name);
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
 }
@@ -3031,7 +3049,7 @@ test('U80 Advertising summary: needs-attention list and costs by property, platf
   // sample data is kept out: load it, the sample adverts (live, ending soon) add nothing
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByTestId('open-ad-tracker').click();
   assert.match(await page.getByTestId('ad-sample-note').innerText(), /not counted/);
   await page.getByTestId('ad-open-summary').click();
@@ -3292,24 +3310,24 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
   await bareProperty(page, 'Plain house');
   await page.getByTestId('open-marketing-studio').click();
   await page.getByTestId('marketing-studio').waitFor();
-  assert.match(await page.getByTestId('ms-no-photos').innerText(), /plain gold panel/);
-  assert.match(await page.getByTestId('ms-warn-price').innerText(), /No price shown/);
+  assert.match(await page.getByTestId('ms-no-photos').innerText(), /plain gold panel/i);
+  assert.match(await page.getByTestId('ms-warn-price').innerText(), /No price shown/i);
   const text = await page.getByTestId('marketing-studio').innerText();
   for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Street', 'Unit', 'Lot no', 'Current tenant']) assert.ok(!text.includes(never), `${never} must not be offered`);
   await page.getByTestId('ms-make').click();
   await page.getByTestId('ms-result').waitFor();           // no photo, no price: still a file
-  assert.match(await page.getByTestId('ms-made').innerText(), /1080 × 1080/);
+  assert.match(await page.getByTestId('ms-made').innerText(), /1080 × 1080/i);
   const plain = await previewColour(page, 0.5, 0.2);
   assert.ok(plain.rgb.every(v => v < 40), `a plain dark panel, not an invented picture: ${plain.rgb}`);
   await home(page);
   // sample data: unconfirmed facts flagged, SAMPLE warning
   await loadSample(page);
   await tile(page, 'Property List');
-  await page.getByText('Renovated 2-storey terrace, Bandar Baru Nilai').first().click();
+  await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByTestId('open-marketing-studio').click();
-  assert.match(await page.getByTestId('ms-warn-sample').innerText(), /says SAMPLE/);
-  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /Owner stated/);
-  assert.match(await page.getByTestId('ms-warn-unverified').innerText(), /Not confirmed yet, marked \* on the design: .*Asking price/);
+  assert.match(await page.getByTestId('ms-warn-sample').innerText(), /says SAMPLE/i);
+  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /Owner stated/i);
+  assert.match(await page.getByTestId('ms-warn-unverified').innerText(), /Not confirmed yet, marked \* on the design: .*Asking price/i);
   await page.getByTestId('ms-make').click();
   await page.getByTestId('ms-result').waitFor();
   await shot(page, '85a-marketing-sample', false);
@@ -3326,10 +3344,10 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
   // a ticked detail with no value is left off and reported
   await page.getByTestId('ms-missing').locator('summary').click();
   await page.getByTestId('mf-monthlyRent').locator('input').check();
-  assert.match(await page.getByTestId('ms-warn-empty').innerText(), /left off the design: .*Monthly rent/);
+  assert.match(await page.getByTestId('ms-warn-empty').innerText(), /left off the design: .*Monthly rent/i);
   // Bahasa Malaysia and Chinese
   await page.getByTestId('ms-lang').selectOption('zh');
-  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /开价|要价|售价|价格/);
+  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /开价|要价|售价|价格/i);
   await page.context().close();
   for (const [aria, re] of [['Bahasa Malaysia', /Studio Pemasaran|Tiada apa disiarkan/], ['中文', /营销工作室|不会发布到任何地方/]]) {
     const p = await phone();
@@ -3469,11 +3487,11 @@ test('U89 a reminder banner never sits on top of an open dialog, so the dialog b
   await page.getByTestId('reminders').getByRole('button', { name: '15 min before' }).click();
   await page.getByTestId('save-appt').click();
   await page.reload(); await page.waitForSelector('nav.grid');
-  await page.waitForSelector('[data-testid="reminder-alerts"]');
+  await page.waitForTimeout(500);
+  assert.equal(await page.getByTestId('reminder-alerts').count(), 0, 'Change 004: no reminder pop-up on the main screen');
   await tile(page, 'Property Calculator');
   await page.getByTestId('calc-pdf').dispatchEvent('click');
   await page.getByTestId('pdf-page').first().waitFor({ timeout: 15000 });
-  assert.equal(await page.getByTestId('reminder-alerts').count(), 1, 'the banner is still there');
   for (const id of ['pdf-download', 'pdf-share', 'pdf-close']) {
     const hit = await page.getByTestId(id).evaluate(b => { const r = b.getBoundingClientRect(); const e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!e && b.contains(e); });
     assert.ok(hit, `${id} is not covered by the reminder banner`);
@@ -3814,6 +3832,253 @@ test('U97 the sign-in screen always has Connection settings, even when the proje
   await page.getByTestId('save-connection').click();
   await page.getByTestId('connection-msg').waitFor();
   assert.match(await page.getByTestId('connection-project').innerText(), /other-project\.supabase\.co/);
+  await ctx.close();
+});
+
+test('U100 Change 009 form: section order, price/commission in Price, Tenure and Title Info, Maintenance Fee and Extra Comments in Property Details, Building Specifications after Owner; rental commission in months', async () => {
+  const page = await phone();
+  await tile(page, 'Property List'); await newProperty(page);
+  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.getByTestId('opt-type').getByRole('option', { name: 'Semi-D Factory' }).click();
+  const order = await page.locator('[data-testid="listing-form"] > .card[id]').evaluateAll(cs => cs.map(c => c.id.replace('sec-', '')));
+  assert.deepEqual(order.filter(x => ['basics', 'tenure', 'photos', 'location', 'details', 'owner', 'specs', 'docs'].includes(x)),
+    ['basics', 'tenure', 'photos', 'location', 'details', 'owner', 'specs', 'docs']);
+  assert.ok(!order.includes('money'), 'the old Price, rental and fees section is gone');
+  assert.match(await page.locator('#sec-tenure .card-title').innerText(), /Price, Tenure and Title Info/);
+  // Sale: asking price, negotiable and commission % are in section 2.
+  await page.locator('[data-field="purpose"]').selectOption('sale');
+  for (const f of ['askingPrice', 'negotiable', 'commissionPct']) assert.equal(await page.locator(`#sec-tenure [data-field="${f}"]`).count(), 1, `${f} in section 2`);
+  await page.locator('[data-field="askingPrice"]').fill('1250000');
+  await page.locator('[data-field="commissionPct"]').fill('2');
+  assert.match(await page.getByTestId('form-commission').innerText(), /RM 25,000/);
+  // Maintenance Fee and the Extra Comments box (under Furnishing) are in Property Details.
+  assert.equal(await page.locator('#sec-details [data-field="maintenanceFee"]').count(), 1);
+  const comments = page.locator('#sec-details textarea[data-field="extraComments"]');
+  assert.equal(await comments.count(), 1);
+  assert.ok((await comments.boundingBox()).height >= 100, 'a large box');
+  // Rent: commission in months (1, 1.5, 2), never a percent.
+  await page.locator('[data-field="purpose"]').selectOption('rent');
+  assert.equal(await page.locator('[data-field="commissionPct"]').count(), 0, 'no percentage for a rental');
+  assert.deepEqual(await page.locator('[data-field="rentCommissionMonths"] option').allInnerTexts(), ['Not set', '1 month of rent', '1.5 months of rent', '2 months of rent']);
+  await page.locator('[data-field="monthlyRent"]').fill('1800');
+  for (const [m, rmx] of [['1', '1,800'], ['1.5', '2,700'], ['2', '3,600']]) {
+    await page.locator('[data-field="rentCommissionMonths"]').selectOption(m);
+    assert.match(await page.getByTestId('form-rent-commission').innerText(), new RegExp(`RM ${rmx}`));
+  }
+  await page.locator('[data-field="securityDepositMonths"]').fill('2');
+  await comments.fill('Line one of the comment.\nLine two, still here.');
+  await page.locator('[data-field="street"]').fill('Jalan Sampel Ujian 1');
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  const money = await page.getByTestId('sec-tenure-view').innerText();
+  assert.match(money, /Commission \(Months of Rent\)[\s\S]*2 months of rent/);
+  assert.match(money, /RM 1,800/);
+  assert.match(await page.getByTestId('detail-rent-commission').innerText(), /RM 3,600/);
+  assert.equal(await page.getByTestId('detail-comments').locator('p').innerText(), 'Line one of the comment.\nLine two, still here.');
+  await page.context().close();
+});
+
+test('U101 Change 009 older records are mapped, not lost: a separate lot number joins Unit/Lot Number, "No restriction" shows as NON Bumiputera, the chosen main photo comes first', async () => {
+  const page = await phone();
+  await page.evaluate(async png => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    const pic = c => ({ id: c, name: `${c}.png`, url: `data:image/png;base64,${png}` });
+    await put('records', 'c:properties:old1', { id: 'old1', created: 1, updated: 1, ref: 'P2001', refPrefix: 'P', refNo: 2001, type: 'Terrace house', purpose: 'sale',
+      unitNo: '7', lotNo: '2/14', street: 'Jalan Lama 1', township: 'Taman Lama', restriction: 'No restriction', tenure: 'freehold',
+      photos: [pic('a'), pic('b'), pic('c')], mainPhotoId: 'c' });
+    db.close();
+  }, PNG_1X1);
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await tile(page, 'Property List');
+  assert.equal(await page.getByTestId('card-address').first().innerText(), '7, Lot 2/14, Jalan Lama 1, Taman Lama');
+  await page.getByTestId('card-open').first().click();
+  assert.match(await page.getByTestId('sec-tenure-view').innerText(), /NON Bumiputera/);
+  assert.match(await page.getByTestId('sec-location-view').innerText(), /Unit\/Lot Number\s*7, Lot 2\/14/);
+  await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
+  assert.equal(await page.locator('[data-field="unitNo"]').inputValue(), '7, Lot 2/14');
+  assert.match(await page.getByTestId('opt-restriction').innerText(), /NON Bumiputera/);
+  assert.deepEqual(await page.getByTestId('form-photo').evaluateAll(xs => xs.map(x => x.dataset.photoId)), ['c', 'a', 'b'], 'the old main photo is first');
+  assert.match(await page.getByTestId('form-photo').first().innerText(), /Main/);
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const g = r.result.transaction('records').objectStore('records').get('c:properties:old1'); g.onsuccess = () => { res(g.result); r.result.close(); }; }; }));
+  assert.deepEqual([rec.unitNo, rec.lotNo, rec.restriction, rec.mainPhotoId, rec.photos.map(x => x.id)], ['7, Lot 2/14', undefined, 'NON Bumiputera', 'c', ['c', 'a', 'b']]);
+  await page.context().close();
+});
+
+test('U102 Change 009 photos: a visible loading spinner, errors named, no Make Main; drag or arrows reorder; the first is always Main, also after deleting', async () => {
+  const page = await phone();
+  await tile(page, 'Property List'); await newProperty(page);
+  // Slow the picture decoding down so the progress indicator can be seen, as on a slower phone.
+  await page.evaluate(() => { const real = window.createImageBitmap.bind(window); window.createImageBitmap = async (...a) => { await new Promise(r => setTimeout(r, 400)); return real(...a); }; });
+  const png = Buffer.from(PNG_1X1, 'base64');
+  const input = page.getByTestId('photo-input');
+  await input.setInputFiles([
+    { name: 'one.png', mimeType: 'image/png', buffer: png }, { name: 'two.png', mimeType: 'image/png', buffer: png },
+    { name: 'three.png', mimeType: 'image/png', buffer: png }, { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a picture') },
+  ]);
+  await page.getByTestId('photo-progress').waitFor();
+  assert.match(await page.getByTestId('photo-progress').innerText(), /Preparing photos… \d of 4/);
+  assert.equal(await page.getByTestId('save-property').isDisabled(), true, 'Save waits while photos are prepared');
+  await page.getByTestId('photo-progress').waitFor({ state: 'detached', timeout: 10000 });
+  const msgs = await page.getByTestId('photo-msg').allInnerTexts();
+  assert.ok(msgs.some(m => /3 photos added/.test(m)), msgs.join(' | '));
+  assert.ok(msgs.some(m => /Could not add notes\.txt/.test(m)), 'the failed file is named');
+  assert.equal(await page.getByRole('button', { name: /Make main/i }).count(), 0, 'no Make Main button');
+  const names = () => page.getByTestId('form-photo').evaluateAll(xs => xs.map(x => x.querySelector('img')?.closest('[data-photo-id]')?.dataset.photoId));
+  const ids0 = await names();
+  assert.equal(ids0.length, 3);
+  assert.equal(await page.getByTestId('photo-main').count(), 1);
+  assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1, 'Main is on the first photo');
+  // Arrow: move photo 3 earlier (it becomes second).
+  await page.getByRole('button', { name: 'Move photo 3 earlier' }).click();
+  assert.deepEqual(await names(), [ids0[0], ids0[2], ids0[1]]);
+  // Drag photo 2 onto the first place: it becomes the main photo.
+  await page.getByTestId('photo-grid').evaluate(el => el.scrollIntoView({ block: 'center' }));   // clear of the top bar
+  const h = await page.getByTestId('photo-drag').nth(1).boundingBox();
+  const t0 = await page.getByTestId('form-photo').nth(0).boundingBox();
+  await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2); await page.mouse.down();
+  await page.mouse.move(t0.x + t0.width / 2, t0.y + t0.height / 2, { steps: 6 }); await page.mouse.up();
+  assert.deepEqual(await names(), [ids0[2], ids0[0], ids0[1]], 'dragged to the front');
+  assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1);
+  // Deleting the main photo makes the next one main; deleting all leaves a safe empty list.
+  await page.getByTestId('form-photo').first().getByRole('button', { name: 'Remove' }).click();
+  assert.deepEqual(await names(), [ids0[0], ids0[1]]);
+  assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1);
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const all = r.result.transaction('records').objectStore('records').getAll(); all.onsuccess = () => { res(all.result.find(x => x && Array.isArray(x.photos) && x.photos.length)); r.result.close(); }; }; }));
+  assert.equal(rec.mainPhotoId, rec.photos[0].id, 'the saved main photo is the first photo');
+  await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
+  for (let i = 0; i < 2; i++) await page.getByTestId('form-photo').first().getByRole('button', { name: 'Remove' }).click();
+  assert.equal(await page.getByTestId('form-photo').count(), 0);
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  await page.context().close();
+});
+
+test('U103 Change 009 searchable dropdowns: type to filter State / City / Township; a typed value is remembered with ✕; land types together; NIL and NON Bumiputera offered', async () => {
+  const page = await phone();
+  await tile(page, 'Property List'); await newProperty(page);
+  const state = page.getByTestId('opt-state');
+  await state.locator('.opt-btn').click();
+  await state.getByTestId('opt-state-search').fill('sel');
+  assert.deepEqual(await state.getByRole('option').allInnerTexts(), ['Selangor']);
+  await state.getByTestId('opt-state-search').press('Enter');
+  assert.match(await state.innerText(), /Selangor/);
+  const city = page.getByTestId('opt-city');
+  await city.locator('.opt-btn').click();
+  await city.getByTestId('opt-city-search').fill('kla');
+  assert.deepEqual(await city.getByRole('option').allInnerTexts(), ['Klang', 'Port Klang']);
+  await city.getByRole('option', { name: 'Klang', exact: true }).click();
+  const town = page.getByTestId('opt-township');
+  await town.locator('.opt-btn').click();
+  await town.getByTestId('opt-township-search').fill('Taman Sampel Baru');
+  assert.match(await town.innerText(), /Nothing matches/);
+  await town.getByTestId('opt-township-add').click();
+  assert.match(await town.innerText(), /Taman Sampel Baru/);
+  // Property type: the four land types together; Land use NIL; restriction NON Bumiputera.
+  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  const types = await page.getByTestId('opt-type').getByRole('option').allInnerTexts();
+  const lands = types.map((t, i) => [t, i]).filter(([t]) => / Land$/.test(t)).map(([, i]) => i);
+  assert.equal(lands.length, 4); assert.equal(lands[3] - lands[0], 3, `land types together: ${types.join(', ')}`);
+  await page.getByTestId('opt-type').getByRole('option', { name: 'Terrace House' }).click();
+  assert.ok((await page.locator('[data-field="landUse"] option').allInnerTexts()).includes('NIL'));
+  await page.locator('[data-testid="opt-restriction"] .opt-btn').click();
+  const r = await page.getByTestId('opt-restriction').getByRole('option').allInnerTexts();
+  assert.ok(r.includes('NON Bumiputera') && !r.some(x => /No restriction/i.test(x)), r.join(', '));
+  await page.getByTestId('opt-restriction').getByRole('option', { name: 'NON Bumiputera' }).click();
+  // Owner details are never copied into the next property; only the remembered dropdown value is offered again.
+  await page.locator('[data-field="ownerName"]').fill('Puan Sampel');
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  await home(page); await tile(page, 'Property List'); await newProperty(page);
+  assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), '', 'no owner copied');
+  const t2 = page.getByTestId('opt-township');
+  await t2.locator('.opt-btn').click();
+  assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).count(), 1, 'remembered, with ✕');
+  await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).click();
+  assert.equal(await t2.getByRole('option', { name: /Taman Sampel Baru/ }).count(), 0);
+  await page.context().close();
+});
+
+test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box; Banner Placed shows Choose Location and the point appears on My Banner Map; card values in verification colours', async () => {
+  const page = await phone({ maps: true });
+  await tile(page, 'Property List'); await newProperty(page);
+  await page.locator('[data-field="purpose"]').selectOption('sale');
+  assert.equal(await page.getByTestId('tenant-box').count(), 0, 'no tenant box for a vacant sale listing');
+  await page.locator('[data-field="availability"]').selectOption('tenanted');
+  await page.getByTestId('tenant-box').waitFor();
+  assert.equal(await page.locator('#sec-tenancy').getAttribute('data-open'), 'yes', 'opened by itself');
+  await page.locator('[data-field="tenancy.tenant"]').fill('Encik Penyewa');
+  await page.locator('[data-field="tenancy.tenantPhone"]').fill('012-345 6789');
+  await page.locator('[data-field="tenancy.tenantPhone"]').blur();
+  assert.equal(await page.locator('[data-field="tenancy.tenantPhone"]').inputValue(), '60 12-345 6789');
+  await page.locator('[data-field="tenancy.tenantWhatsapp"]').fill('penyewa_ns');
+  // Banner Placed → Choose Location → a point on the map.
+  await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('yes');
+  await page.getByTestId('banner-choose-location').click();
+  await page.waitForSelector('[data-testid="picker-map"]');
+  await page.evaluate(() => window.__mapClick(2.8311, 101.8122));
+  await page.getByTestId('apply-location').click();
+  assert.match(await page.getByTestId('banner-picked').innerText(), /Banner location chosen/);
+  await page.locator('[data-field="street"]').fill('Jalan Sampel Banner 1');
+  await page.locator('[data-field="askingPrice"]').fill('600000');
+  await page.locator('[data-verify="askingPrice"]').selectOption('confirmed');
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  assert.match(await page.getByTestId('tenancy').innerText(), /Encik Penyewa[\s\S]*\+60 12-345 6789[\s\S]*@penyewa_ns/);
+  assert.match(await page.getByTestId('banner-summary').innerText(), /1 banner up/);
+  await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-banners').click();
+  await page.getByTestId('banner-card').filter({ hasText: 'Jalan Sampel Banner 1' }).waitFor();
+  await page.waitForFunction(() => window.__markers?.some(m => Math.abs((m.o.position?.lat ?? 0) - 2.8311) < 1e-6));
+  // Card colours: Confirmed green, unmarked = Need to check red.
+  await home(page); await tile(page, 'Property List');
+  await page.getByRole('button', { name: 'Large cards' }).click();
+  const card = page.getByTestId('listing-card').filter({ hasText: 'Jalan Sampel Banner 1' });
+  assert.equal(await card.locator('[data-vkey="askingPrice"]').getAttribute('data-verify'), 'confirmed');
+  assert.equal(await card.locator('[data-vkey="askingPrice"]').evaluate(e => getComputedStyle(e).color), 'rgb(111, 212, 155)', 'green');
+  assert.ok(!/Confirmed|Need to Check|Owner Stated/.test(await card.innerText()), 'colour only on cards, no repeated status words');
+  await page.context().close();
+});
+
+test('U98 Change 001: the first-start sample-data choice sits higher on the screen, on a normal and a small phone, and still works', async () => {
+  for (const vp of [{ width: 384, height: 824 }, { width: 320, height: 568 }]) {
+    const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage();
+    await page.goto(base);
+    const sheet = page.getByTestId('start-choice');
+    await sheet.waitFor();
+    const box = await sheet.boundingBox();
+    assert.ok(box.y <= vp.height * 0.12, `top of the choice near the top of the screen (${box.y} of ${vp.height})`);
+    assert.ok(box.y + box.height <= vp.height + 1, 'the whole choice fits on the screen (it scrolls inside when needed)');
+    const empty = page.getByTestId('start-empty');
+    await empty.scrollIntoViewIfNeeded();
+    await empty.click();
+    await page.waitForFunction(() => !document.querySelector('[data-testid="start-choice"]'));
+    if (vp.width === 384) await shot(page, '98-after-start', false);
+    await ctx.close();
+  }
+});
+
+test('U99 Change 007: the QA build has no orange QA banner; About still says QA; the save status line stays', async () => {
+  const QA_DIST = new URL('../.test-qa-dist/', import.meta.url).pathname;
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, ['scripts/build.mjs', '--no-env'], { cwd: new URL('..', import.meta.url).pathname, env: { ...process.env, EAB_QA: '1', EAB_OUTDIR: '.test-qa-dist' }, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await ctx.route('https://qa.test/**', async route => {
+    const u = new URL(route.request().url());
+    const file = join(QA_DIST, u.pathname === '/' ? 'index.html' : u.pathname);
+    try { await route.fulfill({ status: 200, contentType: types[extname(file)] ?? 'application/octet-stream', body: await readFile(file) }); }
+    catch { await route.fulfill({ status: 404, body: '' }); }
+  });
+  const page = await ctx.newPage();
+  await page.goto('https://qa.test/'); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  assert.equal(await page.getByTestId('qa-bar').count(), 0, 'no orange QA banner');
+  assert.equal(await page.locator('.qa-bar').count(), 0);
+  assert.ok(await page.locator('[data-testid="save-status"], .save-status').first().isVisible(), 'the save / sync status line is still shown');
+  // No empty strip: the save status line follows the header directly.
+  const gap = await page.evaluate(() => { const h = document.querySelector('header.topbar').getBoundingClientRect(); const n = h.bottom; const next = document.querySelector('header.topbar').nextElementSibling.getBoundingClientRect(); return next.top - n; });
+  assert.ok(gap < 2, `nothing left between the header and the next line (${gap}px)`);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByTestId('about').scrollIntoViewIfNeeded().catch(() => {});
+  assert.match(await page.getByTestId('about-qa').innerText(), /QA test build/, 'Settings → About still identifies the QA build');
   await ctx.close();
 });
 

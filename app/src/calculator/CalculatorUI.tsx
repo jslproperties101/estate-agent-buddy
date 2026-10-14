@@ -9,7 +9,7 @@ import { Confirm, Tabs } from '../ui/common';
 import {
   purchase, rental, sale, agentCommission, PurchaseInput, RentalInput, SaleInput, TierPart,
 } from '../domain/calculator';
-import { rm, rm2, cardTitle, Listing } from '../listing/model';
+import { rm, rm2, cardTitle, Listing, rentCommissionRm } from '../listing/model';
 import { MoneyInput } from '../ui/MoneyInput';
 import type { CalcKind, Calculation } from '../data/types';
 import { applyPropertyUpdates, buildCalculation, fromFlat, headline, proposeUpdates, PropertyUpdate, searchProperties, toFlat } from './saved';
@@ -61,7 +61,10 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
   const [p, setP] = useState<PurchaseInput>({ price: price0, downPct: 10, tenureYears: 35, ratePct: 4.2, buyer: 'citizen', firstHome: false, valuationFee: 0, otherCosts: 0 });
   const [r, setR] = useState<RentalInput>({ monthlyRent: prop?.monthlyRent ?? 0, maintenanceMonthly: prop?.maintenanceFee ?? 0, quitRentAssessmentYearly: 0, insuranceYearly: 0, otherMonthly: 0, vacancyMonths: 1 });
   const [s, setS] = useState<SaleInput>({ salePrice: price0, purchasePrice: 0, purchaseCosts: 0, holdingYears: 6, outstandingLoan: 0, commissionPct: prop?.commissionPct ?? 2, commissionSst: true, earlySettlementPenalty: 0, otherSaleCosts: 0 });
-  const [cv, setCv] = useState({ value: prop?.askingPrice ?? prop?.monthlyRent ?? 0, pct: prop?.commissionPct ?? 2, sst: true });
+  // Commission tab: a sale uses price × %; a rent-only property's commission is months of rent (Change 009), so the
+  // amount starts as rent × months at 100% instead of treating the months as a percentage.
+  const rentBase = (l?: Listing) => (l?.purpose === 'rent' && l.rentCommissionMonths !== undefined ? rentCommissionRm(l) : undefined);
+  const [cv, setCv] = useState(() => { const rb = rentBase(prop); return rb !== undefined ? { value: rb, pct: 100, sst: true } : { value: prop?.askingPrice ?? prop?.monthlyRent ?? 0, pct: prop?.commissionPct ?? 2, sst: true }; });
   /** Choosing a property fills the price, rent, maintenance fee and commission from it (the agent can still edit them). */
   function chooseProperty(l: Listing | undefined) {
     setPropId(l?.id); setPicking(false); setQuery('');
@@ -69,7 +72,7 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
     setP(v => ({ ...v, price: l.askingPrice ?? v.price }));
     setR(v => ({ ...v, monthlyRent: l.monthlyRent ?? v.monthlyRent, maintenanceMonthly: l.maintenanceFee ?? v.maintenanceMonthly }));
     setS(v => ({ ...v, salePrice: l.askingPrice ?? v.salePrice, commissionPct: l.commissionPct ?? v.commissionPct }));
-    setCv(v => ({ value: l.askingPrice ?? l.monthlyRent ?? v.value, pct: l.commissionPct ?? v.pct, sst: v.sst }));
+    setCv(v => { const rb = rentBase(l); return rb !== undefined ? { value: rb, pct: 100, sst: v.sst } : { value: l.askingPrice ?? l.monthlyRent ?? v.value, pct: l.commissionPct ?? v.pct, sst: v.sst }; });
     if (l.purpose === 'rent') setTab(tb => (tb === 'purchase' ? 'rental' : tb));
   }
   const kindOfTab = (tb: Tab): CalcKind => (tb === 'rental' || tb === 'sale' || tb === 'commission' ? tb : 'purchase');

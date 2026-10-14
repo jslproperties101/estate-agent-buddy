@@ -26,7 +26,8 @@ test('S3-1 the four agreed states are exactly Confirmed, Owner stated, Need to c
     assert.equal(new Set(labels).size, 4, `${lang}: four different labels`);
     assert.ok(labels.every(Boolean));
   }
-  assert.deepEqual(VERIFY_STATES.map(k => listingStrings.en.verify[k]), ['Confirmed', 'Owner stated', 'Need to check', 'Unknown']);
+  // Change 009: labels in Title Case.
+  assert.deepEqual(VERIFY_STATES.map(k => listingStrings.en.verify[k]), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
 });
 
 test('S3-2 setting, changing and clearing a state changes only that field and never touches the value', () => {

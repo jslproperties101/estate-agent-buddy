@@ -1,5 +1,6 @@
 // Per-field verification: how far one fact in a property record can be trusted. Four agreed states; a field that has not
-// been marked has no entry. The states are stored on the record itself (Listing.verification), so they sync, appear in
+// been marked has no stored entry, and is treated as "Need to check" wherever a value is shown (Change 009): nothing is
+// ever shown as confirmed unless someone marked it so. The states are stored on the record itself (Listing.verification), so they sync, appear in
 // the history and travel with the record like any other detail.
 import type { Listing } from './model';
 
@@ -8,7 +9,7 @@ export type VerifyState = (typeof VERIFY_STATES)[number];
 
 /** The facts an agent is expected to double-check before relying on them or sharing the listing. */
 export const VERIFIABLE_FIELDS = [
-  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionPct',
+  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionPct', 'rentCommissionMonths',
   'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction',
   'landSqft', 'builtUpSqft', 'bedrooms', 'bathrooms', 'floors', 'parking', 'furnishing',
   'condition', 'availability', 'ownerName', 'ownerPhone',
@@ -29,9 +30,18 @@ export function withVerification<T extends Pick<Listing, 'verification'>>(l: T, 
   return { ...l, verification: Object.keys(next).length ? next : undefined };
 }
 
-/** Fields that still need attention: marked "Need to check" or "Unknown". */
+const hasValue = (l: object, k: string) => { const v = (l as Record<string, unknown>)[k]; return v !== undefined && v !== null && v !== ''; };
+
+/** The state to show for one fact (Change 009): its mark, or "Need to check" when it has a value but no mark yet.
+ *  undefined when the fact is not verifiable or has neither a value nor a mark. */
+export function shownState(l: Pick<Listing, 'verification'>, k: string): VerifyState | undefined {
+  if (!isVerifiable(k)) return undefined;
+  return verifyStateOf(l, k) ?? (hasValue(l, k) ? 'check' : undefined);
+}
+
+/** Fields that still need attention: "Need to check" (marked, or filled in but not marked) or "Unknown". */
 export const toCheck = (l: Pick<Listing, 'verification'>): string[] =>
-  Object.entries(l.verification ?? {}).filter(([k, v]) => isVerifiable(k) && (v === 'check' || v === 'unknown')).map(([k]) => k);
+  VERIFIABLE_FIELDS.filter(k => { const v = shownState(l, k); return v === 'check' || v === 'unknown'; });
 
 /** How many fields are in each state (only fields that are in the record's verifiable list). */
 export function verifyCounts(l: Pick<Listing, 'verification'>): Record<VerifyState, number> {

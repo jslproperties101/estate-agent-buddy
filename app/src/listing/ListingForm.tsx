@@ -3,15 +3,21 @@
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
 // Fields that may not be obvious have a "?" (ui/FieldHelp).
+// Change 009 (owner, Oct 2026): section 2 is "Price, Tenure and Title Info" (asking price, commission, negotiable, rent,
+// deposits, tenure, title); the old "Price, rental and fees" section is gone and Maintenance Fee is in Property Details,
+// with a large Extra Comments box under Furnishing. One Unit/Lot Number field. Add Location saves only a map point (the
+// address is never rewritten) and a Google Maps Link can be pasted; no latitude/longitude boxes. Photos are reordered by
+// dragging; the first is the main photo. Owner and tenant use the same contact box (phone book at the end of the name row,
+// "+" phone, "@" WhatsApp). Banner Placed shows Choose Location, saved to My Banner Map. Verification has no "Not marked":
+// an unmarked fact counts as Need to check.
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { listingStrings } from './strings';
-import { mapStrings } from '../maps/strings';
 import {
   Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
   FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
-  rm, yearsRemaining, commissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
-  ALL_FORM_FIELDS, hasPosition, cardTitle,
+  rm, yearsRemaining, commissionRm, rentCommissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
+  ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, parseMapsLink, RENT_COMMISSION_MONTHS,
 } from './model';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
@@ -30,25 +36,28 @@ import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPr
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
 import { FieldHelp } from '../ui/FieldHelp';
-import { PhoneInput } from '../ui/PhonebookButton';
+import { ContactBox, ContactValue, aliasValue } from '../ui/ContactBox';
 import type { PickedContact } from '../lib/phonebook';
+import type { Contact } from '../data/types';
+import { buildBanner, activeBanners } from '../domain/banners';
+import { ymd } from '../lib/dates';
 import { contactStrings } from '../contacts/strings';
-import { VERIFY_STATES, VerifyState, isVerifiable, verifyStateOf, withVerification } from './verify';
+import { VERIFY_STATES, VerifyState, isVerifiable, shownState, withVerification } from './verify';
 import { deleteListing } from './deleteListing';
 import { IconMic } from '../icons';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
-const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'specs', 'money', 'tenancy', 'availability', 'owner', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
+const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'availability', 'tenancy', 'owner', 'specs', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
 const SECTION_KEYS: Record<string, string[]> = {
   basics: ['type', 'purpose'],
-  tenure: ['tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
-  location: ['country', 'state', 'city', 'township', 'lotNo', 'street', 'unitNo', 'lat'],
-  details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing'],
+  tenure: ['askingPrice', 'negotiable', 'commissionPct', 'monthlyRent', 'rentCommissionMonths', 'securityDepositMonths', 'utilityDepositMonths',
+    'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
+  location: ['country', 'state', 'city', 'township', 'unitNo', 'street', 'mapsLink', 'lat'],
+  details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'extraComments', 'maintenanceFee'],
   specs: ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse', 'roadAccess', 'specs'],
-  money: ['askingPrice', 'negotiable', 'commissionPct', 'monthlyRent', 'securityDepositMonths', 'utilityDepositMonths', 'maintenanceFee'],
   availability: ['availability', 'availableFrom', 'condition', 'features'],
-  owner: ['vendorId', 'ownerName', 'ownerPhone'],
+  owner: ['vendorId', 'ownerName', 'ownerPhone', 'ownerWhatsapp'],
   arrangement: ['arrangement', 'arrangementNote', 'status', 'handledBy'],
   banner: ['bannerStatus'],
   marketing: ['headline'],
@@ -80,8 +89,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const s = listingStrings[lang];
   const c = strings[lang].c;
   const initial = id ? state.properties.find(x => x.id === id) : undefined;
+  // "money" was its own section before Change 009; links to it now open Price, Tenure and Title Info.
+  const startSection = section === 'money' ? 'tenure' : section;
   const [d, setD] = useState<Listing>(() => {
-    if (initial) return { ...initial, photos: [...initial.photos] };
+    if (initial) return forEditing(initial);
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
     const no = nextNumber(state.properties);
     return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
@@ -105,7 +116,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [refErr, setRefErr] = useState<string | null>(null);
   const [refOpen, setRefOpen] = useState(false);
   // Collapsible sections: closed at first (the form is long); opening from a detail card's Edit opens that section.
-  const [open, setOpen] = useState<Set<string>>(() => new Set(section ? [section] : []));
+  const [open, setOpen] = useState<Set<string>>(() => new Set(startSection ? [startSection] : []));
+  const [photoMsg, setPhotoMsg] = useState<{ text: string; error: boolean }[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+  const [mapsLinkText, setMapsLinkText] = useState(d.mapsLink ?? '');
+  const [bannerPicker, setBannerPicker] = useState(false);
+  const [bannerPick, setBannerPick] = useState<{ lat: number; lng: number } | null>(null);
+  const [tenantPick, setTenantPick] = useState<PickedContact | null>(null);
   const allOpen = SECTION_IDS.every(x => open.has(x));
   const toggle = (sid: string) => setOpen(o => { const n = new Set(o); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const addedFiles = useRef<string[]>([]);
@@ -134,25 +153,25 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   }, [refOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!section) return;
-    const el = document.getElementById(`sec-${section}`);
+    if (!startSection) return;
+    const el = document.getElementById(`sec-${startSection}`);
     if (el) { el.scrollIntoView({ block: 'start' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600); }
-  }, [section]);
+  }, [startSection]);
 
   const set = <K extends keyof Listing>(k: K, v: Listing[K] | undefined) =>
     setD(prev => ({ ...prev, [k]: v, filledFrom: { ...(prev.filledFrom ?? {}), [k]: 'typed' } }));
   const fromWords = (k: keyof Listing) => d.filledFrom?.[k] === 'words' ? <span className="chip stated small-chip">{s.fromWords}</span> : null;
 
-  // Per-field verification: a small status picker under a field (Confirmed / Owner stated / Need to check / Unknown).
-  // The state is kept on the record (Listing.verification) and shown on the detail screen. Colour is never the only signal.
+  // Per-field verification: a small status picker under a field (Confirmed / Owner Stated / Need to Check / Unknown).
+  // There is no "Not marked" (Change 009): a fact without a mark shows as Need to Check until someone marks it. The state
+  // is kept on the record (Listing.verification); here the word is always shown with its colour.
   const vsel = (k: string, label: string) => {
-    const cur = verifyStateOf(d, k);
+    const cur = shownState(d, k) ?? 'check';
     return (
-      <label className={`vp ${cur ? `vp-${cur}` : ''}`}>
+      <label className={`vp vp-${cur}`}>
         <span className="vp-label">{s.verify.label}</span>
-        <select data-verify={k} aria-label={s.verify.aria(label)} value={cur ?? ''}
-          onChange={e => setD(prev => withVerification(prev, k, (e.target.value || undefined) as VerifyState | undefined))}>
-          <option value="">{s.verify.none}</option>
+        <select data-verify={k} aria-label={s.verify.aria(label)} value={cur} className={`vc-sel vc-${cur}`}
+          onChange={e => setD(prev => withVerification(prev, k, e.target.value as VerifyState))}>
           {VERIFY_STATES.map(v => <option key={v} value={v}>{s.verify[v]}</option>)}
         </select>
       </label>
@@ -191,21 +210,56 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     return xs.length === 1 ? xs[0] : <div className="two">{xs}</div>;
   };
 
+  /** Adds pictures one by one with a visible spinner and count (they are shrunk first, which can take a moment on a phone).
+   *  A file that is not a picture, or cannot be read, is reported by name; the rest are still added. Save and the photo
+   *  controls wait until it is finished. The first photo is always the main photo. */
   async function addPhotos(files: FileList | null) {
     if (!files?.length) return;
-    setBusy(true);
+    const list = [...files];
+    setBusy(true); setPhotoMsg([]); setProgress({ done: 0, total: list.length });
     const added: Photo[] = [];
-    for (const f of [...files]) {
-      if (!f.type.startsWith('image/')) continue;
-      let blob: Blob = f;
-      try { blob = (await compressImage(f)).blob; } catch { /* keep the original */ }
-      const fileId = await store.putFile(blob);
-      addedFiles.current.push(fileId);
-      added.push({ id: newId(), name: f.name, fileId, bytes: blob.size });
+    const problems: { text: string; error: boolean }[] = [];
+    try {
+      for (const f of list) {
+        try {
+          if (!f.type.startsWith('image/')) throw new Error('not an image');
+          let blob: Blob = f;
+          try { blob = (await compressImage(f)).blob; } catch { /* keep the original */ }
+          const fileId = await store.putFile(blob);
+          addedFiles.current.push(fileId);
+          added.push({ id: newId(), name: f.name, fileId, bytes: blob.size });
+        } catch { problems.push({ text: s.n9.photoFailed(f.name), error: true }); }
+        setProgress(p => (p ? { ...p, done: p.done + 1 } : p));
+      }
+      setD(prev => { const photos = [...prev.photos, ...added]; return { ...prev, photos, mainPhotoId: photos[0]?.id }; });
+    } finally {
+      setBusy(false); setProgress(null);
+      setPhotoMsg([...(added.length ? [{ text: s.n9.photosDone(added.length), error: false }] : []), ...problems]);
     }
-    setD(prev => ({ ...prev, photos: [...prev.photos, ...added], mainPhotoId: prev.mainPhotoId ?? added[0]?.id }));
-    setBusy(false);
   }
+  /** New order of the photos; the first one is the main photo. */
+  const reorder = (from: number, to: number) => setD(prev => { const photos = movePhoto(prev.photos, from, to); return { ...prev, photos, mainPhotoId: photos[0]?.id }; });
+  /** Drag by the ⠿ handle (finger, pen or mouse): the photo under the pointer is where it goes. The move and release are
+   *  followed on the whole window, so a finger that slides off the small handle still drops the photo in the right place. */
+  const dragProps = (i: number) => ({
+    onPointerDown: (e: { preventDefault(): void }) => {
+      if (busy) return;
+      e.preventDefault();
+      let over = i;
+      setDragFrom(i); setDragOver(i);
+      const move = (ev: PointerEvent) => {
+        const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-photo-index]');
+        const to = el ? Number(el.getAttribute('data-photo-index')) : NaN;
+        if (Number.isFinite(to)) { over = to; setDragOver(to); }
+      };
+      const end = (ev: PointerEvent) => {
+        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+        if (ev.type === 'pointerup' && over !== i) reorder(i, over);
+        setDragFrom(null); setDragOver(null);
+      };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+    },
+  });
   async function addDocs(category: DocCategory, files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
@@ -229,18 +283,19 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
     );
   }
-  function manualPos(which: 'lat' | 'lng', text: string) {
-    const next = { ...raw, [`pos_${which}`]: text };
-    setRaw(next);
-    const lat = parseFloat(next.pos_lat ?? String(d.lat ?? ''));
-    const lng = parseFloat(next.pos_lng ?? String(d.lng ?? ''));
-    if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) setD(prev => ({ ...prev, lat, lng, geoSource: 'manual', geoAccuracy: undefined, placeId: undefined }));
-  }
+  /** Add Location (Change 009): only the chosen map point is saved. The typed address is never read back or changed. */
   function applyLocation(r: LocationResult) {
-    setD(prev => ({ ...prev, ...r.fields, lat: r.lat, lng: r.lng, placeId: r.placeId, geoSource: 'google', geoAccuracy: undefined }));
-    setRaw(x => { const y = { ...x }; delete y.pos_lat; delete y.pos_lng; return y; });
+    setD(prev => ({ ...prev, lat: r.lat, lng: r.lng, placeId: undefined, geoSource: 'google', geoAccuracy: undefined }));
     setPicker(false);
   }
+  /** Google Maps Link: kept as typed. If the link itself holds the point, the map position is taken from it as well. */
+  function setMapsLink(text: string) {
+    setMapsLinkText(text);
+    const v = text.trim() || undefined;
+    const at = parseMapsLink(v);
+    setD(prev => ({ ...prev, mapsLink: v, ...(at ? { lat: at.lat, lng: at.lng, geoSource: 'manual' as const, geoAccuracy: undefined, placeId: undefined } : {}) }));
+  }
+  const linkPoint = parseMapsLink(d.mapsLink);
 
   /** Voice fill: only empty fields, each marked "from your words". */
   function fillFromWords() {
@@ -285,6 +340,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
 
   const yrs = yearsRemaining(d);
   const comm = commissionRm(d);
+  const rentComm = rentCommissionRm(d);
   const rentMode = forRent(d);
   const saleMode = forSale(d);
   const depositRm = d.monthlyRent !== undefined ? d.monthlyRent * ((d.securityDepositMonths ?? 0) + (d.utilityDepositMonths ?? 0)) : undefined;
@@ -318,6 +374,27 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     ...prev, ownerName: p.name || prev.ownerName, ownerPhone: normalisePhone(p.tel) ?? prev.ownerPhone,
     filledFrom: { ...(prev.filledFrom ?? {}), ownerName: 'typed', ownerPhone: 'typed' },
   }));
+  const setOwner = (patch: ContactValue) => setD(prev => {
+    const next = { ...prev, filledFrom: { ...(prev.filledFrom ?? {}) } };
+    if ('name' in patch) { next.ownerName = patch.name; next.filledFrom.ownerName = 'typed'; }
+    if ('phone' in patch) { next.ownerPhone = patch.phone; next.filledFrom.ownerPhone = 'typed'; }
+    if ('whatsapp' in patch) next.ownerWhatsapp = patch.whatsapp;
+    return next;
+  });
+  /** A saved contact chosen for the owner: link that vendor record instead of typing the same person again. */
+  const linkOwner = (c: Contact) => setD(prev => ({ ...prev, vendorId: c.id, ownerName: undefined, ownerPhone: undefined, ownerWhatsapp: undefined }));
+  // Tenant (Change 009): same contact box, kept with the tenancy.
+  const tenant: ContactValue = { name: d.tenancy?.tenant, phone: d.tenancy?.tenantPhone, whatsapp: d.tenancy?.tenantWhatsapp };
+  const setTenant = (patch: ContactValue) => {
+    if ('name' in patch) setTen('tenant', patch.name);
+    if ('phone' in patch) setTen('tenantPhone', patch.phone);
+    if ('whatsapp' in patch) setTen('tenantWhatsapp', patch.whatsapp);
+  };
+  const applyTenant = (p: PickedContact) => setTenant({ name: p.name || tenant.name, phone: normalisePhone(p.tel) ?? tenant.phone });
+  function pickTenant(p: PickedContact) {
+    const differs = (tenant.name && p.name && tenant.name !== p.name) || (tenant.phone && p.tel && normalisePhone(p.tel) !== normalisePhone(tenant.phone));
+    if (differs) setTenantPick(p); else applyTenant(p);
+  }
 
   function save(skipReview = false) {
     if (needsReview && !skipReview) { setAskUnchecked(true); return; }
@@ -325,9 +402,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     const clean: Listing = { ...d, refNo, ref: makeRef(d.refPrefix!, refNo!), refPrefix: d.refPrefix!.toUpperCase() };
     for (const k of ALL_FORM_FIELDS) if (!vf.has(k)) delete clean[k];
     if (!forSale(clean)) { delete clean.askingPrice; delete clean.negotiable; delete clean.commissionPct; }
-    if (!forRent(clean)) { delete clean.monthlyRent; delete clean.securityDepositMonths; delete clean.utilityDepositMonths; }
+    if (!forRent(clean)) { delete clean.monthlyRent; delete clean.rentCommissionMonths; delete clean.securityDepositMonths; delete clean.utilityDepositMonths; }
+    // One Unit/Lot Number (Change 009); the first photo is the main photo.
+    delete clean.lotNo;
+    clean.mainPhotoId = clean.photos[0]?.id;
+    if (!clean.extraComments?.trim()) delete clean.extraComments;
     let next: Listing = {
       ...clean, ownerPhone: linked ? undefined : normalisePhone(d.ownerPhone), ownerName: linked ? undefined : d.ownerName,
+      ownerWhatsapp: linked ? undefined : aliasValue(d.ownerWhatsapp),
       handledBy: d.status === 'in_progress' ? d.handledBy : undefined,
       leaseExpiryYear: d.tenure === 'leasehold' ? d.leaseExpiryYear : undefined,
       availableFrom: d.availability === 'from_date' ? d.availableFrom : undefined,
@@ -336,7 +418,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     // Marks that no longer apply go with the field they described (an empty field keeps its mark: "Unknown" is meaningful).
     if (next.verification) {
       const dropped = (k: string) => (ALL_FORM_FIELDS as readonly string[]).includes(k) && !vf.has(k as FormField)
-        || (['askingPrice', 'commissionPct'].includes(k) && !forSale(clean)) || (k === 'monthlyRent' && !forRent(clean))
+        || (['askingPrice', 'commissionPct'].includes(k) && !forSale(clean)) || (['monthlyRent', 'rentCommissionMonths'].includes(k) && !forRent(clean))
         || (k === 'leaseExpiryYear' && d.tenure !== 'leasehold') || ((k === 'ownerName' || k === 'ownerPhone') && !!linked);
       let v = next;
       for (const k of Object.keys(next.verification)) if (dropped(k)) v = withVerification(v, k, undefined);
@@ -345,12 +427,17 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     // A typed owner becomes a vendor record in the Vendor List, so there is one record per person.
     if (!next.vendorId && next.ownerName) {
       const now = Date.now();
-      const v = store.upsert('contacts', { id: newId(), created: now, updated: now, name: next.ownerName, phone: next.ownerPhone, roles: ['vendor'] });
-      next = { ...next, vendorId: v.id, ownerName: undefined, ownerPhone: undefined };
+      const v = store.upsert('contacts', { id: newId(), created: now, updated: now, name: next.ownerName, phone: next.ownerPhone, whatsapp: next.ownerWhatsapp, roles: ['vendor'] });
+      next = { ...next, vendorId: v.id, ownerName: undefined, ownerPhone: undefined, ownerWhatsapp: undefined };
     }
     const isNew = !initial;
     next = { ...next, history: [{ at: Date.now(), source: (prefill ? 'voice' : 'form') as 'voice' | 'form', summary: '' }, ...(next.history ?? [])].slice(0, 50) };
     store.upsert('properties', next);
+    // Banner Placed → Choose Location: the point goes into the banner records that My Banner Map shows (Change 009).
+    if (bannerPick && next.bannerStatus === 'yes') {
+      const now = Date.now();
+      store.upsert('banners', buildBanner(newId(), next, { lat: bannerPick.lat, lng: bannerPick.lng, source: 'map' }, { placedOn: ymd(new Date(now)) }, now));
+    }
     draft.clear();
     for (const f of removedFiles.current) store.removeFile(f);
     if (isNew) store.setSingleton('settings', { lastPrefix: next.refPrefix });
@@ -450,8 +537,33 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Select({ k: 'purpose', options: PURPOSES, labels: s.purpose })}
       </Sec>
 
-      {/* 2. Tenure & Title */}
-      <Sec id="tenure" title={`2 · ${s.sec.tenure}`} {...secProps('tenure')}>
+      {/* 2. Price, Tenure and Title Info (Change 009): price, commission and rent first, then tenure and title. */}
+      <Sec id="tenure" title={`2 · ${s.sec.tenure}`} testId="sec-tenure-form" {...secProps('tenure')}>
+        {saleMode && <>
+          {Text({ k: 'askingPrice', money: true })}
+          <div className="two">
+            {Select({ k: 'negotiable', options: ['yes', 'no'], labels: s.negotiable })}
+            {Text({ k: 'commissionPct', numeric: true })}
+          </div>
+          {comm !== undefined && <small className="muted" data-testid="form-commission">{s.commission(rm(comm))}</small>}
+        </>}
+        {rentMode && <>
+          {Text({ k: 'monthlyRent', money: true })}
+          {withVp('rentCommissionMonths', (
+            <label className="ff" key="rentCommissionMonths">
+              <span>{s.l.rentCommissionMonths}<FieldHelp lang={lang} topic="commissionPct" label={s.l.rentCommissionMonths} /></span>
+              <select data-field="rentCommissionMonths" value={d.rentCommissionMonths ?? ''} onChange={e => set('rentCommissionMonths', e.target.value ? Number(e.target.value) : undefined)}>
+                <option value="">{s.notSet}</option>
+                {RENT_COMMISSION_MONTHS.map(m => <option key={m} value={m}>{s.n9.rentMonths(m)}</option>)}
+                {d.rentCommissionMonths !== undefined && !(RENT_COMMISSION_MONTHS as readonly number[]).includes(d.rentCommissionMonths) && <option value={d.rentCommissionMonths}>{s.n9.rentMonths(d.rentCommissionMonths)}</option>}
+              </select>
+              <small className="muted">{s.n9.rentCommissionHint}</small>
+            </label>
+          ))}
+          {rentComm !== undefined && <small className="muted" data-testid="form-rent-commission">{s.n9.rentCommission(rm(rentComm))}</small>}
+          {pair(Text({ k: 'securityDepositMonths', numeric: true }), Text({ k: 'utilityDepositMonths', numeric: true }))}
+          {depositRm ? <small className="muted" data-testid="form-deposit">{s.depositRm(rm(depositRm))}</small> : null}
+        </>}
         {Select({ k: 'tenure', options: TENURES, labels: s.tenure })}
         {d.tenure === 'leasehold' && (
           <>
@@ -467,28 +579,37 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       {/* 3. Photos */}
       <Sec id="photos" title={`3 · ${s.sec.photos}`} {...secProps('photos')}>
         <small className="muted">{s.photosNote}</small>
+        {d.photos.length > 1 && <small className="muted" data-testid="drag-hint">{s.n9.dragHint}</small>}
         {d.photos.length > 0 && (
-          <div className="photo-grid">
-            {d.photos.map(p => (
-              <div key={p.id} className={`pg-item ${p.id === (d.mainPhotoId ?? d.photos[0]?.id) ? 'main' : ''}`} data-testid="form-photo">
+          <div className="photo-grid" data-testid="photo-grid">
+            {d.photos.map((p, i) => (
+              <div key={p.id} data-photo-index={i}
+                className={`pg-item ${i === 0 ? 'main' : ''} ${dragFrom === i ? 'dragging' : ''} ${dragFrom !== null && dragOver === i && dragFrom !== i ? 'drop-target' : ''}`}
+                data-testid="form-photo" data-photo-id={p.id}>
                 <StoredImage fileId={p.fileId} url={p.url} />
-                {p.id === (d.mainPhotoId ?? d.photos[0]?.id)
-                  ? <span className="pg-main">{s.mainPhoto}</span>
-                  : <button className="btn small secondary" onClick={() => setD(prev => ({ ...prev, mainPhotoId: p.id }))}>{s.makeMain}</button>}
-                <button className="btn small secondary danger-text" onClick={() => {
+                <button type="button" className="pg-handle" aria-label={s.n9.dragLabel(i + 1)} title={s.n9.dragHint} data-testid="photo-drag" {...dragProps(i)}>⠿</button>
+                {i === 0 && <span className="pg-main" data-testid="photo-main">{s.mainPhoto}</span>}
+                <div className="pg-moves">
+                  <button type="button" className="btn small secondary" disabled={busy || i === 0} aria-label={s.n9.moveEarlier(i + 1)} onClick={() => reorder(i, i - 1)}>◀</button>
+                  <button type="button" className="btn small secondary" disabled={busy || i === d.photos.length - 1} aria-label={s.n9.moveLater(i + 1)} onClick={() => reorder(i, i + 1)}>▶</button>
+                </div>
+                <button className="btn small secondary danger-text" disabled={busy} onClick={() => {
                   if (p.fileId) removedFiles.current.push(p.fileId);
-                  setD(prev => {
-                    const photos = prev.photos.filter(x => x.id !== p.id);
-                    return { ...prev, photos, mainPhotoId: prev.mainPhotoId === p.id ? photos[0]?.id : prev.mainPhotoId };
-                  });
+                  setD(prev => { const photos = prev.photos.filter(x => x.id !== p.id); return { ...prev, photos, mainPhotoId: photos[0]?.id }; });
                 }}>{s.remove}</button>
               </div>
             ))}
           </div>
         )}
-        <label className="btn secondary" aria-busy={busy}>
+        {progress && (
+          <div className="busy-line" role="status" aria-live="polite" data-testid="photo-progress">
+            <span className="spinner" aria-hidden="true" /><span>{s.n9.photosBusy(progress.done, progress.total)}</span>
+          </div>
+        )}
+        {photoMsg.map((m, i) => <p key={i} className={m.error ? 'error small' : 'ok-text small'} role={m.error ? 'alert' : 'status'} data-testid="photo-msg">{m.text}</p>)}
+        <label className={`btn secondary ${busy ? 'disabled' : ''}`} aria-busy={busy} aria-disabled={busy}>
           {s.addPhotos}
-          <input data-testid="photo-input" className="file-input" type="file" accept="image/*" multiple onChange={e => { void addPhotos(e.target.files); e.currentTarget.value = ''; }} />
+          <input data-testid="photo-input" className="file-input" type="file" accept="image/*" multiple disabled={busy} onChange={e => { void addPhotos(e.target.files); e.currentTarget.value = ''; }} />
         </label>
       </Sec>
 
@@ -498,22 +619,24 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
         {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
         {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
-        {Text({ k: 'lotNo' })}
-        {Text({ k: 'street' })}
         {Text({ k: 'unitNo' })}
-        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {mapStrings[lang].addFromMap}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
-        <p className="small muted" data-testid="pos-text">{hasPosition(d) ? `${s.l.lat}: ${s.position(d.lat!.toFixed(5), d.lng!.toFixed(5))}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.noPosition}</p>
+        {Text({ k: 'street' })}
+        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
+        <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
         <div className="two">
           <button className="btn secondary" onClick={locate} disabled={locating}>{locating ? s.locating : s.useMyLocation}</button>
           <button className="btn secondary" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
         </div>
-        <div className="two">
-          <label className="ff">{s.lat}<input inputMode="decimal" data-field="lat" value={shownNum('pos_lat', d.lat) as string} onChange={e => manualPos('lat', e.target.value)} /></label>
-          <label className="ff">{s.lng}<input inputMode="decimal" data-field="lng" value={shownNum('pos_lng', d.lng) as string} onChange={e => manualPos('lng', e.target.value)} /></label>
-        </div>
         {posErr && <p className="error" role="alert">{s.posError}</p>}
+        <label className="ff">
+          <span>{s.l.mapsLink}</span>
+          <input data-field="mapsLink" type="url" inputMode="url" autoComplete="off" placeholder={s.n9.mapsLinkPh} value={mapsLinkText} onChange={e => setMapsLink(e.target.value)} />
+          <small className="muted">{s.n9.mapsLinkHint}</small>
+        </label>
+        {d.mapsLink && <small className={linkPoint ? 'ok-text' : 'muted'} data-testid="maps-link-note">{linkPoint ? s.n9.linkPosition : s.n9.linkNoPosition}</small>}
+        {d.mapsLink && /^https?:\/\//i.test(d.mapsLink) && <a className="btn small secondary" href={d.mapsLink} target="_blank" rel="noreferrer" data-testid="open-maps-link">🗺 {s.n9.openMapsLink}</a>}
       </Sec>
-      {picker && <LocationPicker lang={lang} current={d} onCancel={() => setPicker(false)} onApply={applyLocation} />}
+      {picker && <LocationPicker lang={lang} current={d} pointOnly title={s.n9.addLocation} onCancel={() => setPicker(false)} onApply={applyLocation} />}
 
       <Sec id="details" title={s.sec.details} testId="sec-details" {...secProps('details')}>
         {pair(show('landSqft') && Text({ k: 'landSqft', numeric: true }), show('builtUpSqft') && Text({ k: 'builtUpSqft', numeric: true }))}
@@ -521,6 +644,66 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {pair(show('bedrooms') && Text({ k: 'bedrooms', numeric: true }), show('bathrooms') && Text({ k: 'bathrooms', numeric: true }))}
         {pair(show('floors') && Text({ k: 'floors', numeric: true }), show('parking') && Text({ k: 'parking', numeric: true }))}
         {pair(show('lotType') && Select({ k: 'lotType', options: LOT_TYPES, labels: s.lotType }), show('furnishing') && Select({ k: 'furnishing', options: FURNISHING, labels: s.furnishing }))}
+        <label className="ff">
+          <span>{s.l.extraComments}</span>
+          <textarea data-field="extraComments" className="big-text" rows={5} value={d.extraComments ?? ''} onChange={e => set('extraComments', e.target.value || undefined)} />
+        </label>
+        {show('maintenanceFee') && Text({ k: 'maintenanceFee', money: true })}
+      </Sec>
+
+      <Sec id="availability" title={s.sec.availability} {...secProps('availability')}>
+        {withVp('availability', (
+          <label className="ff" key="availability">
+            <span>{s.l.availability}<FieldHelp lang={lang} topic="availability" label={s.l.availability} /></span>
+            <select data-field="availability" value={d.availability ?? ''} onChange={e => {
+              const v = (e.target.value || undefined) as Listing['availability'];
+              set('availability', v);
+              // Tenanted reveals the tenant's contact box straight away (Change 009).
+              if (v === 'tenanted') setOpen(o => new Set([...o, 'tenancy']));
+            }}>
+              <option value="">{s.notSet}</option>
+              {AVAILABILITY.map(o => <option key={o} value={o}>{s.availability[o]}</option>)}
+            </select>
+          </label>
+        ))}
+        {d.availability === 'from_date' && (
+          <label className="ff">{s.l.availableFrom}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
+        )}
+        {show('condition') && Select({ k: 'condition', options: CONDITIONS, labels: s.condition })}
+        {Text({ k: 'features', area: true })}
+      </Sec>
+
+      {(rentMode || d.availability === 'tenanted' || d.tenancy) && (
+        <Sec id="tenancy" title={s.sec.tenancy} testId="sec-tenancy" {...secProps('tenancy')}>
+          <ContactBox lang={lang} idPrefix="tenant" contacts={state.contacts} fields={{ name: 'tenancy.tenant', phone: 'tenancy.tenantPhone', whatsapp: 'tenancy.tenantWhatsapp' }}
+            labels={{ name: s.l.tenant, phone: s.l.tenantPhone, whatsapp: s.l.tenantWhatsapp }} value={tenant} onChange={setTenant}
+            onPicked={pickTenant} onSuggest={c => setTenant({ name: c.name, phone: c.phone, whatsapp: c.whatsapp })}
+            pickLabel={contactStrings[lang].pickFromPhone} suggestLabel={s.n9.fromContacts} useLabel={s.n9.suggestionUse} phonePh={s.n9.phonePh} whatsappPh={s.n9.whatsappPh} />
+          <div className="two">
+            <label className="ff">{s.l.tStart}<input data-field="tenancy.start" type="month" value={d.tenancy?.start ?? ''} onChange={e => setTen('start', e.target.value || undefined)} /></label>
+            <label className="ff">{s.l.tEnd}<input data-field="tenancy.end" type="month" value={d.tenancy?.end ?? ''} onChange={e => setTen('end', e.target.value || undefined)} /></label>
+          </div>
+          <label className="ff">{s.l.tRent}<MoneyInput data-field="tenancy.rent" value={d.tenancy?.rent} onChange={n => setTen('rent', n)} /></label>
+          <label className="ff">{s.l.tNotes}<textarea data-field="tenancy.notes" rows={2} value={d.tenancy?.notes ?? ''} onChange={e => setTen('notes', e.target.value || undefined)} /></label>
+        </Sec>
+      )}
+
+      <Sec id="owner" title={s.sec.owner} testId="sec-owner" {...secProps('owner')}>
+        <label className="ff"><span>{s.l.vendorId}<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} /></span>
+          <select data-field="vendorId" value={d.vendorId ?? ''} onChange={e => set('vendorId', e.target.value || undefined)}>
+            <option value="">{s.vendorNone}</option>
+            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </label>
+        {linked ? <small className="muted">{s.vendorLinked}{linked.phone ? ` ${linked.phone}` : ''}{linked.whatsapp ? ` · ${linked.whatsapp}` : ''}</small> : <>
+          <ContactBox lang={lang} idPrefix="owner" fields={{ name: 'ownerName', phone: 'ownerPhone', whatsapp: 'ownerWhatsapp' }} contacts={state.contacts.filter(x => x.roles.some(r => r === 'vendor' || r === 'landlord'))}
+            labels={{ name: s.l.ownerName, phone: s.l.ownerPhone, whatsapp: s.l.ownerWhatsapp }}
+            value={{ name: d.ownerName, phone: d.ownerPhone, whatsapp: d.ownerWhatsapp }} onChange={setOwner} onPicked={pickOwner} onSuggest={linkOwner}
+            pickLabel={s.pickOwner} suggestLabel={s.n9.fromContacts} useLabel={s.n9.suggestionUse} phonePh={s.n9.phonePh} whatsappPh={s.n9.whatsappPh} />
+          {(fromWords('ownerName') || fromWords('ownerPhone')) && <span className="row-gap">{fromWords('ownerName') ?? fromWords('ownerPhone')}</span>}
+          {(isVerifiable('ownerName') || isVerifiable('ownerPhone')) && (d.ownerName || d.ownerPhone) && <div className="two">{d.ownerName && vsel('ownerName', s.l.ownerName)}{d.ownerPhone && vsel('ownerPhone', s.l.ownerPhone)}</div>}
+          {d.ownerName && <small className="muted">{s.vendorNew}</small>}
+        </>}
       </Sec>
 
       {(show('ceilingFt') || show('specs') || show('zoning') || show('currentUse') || show('roadAccess')) && (
@@ -535,60 +718,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </Sec>
       )}
 
-      <Sec id="money" title={s.sec.money} testId="sec-money" {...secProps('money')}>
-        {saleMode && <>
-          {Text({ k: 'askingPrice', money: true })}
-          <div className="two">
-            {Select({ k: 'negotiable', options: ['yes', 'no'], labels: s.negotiable })}
-            {Text({ k: 'commissionPct', numeric: true })}
-          </div>
-          {comm !== undefined && <small className="muted" data-testid="form-commission">{s.commission(rm(comm))}</small>}
-        </>}
-        {rentMode && <>
-          {Text({ k: 'monthlyRent', money: true })}
-          {pair(Text({ k: 'securityDepositMonths', numeric: true }), Text({ k: 'utilityDepositMonths', numeric: true }))}
-          {depositRm ? <small className="muted" data-testid="form-deposit">{s.depositRm(rm(depositRm))}</small> : null}
-        </>}
-        {show('maintenanceFee') && Text({ k: 'maintenanceFee', money: true })}
-      </Sec>
-
-      {(rentMode || d.availability === 'tenanted' || d.tenancy) && (
-        <Sec id="tenancy" title={s.sec.tenancy} testId="sec-tenancy" {...secProps('tenancy')}>
-          <label className="ff">{s.l.tenant}<input data-field="tenancy.tenant" value={d.tenancy?.tenant ?? ''} onChange={e => setTen('tenant', e.target.value || undefined)} /></label>
-          <div className="two">
-            <label className="ff">{s.l.tStart}<input data-field="tenancy.start" type="month" value={d.tenancy?.start ?? ''} onChange={e => setTen('start', e.target.value || undefined)} /></label>
-            <label className="ff">{s.l.tEnd}<input data-field="tenancy.end" type="month" value={d.tenancy?.end ?? ''} onChange={e => setTen('end', e.target.value || undefined)} /></label>
-          </div>
-          <label className="ff">{s.l.tRent}<MoneyInput data-field="tenancy.rent" value={d.tenancy?.rent} onChange={n => setTen('rent', n)} /></label>
-          <label className="ff">{s.l.tNotes}<textarea data-field="tenancy.notes" rows={2} value={d.tenancy?.notes ?? ''} onChange={e => setTen('notes', e.target.value || undefined)} /></label>
-        </Sec>
-      )}
-
-      <Sec id="availability" title={s.sec.availability} {...secProps('availability')}>
-        {Select({ k: 'availability', options: AVAILABILITY, labels: s.availability })}
-        {d.availability === 'from_date' && (
-          <label className="ff">{s.l.availableFrom}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
-        )}
-        {show('condition') && Select({ k: 'condition', options: CONDITIONS, labels: s.condition })}
-        {Text({ k: 'features', area: true })}
-      </Sec>
-
-      <Sec id="owner" title={s.sec.owner} testId="sec-owner" {...secProps('owner')}>
-        <label className="ff"><span>{s.l.vendorId}<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} /></span>
-          <select data-field="vendorId" value={d.vendorId ?? ''} onChange={e => set('vendorId', e.target.value || undefined)}>
-            <option value="">{s.vendorNone}</option>
-            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
-        </label>
-        {linked ? <small className="muted">{s.vendorLinked}{linked.phone ? ` ${linked.phone}` : ''}</small> : <>
-          {Text({ k: 'ownerName' })}
-          {withVp('ownerPhone', <PhoneInput lang={lang} id="owner-phone" dataField="ownerPhone" testId="pick-owner" pickLabel={s.pickOwner}
-            label={<span className="between"><span>{s.l.ownerPhone}</span>{fromWords('ownerPhone')}</span>}
-            value={d.ownerPhone ?? ''} onChange={v => set('ownerPhone', v || undefined)} onBlur={() => set('ownerPhone', normalisePhone(d.ownerPhone))}
-            onPicked={pickOwner} />)}
-          {d.ownerName && <small className="muted">{s.vendorNew}</small>}
-        </>}
-      </Sec>
 
       <Sec id="arrangement" title={s.sec.arrangement} {...secProps('arrangement')}>
         {Select({ k: 'arrangement', options: ARRANGEMENTS, labels: s.arrangement })}
@@ -603,7 +732,16 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
 
       <Sec id="banner" title={s.sec.banner} testId="sec-banner-form" {...secProps('banner')}>
         {Select({ k: 'bannerStatus', options: BANNER_STATUSES, labels: s.banner })}
+        {d.bannerStatus === 'yes' && (
+          <div className="stack-sm" data-testid="banner-location">
+            <button type="button" className="btn primary" data-testid="banner-choose-location" onClick={() => setBannerPicker(true)}>📍 {s.n9.chooseBannerLocation}</button>
+            {bannerPick && <small className="ok-text" role="status" data-testid="banner-picked">✓ {s.n9.bannerLocationNew}</small>}
+            {!bannerPick && activeBanners(state.banners, d.id).length > 0 && <small className="muted">{s.n9.bannerLocationSaved(activeBanners(state.banners, d.id).length)}</small>}
+          </div>
+        )}
       </Sec>
+      {bannerPicker && <LocationPicker lang={lang} current={d} pointOnly title={s.n9.bannerPickTitle} start={bannerPick ?? (hasPosition(d) ? { lat: d.lat!, lng: d.lng! } : undefined)}
+        onCancel={() => setBannerPicker(false)} onApply={r => { setBannerPick({ lat: r.lat, lng: r.lng }); setBannerPicker(false); }} />}
 
       <Sec id="marketing" title={s.sec.marketing} testId="sec-marketing" {...secProps('marketing')}>
         {Text({ k: 'headline' })}
@@ -702,6 +840,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       {askUnchecked && <Confirm lang={lang} title={s.reviewQ} body={s.reviewBody(unchecked.length)} danger={false} okLabel={s.reviewSave}
         onCancel={() => { setAskUnchecked(false); setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}
         onOk={() => { setAskUnchecked(false); save(true); }} />}
+      {tenantPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
+        body={contactStrings[lang].replaceBody([tenant.name, tenant.phone].filter(Boolean).join(' · '), [tenantPick.name, tenantPick.tel].filter(Boolean).join(' · '))}
+        onCancel={() => setTenantPick(null)} onOk={() => { applyTenant(tenantPick); setTenantPick(null); }} />}
       {ownerPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
         body={contactStrings[lang].replaceBody([d.ownerName, d.ownerPhone].filter(Boolean).join(' · '), [ownerPick.name, ownerPick.tel].filter(Boolean).join(' · '))}
         onCancel={() => setOwnerPick(null)} onOk={() => { applyOwner(ownerPick); setOwnerPick(null); }} />}

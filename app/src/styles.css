@@ -75,7 +75,6 @@ small, .small { font-size: 14px; }
 .lang button[aria-pressed="true"] { background: var(--gold-grad); color: var(--on-gold); }
 .update-bar { background: #221B0E; color: #F3DDA6; border-bottom: 1px solid var(--gold-lo); padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 15px; }
 .proto-bar { background: #2A120E; color: #FFD9D2; font-size: 14px; padding: 6px 12px; text-align: center; border-bottom: 1px solid var(--line); }
-.qa-bar { background: #B45309; color: #fff; font-weight: 600; }
 
 .content { flex: 1; padding: 14px max(14px, env(safe-area-inset-right, 0px)) calc(120px + env(safe-area-inset-bottom, 0px)) max(14px, env(safe-area-inset-left, 0px)); min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -202,6 +201,9 @@ label.btn { position: relative; cursor: pointer; }
 .opt-row .opt-item { flex: 1; min-width: 0; }
 .opt-x { width: 44px; min-height: 44px; flex: none; border: 1px solid var(--line-2); border-radius: 8px; background: #2A120E; color: var(--red); font-weight: 800; }
 .opt-new { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; }
+.opt-search { position: sticky; top: -4px; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--card-2); border-bottom: 1px solid var(--line); }
+.opt-search input { flex: 1 1 160px; }
+.opt-none { padding: 6px 10px; }
 .opt-new input { flex: 1 1 160px; }
 
 /* Combo box: a field you can type in, with a gold button that opens a list (used for reference numbers). */
@@ -274,9 +276,6 @@ label.btn { position: relative; cursor: pointer; }
 .toast { position: fixed; left: 12px; right: 12px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: 696px; margin: 0 auto; background: #1E1B15; color: var(--ink); border: 1px solid var(--gold-lo); border-radius: 14px; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 8px; z-index: 30; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 .toast span { flex: 1; font-size: 15px; }
 .toast button { background: transparent; color: var(--gold-hi); border: 0; font-weight: 800; min-height: 44px; min-width: 44px; }
-.alerts { position: fixed; left: 12px; right: 12px; bottom: 84px; max-width: 696px; margin: 0 auto; z-index: 18; max-height: 45vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
-.alert { box-shadow: 0 8px 24px rgba(0,0,0,.6); }
-.alert { background: #221B0E; border: 1px solid var(--gold); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Voice */
 .mic { min-height: 60px; border-radius: 30px; border: 0; background: var(--gold-grad); color: var(--on-gold); font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 20px rgba(212,175,55,.25); text-align: center; padding: 6px 14px; }
@@ -360,9 +359,6 @@ label.btn { position: relative; cursor: pointer; }
 .gc-st { display: flex; align-items: center; gap: 4px; }
 .gc-dot { width: 10px; height: 10px; border-radius: 5px; flex: none; padding: 0; }
 
-.fab { position: fixed; right: max(16px, calc(50% - 344px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 15; min-height: 56px; max-width: calc(100vw - 32px); border-radius: 28px; border: 0; padding: 4px 20px;
-  background: var(--gold-grad); color: var(--on-gold); font-weight: 800; font-size: 16px; box-shadow: 0 8px 24px rgba(212,175,55,.35), 0 2px 0 rgba(255,255,255,.3) inset; display: flex; align-items: center; gap: 8px; text-align: left; }
-.fab span { font-size: 26px; line-height: 1; }
 
 /* Property detail */
 .key-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
@@ -636,11 +632,9 @@ label.btn { position: relative; cursor: pointer; }
 /* Logo in the header and on the sign-in screen (slightly larger than the old mark). */
 .logo-img { display: block; flex: none; object-fit: contain; border-radius: 22%; }
 
-/* Top bar: Co-broke Opportunities (Coming Soon) and Notifications */
+/* Top bar: Notifications (the Co-broke "Soon" item was removed, Change 003) */
 .top-btn { position: relative; flex: none; }
 .topbar.home .top-btn { width: 40px; min-width: 40px; }
-.top-soon { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 14px; line-height: 1; font-weight: 800; letter-spacing: .02em;
-  padding: 1px 4px; border-radius: 6px; background: #2A2312; color: var(--gold-hi); border: 1px solid var(--gold-lo); white-space: nowrap; }
 .top-badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
   font-size: 14px; font-weight: 800; line-height: 22px; text-align: center; }
 .topbar.home .wordmark span { font-size: 14px; }
@@ -674,7 +668,8 @@ label.btn { position: relative; cursor: pointer; }
 .listing[data-testid="listing-form"] { padding-bottom: 96px; }
 
 /* New-user start choice */
-.start-scrim { z-index: 60; }
+.start-scrim { z-index: 60; align-items: flex-start; padding-top: max(16px, 6vh); }
+.start-scrim .sheet { max-height: calc(100vh - max(16px, 6vh) - 12px); }
 .start-choice { align-items: stretch; text-align: center; gap: 12px; }
 .start-logo { display: flex; justify-content: center; }
 .choice-card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 16px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); }
@@ -738,15 +733,11 @@ label.btn { position: relative; cursor: pointer; }
 .vchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; vertical-align: middle; }
 .vchip-confirmed { color: var(--ok); }
 .vchip-owner { color: var(--blue); }
-.vchip-check { color: var(--amber); }
-.vchip-unknown { color: var(--muted); border-style: dashed; }
+.vchip-check { color: var(--red); }
+.vchip-unknown { color: var(--red); border-style: dashed; }
 .kf .vchip { margin-top: 2px; }
-li.has-preview { position: relative; }
-.preview-btn { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--line-2); background: rgba(0,0,0,.65); color: #F2EEE3; font-size: 20px; display: flex; align-items: center; justify-content: center; }
 .gc, .lc-card { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .row-gap { display: inline-flex; gap: 8px; }
-.preview-sheet { max-height: 92vh; overflow-y: auto; }
-.preview-sheet .lc-photo { border-radius: 14px; overflow: hidden; aspect-ratio: 16 / 10; }
 .pb-msg { margin: 4px 0 0; }
 
 /* ---- Stage 5: PDF preview, calculator picker and history, voice diagnostics ---- */
@@ -786,3 +777,46 @@ li.has-preview { position: relative; }
 .crit.unknown { color: var(--muted, #BEB7A6); }
 .match-row { padding-block: 6px; border-top: 1px solid var(--line, #4A4231); }
 .match-row:first-of-type { border-top: 0; }
+
+
+/* ---------- Change 008/009: Property List cards ---------- */
+/* Verification by font colour: Confirmed green, Owner stated blue, Need to check and Unknown red. */
+.vval.vc-confirmed { color: var(--ok); }
+.vval.vc-owner { color: var(--blue); }
+.vval.vc-check, .vval.vc-unknown { color: var(--red); }
+.lc-card.tappable { cursor: pointer; }
+.lc-tenure { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+.lc-tenure .lc-line { display: block; }
+.gc .lc-tenure { padding: 0 7px; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+/* A grid card is its tap area plus the Location / Open buttons under it: the buttons stay inside the card's own cell. */
+.lc-grid li { display: flex; flex-direction: column; }
+.lc-grid li > .gc { height: auto; flex: 1 1 auto; }
+.muted-2 { color: var(--muted); }
+.lc-comments { margin: 4px 0 0; padding-top: 6px; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink); overflow-wrap: anywhere; }
+.gc-comments { display: block; margin: 2px 7px 0; padding-top: 4px; border-top: 1px solid var(--line); font-size: 14px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; white-space: pre-wrap; }
+.gc-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+/* The Open control: larger and gold (Change 009). */
+.open-gold { min-height: 48px; padding: 6px 18px; border-radius: 12px; border: 1px solid var(--gold-lo); background: var(--gold-grad); color: var(--on-gold); font-weight: 800; font-size: 17px; letter-spacing: .01em; cursor: pointer; }
+.gc-actions .open-gold { width: 100%; }
+.gc-loc { min-height: 44px; width: 100%; border-radius: 10px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--gold-hi); font-size: 14px; font-weight: 700; padding: 4px 6px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
+.loc-btn { text-decoration: none; }
+.break { overflow-wrap: anywhere; }
+
+/* Change 009: phone with a ready "+", WhatsApp alias with a ready "@", contact suggestions. */
+.prefixed { display: flex; align-items: stretch; }
+.prefixed .prefix { display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--line-2); border-right: 0; border-radius: 10px 0 0 10px; background: #1E1B15; color: var(--gold-hi); font-weight: 800; font-size: 18px; }
+.prefixed input { border-top-left-radius: 0; border-bottom-left-radius: 0; min-width: 0; flex: 1; }
+.suggest { display: flex; flex-direction: column; gap: 4px; border: 1px dashed var(--line-2); border-radius: 10px; padding: 6px; }
+.suggest-item { display: flex; justify-content: space-between; gap: 8px; text-align: left; min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink); }
+.suggest-item strong { color: var(--gold-hi); }
+/* Photos: drag to reorder (Change 009). */
+.pg-item { position: relative; touch-action: auto; }
+.pg-item.dragging { opacity: .55; outline: 2px dashed var(--gold); }
+.pg-item.drop-target { outline: 2px solid var(--gold); }
+.pg-handle { position: absolute; top: 4px; left: 4px; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line-2); background: rgba(0,0,0,.7); color: var(--gold-hi); font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab; }
+.pg-moves { display: flex; gap: 4px; }
+.pg-moves button { flex: 1; min-height: 40px; }
+.spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--line-2); border-top-color: var(--gold); animation: eab-spin .8s linear infinite; flex: none; }
+@keyframes eab-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+.busy-line { display: flex; align-items: center; gap: 10px; }
