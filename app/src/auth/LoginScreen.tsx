@@ -10,6 +10,7 @@ import { startGoogleSignIn, handleCallback, cleanWebAddress, canSignInHere, take
 import { onAppUrlOpen, onBrowserClosed, isNative, AUTH_CALLBACK } from '../native/native';
 import { authStrings } from './strings';
 import { IconLogo } from '../icons';
+import { ConnectionRecovery } from './ConnectionRecovery';
 
 type Phase = 'idle' | 'opening' | 'waiting' | 'exchanging';
 
@@ -87,6 +88,8 @@ export function LoginScreen({ lang }: { lang: Lang }) {
           </>
         )}
         {err && <p className="error" role="alert" data-testid="login-error">{a.err[err] ?? `${a.err.other} (${err})`}</p>}
+        {/* Always reachable without signing in: the way back when a typed Supabase URL or key stops sign-in working. */}
+        <ConnectionRecovery lang={lang} startOpen={!!err && (cfg.source.supabaseUrl === 'phone' || cfg.source.supabaseAnonKey === 'phone')} />
       </section>
     </div>
   );

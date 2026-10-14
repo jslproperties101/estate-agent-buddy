@@ -22,7 +22,8 @@ import { normalisePhone, phoneDigits } from '../listing/model';
 import { compressImage } from '../lib/images';
 import { PhonebookButton } from '../ui/PhonebookButton';
 import { FieldHelp } from '../ui/FieldHelp';
-import { config } from '../config';
+import { config, supabaseInputProblem } from '../config';
+import { authStrings } from '../auth/strings';
 import { AccountCard } from '../auth/AccountUI';
 import { DataSafetyCard } from '../sync/SyncUI';
 import { permission, requestPermission } from '../lib/notify';
@@ -239,6 +240,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
   const built = config({});
   const [form, setForm] = useState({ mapsApiKey: s.mapsApiKey ?? '', supabaseUrl: s.supabaseUrl ?? '', supabaseAnonKey: s.supabaseAnonKey ?? '', expertApiUrl: s.expertApiUrl ?? '' });
   const [perm, setPerm] = useState(permission());
+  const [sbProblem, setSbProblem] = useState<'url' | 'pair' | null>(null);
   const hint = (k: keyof typeof built.source) => (built.source[k] === 'build' ? t.fromBuild : t.notSetYet);
 
   return (
@@ -278,7 +280,12 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <small className="muted">{t.cloudHelp}</small>
         <label className="ff">{t.sbUrl}<input type="url" placeholder={hint('supabaseUrl')} value={form.supabaseUrl} onChange={e => setForm(f => ({ ...f, supabaseUrl: e.target.value }))} /></label>
         <label className="ff">{t.sbKey}<input type="password" autoComplete="off" placeholder={hint('supabaseAnonKey')} value={form.supabaseAnonKey} onChange={e => setForm(f => ({ ...f, supabaseAnonKey: e.target.value }))} /></label>
+        {sbProblem && <p className="error" role="alert" data-testid="settings-supabase-problem">{sbProblem === 'url' ? authStrings[lang].rec.badUrl : authStrings[lang].rec.badPair}</p>}
         <button className="btn primary" data-testid="save-settings" onClick={() => {
+          // A malformed Supabase URL, or a URL without its key, is never saved: it would only stop sign-in working.
+          const problem = supabaseInputProblem(form.supabaseUrl, form.supabaseAnonKey);
+          setSbProblem(problem);
+          if (problem) return;
           store.setSingleton('settings', { mapsApiKey: form.mapsApiKey.trim() || undefined, supabaseUrl: form.supabaseUrl.trim() || undefined, supabaseAnonKey: form.supabaseAnonKey.trim() || undefined, expertApiUrl: form.expertApiUrl.trim() || undefined });
           toast(t.settingsSaved);
         }}>{t.saveSettings}</button>

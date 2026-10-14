@@ -3726,6 +3726,97 @@ test('U95 duplicate warning: typing an address that is already in the list shows
   await page.context().close();
 });
 
+test('U96 locked out by a typed Supabase project: sign-in screen offers Connection settings; invalid URL refused; failed Google sign-in; reset keeps records; Settings reopens', async () => {
+  // The QA phone (14 Oct): signed in, then a Supabase URL/key typed in Settings. That project refuses the session,
+  // the app signs out, and Google sign-in fails there too. Supabase is a stand-in here; Google is not contacted.
+  const SB = 'https://typed-wrong.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+  await ctx.route(`${SB}/**`, async route => {
+    const req = route.request(); const u = new URL(req.url());
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    if (u.pathname === '/auth/v1/authorize') return route.fulfill({ status: 302, headers: { location: `${u.searchParams.get('redirect_to')}?error=access_denied&error_description=provider+not+enabled` } });
+    return route.fulfill({ status: 401, contentType: 'application/json', headers: cors, body: '{"message":"Invalid API key"}' });
+  });
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  await page.evaluate(async SBURL => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    await put('records', 'c:contacts:keep1', { id: 'keep1', created: 1, updated: 1, name: 'Puan Keep Me', roles: ['vendor'] });
+    await put('records', 's:meta', { fired: [], dirty: [], tombstones: [], syncWorkspaceId: 'ws-1', lastSeq: 0, syncSession: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3_600_000, email: 'qa@x.c', userId: 'u1', workspaceId: 'ws-1', workspaceName: 'QA team', role: 'owner' } });
+    await put('records', 's:settings', { lang: 'en', layout: 'grid', supabaseUrl: SBURL, supabaseAnonKey: 'typed-key' });
+    db.close();
+  }, SB);
+  const stored = () => page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const tx = r.result.transaction('records'); const g1 = tx.objectStore('records').get('s:settings'); const g2 = tx.objectStore('records').get('c:contacts:keep1'); tx.oncomplete = () => { res({ settings: g1.result, contact: g2.result }); r.result.close(); }; }; }));
+  await page.reload();
+  // The typed project refuses the session: signed out, and the sign-in screen opens Connection settings by itself.
+  await page.getByTestId('login').waitFor({ timeout: 15000 });
+  await page.getByTestId('connection-recovery').waitFor();
+  assert.equal(await page.getByTestId('connection-recovery').getAttribute('data-source'), 'phone');
+  assert.match(await page.getByTestId('connection-project').innerText(), /typed-wrong\.supabase\.co/);
+  assert.equal(await page.getByText('typed-key').count(), 0, 'the key is never shown');
+  // Failed Google sign-in: the message shows and Connection settings stays available.
+  await page.getByTestId('google-sign-in').click();
+  await page.getByTestId('login-error').waitFor();
+  assert.match(await page.getByTestId('login-error').innerText(), /cancelled or not allowed/);
+  assert.ok(await page.getByTestId('connection-recovery').isVisible());
+  await shot(page, '96a-login-recovery', false);
+  // An invalid URL is refused and nothing is saved.
+  await page.getByTestId('edit-connection').click();
+  await page.getByTestId('connection-url').fill('https://supabase.com/dashboard/project/abcd');
+  await page.getByTestId('save-connection').click();
+  assert.match(await page.getByTestId('connection-problem').innerText(), /not a Supabase project address/);
+  assert.equal((await stored()).settings.supabaseUrl, SB, 'nothing saved');
+  // Reset: only the typed URL and key go; the record on the phone stays.
+  await page.getByTestId('reset-connection').click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.waitForSelector('nav.grid'); // this test build has no built-in project, so the app opens on the phone
+  const after = await stored();
+  assert.equal(after.settings.supabaseUrl, undefined);
+  assert.equal(after.settings.supabaseAnonKey, undefined);
+  assert.equal(after.settings.lang, 'en', 'other settings kept');
+  assert.equal(after.contact?.name, 'Puan Keep Me', 'records kept');
+  // Settings opens again, and refuses an invalid URL there too (the app is not locked a second time).
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByLabel('Supabase project URL').fill('abcd.supabase.co');
+  await page.getByLabel('Supabase anon (public) key').fill('k');
+  await page.getByTestId('save-settings').click();
+  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /not a Supabase project address/);
+  await page.getByLabel('Supabase project URL').fill('https://abcd.supabase.co');
+  await page.getByLabel('Supabase anon (public) key').fill('');
+  await page.getByTestId('save-settings').click();
+  assert.match(await page.getByTestId('settings-supabase-problem').innerText(), /Type both/);
+  assert.equal((await stored()).settings.supabaseUrl, undefined, 'still nothing saved');
+  assert.equal(await page.getByTestId('login').count(), 0, 'still in the app');
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await ctx.close();
+});
+
+test('U97 the sign-in screen always has Connection settings, even when the project is fine and nothing failed', async () => {
+  const SB = 'https://fine-project.supabase.co';
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await ctx.route(`${SB}/**`, route => route.fulfill({ status: 404, body: '' }));
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/ }).click();
+  await page.getByLabel('Supabase project URL').fill(`${SB}/`);
+  await page.getByLabel('Supabase anon (public) key').fill('anon-public-key');
+  await page.getByTestId('save-settings').click();
+  await page.getByTestId('login').waitFor();
+  assert.equal(await page.getByTestId('connection-recovery').count(), 0, 'closed until asked for');
+  await page.getByTestId('login-connection').click();
+  assert.match(await page.getByTestId('connection-project').innerText(), /fine-project\.supabase\.co/);
+  // Correct the values from here: a valid pair is saved (the app stays on sign-in, now for that project).
+  await page.getByTestId('edit-connection').click();
+  await page.getByTestId('connection-url').fill('https://other-project.supabase.co');
+  await page.getByTestId('connection-key').fill('other-key');
+  await page.getByTestId('save-connection').click();
+  await page.getByTestId('connection-msg').waitFor();
+  assert.match(await page.getByTestId('connection-project').innerText(), /other-project\.supabase\.co/);
+  await ctx.close();
+});
+
 test('U22 no requests leave the phone without a configured service, and no errors in the browser console', () => {
   assert.deepEqual(external, []);
   assert.deepEqual(consoleErrors, []);
