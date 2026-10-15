@@ -148,7 +148,7 @@ export function ExportManagementScreen({ lang, go, section }: { lang: Lang; go: 
   const toast = useToast();
   // Q120: the section used last is remembered; search and filters are not.
   const [tab, setTabRaw] = useState<Section>(section ?? state.settings.exportSection ?? 'saved');
-  const setTab = (t: Section) => { setTabRaw(t); store.setSingleton('settings', { exportSection: t }); };
+  const setTab = (t: Section) => { setSel([]); setTabRaw(t); store.setSingleton('settings', { exportSection: t }); };
   const [all, setAll] = useState<SavedExport[] | null>(null);
   const [q, setQ] = useState('');
   const [fRec, setFRec] = useState('');
@@ -201,11 +201,11 @@ export function ExportManagementScreen({ lang, go, section }: { lang: Lang; go: 
           <small className="muted">{s.keptHelp}</small>
           <strong data-testid="deleted-count">{s.totalDeleted(inTab.length)}</strong>
         </>}
-        <label className="ff">{s.search}<input value={q} onChange={e => setQ(e.target.value)} data-field="exportSearch" /></label>
+        <label className="ff">{s.search}<input value={q} onChange={e => { setSel([]); setQ(e.target.value); }} data-field="exportSearch" /></label>
         <div className="filter-grid">
-          <label>{s.fRecord}<select value={fRec} onChange={e => setFRec(e.target.value)} data-testid="filter-record"><option value="">{s.any}</option>{recordChoices.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
-          <label>{s.fFormat}<select value={fFmt} onChange={e => setFFmt(e.target.value)} data-testid="filter-format"><option value="">{s.any}</option><option value="pdf">PDF</option><option value="xlsx">XLSX</option></select></label>
-          <label>{s.fDate}<input type="date" value={fDate} onChange={e => setFDate(e.target.value)} data-testid="filter-date" /></label>
+          <label>{s.fRecord}<select value={fRec} onChange={e => { setSel([]); setFRec(e.target.value); }} data-testid="filter-record"><option value="">{s.any}</option>{recordChoices.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
+          <label>{s.fFormat}<select value={fFmt} onChange={e => { setSel([]); setFFmt(e.target.value); }} data-testid="filter-format"><option value="">{s.any}</option><option value="pdf">PDF</option><option value="xlsx">XLSX</option></select></label>
+          <label>{s.fDate}<input type="date" value={fDate} onChange={e => { setSel([]); setFDate(e.target.value); }} data-testid="filter-date" /></label>
         </div>
       </div>
 

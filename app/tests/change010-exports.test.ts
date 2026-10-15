@@ -135,8 +135,8 @@ test('R7 every export is recorded in the audit trail of every record in it', asy
 });
 
 // ---------- saved exports ----------
-async function saved(s: Store, ref: string, ownerIds = ['u-me'], keys = ['properties:p1']) {
-  return keepExport(s, { ref, fileName: `Audit-History-P1001-20261015-${ref}.pdf`, format: 'pdf', mode: 'history', recordIds: ['P1001'], recordKeys: keys, ownerIds, exporterId: 'u-me', exporterLabel: 'Mei', at: Date.UTC(2026, 9, 15) }, new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }));
+async function saved(s: Store, ref: string, ownerIds = ['u-me'], keys = ['properties:p1'], exporterId = 'u-me') {
+  return keepExport(s, { ref, fileName: `Audit-History-P1001-20261015-${ref}.pdf`, format: 'pdf', mode: 'history', recordIds: ['P1001'], recordKeys: keys, ownerIds, exporterId, exporterLabel: 'Mei', at: Date.UTC(2026, 9, 15) }, new Blob(['%PDF-1.4 test'], { type: 'application/pdf' }));
 }
 
 test('E1 keep in the app; delete moves to Deleted Exports (recoverable), records who and when, and audits it', async () => {
@@ -167,22 +167,48 @@ test('E2 permanent deletion removes the file; bulk deletions are audited with th
   assert.deepEqual([ev.detail?.count, (ev.detail?.refs as string[]).sort(), ev.detail?.bulk], [2, ['EXPA', 'EXPB'], true]);
 });
 
-test('E3 only the original record owner may delete or permanently delete; restore and open need current access', async () => {
+test('E3 owner decision: people delete their OWN export copies (even of a shared record); never the record, its history or another person\'s copy; opening needs current access', async () => {
   const s = await storeWithHistory(1);
-  s.setSingleton('meta', { shared: { 'properties:p2': { workspaceId: 'ws-her', ownerId: 'u-her', ownerEmail: 'her@x.com', level: 'edit' } } });
-  const mine = await saved(s, 'EXPMINE');
-  const theirs = await saved(s, 'EXPHERS', ['u-her'], ['properties:p2']);
-  assert.equal(canDeleteExport(s.getState(), mine), true);
-  assert.equal(canDeleteExport(s.getState(), theirs), false);
-  assert.equal(canAccessExport(s.getState(), theirs), true, 'still shared with me: may open');
-  assert.deepEqual((await refusedFor(s, ['EXPMINE', 'EXPHERS'], 'delete')).map(e => e.ref), ['EXPHERS']);
-  const r = await bulk(s, ['EXPMINE', 'EXPHERS'], 'delete');
-  assert.deepEqual(r, { done: ['EXPMINE'], failed: [], refused: ['EXPHERS'] });
-  assert.equal((await listExports(s)).find(e => e.ref === 'EXPHERS')!.deletedAt, undefined, 'refused file untouched');
-  // Access ends: opening or restoring that export is refused.
+  s.setSingleton('meta', { shared: { 'properties:p2': { workspaceId: 'ws-her', ownerId: 'u-her', ownerEmail: 'her@x.com', level: 'view' } } });
+  const mineOfHers = await saved(s, 'EXPMINE', ['u-her'], ['properties:p2']);
+  const someoneElses = await saved(s, 'EXPOTHER', ['u-me'], ['properties:p1'], 'u-other');
+  assert.equal(canDeleteExport(s.getState(), mineOfHers), true, 'my copy, though the record is hers');
+  assert.equal(canDeleteExport(s.getState(), someoneElses), false, 'a copy made by another account');
+  assert.deepEqual((await refusedFor(s, ['EXPMINE', 'EXPOTHER'], 'delete')).map(e => e.ref), ['EXPOTHER']);
+  const histBefore = (await s.auditEntries('properties:p1')).filter(e => e.action !== 'export').length;
+  const r = await bulk(s, ['EXPMINE', 'EXPOTHER'], 'delete');
+  assert.deepEqual(r, { done: ['EXPMINE'], failed: [], refused: ['EXPOTHER'] });
+  assert.equal((await listExports(s)).find(e => e.ref === 'EXPOTHER')!.deletedAt, undefined, 'the other copy untouched');
+  await bulk(s, ['EXPMINE'], 'purge');
+  assert.ok(s.getState().properties.some(p => p.id === 'p2'), 'the record stays');
+  assert.equal((await s.auditEntries('properties:p1')).filter(e => e.action !== 'export').length, histBefore, 'audit history stays');
+  // Opening still needs current access to the record.
+  const again = await saved(s, 'EXPMINE2', ['u-her'], ['properties:p2']);
+  assert.equal(canAccessExport(s.getState(), again), true);
   s.setSingleton('meta', { shared: {} });
   s.forgetRecord('properties', 'p2');
-  assert.equal(canAccessExport(s.getState(), theirs), false);
+  assert.equal(canAccessExport(s.getState(), again), false);
+  assert.equal(canDeleteExport(s.getState(), again), true, 'but I can still delete my own copy');
+});
+
+test('E5 owner decision: audit history of my own records is in my backup and comes back on restore; never other agents\' records', async () => {
+  const { buildBackupManifest } = await import('../src/data/manifest');
+  const { createBackup, inspectBackup, restoreBackup } = await import('../src/backup/backup');
+  const s = await storeWithHistory(2);
+  s.setSingleton('meta', { shared: { 'properties:p2': { workspaceId: 'ws-her', ownerId: 'u-her', ownerEmail: 'her@x.com', level: 'view' } } });
+  s.appendAudit('team', [{ id: 'team-1', actorId: 'u-her', action: 'membership', at: 1 }]);
+  const m = await buildBackupManifest(s);
+  assert.deepEqual(Object.keys(m.audit ?? {}), ['properties:p1'], 'own record only: not the shared p2, not Team Workspace events');
+  assert.equal(m.audit!['properties:p1'].length, 3);
+  const b = await createBackup(s);
+  const t = await Store.open(new MemoryBackend());
+  signedIn(t);
+  const res = await restoreBackup(t, await inspectBackup(b.bytes), 'missing');
+  assert.equal(res.auditRestored, 3);
+  const back = await t.auditEntries('properties:p1');
+  for (const e of m.audit!['properties:p1']) assert.ok(back.some(x => x.id === e.id), 'every original entry is back');
+  const again = await restoreBackup(t, await inspectBackup(b.bytes), 'missing');
+  assert.equal(again.auditRestored, 0, 'restoring twice never duplicates');
 });
 
 test('E4 a failed deletion is retried once automatically; if it fails again the file is kept and named', async () => {

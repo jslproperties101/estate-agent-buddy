@@ -143,11 +143,12 @@ export class Store {
     const key = `${c}:${next.id}`;
     if (!keepTime) this.checkWrite(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, false);
     if (i >= 0 && !next.sample) this.keepRevision(key, list[i] as unknown as Record<string, unknown>, source, note);
-    if (!keepTime && !next.sample) this.recordAudit(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, source);
     const updated = i >= 0 ? list.map((x, j) => (j === i ? next : x)) : [next, ...list];
     this.state = { ...this.state, [c]: updated };
     this.write(() => this.backend.put(recKey(c, next.id), next));
     if (i < 0) this.write(() => this.backend.removeLocal(`del:${key}`));
+    // Change 010: the audit entry is written after the record itself, so a save is never held up by its history.
+    if (!keepTime && !next.sample) this.recordAudit(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, source);
     if (!keepTime) this.markDirty(key);
     this.emit();
     return next;

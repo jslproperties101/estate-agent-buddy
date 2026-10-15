@@ -49,7 +49,7 @@ const en = {
   deleteSel: 'Delete', deleteQ: (n: number) => `Delete ${n} saved export${n === 1 ? '' : 's'}?`,
   deleteBody: 'They move to Deleted Exports, where they can be restored. The audit history itself is not deleted.',
   restoreSel: 'Restore', deletePerm: 'Delete permanently', deletePermQ: (n: number) => `Permanently delete ${n} export${n === 1 ? '' : 's'}?`,
-  deletePermBody: 'They cannot be recovered afterwards. Only the original record owner can do this.',
+  deletePermBody: 'They cannot be recovered afterwards. Only the copy is removed: the record and its audit history stay.',
   keptHelp: 'Deleted export copies stay recoverable for as long as you keep them. Nothing expires by itself; only an authorised person deleting them permanently removes them.',
   totalDeleted: (n: number) => `${n} deleted export${n === 1 ? '' : 's'}`,
   okAll: 'Done.', someFailed: (n: number) => `${n} could not be completed and were kept. Select them and try again.`,
@@ -57,7 +57,7 @@ const en = {
   noAccessQ: (n: number) => `${n} of the selected files are no longer yours to change`,
   noAccessBody: (names: string) => `You no longer have permission for: ${names}. Continue with the remaining files only?`,
   continueRest: 'Continue with the rest', noneAllowed: 'You do not have permission for any of the selected files. Nothing was changed.',
-  ownerOnly: 'Only the original record owner can delete saved exports of this record.',
+  ownerOnly: 'Only the person who made this copy can delete it.',
   openFailed: 'The file could not be opened.',
 };
 type ExportStrings = typeof en;
@@ -99,7 +99,7 @@ const bm: ExportStrings = {
   deleteSel: 'Padam', deleteQ: n => `Padam ${n} eksport tersimpan?`,
   deleteBody: 'Ia berpindah ke Eksport Dipadam dan boleh dipulihkan. Sejarah audit itu sendiri tidak dipadam.',
   restoreSel: 'Pulihkan', deletePerm: 'Padam secara kekal', deletePermQ: n => `Padam ${n} eksport secara kekal?`,
-  deletePermBody: 'Ia tidak boleh dipulihkan selepas itu. Hanya pemilik asal rekod boleh berbuat demikian.',
+  deletePermBody: 'Ia tidak boleh dipulihkan selepas itu. Hanya salinan dibuang: rekod dan sejarah auditnya kekal.',
   keptHelp: 'Salinan eksport yang dipadam kekal boleh dipulihkan selagi anda menyimpannya. Tiada yang tamat tempoh dengan sendirinya; hanya orang yang dibenarkan yang memadamnya secara kekal akan membuangnya.',
   totalDeleted: n => `${n} eksport dipadam`,
   okAll: 'Selesai.', someFailed: n => `${n} tidak dapat diselesaikan dan disimpan. Pilih dan cuba lagi.`,
@@ -107,7 +107,7 @@ const bm: ExportStrings = {
   noAccessQ: n => `${n} daripada fail yang dipilih bukan lagi milik anda untuk diubah`,
   noAccessBody: names => `Anda tidak lagi mempunyai kebenaran untuk: ${names}. Teruskan dengan fail selebihnya sahaja?`,
   continueRest: 'Teruskan dengan selebihnya', noneAllowed: 'Anda tidak mempunyai kebenaran untuk mana-mana fail yang dipilih. Tiada apa diubah.',
-  ownerOnly: 'Hanya pemilik asal rekod boleh memadam eksport tersimpan rekod ini.',
+  ownerOnly: 'Hanya orang yang membuat salinan ini boleh memadamnya.',
   openFailed: 'Fail tidak dapat dibuka.',
 };
 
@@ -148,7 +148,7 @@ const zh: ExportStrings = {
   deleteSel: '删除', deleteQ: n => `删除 ${n} 个已保存的导出？`,
   deleteBody: '它们将移至“已删除的导出”，可以恢复。审计历史本身不会被删除。',
   restoreSel: '恢复', deletePerm: '永久删除', deletePermQ: n => `永久删除 ${n} 个导出？`,
-  deletePermBody: '之后将无法恢复。只有记录的原始所有者可以执行此操作。',
+  deletePermBody: '之后将无法恢复。只删除副本：记录及其审计历史会保留。',
   keptHelp: '已删除的导出副本在您保留期间始终可以恢复。不会自动过期；只有获授权的人永久删除后才会移除。',
   totalDeleted: n => `${n} 个已删除的导出`,
   okAll: '完成。', someFailed: n => `${n} 个未能完成，已保留。请选择后重试。`,
@@ -156,7 +156,7 @@ const zh: ExportStrings = {
   noAccessQ: n => `所选文件中有 ${n} 个您已无权更改`,
   noAccessBody: names => `您已无权处理：${names}。仅继续处理其余文件？`,
   continueRest: '继续处理其余文件', noneAllowed: '您对所选文件均无权限，未作任何更改。',
-  ownerOnly: '只有记录的原始所有者可以删除此记录的已保存导出。',
+  ownerOnly: '只有制作此副本的人可以删除它。',
   openFailed: '无法打开文件。',
 };
 

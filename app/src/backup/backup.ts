@@ -138,7 +138,7 @@ export async function planRestore(store: Store, insp: Inspection, mode: RestoreM
   return plan;
 }
 
-export interface RestoreResult { added: number; replaced: number; kept: number; filesRestored: number; safetyAt: number }
+export interface RestoreResult { added: number; replaced: number; kept: number; filesRestored: number; safetyAt: number; /** Change 010: audit entries brought back. */ auditRestored?: number }
 
 /** Applies a checked backup. Throws Error('refused:<reason>') or Error('bad-backup') without having changed anything. */
 export async function restoreBackup(store: Store, insp: Inspection, mode: RestoreMode, now = Date.now()): Promise<RestoreResult> {
@@ -163,13 +163,24 @@ export async function restoreBackup(store: Store, insp: Inspection, mode: Restor
     const exists = (store.getState()[c] as { id: string }[]).some(x => x.id === r.id);
     store.upsert(c, structuredClone(r) as never, false, 'restore', exists ? 'replaced by backup' : 'brought back from backup');
   }
+  // Change 010: audit history of the account's own records, merged by id (nothing on the phone is replaced or lost).
+  // Entries the cloud never received are queued to be sent; entries it already has are not sent twice.
+  let auditRestored = 0;
+  for (const [key, list] of Object.entries(m.audit ?? {})) {
+    if (store.getState().meta.shared?.[key] || !Array.isArray(list)) continue;
+    const have = new Set((await store.auditEntries(key)).map(e => e.id));
+    const fresh = list.filter(e => e && typeof e.id === 'string' && !have.has(e.id));
+    store.appendAudit(key, fresh.filter(e => e.seq !== undefined));
+    store.appendAudit(key, fresh.filter(e => e.seq === undefined), true);
+    auditRestored += fresh.length;
+  }
   // the profile only when the phone has none; dropdown values are added, never removed
   const st = store.getState();
   if (!st.profile.fullName && m.singletons?.profile?.fullName) store.setSingleton('profile', structuredClone(m.singletons.profile));
   for (const [list, vals] of Object.entries(m.singletons?.options ?? {})) for (const v of vals) if (!(st.options[list] ?? []).some(o => o.value === v.value)) store.addOption(list, v.value);
   store.setSingleton('meta', { lastRestoreAt: now });
   await store.flush();
-  return { added: plan.add.length, replaced: plan.replace.length, kept: plan.kept, filesRestored, safetyAt: now };
+  return { added: plan.add.length, replaced: plan.replace.length, kept: plan.kept, filesRestored, safetyAt: now, auditRestored };
 }
 
 function mimeOf(name: string | undefined, kind: string): string {

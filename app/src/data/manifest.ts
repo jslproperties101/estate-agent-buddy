@@ -7,6 +7,7 @@
 // relationships (record, id, checksum, cloud path) and the schema/data version.
 // Never included: sign-in tokens, the Supabase keys, API keys, or the pictures' bytes (those are the ZIP's job; here only
 // their ids and checksums are listed).
+import type { AuditEntry } from '../audit/model';
 import type { Store } from './store';
 import { fileRefs } from './fileRefs';
 import { COLLECTIONS, CollectionName, Conflict } from './types';
@@ -31,6 +32,10 @@ export interface BackupManifest {
   cloudVersions: Record<string, { rev: number; hash: string; deleted: boolean }>;
   pending: { dirty: string[]; tombstones: string[]; conflicts: Conflict[]; errors: Record<string, string> };
   files: ManifestFile[];
+  /** Change 010 (owner decision, 15 Oct): audit history of the records belonging to the account being backed up,
+   *  "collection:id" → entries. Never another agent's records (shared or private) and never Team Workspace events.
+   *  Optional: backups made before Change 010 have none, and older app versions ignore it. */
+  audit?: Record<string, AuditEntry[]>;
 }
 
 export async function buildBackupManifest(store: Store, now = Date.now()): Promise<BackupManifest> {
@@ -40,6 +45,7 @@ export async function buildBackupManifest(store: Store, now = Date.now()): Promi
   // Change 010: records another agent shares with me are theirs, never mine to back up or restore (that would copy them
   // into my workspace, i.e. share them onward). Only my own records, their history and their files go in.
   const foreign = (key: string) => !!m.shared?.[key];
+  const me = m.syncSession?.userId ?? 'local';
   for (const c of COLLECTIONS) records[c] = (st[c] as unknown as { id: string; sample?: boolean }[]).filter(r => !r.sample && !foreign(`${c}:${r.id}`));
   const revisions: BackupManifest['revisions'] = {};
   for (const { key, value } of await store.listLocal('rev:')) if (!foreign(key.slice(4))) revisions[key.slice(4)] = (value as { at: number; source: string; data: unknown }[]).map(r => ({ at: r.at, source: r.source, data: r.data }));
@@ -47,6 +53,13 @@ export async function buildBackupManifest(store: Store, now = Date.now()): Promi
   const cloudVersions: BackupManifest['cloudVersions'] = {};
   for (const k of store.baseKeys()) { if (foreign(k)) continue; const b = store.getBase(k)!; cloudVersions[k] = { rev: b.rev, hash: b.hash, deleted: b.deleted }; }
   const ws = m.syncSession?.workspaceId ?? m.syncWorkspaceId;
+  const audit: Record<string, AuditEntry[]> = {};
+  for (const { key, value } of await store.listLocal('audit:')) {
+    const k = key.slice(6);
+    if (k === 'team' || foreign(k) || !(COLLECTIONS as string[]).includes(k.slice(0, k.indexOf(':')))) continue;
+    const list = (value as AuditEntry[]).filter(e => !e.ownerId || e.ownerId === me || e.ownerId === 'local');
+    if (list.length) audit[k] = structuredClone(list);
+  }
   const files: ManifestFile[] = fileRefs(st).filter(r => !foreign(`${r.collection}:${r.recordId}`)).map(r => {
     const e = store.fileEntry(r.fileId);
     return { id: r.fileId, collection: r.collection, recordId: r.recordId, kind: r.kind, name: r.name, sha256: e?.sha256, bytes: e?.bytes, status: e?.status ?? 'local', cloudPath: ws && e?.sha256 ? `${ws}/${e.sha256}` : undefined };
@@ -54,7 +67,7 @@ export async function buildBackupManifest(store: Store, now = Date.now()): Promi
   return {
     format: 'eab-backup-manifest', version: MANIFEST_VERSION, localSchema: LOCAL_SCHEMA_VERSION, createdAt: now,
     workspaceId: ws, deviceId: m.deviceId, lastSeq: m.lastSeq,
-    records, deleted, revisions, cloudVersions,
+    records, deleted, revisions, cloudVersions, audit,
     pending: { dirty: m.dirty.filter(k => !foreign(k)), tombstones: m.tombstones.filter(k => !foreign(k)), conflicts: structuredClone((m.conflicts ?? []).filter(c => !foreign(c.key))), errors: Object.fromEntries(Object.entries(m.recErrors ?? {}).filter(([k]) => !foreign(k))) },
     files,
   };

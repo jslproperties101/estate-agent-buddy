@@ -1,7 +1,9 @@
 // Change 010 E: audit-history export copies kept inside the app (on this phone), Saved Exports and Deleted Exports.
 //  - A saved copy stays until it is deleted; nothing expires. Deleting a copy never deletes the audit history.
 //  - Delete moves it to Deleted Exports (recoverable); only "Delete permanently" removes it.
-//  - Only the original owner of the record(s) an export belongs to may delete or permanently delete it (also in bulk).
+//  - Owner decision (15 Oct): a person may delete (and permanently delete, and restore) the export copies THEY made,
+//    also in bulk. That never deletes the record, its audit history or anyone else's copies. Opening a copy still
+//    needs current access to its records.
 //  - Permissions are checked again at the moment of every action; files that are no longer allowed are named, and the
 //    person decides whether to go on with the rest.
 //  - A deletion that fails is tried once more; if it fails again the file is kept and named, so it can be retried.
@@ -37,14 +39,14 @@ export async function keepExport(store: Store, meta: Omit<SavedExport, 'fileId' 
 }
 
 const isMe = (state: AppState, id: string) => id === myId(state) || id === 'local';
-/** Only the original record owner may delete (or permanently delete) a saved export of their record. */
-export const canDeleteExport = (state: AppState, e: SavedExport) => e.ownerIds.length > 0 && e.ownerIds.every(o => isMe(state, o));
+/** A person may delete, permanently delete or restore the export copies they made themselves. */
+export const canDeleteExport = (state: AppState, e: SavedExport) => isMe(state, e.exporterId);
 /** Opening or restoring needs current access to every record in it (or being their owner). */
-export const canAccessExport = (state: AppState, e: SavedExport) => canDeleteExport(state, e) || e.recordKeys.every(k => { const i = k.indexOf(':'); return !!levelOf(state, k.slice(0, i) as CollectionName, k.slice(i + 1)); });
+export const canAccessExport = (state: AppState, e: SavedExport) => e.recordKeys.every(k => { const i = k.indexOf(':'); return !!levelOf(state, k.slice(0, i) as CollectionName, k.slice(i + 1)); });
 
 export interface BulkResult { done: string[]; failed: string[]; refused: string[] }
 type Op = 'delete' | 'restore' | 'purge';
-const allowed = (state: AppState, e: SavedExport, op: Op) => (op === 'restore' ? canAccessExport(state, e) : canDeleteExport(state, e));
+const allowed = (state: AppState, e: SavedExport, _op: Op) => canDeleteExport(state, e);
 
 /** Which of the selected files the person may no longer act on (checked now). */
 export async function refusedFor(store: Store, refs: string[], op: Op): Promise<SavedExport[]> {

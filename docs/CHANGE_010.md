@@ -56,7 +56,7 @@ plainly that Team Workspace is not switched on, and everything else keeps workin
 | Kept indefinitely; corrections never erase entries | IT | insert-only + immutable trigger | DB |
 | Owner deletes old entries after warning; copies kept in a backup not readable from the app; never auto-deleted | IT (local + DB), NV | `eab_audit_delete` → `eab_audit_backup` (no policy/grant); local `auditbak:` keys never shown | DB, AU9 |
 | Search/filter across authorised records | IT | `AuditSearchScreen` | C9 |
-| Previous-version **field** restore | **BD** | not built (see decisions); Phase 2's whole-version restore is unchanged | — |
+| Previous-version **field** restore | Deferred (owner decision 1) | not built; Phase 2's whole-version restore is unchanged | — |
 
 ## D. Search/export scope, E. reports
 | Requirement | Status | Code | Tests |
@@ -81,11 +81,26 @@ plainly that Team Workspace is not switched on, and everything else keeps workin
 | Q | Status | Tests |
 |---|---|---|
 | 103 confirm with count · 104 audit every deletion (count, refs) · 105 one retry, keep and name failures, retry | IT | E1, E2, E4, C11 |
-| 106 Deleted Exports recoverable · 107 confirm permanent delete, owner only · 108 bulk restore with results | IT | E1–E3, C11 |
+| 106 Deleted Exports recoverable · 107 confirm permanent delete; **who may delete: see owner decision 3 below** · 108 bulk restore with results | IT | E1–E3, C11 |
 | 109 restore without extra confirmation · 110 search/filters · 111 details · 112 exact retention text · 113 count inside the section | IT | C11 |
 | 114 newest deletion first · 115 no Restore All · 116 select all matching · 117 selection cleared on change | IT | C11 |
 | 118 permission recheck, name inaccessible files, continue with the rest · 119 brief notification, actionable failures | IT | E3, E4, C11 |
 | 120 remember the section (not search/filters) | IT | C11 |
+
+## Owner decisions, 15 Oct 2026 (applied)
+1. **Individual-field restoration: deferred.** Not built. The existing whole-version restore (History → Restore this
+   version, from Phase 2) is unchanged.
+2. **Audit history is included in backups** for the records belonging to the account being backed up
+   (`data/manifest.ts` → optional `audit` in the backup manifest). Excluded: records another agent shares with me,
+   other agents' private records (never on the phone), entries owned by someone else, and Team Workspace events.
+   Restore merges entries by id (never duplicates, never replaces); entries the cloud never received are queued to be
+   sent. Backups made before Change 010 have no `audit` part and still restore; older app versions ignore it. The
+   backup ZIP format otherwise and Change 006's design are unchanged. Tests: E5 (and the existing B1–B7).
+3. **People delete their own saved export copies.** Delete, permanently delete and restore are allowed for the copies
+   the person made (`exports/saved.ts` `canDeleteExport` = exporter is me), also in bulk, also when the record is
+   someone else's. This never deletes the record, its audit history or anyone else's copy. Opening a copy still
+   needs current access to its records (a copy of a record no longer shared with me can be deleted but not opened).
+   Tests: E3, E1–E4, C11.
 
 ## Bugs found during the regression pass (fixed, with tests)
 - Reference-number checks counted properties shared by the other agent, so an agent's own P1001 could not be saved
@@ -93,13 +108,17 @@ plainly that Team Workspace is not switched on, and everything else keeps workin
 - The fix above first introduced a crash in New Property (variable used before definition); caught by the existing
   browser tests U4–U8, fixed, suite green.
 - Archived properties are kept out of buyer matching, advert reminders, maps, property pickers and voice updates.
+- (15 Oct, after the owner decisions) A save now writes the record before its audit entry, so the history never holds
+  up the save itself (an existing storage test, U101, showed the delay under load).
+- (15 Oct) Export Management clears the selection in the same step as a search/filter change, so an old selection is
+  never shown next to new results, even for a moment (C11 under load).
 
 ## Test results on the final commit (this machine)
 | Check | Result |
 |---|---|
 | TypeScript (strict) | 0 errors |
 | Lint (incl. EN/BM/ZH coverage) | passed, 216 files |
-| Unit tests (Node) | 367 / 367 (319 before Change 010) |
+| Unit tests (Node) | 368 / 368 (319 before Change 010) |
 | Browser tests (Chromium 384 × 824, stand-ins) | 115 / 115 (103 existing + 12 Change 010) |
 | DB: existing RLS / rollback / write-block | 125 / 125 · 18 / 18 · 22 / 22 |
 | DB: Change 010 proposal | 122 / 122 |
@@ -110,17 +129,15 @@ plainly that Team Workspace is not switched on, and everything else keeps workin
 1. **Team owner** = the agent who created the Team Workspace (sent the first invitation).
 2. **One active Team Workspace per person**; leaving or removing the other person **ends** it for both.
 3. **Personal Workspace** shows my own records; **Team Workspace** shows what I share plus what is shared with me.
-4. **Saved export copies stay on the phone that made them** (not synced). Taken literally, Q107/E-rules mean only the record's owner may delete a copy, so a recipient cannot delete their own copy of the owner's record. Implemented literally; please confirm.
+4. **Saved export copies stay on the phone that made them** (not synced). Who may delete them: owner decision 3 above.
 5. **Multi-record file name** uses `MULTI<n>` as the record part; every record ID is listed inside the report.
 6. **Export reference** format `EXP` + 8 random characters (e.g. `EXP7K2M9QX4`).
 7. **Deleting a property** now archives it (old behaviour: removed, 30 days in Recently deleted). Permanent delete from the archive uses the old path (still 30 days in Recently deleted on that phone).
-8. **Deleted audit entries' backup**: cloud table `eab_audit_backup` (no API access) and hidden `auditbak:` keys on the phone. Not added to the backup ZIP (Change 006 untouched).
+8. **Deleted audit entries' backup**: cloud table `eab_audit_backup` (no API access) and hidden `auditbak:` keys on the phone. Those hidden deleted entries are not put in the backup ZIP (only the live audit history is, owner decision 2).
 9. **Report language** follows the app language; the English texts are the approved wording; BM/ZH are drafts.
 
 ## Owner decisions still open (BD)
-- Previous-version **field** restore (not finalised in the requirements; not built).
-- Whether audit history should be part of the whole-app backup ZIP (would change Change 006's area; not done).
-- Recipient-made export copies of an owner's record (decision 4).
+- None from Change 010 itself. Remaining items are verification steps (Known gaps, and `docs/CHANGE_010_SUPABASE_TEST_PLAN.md`).
 
 ## Known gaps
 - **Nothing is applied to Supabase.** Next step: apply the proposal to a separate Supabase **test** project, then test two real Google accounts on two phones.
