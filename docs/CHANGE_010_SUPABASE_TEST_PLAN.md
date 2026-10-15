@@ -123,7 +123,9 @@ screen → Scopes → add `.../auth/drive.file`. Then on phone 1: Agent Profile 
 | # | Do this | Pass when | ✓ |
 |---|---|---|---|
 | 1 | After connecting, open drive.google.com with Agent A | folder **Estate Agent AI Buddy** with Property Listing/…/Owner/Property Details.txt, Pictures/01-…jpg | |
-| 2 | Add a title deed (Confidential) to P1, sync, Back up to Drive now | the deed is **not** in Drive; Property Details lists it as "Withheld (confidential)" | |
+| 2 | Add a title deed (Confidential) to P1, sync, Back up to Drive now | the deed **is** in A's Drive under Documents/Property Title (owner decision); P1's file line says "confidential: not shared with your team" | |
+| 2a | A shares P1 with B (View and Edit); B syncs | B sees P1 but **not** the title deed; SQL `select count(*) from eab_files where name = 'Geran.pdf';` = 0 (never in the shared bucket) | |
+| 2b | A stops sharing P1 (or B leaves the Team Workspace); B syncs | P1 disappears from phone 2 | |
 | 3 | Edit P1's price, sync, Back up to Drive now | Property Details.txt updated; previous copy in `Recovery/` with the time in its name | |
 | 4 | In Drive, edit a To-Do .txt by hand; Back up to Drive now | your text kept in To-Do/Recovery "edited outside the app"; the app's text back; Settings says so | |
 | 5 | Delete P2 permanently in the app, sync, back up | P2's folder moved to its parent's `Recovery/`, not deleted | |
@@ -135,7 +137,7 @@ screen → Scopes → add `.../auth/drive.file`. Then on phone 1: Agent Profile 
 |---|---|---|---|
 | 1 | Back up to Drive now | Disaster Recovery/Restore Points/<time>/manifest.json, records.json, Restore Point.txt; message names the point | |
 | 2 | Open records.json in Drive and search for the Supabase key, "accessToken", "refreshToken", the Maps key | none found | |
-| 3 | Uninstall the QA app (or use phone 2 signed in as A on a clean install), connect Drive, Restore points → newest → Check | preview shows counts; restore brings back records, photos and documents | |
+| 3 | Uninstall the QA app (or use phone 2 signed in as A on a clean install), connect Drive, Restore points → newest → Check | preview shows counts; restore brings back records, photos and documents, **including the title deed** | |
 | 4 | Change a byte in one Objects file (download, edit, upload over it), try that point again | refused: "did not pass its checks"; nothing changed | |
 | 5 | Leave the app closed for 3 days, then open it | warning shows the last point's date; a new point is made at start | |
 | 6 | An older `.zip` in "Estate Agent AI Buddy backups" (from the previous QA app) | still listed under "Older backup files on Drive" and restores | |

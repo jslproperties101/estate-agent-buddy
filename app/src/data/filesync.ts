@@ -136,7 +136,8 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
   const now = (opts.now ?? Date.now)();
   const prepare = opts.prepare ?? defaultPrepare;
   const res: FileSyncResult = { uploaded: 0, downloaded: 0, failed: 0 };
-  // Confidential documents are never sent or fetched: they stay on the phone that holds them (see data/fileRefs.ts).
+  // Confidential documents never go to the shared bucket (owner decision: only the owner's own backups and Drive; see
+  // data/fileRefs.ts), so no team member can download them whatever is shared.
   const refs = cloudFileRefs(store.getState()).filter(r => !opts.only || opts.only(r));
   const toDownload: FileRef[] = [];
 
@@ -183,11 +184,11 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
 
 /** Number of a record's files in each state, for the small line under its pictures. */
 export function recordFileSummary(store: Store, collection: string, recordId: string) {
-  const out = { total: 0, uploaded: 0, waiting: 0, failed: 0, missing: 0, denied: 0, phoneOnly: 0 };
+  const out = { total: 0, uploaded: 0, waiting: 0, failed: 0, missing: 0, denied: 0, ownerOnly: 0 };
   for (const r of fileRefs(store.getState())) {
     if (r.collection !== collection || r.recordId !== recordId) continue;
     out.total++;
-    if (r.confidential) { out.phoneOnly++; continue; }
+    if (r.confidential) { out.ownerOnly++; continue; }
     const e = store.fileEntry(r.fileId);
     if (!e) out.waiting++;
     else if (e.status === 'uploaded') out.uploaded++;

@@ -12,12 +12,13 @@
 //     To-Do/ · Calendar/ · Contacts/Buyers|Vendors|Other/ · Inquiries and Viewings/ · GPS Assistance/ ·
 //     Agent Financial/ · Property Calculator/ · Agent Profile/ · Ask Expert/      (only when they hold something)
 //
-// Privacy (least privilege, owner defaults of Oct 2026):
-//  - Only this account's own records: never a record another agent shares in (Change 010), never sample data.
-//  - Confidential documents (title, owner correspondence, rental/sales documents) are never copied here; the property's
-//    details list them as "Withheld (confidential)". Identity numbers (IC/NRIC/passport/bank) are withheld the same way
-//    as in Change 010 exports (exports/report.ts snapshotOf). There is no identity-document folder: the app does not
-//    collect identity documents (owner default).
+// What goes in (owner decision of 16 Oct 2026: this is the owner's own trusted Google Drive, and an incomplete backup
+// defeats its purpose):
+//  - Every field of the owner's records, identity numbers included, and every attached document, confidential ones
+//    included (Documents/Property Title, Owner Correspondence, Agreements…). No extra app-level encryption: Google Drive's
+//    own access control and secure connections (owner decision).
+//  - Only this account's own records: never a record another agent shares in (Change 010), never sample data. Team
+//    sharing is a separate boundary (data/fileRefs.ts): nothing here is ever shared by the app.
 //  - No settings secrets: the Maps key, the Supabase address and key, and the Ask Expert address are never written.
 //  - Records changed on the phone but not yet confirmed by the cloud are marked `waiting`: their previous Drive copy
 //    stays until the change has synced (design: the Drive layers are written from cloud-confirmed data).
@@ -28,8 +29,9 @@
 // the later one (by creation, then id) gets " [first 8 characters of its id]".
 import type { AppState, Appointment, CollectionName, Contact, Deal, ExpertThread, Expense, Income, Inquiry, Journey, Target, Task, Calculation, Banner } from '../data/types';
 import { BUYER_ROLES, VENDOR_ROLES } from '../data/types';
-import { CONFIDENTIAL_DOCS, Listing, orderedPhotos, unitLot } from '../listing/model';
-import { snapshotOf } from '../exports/report';
+import { Listing, orderedPhotos, unitLot } from '../listing/model';
+import { fieldLabel } from '../sync/SyncUI';
+import { showValue } from '../audit/model';
 import { hash53 } from '../data/hash';
 import { cleanName, mytIso } from './driveApi';
 
@@ -54,7 +56,6 @@ export interface TreeEntry {
   waiting?: boolean;
 }
 
-export const WITHHELD = 'Withheld (confidential)';
 const photosN = (n: number) => `${n} photo${n === 1 ? '' : 's'}`;
 const DOC_FOLDER: Record<string, string> = { brochure: 'Brochures and Floor Plans', floorplan: 'Brochures and Floor Plans', other: 'Other', title: 'Property Title', correspondence: 'Owner Correspondence', transaction: 'Agreements' };
 const MOD = {
@@ -77,7 +78,20 @@ function textDoc(title: string, id: string | undefined, updated: number | undefi
   const head = [title, ...(id ? [`Record ID: ${id}`] : []), ...(updated ? [`Last changed: ${mytIso(updated)}`] : []), ''];
   return [...head, ...lines.map(([k, v]) => `${k}: ${indent(v)}`)].join('\n') + '\n' + (extra ? `\n${extra}` : '');
 }
-const snap = (c: CollectionName, r: unknown) => snapshotOf('en', c, r as Record<string, unknown>, WITHHELD, photosN);
+/** Every current field of a record, labelled in English (nothing withheld: the owner's own Drive). Photos are counted
+ *  (they are in Pictures/); documents are listed by name and category (they are in Documents/). */
+function snap(c: CollectionName, rec: unknown): [string, string][] {
+  const out: [string, string][] = [];
+  const walk = (v: unknown, path: string) => {
+    if (path === 'photos' && Array.isArray(v)) { out.push([path, photosN(v.length)]); return; }
+    if (path === 'documents' && Array.isArray(v)) { v.forEach((d, i) => { const doc = d as { name?: string; category?: string }; out.push([`documents.${i + 1}`, `${doc.name ?? ''}${doc.category ? ` (${doc.category})` : ''}`]); }); return; }
+    if (v && typeof v === 'object' && !Array.isArray(v)) { for (const [k, x] of Object.entries(v as Record<string, unknown>)) walk(x, path ? `${path}.${k}` : k); return; }
+    if (v === undefined || v === null || v === '') return;
+    out.push([path, showValue(v)]);
+  };
+  for (const [k, v] of Object.entries(rec as Record<string, unknown>)) { if (k === 'id' || k === 'sample' || k === 'history') continue; walk(v, k); }
+  return out.map(([p, v]) => [p.includes('.') ? `${fieldLabel('en', c, p)} (${p})` : fieldLabel('en', c, p), v] as [string, string]).sort((a, b) => a[0].localeCompare(b[0]));
+}
 
 const csvCell = (v: unknown) => { const s = v === undefined || v === null ? '' : String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 export const csv = (header: string[], rows: unknown[][]) => [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
@@ -141,7 +155,7 @@ export function buildTree(state: AppState, opts: TreeOptions = {}): TreeEntry[] 
     });
     const docNames = new Names();
     for (const d of (p.documents ?? []).slice().sort((a, b) => a.added - b.added || (a.id < b.id ? -1 : 1))) {
-      if (!d.fileId || CONFIDENTIAL_DOCS.includes(d.category)) continue;           // confidential: never in Drive folders
+      if (!d.fileId) continue;                                                       // confidential ones included (owner decision)
       const folder = [...root, 'Documents', DOC_FOLDER[d.category] ?? 'Other'];
       const e = ext(d.name, 'pdf');
       add({ key: `${key}:doc:${d.fileId}`, path: folder, name: docNames.claim(folder, cleanName(d.name.replace(/\.[A-Za-z0-9]{1,5}$/, ''), 'document'), d.id, `.${e}`), mime: d.mime || mimeFor(`x.${e}`), fileId: d.fileId, ...grp });

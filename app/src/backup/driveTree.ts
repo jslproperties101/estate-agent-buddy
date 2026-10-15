@@ -66,8 +66,8 @@ This is a view, not a backup format. Changes you make here are NOT read back int
 Recovery as "edited outside the app" and the app's version is written again.
 To restore the app, use the restore points in "${DR_NAME}" (Agent Profile > Settings > Backup and restore).
 
-Not included on purpose: confidential documents (title, owner correspondence, rental or sales documents), records other
-agents share with you, sample data, and any keys or passwords.
+Included: your confidential documents too (title deeds, owner correspondence, agreements), because this is your own
+Drive. Not included on purpose: records other agents share with you, sample data, and any keys, tokens or passwords.
 `;
 
 export async function exportTree(store: Store, d: DriveClient, now = Date.now()): Promise<TreeRun> {

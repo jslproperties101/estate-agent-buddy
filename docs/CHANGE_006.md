@@ -3,7 +3,9 @@
 Branch `feature/v2.0.10-integrated` (from Change 010 `e368606`). Specification: the approved design document
 "Change 006 Four-Layer Backup and Recovery Architecture" (design-only, checked against `5037b41`). This file reports the
 implementation against it. Owner defaults applied (Oct 2026): Drive backups only while the app is open, no server and
-no stored refresh token; Supabase stays on Free; restore points daily, 30 kept; no identity-document collection.
+no stored refresh token; Supabase stays on Free; restore points daily, 30 kept; no new identity-document feature.
+**Owner decision of 16 Oct 2026: confidential documents ARE included in the owner's own backups** (backup file, readable
+Drive folders, restore points), with no extra app-level encryption; team sharing must never expose them (see below).
 
 Status words: **IT** = implemented and covered by automated tests (Node, Chromium at 384 × 824 with stand-ins, local
 PostgreSQL 16). **NV** = not verified on a real phone or live service. **OD** = waits for an owner decision or owner
@@ -53,7 +55,7 @@ Calculator, Agent Profile, Ask Expert. A module folder exists only when it holds
 |---|---|---|
 | Exact layout; empty levels "… Not Recorded"; clashes get `[id8]`; identity from Record ID, never folder name | IT | T1 |
 | Own records only: no shared-in (Change 010), no sample data | IT | T1 |
-| **No confidential documents** (title, owner correspondence, rental/sales papers) and **no identity-document folder**; IC/NRIC/passport/bank fields withheld | IT | T1 |
+| **Confidential documents included** (Documents/Property Title, Owner Correspondence, Agreements) and every field, IC numbers included (owner decision) | IT | T1, FX2 |
 | No secrets: Maps key, Supabase URL/key, Ask Expert URL, tokens never written | IT | T1, T10 |
 | Idempotent: rerun uploads nothing | IT | T2 |
 | Edit → previous version to Recovery, same Drive file updated | IT | T3 |
@@ -114,28 +116,38 @@ entry checked against the inner manifest.
 | Real independent storage, object lock, key holders, nightly schedule, monthly restore drill | **Not operational (OD)** | — |
 
 ## Fixes made during the integration (each with a regression test)
-1. **Confidential documents reached the cloud** although the form says "kept on this phone only"; a Team Workspace
-   member could then download them. Cloud file sync now skips them (`data/fileRefs.ts` `cloudFileRefs`); the record
-   shows "N confidential, kept on this phone only". They remain in the person's own backup file and Drive restore
-   points. Test FX2. *Owner to confirm this reading (see below).*
+1. **Confidential documents reached the shared cloud bucket**, where anyone who may read the record can read its
+   files, so sharing a property would have handed over its title deed. They are now never put in that bucket
+   (`data/fileRefs.ts` `cloudFileRefs`). Tests TB1, TB2, FX2.
 2. **Advert screenshots were in no backup and never synced** (missing from `fileRefs`). Now included (cloud kind
    "other"). Test FX1.
 3. **Two restore points in the same second shared one folder.** Now separate (`…07.400Z`). Test RP7 (found by U92).
 
-## Identity documents and privacy
-No identity-document folders and no collection: the app has no place for owner or buyer IC scans, and none was added.
-If the owner later asks for it, it needs consent recording, access control, encryption and retention rules first
-(design section 13). Malaysian PDPA notes in the design still apply (Supabase region and backup location belong in the
-privacy notice).
+## Confidential documents: the final policy (owner decision, 16 Oct 2026)
+| Where | Confidential documents (title, owner correspondence, rental/sales and transaction papers; any IC scan the agent attaches as one of these) |
+|---|---|
+| Backup file (share sheet / download) | **included**, restorable (FX2) |
+| Readable Google Drive folders (owner's own Drive) | **included** under Documents/…; every field incl. IC numbers (T1) |
+| Drive restore points | **included**, restorable on a clean phone (RP1, FX2) |
+| Shared Supabase file bucket | **never**: not uploaded, no file row (TB1) |
+| Team member with View Only or View and Edit on the record | sees the record and the document's name, **never the file** (TB2) |
+| Revoking a share / leaving / removal / disabled account | the shared record leaves the other phone (TB2, S10–S12); files that are in the bucket stop being readable at once (`file-access-test.sh`, 16 checks) |
+| Secrets (tokens, keys, passwords, Supabase/Maps keys) | never in any backup (RP1, T1, T10, D5, Layer 4 P4-2) |
+
+Why the bucket is the boundary: in Supabase, a file row and its stored object are readable by anyone who may read the
+record (`supabase/tests/file-access-test.sh`). Sharing is per record, so the only way to share a property without its
+title deed is to keep the deed out of the bucket. Consequence: a second phone of the SAME owner gets confidential
+documents from the owner's Drive restore point or backup file, not from cloud sync; and a confidential document that a
+team member adds to the owner's shared record stays on that member's phone. No Supabase policy was changed.
+
+Identity documents: there is still no separate identity-document section (none was requested as a feature); IC scans
+attached as confidential documents follow the policy above. Malaysian PDPA notes in the design still apply.
 
 ## Owner actions and decisions (only the ones that need you)
 1. **Google OAuth for Drive (test first).** In the Google Cloud project used for the **test** sign-in: OAuth consent
    screen → Scopes → add `https://www.googleapis.com/auth/drive.file`; add your two test Google accounts as test users.
    Nothing else in Drive becomes visible to the app.
 2. **Layer 4 provider and key holders** — see `CHANGE_006_LAYER4.md` §2. Until then Layer 4 is code and tests only.
-3. **Confidential documents off the cloud (fix 1).** Built as the form promises. If you instead want title deeds etc.
-   in the cloud (so a new phone gets them automatically), say so; it is a one-line switch, but teammates with access
-   to the record would then be able to download them.
 
 ## Not changed
 `main`, the Supabase production project, the website and update channel, Google Cloud settings, any Drive account,

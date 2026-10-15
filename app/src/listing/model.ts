@@ -56,7 +56,7 @@ export const SALE_COMMISSION_TYPES: SaleCommissionType[] = ['pct', 'flat'];
 export const RENT_COMMISSION_TYPES: RentCommissionType[] = ['months', 'flat'];
 export const TITLE_TYPES = ['Individual title', 'Strata title', 'Master title'] as const;
 export const DOC_CATEGORIES: DocCategory[] = ['title', 'brochure', 'floorplan', 'correspondence', 'transaction', 'other'];
-/** Title documents and owner correspondence can hold personal details: kept on this phone only. */
+/** Documents that can hold personal details: in the owner's own backups and Google Drive, never in the shared team cloud bucket (data/fileRefs.ts). */
 export const CONFIDENTIAL_DOCS: DocCategory[] = ['title', 'correspondence', 'transaction'];
 export const PLATFORMS = ['PropertyGuru', 'iProperty', 'Mudah', 'The Edge Property', 'Facebook Ads', 'Facebook Marketplace'] as const;
 export const AD_STATUSES: AdStatus[] = ['planned', 'live', 'needs_update', 'paused', 'expired'];

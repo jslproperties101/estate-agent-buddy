@@ -197,10 +197,11 @@ test('RP6 an upload whose size does not check out is binned and reported; no suc
   assert.equal(r.ok, false); assert.equal(r.pointError, 'notVerified');
   assert.equal(s.getState().meta.driveLastOkAt, undefined);
   assert.equal(s.getState().meta.driveLast?.ok, false);
+  for (const f of fileRefs(s.getState())) assert.ok(await s.getFile(f.fileId), 'a failed upload never removes the phone\'s copy');
 });
 
 // ---------------------------------------------------------------- readable folders (Layer 2) and Recovery (Layer 1 in Drive)
-test('T1 the readable tree has the approved layout; confidential documents, identity numbers, secrets and shared-in records stay out', async () => {
+test('T1 the readable tree has the approved layout; it holds the owner\'s confidential documents and every field (owner decision), never secrets or shared-in records', async () => {
   const { s } = await agentPhone();
   s.setSingleton('meta', { shared: { 'properties:sh': { workspaceId: 'ws2', ownerId: 'u2', ownerEmail: 'b@x.com', level: 'edit' } } });
   s.upsert('properties', { id: 'sh', created: 50, updated: 50, street: 'Jalan Kongsi', ownerName: 'Shared Owner', photos: [] } as unknown as Listing, true);
@@ -219,16 +220,19 @@ test('T1 the readable tree has the approved layout; confidential documents, iden
     `${ROOT}/Contacts/Buyers/Encik Rahman/Buyer Details.txt`, `${ROOT}/Inquiries and Viewings/2026-10-14 10.00 Encik Rahman.txt`,
     `${ROOT}/Agent Profile/Profile.txt`, `${ROOT}/Settings/Current Settings.txt`,
   ]) assert.ok(paths.includes(p), `missing ${p}\n${paths.join('\n')}`);
-  assert.ok(!paths.some(p => /Geran|Property Title|Identity/i.test(p)), 'no confidential document, no identity-document folder');
+  assert.ok(paths.includes(`${PROP}/Documents/Property Title/Geran.pdf`), 'the title deed is in the owner\'s own Drive (owner decision, 16 Oct)');
+  assert.equal(d.textAt(`${PROP}/Documents/Property Title/Geran.pdf`), '%PDF-geran-CONFIDENTIAL');
+  assert.ok(!paths.some(p => /Identity Documents/i.test(p)), 'no empty identity-document folder (the app has no such feature)');
   assert.ok(!paths.some(p => /Jalan Kongsi|Shared Owner|Jalan Contoh/.test(p)), 'no shared-in or sample record');
   const details = d.textAt(`${PROP}/Property Details.txt`)!;
   assert.match(details, /^Property Details\nRecord ID: p1\n/);
-  assert.match(details, /Withheld \(confidential\)/, 'the title deed is listed as withheld');
+  assert.match(details, /Geran\.pdf \(title\)/, 'the title deed is listed by name');
+  assert.doesNotMatch(details, /Withheld/);
   assert.equal(await d.textAt(`${PROP}/Pictures/01-front.jpg`), 'FRONT-PHOTO', 'main photo is 01');
   const buyer = d.textAt(`${ROOT}/Contacts/Buyers/Encik Rahman/Buyer Details.txt`)!;
-  assert.ok(!buyer.includes('900101-05-1234'), 'IC number withheld');
+  assert.ok(buyer.includes('900101-05-1234'), 'the owner\'s own backup keeps the IC number');
   const all = [...d.files.values()].map(f => new TextDecoder().decode(f.data)).join('\n');
-  for (const secret of ['SECRET-MAPS-KEY', 'SECRET-ANON', 'secret.supabase.co', 'secret-expert', 'TOKEN-SECRET', '%PDF-geran']) assert.ok(!all.includes(secret), `no ${secret}`);
+  for (const secret of ['SECRET-MAPS-KEY', 'SECRET-ANON', 'secret.supabase.co', 'secret-expert', 'TOKEN-SECRET', 'REFRESH-SECRET', '"TOK"']) assert.ok(!all.includes(secret), `no ${secret}`);
   assert.match(d.textAt(`${ROOT}/Export Status.txt`)!, /Status: complete/);
   assert.match(d.textAt(`${ROOT}/Index.csv`)!, /properties:p1:details,properties:p1,Property Listing\/Malaysia\/.*\/Property Details\.txt,[0-9a-f]{64},\d+/);
 });
@@ -421,12 +425,25 @@ test('FX1 advert screenshots are part of the record: in the backup file, the res
   assert.ok(i.ok && i.manifest!.files.some(f => f.id === adShot));
 });
 
-test('FX2 confidential documents are never offered to the cloud, but stay in the person\'s own backups', async () => {
+test('FX2 confidential documents: never offered to the shared team bucket; in the owner\'s backup file, Drive folders and restore points, and restorable', async () => {
   const { s, title, brochure } = await agentPhone();
   const cloud = cloudFileRefs(s.getState()).map(r => r.fileId);
   assert.ok(!cloud.includes(title), 'title deed not for the cloud');
   assert.ok(cloud.includes(brochure));
   assert.ok(fileRefs(s.getState()).find(r => r.fileId === title)!.confidential);
   const b = await createBackup(s, T0);
-  assert.ok((await inspectBackup(b.bytes)).manifest!.files.some(f => f.id === title), 'own backup file keeps it');
+  const insp = await inspectBackup(b.bytes);
+  assert.ok(insp.manifest!.files.some(f => f.id === title), 'own backup file keeps it');
+  const fresh = await Store.open(new MemoryBackend());
+  await restoreBackup(fresh, insp, 'missing', T0 + 1);
+  assert.equal(await (await fresh.getFile(title))!.text(), '%PDF-geran-CONFIDENTIAL', 'and the owner gets it back from the file');
+  // restore point: in it, and restored on a clean phone
+  const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
+  await createRestorePoint(s, c, 'manual', T0);
+  const f = await drFolders(c);
+  const pv = await loadRestorePoint(c, f, (await listPoints(c, f)).complete[0]);
+  assert.ok(!('problem' in pv) && pv.inspection.manifest!.files.some(x => x.id === title));
+  const fresh2 = await Store.open(new MemoryBackend());
+  await restoreBackup(fresh2, pv.inspection, 'missing', T0 + 2);
+  assert.equal(await (await fresh2.getFile(title))!.text(), '%PDF-geran-CONFIDENTIAL', 'and from the restore point');
 });

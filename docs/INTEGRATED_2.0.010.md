@@ -37,7 +37,7 @@ Status key: **IT** implemented and tested automatically (Node, Chromium 384 × 8
 ### Found and fixed during integration (each with a regression test)
 | Defect | Effect | Fix | Test |
 |---|---|---|---|
-| Confidential documents uploaded to the cloud | contradicted "kept on this phone only"; a teammate could download a title deed | cloud sync skips them; shown as "confidential, kept on this phone only" | FX2 |
+| Confidential documents uploaded to the shared cloud bucket | a teammate with access to the record could download a title deed | never put in the bucket; in the owner's own backups and Drive (owner decision 16 Oct) | TB1, TB2, FX2, `file-access-test.sh` |
 | Advert screenshots missing from `fileRefs` | not in any backup, never synced | included (cloud kind "other") | FX1 |
 | Two restore points in the same second | one folder with two manifests | separate names with milliseconds | RP7, U92 |
 
@@ -48,20 +48,21 @@ separate test project's secrets (`EAB_QA_SUPABASE_URL` / `EAB_QA_SUPABASE_ANON_K
 for the connection on its sign-in screen. Test W2. Use the QA APK built after this change, not `qa-96e2803`.
 
 ### Shared systems checked across Changes 006 and 010
-Backups and restore points carry only the account's own records, history, audit entries and files: never records
-shared in by another agent, never Team Workspace events (RP1, E5). The readable Drive folders apply the same rule and
-also leave out confidential documents and identity numbers (T1). Change 010 permissions were not relaxed anywhere: no
+Backups and restore points carry only the account's own records, history, audit entries and files (confidential documents
+included, owner decision 16 Oct): never records shared in by another agent, never Team Workspace events (RP1, E5, T1).
+Confidential documents never enter the shared cloud bucket, so team sharing cannot expose them (TB1, TB2). Change 010 permissions were not relaxed anywhere: no
 SQL, policy or access-check file was changed by this integration.
 
 ## Automated results on the final integrated commit (this workspace)
 | Check | Result |
 |---|---|
 | TypeScript strict | 0 errors |
-| Lint (incl. EN/BM/ZH) | passed, 225 files |
-| Unit tests (Node) | 398 / 398 (368 before; +30: Change 006 Drive 22, Layer 1 5, version 1, workflow 2) |
+| Lint (incl. EN/BM/ZH) | passed, 226 files |
+| Unit tests (Node) | 400 / 400 (368 before; +32: Change 006 Drive 22, Layer 1 5, team boundary 2, version 1, workflow 2) |
 | Browser tests (Chromium 384 × 824, stand-ins) | 115 / 115 (U92 rewritten for the Drive layers, U30 for the release label) |
 | Production build (no publishing) | built (`scripts/build.mjs --no-env`); QA build inside U99 |
 | DB: RLS / rollback / write-block / Change 010 / RLS + 010 | 125/125 · 18/18 · 22/22 · 122/122 · 126/126 |
+| DB: file access with sharing, revoking, leaving | 16/16 |
 | Layer 4 format tests | 10 / 10 |
 | Layer 4 PostgreSQL rehearsal | 22 / 22 |
 | GitHub Actions | see the final report for run links |
