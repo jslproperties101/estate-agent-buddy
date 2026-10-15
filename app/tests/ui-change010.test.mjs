@@ -334,7 +334,7 @@ async function editStreet(page, value) {
 
 test('C10 export: preview with scope/filters/count/size, confirm, PDF and XLSX files with the right names, keep in app, export audited; cancel makes nothing', async () => {
   const cloud = new FakeTeamCloud(); cloud.available = false;
-  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1')]));
+  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1', { ref: 'P1001', refNo: 1001 })]));
   await a.page.locator('nav.grid > button', { hasText: 'Property List' }).click();
   await a.page.getByTestId('listing-card').first().locator('.gc').click();
   for (const v of ['Jalan Aina 2', 'Jalan Aina 3']) await editStreet(a.page, v);
@@ -444,4 +444,20 @@ test('C11 Export Management: saved list, search and filters, select all matching
   await a.page.getByTestId('deleted-list').waitFor();
   assert.equal(await a.page.locator('[data-field="exportSearch"]').inputValue(), '', 'search not remembered');
   await a.ctx.close();
+});
+
+test('C12 regression: a property shared by the other agent with the same number (P1001) never blocks saving my own P1001', async () => {
+  const cloud = new FakeTeamCloud();
+  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1', { ref: 'P1001', refNo: 1001 })]));
+  const b = await agent(cloud, 'badrul@x.com', 'Badrul', Object.fromEntries([prop('pb1', 'Jalan Badrul 9', { ref: 'P1001', refNo: 1001 })]));
+  await waitFor(() => cloud.rows.has('ws-aina@x.com|properties|pa1') && cloud.rows.has('ws-badrul@x.com|properties|pb1'));
+  const { token } = await (await cloud.fetch(`${SB}/rest/v1/rpc/eab_team_invite`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_email: 'badrul@x.com' }) })).json();
+  await cloud.fetch(`${SB}/rest/v1/rpc/eab_team_accept`, { method: 'POST', headers: { authorization: `Bearer tok-${b.user.id}` }, body: JSON.stringify({ p_token: token }) });
+  await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [{ collection: 'properties', id: 'pa1', level: 'view' }] }) });
+  await syncNow(b.page);
+  await b.page.locator('nav.grid > button', { hasText: 'Property List' }).click();
+  await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' }).locator('.gc').click();
+  await editStreet(b.page, 'Jalan Badrul 10');
+  assert.match(await b.page.getByTestId('detail-address').innerText(), /Jalan Badrul 10/);
+  await a.ctx.close(); await b.ctx.close();
 });

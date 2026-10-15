@@ -2,6 +2,7 @@
 // Smart Capture). Property details, to-dos, appointments and contacts are understood on the phone and always
 // opened in their form for the agent to check before saving.
 import { useState } from 'react';
+import { can } from '../team/access';
 import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { Go } from '../nav';
@@ -104,7 +105,7 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
       setPanel({ kind: 'buyers', query: bq.query, matches: findBuyers(bq.query, state.contacts, state.inquiries, state.appointments, state.properties) });
       return true;
     }
-    const tu = parseTargetedUpdate(text, state.properties, places);
+    const tu = parseTargetedUpdate(text, state.properties.filter(p => !p.archived && can(state, 'edit', 'properties', p.id)), places);
     if (tu) {
       setTicked(tu.kind === 'update' ? Object.fromEntries(tu.changes.map(c => [c.key, true])) : {});
       setPanel({ kind: 'target', result: tu, text });

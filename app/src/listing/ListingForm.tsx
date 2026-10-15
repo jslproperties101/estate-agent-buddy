@@ -92,10 +92,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const initial = id ? state.properties.find(x => x.id === id) : undefined;
   // "money" was its own section before Change 009; links to it now open Price, Tenure and Title Info.
   const startSection = section === 'money' ? 'tenure' : section;
+  // Change 010: reference numbers belong to each agent's own workspace; records shared by the other agent never count.
+  const ownProps = useMemo(() => state.properties.filter(p => !isForeign(state, 'properties', p.id)), [state]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [d, setD] = useState<Listing>(() => {
     if (initial) return forEditing(initial);
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
-    const no = nextNumber(state.properties);
+    const no = nextNumber(ownProps);
     return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
   });
   const dups = useMemo(() => possibleDuplicates(d, state.properties), [d.street, d.unitNo, d.lotNo, d.township, d.city, d.id, state.properties]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -151,7 +153,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   useEffect(() => {
     if (!refOpen) return;
     const list = document.querySelector<HTMLElement>('[data-testid="ref-no-list"]');
-    const target = list?.querySelector<HTMLElement>('[aria-selected="true"]') ?? list?.querySelector<HTMLElement>(`[data-no="${nextNumber(state.properties, d.id)}"]`);
+    const target = list?.querySelector<HTMLElement>('[aria-selected="true"]') ?? list?.querySelector<HTMLElement>(`[data-no="${nextNumber(ownProps, d.id)}"]`);
     if (list && target) list.scrollTop = target.offsetTop - list.clientHeight / 2;
   }, [refOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -350,8 +352,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const vendors = state.contacts.filter(x => x.roles.some(r => r === 'vendor' || r === 'landlord') || x.id === d.vendorId);
   const linked = state.contacts.find(v => v.id === d.vendorId);
   const refNo = num(refNoText);
-  const refProblem = checkRef(state.properties, d.id, d.refPrefix ?? '', refNo);
-  const suggestion = nextNumber(state.properties, d.id);
+  const refProblem = checkRef(ownProps, d.id, d.refPrefix ?? '', refNo);
+  const suggestion = nextNumber(ownProps, d.id);
   const refText = (p: ReturnType<typeof checkRef>) => (p === 'numberTaken' || p === 'refTaken' ? s.refProblem[p](suggestion) : p ? s.refProblem[p] : null);
 
   /** How many details a section holds, shown on its closed header so nothing entered is hidden from view. */
@@ -520,7 +522,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {refOpen && (
           <div className="opt-list ref-list" role="listbox" aria-label={s.refPick.listLabel} data-testid="ref-no-list">
             <small className="ref-legend">{s.refPick.legend}</small>
-            {numberChoices(state.properties, d.id).map(ch => {
+            {numberChoices(ownProps, d.id).map(ch => {
               const used = ch.usedBy.length > 0;
               const chosen = ch.no === refNo;
               return (

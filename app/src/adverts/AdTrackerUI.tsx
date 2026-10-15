@@ -192,7 +192,7 @@ export function AdSummaryScreen({ lang, go }: { lang: Lang; go: Go }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const today = ymd(new Date());
-  const att = useMemo(() => attention(state.properties, today), [state.properties, today]);
+  const att = useMemo(() => attention(state.properties.filter(p => !p.archived), today), [state.properties, today]);
   const sum = useMemo(() => costSummary(state.properties, title, { from: from || undefined, to: to || undefined }), [state.properties, from, to]);
   const byId = new Map(state.properties.map(p => [p.id, p]));
   const Lines = ({ lines, testId, link }: { lines: typeof sum.byProperty; testId: string; link?: boolean }) => (

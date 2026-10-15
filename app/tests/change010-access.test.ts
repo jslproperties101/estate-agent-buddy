@@ -130,3 +130,17 @@ test('A12 access ends the moment the share list drops a record (no stale access)
   assert.equal(can(s, 'view', 'properties', 'theirsEdit'), false);
   assert.equal(can(s, 'exportAudit', 'properties', 'theirsEdit'), false);
 });
+
+test('A13 every Change 010 text exists in English, Bahasa Malaysia and Chinese', async () => {
+  const { teamStrings } = await import('../src/team/strings');
+  const { auditStrings } = await import('../src/audit/strings');
+  const { exportStrings, EXACT_EXPORT } = await import('../src/exports/strings');
+  const { EXACT } = await import('../src/team/strings');
+  const keys = (o: object, p = ''): string[] => Object.entries(o).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? keys(v, `${p}${k}.`) : [`${p}${k}`])).sort();
+  for (const t of [teamStrings, auditStrings, exportStrings, EXACT_EXPORT, EXACT] as Record<string, object>[]) {
+    assert.deepEqual(keys(t.bm), keys(t.en)); assert.deepEqual(keys(t.zh), keys(t.en));
+  }
+  assert.equal(EXACT.en.endTeamQ, 'End this Team Workspace? Shared access will be revoked immediately. Your personal listings will remain in your Personal Workspace.');
+  assert.equal(EXACT_EXPORT.en.kept, 'Kept until permanently deleted');
+  assert.equal(EXACT_EXPORT.en.warning, 'Confidential Information: This export may contain confidential information. Share it only with authorized people.');
+});

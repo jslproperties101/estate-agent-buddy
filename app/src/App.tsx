@@ -265,7 +265,7 @@ function Shell() {
   useEffect(() => {
     const list = upcomingReminders(state.tasks, state.appointments, Date.now()).map(r => ({ id: idFor(r.key), at: r.at, ...reminderText(r, state, lang) }));
     // Advert expiry reminders (real adverts only; test and sample adverts never remind).
-    const ads = adReminders(state.properties, Date.now()).map(r => {
+    const ads = adReminders(state.properties.filter(p => !p.archived), Date.now()).map(r => {
       const p = state.properties.find(z => z.id === r.propertyId); const a = p?.marketing?.ads.find(z => z.id === r.adId);
       return { id: idFor(r.key), at: r.at, title: adStrings[lang].reminderTitle, body: adStrings[lang].reminderBody(p ? (p.ref ?? cardTitle(p)) : '', a?.platform ?? '', r.days) };
     });
@@ -525,7 +525,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   // Change 004: the main screen no longer pops up due reminders; the ones from the last 24 hours (to-dos not done,
   // appointments still scheduled) are listed here instead, so none is missed.
   const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30);
-  const adAttn = attention(state.properties, ymd(new Date()));
+  const adAttn = attention(state.properties.filter(p => !p.archived), ymd(new Date()));
   const perm = permission();
   const waiting = state.meta.dirty.length;
   const signedIn = !!state.meta.syncSession;

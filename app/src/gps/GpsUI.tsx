@@ -3,6 +3,7 @@
 // navigate; shows each property's banner status) and Co-broke Opportunity Map (Coming Soon).
 // Only real saved positions are shown.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { isForeign } from '../team/access';
 import { useMyPosition } from '../maps/position';
 import { MyPositionButton } from '../maps/MyPositionButton';
 import { MoneyInput } from '../ui/MoneyInput';
@@ -121,7 +122,7 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
   const recording = j && (j.status === 'recording' || j.status === 'paused');
   const here = tracker.fix ?? (j?.points.length ? { ...j.points[j.points.length - 1] } : null);
   const previous = state.journeys.filter(x => x.status === 'saved').sort((a, b) => b.startedAt - a.startedAt);
-  const withPos = state.properties.filter(hasPosition);
+  const withPos = state.properties.filter(p => !p.archived).filter(hasPosition);
 
   return (
     <section className="stack" data-testid="house-shopping">
@@ -267,7 +268,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
     if (!spot) return;
     setBusy(true);
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
-    const no = nextNumber(state.properties);
+    const no = nextNumber(state.properties.filter(p => !isForeign(state, 'properties', p.id)));
     const p: Listing = {
       id: newId(), created: Date.now(), updated: Date.now(), photos: [], ref: makeRef(prefix, no), refPrefix: prefix, refNo: no,
       type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), extraComments: note.trim() || undefined, status: 'needs_check', country: DEFAULT_COUNTRY,
@@ -358,7 +359,7 @@ export function PropertyMap({ lang, go, id }: { lang: Lang; go: Go; id?: string 
   const g = gpsStrings[lang];
   const ls = listingStrings[lang];
   const { maps, status } = useGoogleMaps(lang);
-  const list = useMemo(() => state.properties.filter(hasPosition).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || '')), [state.properties]);
+  const list = useMemo(() => state.properties.filter(p => !p.archived).filter(hasPosition).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || '')), [state.properties]);
   const [sel, setSel] = useState<string | undefined>(id ?? list[0]?.id);
   const mine = useMyPosition(false);
   const [route, setRoute] = useState<{ path: { lat: number; lng: number }[]; info?: string } | null>(null);

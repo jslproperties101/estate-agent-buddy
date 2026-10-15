@@ -195,3 +195,13 @@ test('E4 a failed deletion is retried once automatically; if it fails again the 
   assert.equal((await listExports(s)).find(e => e.ref === 'EXPB')!.deletedAt, undefined, 'kept');
   assert.equal((await s.auditEntries('properties:p1')).filter(x => x.detail?.event === 'export_copy_deleted').length, 1, 'only the real deletion is audited');
 });
+
+test('R8 an archived record can be exported without restoring it, with its archive history', async () => {
+  const s = await storeWithHistory(1);
+  const p = s.getState().properties.find(x => x.id === 'p1')!;
+  s.upsert('properties', { ...p, archived: { at: Date.now(), by: 'u-me' } });
+  const r = await report(s, ['properties:p1']);
+  assert.ok(s.getState().properties.find(x => x.id === 'p1')!.archived, 'still archived');
+  assert.ok(r.records[0].entries.some(e => e.action === 'archive'));
+  assert.equal(r.totals.delete, 1, 'archiving counts as a deletion');
+});

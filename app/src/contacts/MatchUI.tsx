@@ -89,7 +89,7 @@ export function BuyerRequirementsCard({ lang, c, go }: { lang: Lang; c: Contact;
   const { state } = useApp();
   const m = matchStrings[lang]; const ls = listingStrings[lang];
   const reqs = (c.requirements ?? []).filter(r => !isEmptyRequirement(r));
-  const matches = useMemo(() => matchesForBuyer(c, state.properties).slice(0, 20), [c, state.properties]);
+  const matches = useMemo(() => matchesForBuyer(c, state.properties.filter(p => !p.archived)).slice(0, 20), [c, state.properties]);
   return (
     <>
       <SectionCard title={m.title} onEdit={() => go({ name: 'contactForm', id: c.id })} editLabel="✎" testId="buyer-requirements">
