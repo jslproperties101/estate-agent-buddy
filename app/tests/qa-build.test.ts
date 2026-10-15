@@ -75,7 +75,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   assert.equal(rp.status, 0, rp.stderr);
   const gp = readFileSync(join(prod, 'android/app/build.gradle'), 'utf8');
   assert.match(gp, /applicationId "com\.jslproperties\.estateagentbuddy"/);
-  assert.match(gp, /versionName "2\.1\.0-n3"/);
+  assert.match(gp, /versionName "2\.2\.0-n3"/);
   const sp = readFileSync(join(prod, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sp, /name="app_name">Estate Agent AI Buddy</);
   assert.match(sp, /name="custom_url_scheme">com\.jslproperties\.estateagentbuddy</);
@@ -86,7 +86,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const gq = readFileSync(join(qa, 'android/app/build.gradle'), 'utf8');
   assert.match(gq, /applicationId "com\.jslproperties\.estateagentbuddy\.qa"/);
   assert.match(gq, /namespace "com\.jslproperties\.estateagentbuddy"/, 'the code package is unchanged');
-  assert.match(gq, /versionName "2\.1\.0-qa-n3"/, 'the native version stays readable by the update logic');
+  assert.match(gq, /versionName "2\.2\.0-qa-n3"/, 'the native version stays readable by the update logic');
   const sq = readFileSync(join(qa, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sq, /name="app_name">EAB QA</);
   assert.match(sq, /name="package_name">com\.jslproperties\.estateagentbuddy\.qa</);

@@ -35,7 +35,9 @@ if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-p
 // (so it can never download the production bundle). See docs/QA.md. Normal builds do not set it.
 // Not a secret, so it is read even with --no-env (the screen tests build a QA copy).
 const qa = process.env.EAB_QA === '1';
-const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(qa ? { qa: true } : {}) };
+// releaseLabel (package.json) is a display-only milestone name ("2.0.010" = the integrated Changes 001-010). It is never
+// compared: installs and updates use the commit (sha), the semantic version and nativeVersion only.
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}) };
 
 // EAB_OUTDIR: another output folder (the screen tests build a QA copy beside dist/). Default dist/.
 const OUT = process.env.EAB_OUTDIR || 'dist';

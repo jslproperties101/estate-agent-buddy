@@ -1,7 +1,8 @@
 {
   "name": "estate-agent-buddy",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.2.0",
+  "releaseLabel": "2.0.010",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

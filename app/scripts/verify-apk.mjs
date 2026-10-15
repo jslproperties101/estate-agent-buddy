@@ -37,7 +37,7 @@ const main = list.find(n => /^assets\/public\/main\.js$/.test(n));
 need(!!main, 'web bundle assets/public/main.js missing');
 if (main) {
   const js = read(main).toString('utf8');
-  const info = /\{sha:"([0-9a-f]+)",version:"([^"]+)",nativeVersion:(\d+),builtAt:"[^"]+"(,qa:!0|,qa:true)?\}/.exec(js);
+  const info = /\{sha:"([0-9a-f]+)",version:"([^"]+)",nativeVersion:(\d+),builtAt:"[^"]+"(?:,release:"[^"]*")?(,qa:!0|,qa:true)?\}/.exec(js);
   need(!!info, 'build info not found in the web bundle');
   if (info) {
     need(variant === 'qa' ? !!info[4] : !info[4], `web bundle QA flag does not match the ${variant} variant`);
