@@ -1,4 +1,4 @@
-# Change 010 — test plan for a separate Supabase TEST project (two Google accounts, two devices)
+# Changes 010 and 006 — test plan for a separate Supabase TEST project (two Google accounts, two devices)
 
 Status: **prepared, not started.** Nothing here has been applied anywhere. **Never run these steps on the production
 project.** Everything below happens in a new, separate Supabase project that holds no real data.
@@ -19,6 +19,11 @@ Files used
   the real app). CI builds the QA APK only for branch names containing `qa`, so this needs either a `qa` branch made
   from `feature/change-010-team-audit-exports` (your approval) or the web version opened from a local build.
   The Supabase URL and anon key are typed in Settings on each device and are never committed.
+  **Integrated release 2.0.010:** use the QA APK from branch `feature/qa-v2.0.10-integrated` (release `qa-<commit>` on GitHub).
+  Never install the normal debug APK for this test.
+- For the Change 006 Drive checks (Part 3): the Google Cloud project behind the **test** sign-in, with the
+  `https://www.googleapis.com/auth/drive.file` scope added to its OAuth consent screen and both test accounts listed as
+  test users.
 
 ## Part 1 — Set up the test project (owner, about 20 minutes)
 1. Supabase → **New project** (free plan is fine), region Singapore. Name it e.g. `eab-change010-test`.
@@ -97,6 +102,44 @@ Write the result (Pass / Fail + a screenshot) in each row. The ✓ column is for
 2. SQL editor: run `supabase/proposed/20261016000000_change010_rollback.sql`.
 3. Pass when: both agents' own records are unchanged, the apps keep syncing their own records, and the Team Workspace
    screen says it is not switched on. Then re-run the proposal to continue testing if needed.
+
+## Part 3 — Change 006 backup and recovery (same test project, test accounts only)
+Before starting: Google Cloud console (test project) → APIs & Services → enable **Google Drive API**; OAuth consent
+screen → Scopes → add `.../auth/drive.file`. Then on phone 1: Agent Profile → Settings → Backup and restore →
+**Connect Google Drive** and allow.
+
+### 3.1 Layer 1 — record history (cloud)
+| # | Do this | Pass when | ✓ |
+|---|---|---|---|
+| 1 | SQL: `select to_regclass('public.eab_record_revisions');` | not null (Phase 2 migration in place) | |
+| 2 | Phone 1: edit P1's price twice, sync; SQL: `select count(*) from eab_record_revisions where record_id='<P1 id>';` | ≥ 2 | |
+| 3 | P1 → History → restore the first version → sync | price back on both phones; View History shows the restore with before/after | |
+| 4 | Airplane mode: edit P2; close and reopen the app; back online | edit still there after reopening; syncs; one audit entry, not two | |
+
+### 3.2 Layer 2 — readable folders (real Google Drive)
+| # | Do this | Pass when | ✓ |
+|---|---|---|---|
+| 1 | After connecting, open drive.google.com with Agent A | folder **Estate Agent AI Buddy** with Property Listing/…/Owner/Property Details.txt, Pictures/01-…jpg | |
+| 2 | Add a title deed (Confidential) to P1, sync, Back up to Drive now | the deed is **not** in Drive; Property Details lists it as "Withheld (confidential)" | |
+| 3 | Edit P1's price, sync, Back up to Drive now | Property Details.txt updated; previous copy in `Recovery/` with the time in its name | |
+| 4 | In Drive, edit a To-Do .txt by hand; Back up to Drive now | your text kept in To-Do/Recovery "edited outside the app"; the app's text back; Settings says so | |
+| 5 | Delete P2 permanently in the app, sync, back up | P2's folder moved to its parent's `Recovery/`, not deleted | |
+| 6 | A record B shares with A | never appears in A's Drive | |
+| 7 | Settings: readable folders line | "complete", or "partial" with the reason (e.g. waiting for sync) | |
+
+### 3.3 Layer 3 — restore points (real Google Drive)
+| # | Do this | Pass when | ✓ |
+|---|---|---|---|
+| 1 | Back up to Drive now | Disaster Recovery/Restore Points/<time>/manifest.json, records.json, Restore Point.txt; message names the point | |
+| 2 | Open records.json in Drive and search for the Supabase key, "accessToken", "refreshToken", the Maps key | none found | |
+| 3 | Uninstall the QA app (or use phone 2 signed in as A on a clean install), connect Drive, Restore points → newest → Check | preview shows counts; restore brings back records, photos and documents | |
+| 4 | Change a byte in one Objects file (download, edit, upload over it), try that point again | refused: "did not pass its checks"; nothing changed | |
+| 5 | Leave the app closed for 3 days, then open it | warning shows the last point's date; a new point is made at start | |
+| 6 | An older `.zip` in "Estate Agent AI Buddy backups" (from the previous QA app) | still listed under "Older backup files on Drive" and restores | |
+
+### 3.4 Layer 4 — not part of this test
+Layer 4 needs a storage provider and two key holders first (`docs/CHANGE_006_LAYER4.md`). Its format and a full
+dump → encrypt → restore-into-a-new-database rehearsal pass automatically on local PostgreSQL in CI.
 
 ## After the test
 - Fill in this file's ✓ column (or send the screenshots) so `docs/CHANGE_010.md` can move rows from **NV** to verified.

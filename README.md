@@ -4,6 +4,16 @@ Field app for a Malaysian property negotiator working mainly in Nilai and Sepang
 "Property Explorer"). The Android package id stays `com.jslproperties.estateagentbuddy`, so new APKs install over the old one.
 Target: a native Android app (Capacitor) for the Samsung S23 Ultra, with Supabase (Singapore) as the cloud backend.
 
+## Integrated release 2.0.010 (version 2.2.0, native version 3 — QA candidate, not released)
+
+Changes 001–010 in one build on `feature/v2.0.10-integrated`, with Change 006's four-layer backup implemented:
+daily verified **restore points** and **readable folders with Recovery copies** in the person's own Google Drive (only
+while the app is open), and a provider-neutral **encrypted platform backup** (`ops/platform-backup/`, not operational
+until a provider and two key holders are chosen). Matrix, results and what is not proven:
+[`docs/INTEGRATED_2.0.010.md`](docs/INTEGRATED_2.0.010.md), [`docs/CHANGE_006.md`](docs/CHANGE_006.md),
+[`docs/CHANGE_006_LAYER4.md`](docs/CHANGE_006_LAYER4.md), test plan
+[`docs/CHANGE_010_SUPABASE_TEST_PLAN.md`](docs/CHANGE_010_SUPABASE_TEST_PLAN.md).
+
 ## Update of 13 Oct 2026 (version 2.1.0, native version 3 — needs the new APK)
 
 One coordinated update from the owner's 21-point list. Details, test evidence and what still needs the phone:

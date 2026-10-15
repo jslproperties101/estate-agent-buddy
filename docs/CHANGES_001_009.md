@@ -11,7 +11,7 @@ Status words: DONE (built and covered by automated tests) · BLOCKED · DESIGN O
 | 003 Remove the top-middle "Soon" item | DONE | `src/App.tsx` header (Co-broke button removed) | U1, U25 |
 | 004 Remove the main-screen To-Do popup | DONE; due reminders are now listed in Notifications ("Due in the last 24 hours"), the bell still counts them, phone notifications unchanged | `src/App.tsx` Shell + Notifications | U9 (reminder test), U89 |
 | 005 Old preview popup | SUPERSEDED by 008/009 — not built | — | U65 asserts it is absent |
-| 006 Four-layer backup | **DESIGN ONLY** — nothing implemented | — | — |
+| 006 Four-layer backup | **DESIGN ONLY** here — implemented later on `feature/v2.0.10-integrated`: see `docs/CHANGE_006.md` and `docs/INTEGRATED_2.0.010.md` | — | — |
 | 007 Remove the orange QA banner | DONE; About still says QA; save/sync line kept; no gap | `src/App.tsx`, `src/styles.css`, `docs/QA.md` | U99 (builds a real QA bundle) |
 | 008 Single tap; no long press / preview eye | DONE (the only long-press and preview code was the Property List) | `src/listing/ListingUI.tsx` | U65 |
 | 009 Property List cards | DONE (grid cards kept short, owner 15 Oct) | `src/listing/ListingUI.tsx`, `src/styles.css` | U65, U104 |
