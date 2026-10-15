@@ -79,23 +79,32 @@ jobs:
       - name: Change 010 proposal - Team Workspace, sharing, audit (local PostgreSQL, not applied anywhere)
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
         run: bash supabase/tests/change010-test.sh
+      - name: Change 006 Layer 4 - encrypted platform backup format (Node, temporary folders only)
+        run: node --test ops/platform-backup/platform-backup.test.mjs
+      - name: Change 006 Layer 4 - dump, encrypt, restore into a NEW database with each key holder (local PostgreSQL, synthetic data)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/platform-backup-test.sh
       - name: Existing roles and row-level security again, with the Change 010 proposal on top
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres, EAB_WITH_CHANGE010: '1' }
         run: bash supabase/tests/rls-test.sh
 
   android:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).
-    # "qa"   = the isolated QA APK (separate package name and storage, automatic updates OFF, release tag qa-<commit>);
-    #          built only for branches whose name contains "qa" (and never publishes anything to the update address).
+    # "qa"   = the isolated QA APK (separate package name and storage, automatic updates OFF, release tag qa-<commit>).
+    # Integrated release 2.0.010 (Oct 2026), narrowest safe change:
+    #   - a branch whose name contains "qa" builds ONLY the QA APK (no normal-package APK is built or offered there);
+    #   - every other branch still builds and checks the normal APK, but only main and feature/v2-full-update attach
+    #     it to a GitHub Release (feature branches no longer publish an APK that installs over the real app).
     strategy:
       fail-fast: false
       matrix:
-        variant: ${{ fromJSON(contains(github.ref_name, 'qa') && '["prod","qa"]' || '["prod"]') }}
+        variant: ${{ fromJSON(contains(github.ref_name, 'qa') && '["qa"]' || '["prod"]') }}
     name: android (${{ matrix.variant }})
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app } }
     env:
       EAB_QA: ${{ matrix.variant == 'qa' && '1' || '' }}
+      PUBLISH_APK: ${{ (matrix.variant == 'qa' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update') && '1' || '' }}
       EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
       EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
       EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
@@ -167,6 +176,7 @@ jobs:
           echo "maps=$([ -n "$EAB_GOOGLE_MAPS_API_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
           echo "supabase=$([ -n "$EAB_SUPABASE_URL" ] && [ -n "$EAB_SUPABASE_ANON_KEY" ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
+        if: env.PUBLISH_APK == '1'
         with: { name: 'apk-${{ matrix.variant }}', path: '${{ steps.apk.outputs.file }}' }
       - name: Real Google Maps check (only with the Maps key secret)
         id: maps
@@ -176,6 +186,7 @@ jobs:
           npx playwright install --with-deps chromium
           MAPS_CHECK_DIST=../dist-maps-check node scripts/maps-check.mjs ../maps-check.png ../maps-check.txt
       - name: Release with the APK
+        if: env.PUBLISH_APK == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
