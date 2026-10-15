@@ -36,7 +36,7 @@ export const POINT_VERSION = 1;
 export const KEEP_POINTS = 30;
 /** An incomplete point older than this is binned by the next run. */
 export const STALE_INCOMPLETE_MS = 24 * 3600_000;
-export const POINT_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z$/;
+export const POINT_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(\.\d{3})?Z$/;
 
 export type PointReason = 'daily' | 'manual' | 'before-restore';
 export interface PointManifest {
@@ -61,8 +61,9 @@ const dec = new TextDecoder();
 const buf = (d: Uint8Array) => d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) as ArrayBuffer;
 const shaOf = (d: Uint8Array) => sha256Hex(buf(d));
 
-export const pointName = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace(/:/g, '-') + 'Z';
-export const pointTime = (name: string) => Date.parse(`${name.slice(0, 10)}T${name.slice(11, 19).replace(/-/g, ':')}Z`);
+/** "2026-10-15T01-42-07Z" (UTC); a second point in the same second gets its milliseconds: "…07.123Z". */
+export const pointName = (ms: number, withMs = false) => new Date(ms).toISOString().slice(0, withMs ? 23 : 19).replace(/:/g, '-') + 'Z';
+export const pointTime = (name: string) => Date.parse(`${name.slice(0, 10)}T${name.slice(11, 19).replace(/-/g, ':')}${name[19] === '.' ? name.slice(19, 23) : ''}Z`);
 
 async function manifestChecksum(m: Omit<PointManifest, 'checksum'> | PointManifest): Promise<string> {
   const { checksum: _c, ...rest } = m as PointManifest; void _c;
@@ -140,7 +141,11 @@ export async function createRestorePoint(store: Store, d: DriveClient, reason: P
     have.set(sha, made); uploadedObjects++;
   }
   // 2. the point's folder and records.json, read back and checked
-  const name = pointName(now);
+  // a new folder every time (never adding to an existing point)
+  const taken = new Set((await d.children(f.points)).map(x => x.name));
+  let name = pointName(now);
+  if (taken.has(name)) name = pointName(now, true);
+  for (let i = 1; taken.has(name); i++) name = pointName(now + i, true);
   const folder = await d.folder(f.points, name);
   const recBytes = enc.encode(JSON.stringify(pkg.manifest));
   const recSha = await shaOf(recBytes);

@@ -164,6 +164,18 @@ test('RP4 a damaged restore point is refused before anything changes (object, re
   assert.equal((await s.safetyCopies()).length, 0);
 });
 
+test('RP7 two restore points in the same second are two separate points', async () => {
+  const { s } = await agentPhone();
+  const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
+  const a = await createRestorePoint(s, c, 'daily', T0);
+  const b = await createRestorePoint(s, c, 'manual', T0 + 400);
+  assert.notEqual(a.name, b.name);
+  assert.equal(b.name, '2026-10-15T01-42-07.400Z');
+  const l = await listPoints(c, await drFolders(c));
+  assert.equal(l.complete.length, 2);
+  assert.equal(l.complete[0].name, b.name, 'newest first');
+});
+
 test('RP5 an interrupted run leaves an incomplete point that is never offered and is binned a day later', async () => {
   const { s } = await agentPhone();
   const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
