@@ -29,6 +29,7 @@ import { applyChoices, merge3 } from './merge';
 import { syncFiles, FileSyncOptions } from './filesync';
 import { syncShared, sharedWorkspaces } from '../team/sharedSync';
 import { TeamError, dropAllShared } from '../team/api';
+import { syncAudit } from '../audit/auditSync';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -123,7 +124,7 @@ export interface CloudRow { collection: string; id: string; data: Rec | null; de
 
 export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number;
   /** Change 010: shared records taken in / dropped because access ended; the Team Workspace part failed (network). */
-  sharedIn?: number; sharedGone?: number; teamFailed?: boolean }
+  sharedIn?: number; sharedGone?: number; teamFailed?: boolean; auditSent?: number; auditReceived?: number; auditFailed?: boolean }
 
 /** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
  *  "Synced" after the cloud really answered. */
@@ -344,6 +345,11 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: S
     }
   }
   tally.conflicts = (metaNow(store).conflicts ?? []).length;
+  // Change 010: audit history up and down (never fails the sync of the records themselves).
+  if (opts.team !== false) {
+    try { const a = await syncAudit(store, cfg, fetchFn); tally.auditSent = a.sent; tally.auditReceived = a.received; }
+    catch { tally.auditFailed = true; }
+  }
   // Pictures and documents go after the records they belong to. One bad file never fails the sync.
   try {
     const f = await syncFiles(store, cfg, session, ws, fetchFn, { ...opts, only: r => !metaNow(store).shared?.[`${r.collection}:${r.recordId}`] });

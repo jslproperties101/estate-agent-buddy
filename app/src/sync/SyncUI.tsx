@@ -32,7 +32,7 @@ export function recordTitle(lang: Lang, collection: CollectionName, r: Rec | und
   return String(r.name ?? r.title ?? r.headline ?? r.message ?? r.kind ?? '').trim().slice(0, 60) || s.untitled;
 }
 
-function fieldLabel(lang: Lang, collection: CollectionName, field: string): string {
+export function fieldLabel(lang: Lang, collection: CollectionName, field: string): string {
   const top = field.split('.')[0];
   if (collection === 'properties') { const l = listingStrings[lang].l[top]; if (l) return l; }
   if (collection === 'contacts') { const f = (contactStrings[lang].f as Record<string, string>)[top]; if (f) return f; }

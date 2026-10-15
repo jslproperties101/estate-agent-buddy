@@ -15,6 +15,7 @@ import { OptionSelect } from '../ui/OptionSelect';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
 import { visible, can } from '../team/access';
 import { SharingLine } from '../team/TeamUI';
+import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { TaskRow } from '../agenda/AgendaUI';
 import { completeTask, sortTasks } from '../domain/workflow';
@@ -204,6 +205,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
       <SectionCard title={s.todos} onEdit={() => go({ name: 'taskForm', prefill: { contactId: c.id } })} editLabel={t.c.add}>
         {tasks.length === 0 ? <Empty>{s.noTodos}</Empty> : <ul className="task-list">{tasks.map(x => <TaskRow key={x.id} lang={lang} t={x} go={go} onToggle={() => store.upsert('tasks', completeTask(x, !x.done))} />)}</ul>}
       </SectionCard>
+      {!c.sample && <ViewHistory lang={lang} collection="contacts" id={c.id} go={go} />}
     </section>
   );
 }

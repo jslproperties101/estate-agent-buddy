@@ -6,6 +6,8 @@ import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
 import { calcStrings } from './strings';
 import { Confirm, Tabs } from '../ui/common';
+import type { Go } from '../nav';
+import { ViewHistory } from '../audit/AuditUI';
 import {
   purchase, rental, sale, agentCommission, PurchaseInput, RentalInput, SaleInput, TierPart,
 } from '../domain/calculator';
@@ -36,7 +38,7 @@ function Row({ k, v, strong, sub, testId }: { k: string; v: string; strong?: boo
   return <div className={`calc-row ${strong ? 'strong' : ''} ${sub ? 'sub' : ''}`}><span>{k}</span><span data-testid={testId}>{v}</span></div>;
 }
 
-export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?: string }) {
+export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propertyId?: string; go?: Go }) {
   const { state, store } = useApp();
   const t = calcStrings[lang];
   const cx = t.x;
@@ -332,6 +334,7 @@ export function CalculatorScreen({ lang, propertyId }: { lang: Lang; propertyId?
                   {hp ? <button className="btn small secondary" onClick={() => setUpdFor(c)} data-testid="calc-history-update">{cx.upd.button}</button> : <span />}
                   <button className="btn small ghost danger" onClick={() => setDelId(c.id)} data-testid="calc-delete">{cx.hist.del}</button>
                 </div>
+                {!c.sample && <ViewHistory lang={lang} collection="calculations" id={c.id} go={go} />}
               </div>
             );
           })}

@@ -6,6 +6,7 @@ import {
 } from './types';
 import { recordHash } from './hash';
 import { fileRefs } from './fileRefs';
+import { AuditEntry, actionFor, diffFields, newestFirst } from '../audit/model';
 
 export const newId = () =>
   (globalThis.crypto && 'randomUUID' in globalThis.crypto) ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -142,6 +143,7 @@ export class Store {
     const key = `${c}:${next.id}`;
     if (!keepTime) this.checkWrite(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, false);
     if (i >= 0 && !next.sample) this.keepRevision(key, list[i] as unknown as Record<string, unknown>, source, note);
+    if (!keepTime && !next.sample) this.recordAudit(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, source);
     const updated = i >= 0 ? list.map((x, j) => (j === i ? next : x)) : [next, ...list];
     this.state = { ...this.state, [c]: updated };
     this.write(() => this.backend.put(recKey(c, next.id), next));
@@ -160,6 +162,7 @@ export class Store {
     if (!fromSync) this.checkWrite(key, old as unknown as Record<string, unknown>, null, true);
     if (!old.sample) {
       this.keepRevision(key, old as unknown as Record<string, unknown>, source, undefined, true);
+      if (!fromSync) this.recordAudit(key, old as unknown as Record<string, unknown>, null, source);
       const at = Date.now();
       this.write(() => this.backend.putLocal(`del:${key}`, { at }));
     }
@@ -203,6 +206,77 @@ export class Store {
     if (old) for (const f of [...(old.photos ?? []), ...(old.documents ?? []), { fileId: old.photoFileId }]) if (f.fileId) this.discardFile(f.fileId);
     this.emit();
   }
+
+  // ---------- audit history (Change 010 D) ----------
+  /** Who is acting on this phone: the signed-in Google account, or the Agent Profile when nobody is signed in. */
+  actor(): { actorId: string; actorName?: string; actorEmail?: string } {
+    const s = this.state.meta.syncSession;
+    return { actorId: s?.userId ?? 'local', actorName: s?.name || this.state.profile.fullName || undefined, actorEmail: s?.email || this.state.profile.email || undefined };
+  }
+  /** Where a record lives in the cloud and whose it is (another agent's when it is shared with me). */
+  private place(key: string): { workspaceId?: string; ownerId?: string } {
+    const info = this.state.meta.shared?.[key];
+    if (info) return { workspaceId: info.workspaceId, ownerId: info.ownerId };
+    const s = this.state.meta.syncSession;
+    return { workspaceId: s?.workspaceId, ownerId: s?.userId ?? 'local' };
+  }
+  /** One audit entry per local save: exact before/after of each changed field. Changes that arrive from the cloud (or are
+   *  the automatic joining of two versions) are not "mine"; the cloud's own entries for them arrive with the next sync. */
+  private recordAudit(key: string, before: Record<string, unknown> | undefined, after: Record<string, unknown> | null, source: RevisionSource) {
+    if (source === 'cloud' || source === 'merge' || source === 'conflict' || source === 'migration') return;
+    const action = actionFor(before, after, source);
+    const changes = action === 'delete' ? [] : diffFields(before ?? {}, after);
+    if (action === 'edit' && !changes.length) return;
+    const i = key.indexOf(':');
+    const entry: AuditEntry = { id: `a-${newId()}`, collection: key.slice(0, i), recordId: key.slice(i + 1), ...this.place(key), ...this.actor(), action, changes, at: this.auditNow() };
+    this.appendAudit(key, [entry], true);
+  }
+  /** Adds entries to a record's audit list (by id: an entry already there is replaced by the cloud's copy, never
+   *  duplicated). `send` queues them for the cloud. Key "team" holds Team Workspace events with no record. */
+  appendAudit(key: string, entries: AuditEntry[], send = false) {
+    if (!entries.length) return;
+    this.write(async () => {
+      const list = ((await this.backend.getLocal(`audit:${key}`)) as AuditEntry[] | undefined) ?? [];
+      const byId = new Map(list.map(e => [e.id, e]));
+      for (const e of entries) byId.set(e.id, { ...byId.get(e.id), ...e });
+      await this.backend.putLocal(`audit:${key}`, [...byId.values()].sort(newestFirst));
+      if (send) for (const e of entries) await this.backend.putLocal(`auditq:${e.id}`, { key, id: e.id });
+    });
+    this.auditEpoch++;
+    this.emit();
+  }
+  private lastAuditAt = 0;
+  /** A time for a new entry: now, but always later than the previous entry made on this phone, so two saves in the same
+   *  millisecond keep their order. */
+  auditNow(): number { this.lastAuditAt = Math.max(Date.now(), this.lastAuditAt + 1); return this.lastAuditAt; }
+  /** Goes up whenever audit history changes, so View History redraws. */
+  auditEpoch = 0;
+  async auditEntries(key: string): Promise<AuditEntry[]> {
+    await this.flush();
+    return (((await this.backend.getLocal(`audit:${key}`)) as AuditEntry[] | undefined) ?? []).slice().sort(newestFirst);
+  }
+  /** Every record key that has audit history on this phone. */
+  async auditKeys(): Promise<string[]> { return (await this.listLocal('audit:')).map(r => r.key.slice(6)); }
+  /** Entries still waiting to reach the cloud. */
+  async auditOutbox(): Promise<{ key: string; id: string }[]> { return (await this.listLocal('auditq:')).map(r => r.value as { key: string; id: string }); }
+  auditSent(id: string) { this.write(() => this.backend.removeLocal(`auditq:${id}`)); }
+  /** The owner deletes old entries (after a warning). Each one is first copied to a hidden backup on this phone that the
+   *  app never shows, and the deletion itself is recorded. Returns how many were removed. */
+  async deleteAuditEntries(key: string, ids: string[]): Promise<number> {
+    await this.flush();
+    const list = ((await this.backend.getLocal(`audit:${key}`)) as AuditEntry[] | undefined) ?? [];
+    const gone = list.filter(e => ids.includes(e.id));
+    if (!gone.length) return 0;
+    const at = this.auditNow();
+    for (const e of gone) await this.backend.putLocal(`auditbak:${e.id}`, { entry: e, deletedAt: at, deletedBy: this.actor().actorId });
+    await this.backend.putLocal(`audit:${key}`, list.filter(e => !ids.includes(e.id)));
+    for (const e of gone) await this.backend.removeLocal(`auditq:${e.id}`);
+    const i = key.indexOf(':');
+    this.appendAudit(key, [{ id: `a-${newId()}`, collection: key.slice(0, i), recordId: key.slice(i + 1), ...this.place(key), ...this.actor(), action: 'audit_delete', detail: { count: gone.length }, at }], false);
+    return gone.length;
+  }
+  /** Drops a record's audit cache (access ended). */
+  forgetAudit(key: string) { this.write(() => this.backend.removeLocal(`audit:${key}`)); this.auditEpoch++; }
 
   // ---------- history ----------
   /** Puts `data` (the version about to be replaced) at the front of the record's history. Queued with the other writes. */

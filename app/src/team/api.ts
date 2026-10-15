@@ -168,5 +168,8 @@ export function dropAllShared(store: Store) {
     const i = key.indexOf(':');
     store.forgetRecord(key.slice(0, i) as CollectionName, key.slice(i + 1));
   }
+  // Team Workspace events: only the person who created the Team Workspace keeps reviewing them after it ends.
+  const st = store.getState();
+  if (st.meta.team?.createdBy !== (st.meta.syncSession?.userId ?? 'local')) store.forgetAudit('team');
   store.setSingleton('meta', { shared: {} });
 }

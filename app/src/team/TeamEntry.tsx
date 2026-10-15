@@ -5,6 +5,8 @@ import { useApp } from '../data/useStore';
 import { IconGear } from '../icons';
 import { teamStrings } from './strings';
 import { partnerOf, personLabel } from './access';
+import { auditStrings } from '../audit/strings';
+import { exportStrings } from '../exports/strings';
 
 export function TeamEntryCard({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
@@ -16,6 +18,10 @@ export function TeamEntryCard({ lang, go }: { lang: Lang; go: Go }) {
       <small className="muted">{partner ? `${t.members}: ${personLabel(partner.name, partner.email)}` : t.intro}</small>
       <button className="btn primary" data-testid="open-team" onClick={() => go({ name: 'team' })}>{t.teamTitle}</button>
       {partner && <button className="btn secondary" onClick={() => go({ name: 'manageSharing' })}><span className="row-gap"><IconGear /> {t.manageSharing}</span></button>}
+      <div className="two">
+        <button className="btn secondary" data-testid="open-audit-search" onClick={() => go({ name: 'auditSearch' })}>{auditStrings[lang].searchTitle}</button>
+        <button className="btn secondary" data-testid="open-exports" onClick={() => go({ name: 'exports' })}>{exportStrings[lang].manageTitle}</button>
+      </div>
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
 import { visible, can, myId } from '../team/access';
 import { WorkspaceSwitch, CreatorTag, SharingLine } from '../team/TeamUI';
+import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { requestDelete, teamErrorOf } from '../team/api';
 import { config } from '../config';
@@ -572,6 +573,8 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
           {l.history!.slice(0, 20).map((h, i) => <small key={i} className="muted">{new Date(h.at).toLocaleString(lang === 'zh' ? 'zh-CN' : lang === 'bm' ? 'ms-MY' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · {s.historyItem[h.source] ?? h.source}{h.summary ? ` (${h.summary})` : ''}</small>)}
         </div>
       )}
+      {/* Change 010: View History, collapsed, always last. */}
+      {!l.sample && <ViewHistory lang={lang} collection="properties" id={l.id} go={go} />}
     </section>
   );
 }

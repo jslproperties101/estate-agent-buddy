@@ -63,7 +63,8 @@ async function agent(cloud, email, name, records = {}, opts = {}) {
   await page.reload(); await page.waitForSelector('nav.grid');
   return { page, ctx, user, errors };
 }
-const prop = (id, street, extra = {}) => [`c:properties:${id}`, { id, created: 1, updated: 1, street, township: 'Nilai Impian', city: 'Nilai', type: 'Terrace house', photos: [], ...extra }];
+let refN = 1000;
+const prop = (id, street, extra = {}) => [`c:properties:${id}`, { id, created: 1, updated: 1, ref: `P${++refN}`, refPrefix: 'P', refNo: refN, street, township: 'Nilai Impian', city: 'Nilai', type: 'Terrace house', photos: [], ...extra }];
 async function openSettings(page) {
   await page.locator('nav.grid > button', { hasText: 'Agent Profile' }).click();
   await page.getByRole('button', { name: /Settings/i }).click();
@@ -281,5 +282,41 @@ test('C8 a cloud without the Change 010 update: the Team Workspace screen says s
   await openSettings(a.page); await a.page.getByTestId('open-team').click();
   await a.page.getByTestId('team-unavailable').waitFor();
   assert.match(await a.page.getByTestId('team-unavailable').innerText(), /not switched on in the cloud yet/i);
+  await a.ctx.close();
+});
+
+test('C9 View History: collapsed at the bottom, exact before/after, actor and Malaysian time; viewing adds nothing; search finds it', async () => {
+  const cloud = new FakeTeamCloud(); cloud.available = false;
+  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1')]));
+  await a.page.locator('nav.grid > button', { hasText: 'Property List' }).click();
+  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByRole('button', { name: 'Edit', exact: true }).first().click();
+  await a.page.waitForSelector('[data-testid="listing-form"]');
+  if ((await a.page.getByTestId('toggle-all').innerText()).match(/Open/)) await a.page.getByTestId('toggle-all').click();
+  await a.page.locator('[data-field="street"]').fill('Jalan Aina 99');
+  await a.page.getByTestId('save-property').click();
+  if (await a.page.getByRole('alertdialog').count()) await a.page.getByRole('alertdialog').getByRole('button').last().click();
+  await a.page.getByTestId('listing-details').waitFor();
+  const vh = a.page.getByTestId('view-history');
+  assert.equal(await vh.evaluate(x => x.open), false, 'collapsed by default');
+  const last = await a.page.locator('[data-testid="listing-details"] > *').last().getAttribute('data-testid');
+  assert.equal(last, 'view-history', 'at the bottom');
+  await vh.locator('summary').first().click();
+  const edit = vh.locator('[data-testid="audit-entry"][data-action="edit"]').first();
+  await edit.waitFor();
+  assert.match(await edit.innerText(), /Edited · \d+ fields? changed[\s\S]*By Aina · \d{1,2} [A-Z][a-z]{2} \d{4}, \d{1,2}:\d{2} (AM|PM) \(MYT, UTC\+8\)/);
+  await edit.locator('summary').click();
+  assert.match(await edit.getByTestId('audit-changes').innerText(), /Before: Jalan Aina 1[\s\S]*After: Jalan Aina 99/);
+  await shot(a.page, 'c010-09-view-history', true);
+  const n = await vh.getByTestId('audit-entry').count();
+  // Opening the record again is not logged.
+  await a.page.locator('header .icon-btn').first().click();
+  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByTestId('view-history').locator('summary').first().click();
+  assert.equal(await a.page.getByTestId('view-history').getByTestId('audit-entry').count(), n);
+  await home(a.page);
+  await openSettings(a.page); await a.page.getByTestId('open-audit-search').click();
+  await a.page.locator('[data-field="auditSearch"]').fill('99');
+  await waitFor(async () => /1 entry in 1 record/.test(await a.page.getByTestId('audit-count').innerText()));
   await a.ctx.close();
 });

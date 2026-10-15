@@ -1,7 +1,100 @@
+// Text for Change 010 audit history (View History, cross-record search, deleting old entries), in three languages.
+// Malay and Chinese wording are drafts for the owner's review.
 import type { Lang } from '../i18n';
 import { titled3 } from '../lib/titleCase';
-const en = { searchTitle: 'Audit History' };
-type S = typeof en;
-const bm: S = { searchTitle: 'Sejarah Audit' };
-const zh: S = { searchTitle: '审计历史' };
-export const auditStrings: Record<Lang, S> = titled3({ en, bm, zh });
+
+const en = {
+  searchTitle: 'Audit History',
+  viewHistory: 'View History', viewHistoryN: (n: number) => `View History (${n})`,
+  none: 'No recorded changes yet.',
+  help: 'Every change to this record: who made it, when, and the exact values before and after. Opening a record is not recorded.',
+  person: 'Person', everyone: 'Everyone', actions: 'Actions', allActions: 'All actions',
+  action: { create: 'Created', edit: 'Edited', archive: 'Archived', restore: 'Restored', delete: 'Deleted', permission: 'Permission changed', membership: 'Membership changed',
+    export: 'History exported', delete_request: 'Deletion requested', delete_decision: 'Deletion request decided', audit_delete: 'Old history entries deleted' } as Record<string, string>,
+  filter: { edit: 'Edits', delete: 'Deletions', restore: 'Restorations', permission: 'Permission changes', membership: 'Membership changes', export: 'Exports' } as Record<string, string>,
+  fieldsChanged: (n: number) => `${n} field${n === 1 ? '' : 's'} changed`,
+  before: 'Before', after: 'After', by: (who: string) => `By ${who}`,
+  thisPhone: 'This phone',
+  perm: (ev: string, from: string, to: string) => ev === 'granted' ? `Access granted: ${to}` : ev === 'revoked' ? `Access revoked (was ${from})` : `Access changed: ${from} → ${to}`,
+  viaAll: (scope: string) => `Share All: ${scope}`,
+  member: { team_created: 'Team Workspace created', invited: 'Invitation sent', invite_cancelled: 'Invitation cancelled', joined: 'Joined', declined: 'Invitation declined',
+    left: 'Left the Team Workspace', removed: 'Removed from the Team Workspace', account_disabled: 'Google account disabled' } as Record<string, string>,
+  exportRef: (ref: string, fmt: string) => `Export ${ref} (${fmt.toUpperCase()})`,
+  deletedCount: (n: number) => `${n} entr${n === 1 ? 'y' : 'ies'} deleted (kept in a secure backup)`,
+  searchAll: 'Search all history', exportHistory: 'Export history',
+  searchHelp: 'Search the history of every record you are allowed to see right now.',
+  search: 'Search records, fields or people', from: 'From', to: 'To', dateHint: 'Dates only narrow what is shown here. An export always includes all available history for the chosen records.',
+  results: (n: number, r: number) => `${n} entr${n === 1 ? 'y' : 'ies'} in ${r} record${r === 1 ? '' : 's'}`,
+  teamEvents: 'Team Workspace', openRecord: 'Open record',
+  deleteOld: 'Delete old entries', deleteSelected: (n: number) => `Delete ${n} selected`, cancelSelect: 'Cancel',
+  deleteQ: (n: number) => `Delete ${n} history entr${n === 1 ? 'y' : 'ies'}?`,
+  deleteBody: 'They disappear from this record\'s history. A copy is kept in a secure backup that the app does not show, and the deletion itself is recorded. Only the record\'s owner can do this.',
+  deletedMsg: (n: number) => `${n} entr${n === 1 ? 'y' : 'ies'} deleted. A secure backup copy was kept.`,
+  deleteFailed: 'Could not delete in the cloud. Nothing was deleted.',
+  restoreNote: 'Restoring an earlier version of a field is not part of this screen: it was not finally decided (History → Restore this version still brings back a whole earlier version).',
+};
+type AuditStrings = typeof en;
+
+const bm: AuditStrings = {
+  searchTitle: 'Sejarah Audit',
+  viewHistory: 'Lihat Sejarah', viewHistoryN: n => `Lihat Sejarah (${n})`,
+  none: 'Belum ada perubahan direkodkan.',
+  help: 'Setiap perubahan pada rekod ini: siapa, bila, dan nilai tepat sebelum dan selepas. Membuka rekod tidak direkodkan.',
+  person: 'Orang', everyone: 'Semua orang', actions: 'Tindakan', allActions: 'Semua tindakan',
+  action: { create: 'Dicipta', edit: 'Disunting', archive: 'Diarkibkan', restore: 'Dipulihkan', delete: 'Dipadam', permission: 'Kebenaran diubah', membership: 'Keahlian diubah',
+    export: 'Sejarah dieksport', delete_request: 'Pemadaman diminta', delete_decision: 'Permintaan pemadaman diputuskan', audit_delete: 'Entri sejarah lama dipadam' },
+  filter: { edit: 'Suntingan', delete: 'Pemadaman', restore: 'Pemulihan', permission: 'Perubahan kebenaran', membership: 'Perubahan keahlian', export: 'Eksport' },
+  fieldsChanged: n => `${n} medan diubah`,
+  before: 'Sebelum', after: 'Selepas', by: who => `Oleh ${who}`,
+  thisPhone: 'Telefon ini',
+  perm: (ev, from, to) => ev === 'granted' ? `Akses diberi: ${to}` : ev === 'revoked' ? `Akses dibatalkan (sebelum ini ${from})` : `Akses diubah: ${from} → ${to}`,
+  viaAll: scope => `Kongsi Semua: ${scope}`,
+  member: { team_created: 'Ruang Kerja Pasukan dicipta', invited: 'Jemputan dihantar', invite_cancelled: 'Jemputan dibatalkan', joined: 'Menyertai', declined: 'Jemputan ditolak',
+    left: 'Keluar dari Ruang Kerja Pasukan', removed: 'Dikeluarkan dari Ruang Kerja Pasukan', account_disabled: 'Akaun Google dinyahaktifkan' },
+  exportRef: (ref, fmt) => `Eksport ${ref} (${fmt.toUpperCase()})`,
+  deletedCount: n => `${n} entri dipadam (disimpan dalam sandaran selamat)`,
+  searchAll: 'Cari semua sejarah', exportHistory: 'Eksport sejarah',
+  searchHelp: 'Cari sejarah setiap rekod yang anda dibenarkan lihat sekarang.',
+  search: 'Cari rekod, medan atau orang', from: 'Dari', to: 'Hingga', dateHint: 'Tarikh hanya mengecilkan apa yang ditunjukkan di sini. Eksport sentiasa merangkumi semua sejarah yang ada untuk rekod yang dipilih.',
+  results: (n, r) => `${n} entri dalam ${r} rekod`,
+  teamEvents: 'Ruang Kerja Pasukan', openRecord: 'Buka rekod',
+  deleteOld: 'Padam entri lama', deleteSelected: n => `Padam ${n} yang dipilih`, cancelSelect: 'Batal',
+  deleteQ: n => `Padam ${n} entri sejarah?`,
+  deleteBody: 'Ia hilang daripada sejarah rekod ini. Satu salinan disimpan dalam sandaran selamat yang tidak ditunjukkan oleh aplikasi, dan pemadaman itu sendiri direkodkan. Hanya pemilik rekod boleh berbuat demikian.',
+  deletedMsg: n => `${n} entri dipadam. Salinan sandaran selamat disimpan.`,
+  deleteFailed: 'Tidak dapat memadam di awan. Tiada apa dipadam.',
+  restoreNote: 'Memulihkan versi lama sesuatu medan bukan sebahagian skrin ini: ia belum diputuskan (Sejarah → Pulihkan versi ini masih memulihkan keseluruhan versi lama).',
+};
+
+const zh: AuditStrings = {
+  searchTitle: '审计历史',
+  viewHistory: '查看历史', viewHistoryN: n => `查看历史（${n}）`,
+  none: '尚无更改记录。',
+  help: '此记录的每次更改：谁、何时，以及更改前后的确切值。打开记录不会被记录。',
+  person: '人员', everyone: '所有人', actions: '操作', allActions: '所有操作',
+  action: { create: '已创建', edit: '已编辑', archive: '已归档', restore: '已恢复', delete: '已删除', permission: '权限已更改', membership: '成员已变更',
+    export: '历史已导出', delete_request: '已请求删除', delete_decision: '删除请求已决定', audit_delete: '旧历史条目已删除' },
+  filter: { edit: '编辑', delete: '删除', restore: '恢复', permission: '权限更改', membership: '成员变更', export: '导出' },
+  fieldsChanged: n => `${n} 个字段已更改`,
+  before: '之前', after: '之后', by: who => `操作人：${who}`,
+  thisPhone: '本手机',
+  perm: (ev, from, to) => ev === 'granted' ? `已授予访问权限：${to}` : ev === 'revoked' ? `已撤销访问权限（原为 ${from}）` : `访问权限已更改：${from} → ${to}`,
+  viaAll: scope => `全部共享：${scope}`,
+  member: { team_created: '已创建团队工作区', invited: '已发送邀请', invite_cancelled: '已取消邀请', joined: '已加入', declined: '已拒绝邀请',
+    left: '已离开团队工作区', removed: '已被移出团队工作区', account_disabled: 'Google 账户已停用' },
+  exportRef: (ref, fmt) => `导出 ${ref}（${fmt.toUpperCase()}）`,
+  deletedCount: n => `已删除 ${n} 条（保留在安全备份中）`,
+  searchAll: '搜索所有历史', exportHistory: '导出历史',
+  searchHelp: '搜索您当前有权查看的每条记录的历史。',
+  search: '搜索记录、字段或人员', from: '从', to: '至', dateHint: '日期只缩小此处显示的内容。导出始终包含所选记录的全部可用历史。',
+  results: (n, r) => `${r} 条记录中的 ${n} 个条目`,
+  teamEvents: '团队工作区', openRecord: '打开记录',
+  deleteOld: '删除旧条目', deleteSelected: n => `删除所选 ${n} 条`, cancelSelect: '取消',
+  deleteQ: n => `删除 ${n} 条历史记录？`,
+  deleteBody: '它们将从此记录的历史中消失。副本会保存在应用不显示的安全备份中，删除操作本身也会被记录。只有记录所有者可以执行此操作。',
+  deletedMsg: n => `已删除 ${n} 条。已保留安全备份副本。`,
+  deleteFailed: '无法在云端删除，未删除任何内容。',
+  restoreNote: '恢复某个字段的早期版本不属于此页面：此功能尚未最终确定（历史 → 恢复此版本 仍会恢复整个早期版本）。',
+};
+
+export const auditStrings: Record<Lang, AuditStrings> = titled3({ en, bm, zh });

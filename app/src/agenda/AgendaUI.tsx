@@ -10,6 +10,7 @@ import { Go } from '../nav';
 import { InquiryHistory, ViewingHistory, ViewingItem } from './History';
 import { visible, can } from '../team/access';
 import { SharingLine } from '../team/TeamUI';
+import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { ContactSelect, PropertySelect, ReminderPicker, LeadPicker, LeadDot, Tabs, Empty, Confirm, SampleTag } from '../ui/common';
 import { useToast } from '../ui/toast';
@@ -122,8 +123,8 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
 }
 
 // ---------- appointment form ----------
-export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, time, title }: {
-  lang: Lang; back: () => void; id?: string; kind?: ApptKind; propertyId?: string; contactId?: string; date?: string; time?: string; title?: string;
+export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, time, title, go }: {
+  lang: Lang; back: () => void; id?: string; kind?: ApptKind; propertyId?: string; contactId?: string; date?: string; time?: string; title?: string; go?: Go;
 }) {
   const { state, store } = useApp();
   const a = agendaStrings[lang];
@@ -207,6 +208,7 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
           save(); draft.clear(); toast(c.saved); back();
         }}>{c.save}</button>
       </div></div>
+      {existing && !existing.sample && <ViewHistory lang={lang} collection="appointments" id={existing.id} go={go} />}
       {del && existing && <Confirm lang={lang} title={a.appt.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { if (can(store.getState(), 'delete', 'appointments', existing.id)) store.remove('appointments', existing.id); back(); }} />}
     </section>
   );
@@ -270,7 +272,7 @@ export function TaskRow({ lang, t, go, onToggle }: { lang: Lang; t: Task; go: Go
   );
 }
 
-export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => void; id?: string; prefill?: Partial<Task> }) {
+export function TaskForm({ lang, back, id, prefill, go }: { lang: Lang; back: () => void; id?: string; prefill?: Partial<Task>; go?: Go }) {
   const { state, store } = useApp();
   const a = agendaStrings[lang];
   const c = strings[lang].c;
@@ -323,6 +325,7 @@ export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => 
           toast(c.saved); back();
         }}>{c.save}</button>
       </div></div>
+      {existing && !existing.sample && <ViewHistory lang={lang} collection="tasks" id={existing.id} go={go} />}
       {del && existing && <Confirm lang={lang} title={a.todo.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { if (can(store.getState(), 'delete', 'tasks', existing.id)) store.remove('tasks', existing.id); back(); }} />}
     </section>
   );

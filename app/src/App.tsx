@@ -76,7 +76,7 @@ import { teamStrings } from './team/strings';
 import { visible } from './team/access';
 import { AuditSearchScreen } from './audit/AuditUI';
 import { auditStrings } from './audit/strings';
-import { ExportManagementScreen } from './exports/ExportsUI';
+import { ExportManagementScreen, AuditExportScreen } from './exports/ExportsUI';
 import { exportStrings } from './exports/strings';
 
 // Change 010: a Team Workspace invitation link the app was opened with is kept until the person deals with it.
@@ -384,6 +384,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'manageSharing': return teamStrings[lang].manageSharing;
     case 'auditSearch': return auditStrings[lang].searchTitle;
     case 'exports': return exportStrings[lang].manageTitle;
+    case 'auditExport': return exportStrings[lang].exportTitle;
   }
 }
 
@@ -412,9 +413,9 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'contactForm': return <ContactForm key={s.id ?? 'new'} lang={lang} go={(next, o) => go(next, { replace: next.name === 'contactDetail', ...o })} back={back} id={s.id} role={s.role} prefill={s.prefill} />;
     case 'activity': return <ActivityScreen lang={lang} go={go} propertyId={s.propertyId} contactId={s.contactId} tab={s.tab} />;
     case 'inquiryForm': return <InquiryForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} contactId={s.contactId} />;
-    case 'apptForm': return <ApptForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} kind={s.kind} propertyId={s.propertyId} contactId={s.contactId} date={s.date} time={s.time} title={s.title} />;
+    case 'apptForm': return <ApptForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} kind={s.kind} propertyId={s.propertyId} contactId={s.contactId} date={s.date} time={s.time} title={s.title} go={go} />;
     case 'todo': return <TodoScreen lang={lang} go={go} />;
-    case 'taskForm': return <TaskForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} prefill={s.prefill} />;
+    case 'taskForm': return <TaskForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} prefill={s.prefill} go={go} />;
     case 'calendar': return <CalendarScreen key={s.date ?? ''} lang={lang} go={go} date={s.date} />;
     case 'gps': return <GpsHome lang={lang} go={go} />;
     case 'houseShopping': return <HouseShopping lang={lang} go={(next, o) => go(next, { replace: next.name === 'journey', ...o })} />;
@@ -425,7 +426,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'dealForm': return <DealForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} />;
     case 'expenseForm': return <MoneyForm key={s.id ?? 'new-e'} lang={lang} back={back} id={s.id} kind="expense" />;
     case 'incomeForm': return <MoneyForm key={s.id ?? 'new-i'} lang={lang} back={back} id={s.id} kind="income" />;
-    case 'calculator': return <CalculatorScreen key={s.propertyId ?? ''} lang={lang} propertyId={s.propertyId} />;
+    case 'calculator': return <CalculatorScreen key={s.propertyId ?? ''} lang={lang} propertyId={s.propertyId} go={go} />;
     case 'buyerPdf': return <BuyerPdfScreen key={s.propertyId} lang={lang} propertyId={s.propertyId} />;
     case 'adTracker': return <AdTrackerScreen key={s.propertyId} lang={lang} go={go} propertyId={s.propertyId} />;
     case 'adSummary': return <AdSummaryScreen lang={lang} go={go} />;
@@ -456,6 +457,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'manageSharing': return <ManageSharingScreen key={s.focus ?? ''} lang={lang} focus={s.focus} />;
     case 'auditSearch': return <AuditSearchScreen key={`${s.collection ?? ''}:${s.id ?? ''}`} lang={lang} go={go} collection={s.collection} id={s.id} />;
     case 'exports': return <ExportManagementScreen lang={lang} go={go} section={s.section} />;
+    case 'auditExport': return <AuditExportScreen key={s.keys.join(',')} lang={lang} go={go} keys={s.keys} person={s.person} actions={s.actions} />;
   }
 }
 

@@ -57,7 +57,8 @@ export type Screen =
   | { name: 'team' }
   | { name: 'manageSharing'; focus?: string }
   | { name: 'auditSearch'; collection?: CollectionName; id?: string }
-  | { name: 'exports'; section?: 'saved' | 'deleted' };
+  | { name: 'exports'; section?: 'saved' | 'deleted' }
+  | { name: 'auditExport'; keys: string[]; person?: string; actions?: ('edit' | 'delete' | 'restore' | 'permission' | 'membership' | 'export')[] };
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */
 export type Go = (s: Screen, opts?: { replace?: boolean }) => void;
