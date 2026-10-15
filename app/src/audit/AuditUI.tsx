@@ -69,6 +69,7 @@ export function entrySummary(_state: AppState, e: AuditEntry, lang: Lang): strin
     return d.via === 'share_all' ? `${base} · ${a.viaAll(ts.scope[String(d.scope) as 'properties'] ?? String(d.scope))}` : base;
   }
   if (e.action === 'membership') return `${a.member[String(d.event)] ?? a.action.membership}${d.email ? ` · ${String(d.email)}` : ''}`;
+  if (e.action === 'export' && (d.event === 'export_copy_deleted' || d.event === 'export_copy_purged')) return a.copyDeleted(d.event === 'export_copy_purged', Number(d.count ?? 0), (d.refs as string[] | undefined ?? []).join(', '));
   if (e.action === 'export') return a.exportRef(String(d.ref ?? ''), String(d.format ?? ''));
   if (e.action === 'audit_delete') return a.deletedCount(Number(d.count ?? 0));
   if ((e.action === 'edit' || e.action === 'create') && e.changes?.length) return `${a.action[e.action]} · ${a.fieldsChanged(e.changes.length)}`;

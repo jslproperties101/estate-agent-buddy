@@ -39,7 +39,14 @@ async function drawPage(page: Page, images: Map<string, HTMLImageElement | undef
   for (const it of page.items) {
     if (it.k === 'rect') { ctx.fillStyle = it.fill; ctx.fillRect(it.x, it.y, it.w, it.h); }
     else if (it.k === 'line') { ctx.strokeStyle = it.colour; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(it.x1, it.y1); ctx.lineTo(it.x2, it.y2); ctx.stroke(); }
-    else if (it.k === 'text') { ctx.font = css(it.font); ctx.fillStyle = it.font.colour; ctx.textAlign = it.align === 'right' ? 'right' : 'left'; ctx.fillText(it.text, it.x, it.y); }
+    else if (it.k === 'text') {
+      ctx.save();
+      ctx.font = css(it.font); ctx.fillStyle = it.font.colour; ctx.textAlign = it.align ?? 'left';
+      if (it.alpha !== undefined) ctx.globalAlpha = it.alpha;
+      if (it.rotate) { ctx.translate(it.x, it.y); ctx.rotate((it.rotate * Math.PI) / 180); ctx.fillText(it.text, 0, 0); }
+      else ctx.fillText(it.text, it.x, it.y);
+      ctx.restore();
+    }
     else {
       const img = images.get(it.src);
       if (!img) { ctx.fillStyle = '#e8e4da'; ctx.fillRect(it.x, it.y, it.w, it.h); continue; }
@@ -76,6 +83,25 @@ export async function renderDocument(doc: Doc, title: string): Promise<RenderedD
   }
   const bytes = buildPdf(jpegs, { title });
   return { previews, pdf: new Blob([bytes as BlobPart], { type: 'application/pdf' }) };
+}
+
+/** Draws ready-laid-out pages into a PDF, one page at a time, reporting progress. Stops (throws 'cancelled') as soon as
+ *  `cancelled()` says so, so a cancelled export never produces a file. */
+export async function renderPagesToPdf(pages: Page[], title: string, opts: { onProgress?: (done: number, total: number) => void; cancelled?: () => boolean } = {}): Promise<Blob> {
+  const srcs = [...new Set(pages.flatMap(p => p.items.filter(i => i.k === 'image').map(i => (i as { src: string }).src)))];
+  const images = new Map<string, HTMLImageElement | undefined>();
+  await Promise.all(srcs.map(async s => { images.set(s, await loadImage(s)); }));
+  const jpegs: JpegPage[] = [];
+  for (let i = 0; i < pages.length; i++) {
+    if (opts.cancelled?.()) throw new Error('cancelled');
+    const canvas = await drawPage(pages[i], images);
+    const blob = await toJpeg(canvas);
+    jpegs.push({ data: new Uint8Array(await blob.arrayBuffer()), w: canvas.width, h: canvas.height });
+    opts.onProgress?.(i + 1, pages.length);
+    await new Promise(r => setTimeout(r, 0));
+  }
+  if (opts.cancelled?.()) throw new Error('cancelled');
+  return new Blob([buildPdf(jpegs, { title }) as BlobPart], { type: 'application/pdf' });
 }
 
 /** A file name that is safe on every system. */

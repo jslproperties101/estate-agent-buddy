@@ -320,3 +320,128 @@ test('C9 View History: collapsed at the bottom, exact before/after, actor and Ma
   await waitFor(async () => /1 entry in 1 record/.test(await a.page.getByTestId('audit-count').innerText()));
   await a.ctx.close();
 });
+
+const OUT = new URL('../.test-out/', import.meta.url).pathname;
+async function editStreet(page, value) {
+  await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
+  await page.waitForSelector('[data-testid="listing-form"]');
+  if ((await page.getByTestId('toggle-all').innerText()).match(/Open/)) await page.getByTestId('toggle-all').click();
+  await page.locator('[data-field="street"]').fill(value);
+  await page.getByTestId('save-property').click();
+  if (await page.getByRole('alertdialog').count()) await page.getByRole('alertdialog').getByRole('button').last().click();
+  await page.getByTestId('listing-details').waitFor();
+}
+
+test('C10 export: preview with scope/filters/count/size, confirm, PDF and XLSX files with the right names, keep in app, export audited; cancel makes nothing', async () => {
+  const cloud = new FakeTeamCloud(); cloud.available = false;
+  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1')]));
+  await a.page.locator('nav.grid > button', { hasText: 'Property List' }).click();
+  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  for (const v of ['Jalan Aina 2', 'Jalan Aina 3']) await editStreet(a.page, v);
+  await a.page.getByTestId('view-history').locator('summary').first().click();
+  await a.page.getByTestId('export-history').click();
+  await a.page.getByTestId('audit-export').waitFor();
+  assert.match(await a.page.getByTestId('export-warning').innerText(), /CONFIDENTIAL · Confidential Information: This export may contain confidential information\. Share it only with authorized people\./);
+  await a.page.getByTestId('export-preview').getByTestId('preview-entries').waitFor();
+  assert.match(await a.page.getByTestId('preview-scope').innerText(), /This Record: P1001/i);
+  assert.equal(await a.page.getByTestId('preview-records').innerText(), '1');
+  assert.equal(await a.page.getByTestId('preview-entries').innerText(), '2');
+  assert.match(await a.page.getByTestId('preview-size').innerText(), /KB|MB/);
+  await shot(a.page, 'c010-10-export-preview', true);
+  await a.page.getByTestId('export-generate').click();
+  await a.page.getByTestId('export-done').waitFor({ timeout: 20000 });
+  const name = await a.page.getByTestId('export-filename').innerText();
+  const ref = await a.page.getByTestId('export-ref').innerText();
+  assert.match(name, new RegExp(`^Audit-History-P1001-\\d{8}-${ref}\\.pdf$`));
+  const dl = a.page.waitForEvent('download');
+  await a.page.getByTestId('export-share').click();
+  const file = await dl;
+  assert.equal(file.suggestedFilename(), name);
+  await file.saveAs(`${OUT}${name}`);
+  const pdf = await readFile(`${OUT}${name}`);
+  assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+  await a.page.getByTestId('export-keep').click();
+  await shot(a.page, 'c010-11-export-done', true);
+  // XLSX of the same record.
+  await a.page.locator('header .icon-btn').first().click();
+  await a.page.getByTestId('view-history').locator('summary').first().click();
+  assert.equal(await a.page.getByTestId('view-history').locator('[data-action="export"]').count(), 1, 'the export is in the audit trail');
+  await a.page.getByTestId('export-history').click();
+  await a.page.locator('[data-format="xlsx"]').click();
+  await a.page.locator('[data-mode="snapshot"]').click();
+  await a.page.getByTestId('export-generate').click();
+  await a.page.getByTestId('export-done').waitFor({ timeout: 20000 });
+  const xname = await a.page.getByTestId('export-filename').innerText();
+  assert.match(xname, /^Audit-History-P1001-\d{8}-EXP[A-Z2-9]{8}\.xlsx$/);
+  const xdl = a.page.waitForEvent('download');
+  await a.page.getByTestId('export-share').click();
+  await (await xdl).saveAs(`${OUT}${xname}`);
+  await a.page.getByTestId('export-keep').click();
+  // Cancel: nothing is made, nothing is kept.
+  await a.page.locator('header .icon-btn').first().click();
+  await a.page.getByTestId('view-history').locator('summary').first().click();
+  await a.page.getByTestId('export-history').click();
+  await a.page.getByTestId('preview-entries').waitFor();
+  await a.page.evaluate(() => { const orig = HTMLCanvasElement.prototype.toBlob; HTMLCanvasElement.prototype.toBlob = function (cb, ...r) { setTimeout(() => orig.call(this, cb, ...r), 800); }; });
+  await a.page.getByTestId('export-generate').click();
+  await a.page.getByTestId('export-cancel').click();
+  await a.page.getByTestId('export-msg').waitFor({ timeout: 15000 });
+  assert.match(await a.page.getByTestId('export-msg').innerText(), /Cancelled\. No file was made/);
+  await a.ctx.close();
+  return { pdfPath: `${OUT}${name}`, xlsxPath: `${OUT}${xname}` };
+});
+
+test('C11 Export Management: saved list, search and filters, select all matching, selection cleared on change, delete with count, Deleted Exports, restore, permanent delete, remembered section', async () => {
+  const cloud = new FakeTeamCloud(); cloud.available = false;
+  const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1'), prop('pa2', 'Jalan Aina 2')]));
+  // Three saved exports, made through the store the screens use.
+  await a.page.evaluate(async () => {
+    const db = await new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => res(r.result); });
+    const put = (store, key, val) => new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    const mk = (ref, rid, key, fmt, at) => ({ ref, fileName: `Audit-History-${rid}-20261015-${ref}.${fmt}`, format: fmt, mode: 'history', recordIds: [rid], recordKeys: [key], ownerIds: ['u-aina@x.com'], exporterId: 'u-aina@x.com', exporterLabel: 'Aina', at, fileId: `f-${ref}`, bytes: 10 });
+    await put('local', 'export:EXPAAAA1111', mk('EXPAAAA1111', 'P1001', 'properties:pa1', 'pdf', Date.UTC(2026, 9, 15, 2)));
+    await put('local', 'export:EXPBBBB2222', mk('EXPBBBB2222', 'P1001', 'properties:pa1', 'xlsx', Date.UTC(2026, 9, 15, 3)));
+    await put('local', 'export:EXPCCCC3333', mk('EXPCCCC3333', 'P1002', 'properties:pa2', 'pdf', Date.UTC(2026, 9, 14, 3)));
+    db.close();
+  });
+  await a.page.reload(); await a.page.waitForSelector('nav.grid');
+  await openSettings(a.page); await a.page.getByTestId('open-exports').click();
+  await a.page.getByTestId('saved-list').waitFor();
+  await waitFor(async () => (await a.page.getByTestId('export-item').count()) === 3);
+  assert.match(await a.page.getByTestId('export-item').first().innerText(), /Audit-History-P1001-20261015-EXPBBBB2222\.xlsx[\s\S]*XLSX · Record ID: P1001[\s\S]*Export Reference: EXPBBBB2222[\s\S]*Aina/);
+  await a.page.locator('[data-field="exportSearch"]').fill('P1001');
+  assert.equal(await a.page.getByTestId('export-item').count(), 2);
+  await a.page.getByTestId('select-all').click();
+  assert.match(await a.page.getByTestId('selected-count').innerText(), /2 Selected/i);
+  await a.page.getByTestId('filter-format').selectOption('pdf');
+  assert.match(await a.page.getByTestId('selected-count').innerText(), /0 Selected/i, 'filter change clears the selection');
+  assert.equal(await a.page.getByTestId('export-item').count(), 1);
+  await a.page.getByTestId('filter-format').selectOption('');
+  await a.page.getByTestId('select-all').click();
+  await a.page.getByTestId('bulk-delete').click();
+  assert.match(await a.page.getByRole('alertdialog').innerText(), /Delete 2 saved exports\?/);
+  await a.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  await waitFor(async () => (await a.page.getByTestId('export-item').count()) === 0);
+  await a.page.locator('[data-field="exportSearch"]').fill('');
+  await a.page.getByRole('tab', { name: 'Deleted Exports' }).click();
+  await a.page.getByTestId('deleted-list').waitFor();
+  assert.equal(await a.page.getByTestId('retention-message').innerText(), 'Kept until permanently deleted');
+  assert.match(await a.page.getByTestId('deleted-count').innerText(), /^2 deleted exports$/i);
+  assert.equal(await a.page.getByRole('button', { name: /Restore All/i }).count(), 0, 'no Restore All');
+  assert.match(await a.page.getByTestId('deleted-info').first().innerText(), /Deleted: .*\(MYT, UTC\+8\) · Deleted by: Aina/i);
+  await shot(a.page, 'c010-12-deleted-exports', true);
+  await a.page.getByTestId('export-item').first().locator('input[type=checkbox]').check();
+  await a.page.getByTestId('bulk-restore').click();                       // no extra confirmation
+  await waitFor(async () => (await a.page.getByTestId('export-item').count()) === 1);
+  assert.match(await a.page.getByTestId('deleted-count').innerText(), /^1 deleted export$/i);
+  await a.page.getByTestId('select-all').click();
+  await a.page.getByTestId('bulk-purge').click();
+  assert.match(await a.page.getByRole('alertdialog').innerText(), /Permanently delete 1 export\?/);
+  await a.page.getByRole('alertdialog').getByRole('button', { name: 'Delete Permanently' }).click();
+  await a.page.getByText('No deleted exports.').waitFor();
+  // The section is remembered when coming back.
+  await home(a.page); await openSettings(a.page); await a.page.getByTestId('open-exports').click();
+  await a.page.getByTestId('deleted-list').waitFor();
+  assert.equal(await a.page.locator('[data-field="exportSearch"]').inputValue(), '', 'search not remembered');
+  await a.ctx.close();
+});

@@ -23,7 +23,7 @@ export type Block =
 
 export interface Font { size: number; bold?: boolean; colour: string }
 export type Placed =
-  | { k: 'text'; x: number; y: number; text: string; font: Font; align?: 'left' | 'right' }
+  | { k: 'text'; x: number; y: number; text: string; font: Font; align?: 'left' | 'right' | 'center'; /** degrees, around (x, y) */ rotate?: number; /** 0–1 */ alpha?: number }
   | { k: 'rect'; x: number; y: number; w: number; h: number; fill: string }
   | { k: 'line'; x1: number; y1: number; x2: number; y2: number; colour: string }
   | { k: 'image'; x: number; y: number; w: number; h: number; src: string };

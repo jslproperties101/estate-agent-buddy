@@ -275,6 +275,19 @@ export class Store {
     this.appendAudit(key, [{ id: `a-${newId()}`, collection: key.slice(0, i), recordId: key.slice(i + 1), ...this.place(key), ...this.actor(), action: 'audit_delete', detail: { count: gone.length }, at }], false);
     return gone.length;
   }
+  // ---------- saved exports (Change 010 E) ----------
+  /** Goes up when saved exports change, so Export Management redraws. */
+  exportsEpoch = 0;
+  touchExports() { this.exportsEpoch++; this.emit(); }
+  /** Writes to the second storage area and waits for it (throws if the write fails, so a failure is never reported as done). */
+  async putLocalNow(key: string, value: unknown) { await this.flush(); await this.backend.putLocal(key, value); }
+  async removeLocalNow(key: string) { await this.flush(); await this.backend.removeLocal(key); }
+  /** Deletes a stored file at once (a permanently deleted export copy). */
+  async removeFileNow(id: string) {
+    await this.flush();
+    await this.backend.removeFile(id); await this.backend.removeLocal(`file:${id}`);
+    this.fileEntries.delete(id); this.old_url(id);
+  }
   /** Drops a record's audit cache (access ended). */
   forgetAudit(key: string) { this.write(() => this.backend.removeLocal(`audit:${key}`)); this.auditEpoch++; }
 
