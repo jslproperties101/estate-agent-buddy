@@ -98,6 +98,7 @@ small, .small { font-size: 14px; }
 .eyebrow { font-size: 14px; font-weight: 700; color: var(--gold); letter-spacing: .05em; text-transform: uppercase; }
 .ok-text { color: var(--ok); font-weight: 600; }
 .warn-text { color: var(--amber); font-weight: 600; }
+.warn-text.danger-text { color: var(--red); }
 .error { color: var(--red); font-weight: 600; font-size: 15px; }
 .sens { background: #221B0E; color: #F3DDA6; border-radius: 8px; padding: 6px 8px; font-weight: 600; }
 .ask { background: #221B0E; border: 1px solid #5A4520; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; color: #F3DDA6; font-weight: 600; }
