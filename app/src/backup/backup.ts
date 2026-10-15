@@ -44,11 +44,17 @@ function usedFileIds(store: Store): string[] {
 
 export interface BackupResult { bytes: Uint8Array; fileName: string; records: number; files: number; missingFiles: string[] }
 
-export async function createBackup(store: Store, now = Date.now()): Promise<BackupResult> {
+/** Everything one backup holds, before it is packed: used by the backup file (ZIP) and by Drive restore points
+ *  (Change 006 Layer 3), so both carry exactly the same content and are restored by the same code. */
+export interface BackupPackage { manifest: PackageManifest; blobs: Map<string, Uint8Array>; missingFiles: string[]; records: number }
+
+const u8buf = (d: Uint8Array) => d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) as ArrayBuffer;
+
+export async function collectPackage(store: Store, now = Date.now()): Promise<BackupPackage> {
   await store.flush();
   const base = await buildBackupManifest(store, now);
   const st = store.getState();
-  const entries: { name: string; data: Uint8Array }[] = [];
+  const blobs = new Map<string, Uint8Array>();
   const files: BackupManifest['files'] = [];
   const missing: string[] = [];
   const refs = new Map(fileRefs(st).map(r => [r.fileId, r]));
@@ -57,17 +63,23 @@ export async function createBackup(store: Store, now = Date.now()): Promise<Back
     const r = refs.get(id);
     if (!blob) { missing.push(id); continue; }
     const data = new Uint8Array(await blob.arrayBuffer());
-    files.push({ id, collection: r?.collection ?? ('properties' as CollectionName), recordId: r?.recordId ?? '', kind: r?.kind ?? 'photo', name: r?.name, sha256: await sha256Hex(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer), bytes: data.length, status: 'backup' });
-    entries.push({ name: `files/${id}`, data });
+    files.push({ id, collection: r?.collection ?? ('properties' as CollectionName), recordId: r?.recordId ?? '', kind: r?.kind ?? 'photo', name: r?.name, sha256: await sha256Hex(u8buf(data)), bytes: data.length, status: 'backup' });
+    blobs.set(id, data);
   }
   const manifest: PackageManifest = {
     ...base, files, package: BACKUP_FORMAT, app: { version: BUILD.version, sha: BUILD.sha },
     singletons: { profile: structuredClone(st.profile), options: structuredClone(st.options) },
   };
-  entries.unshift({ name: 'manifest.json', data: enc.encode(JSON.stringify(manifest)) });
-  const d = new Date(now); const p = (n: number) => String(n).padStart(2, '0');
   const records = COLLECTIONS.reduce((n, c) => n + (manifest.records[c]?.length ?? 0), 0);
-  return { bytes: makeZip(entries, d), fileName: `EstateAgentBuddy-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.zip`, records, files: files.length, missingFiles: missing };
+  return { manifest, blobs, missingFiles: missing, records };
+}
+
+export async function createBackup(store: Store, now = Date.now()): Promise<BackupResult> {
+  const pkg = await collectPackage(store, now);
+  const entries: { name: string; data: Uint8Array }[] = [{ name: 'manifest.json', data: enc.encode(JSON.stringify(pkg.manifest)) }];
+  for (const f of pkg.manifest.files) entries.push({ name: `files/${f.id}`, data: pkg.blobs.get(f.id)! });
+  const d = new Date(now); const p = (n: number) => String(n).padStart(2, '0');
+  return { bytes: makeZip(entries, d), fileName: `EstateAgentBuddy-backup-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.zip`, records: pkg.records, files: pkg.manifest.files.length, missingFiles: pkg.missingFiles };
 }
 
 export type Problem = 'not-a-backup' | 'damaged' | 'unsupported' | 'wrong-format' | 'newer-version' | 'file-mismatch' | 'file-missing';
@@ -88,17 +100,26 @@ export async function inspectBackup(bytes: Uint8Array): Promise<Inspection> {
   if (!mf) { out.problems.push('not-a-backup'); return out; }
   let m: PackageManifest;
   try { m = JSON.parse(dec.decode(mf.data)) as PackageManifest; } catch { out.problems.push('damaged'); return out; }
+  const blobs = new Map<string, Uint8Array>();
+  for (const e of entries) if (e.name.startsWith('files/')) blobs.set(e.name.slice(6), e.data);
+  return inspectPackage(m, blobs);
+}
+
+/** The checks every restore runs before touching anything, whatever the backup came from (a file or a Drive restore
+ *  point): format, version, and every file present with the SHA-256 the manifest names. */
+export async function inspectPackage(m: PackageManifest, blobs: Map<string, Uint8Array>): Promise<Inspection> {
+  const out: Inspection = { ok: false, problems: [], blobs: new Map(), counts: {}, files: 0 };
   if (m?.package !== BACKUP_FORMAT) { out.problems.push('not-a-backup'); return out; }
   const shape = checkManifest(m);
   if (shape.some(s => s.startsWith('newer'))) out.problems.push('newer-version');
   else if (shape.length) out.problems.push('wrong-format');
   if (typeof m.localSchema === 'number' && m.localSchema > LOCAL_SCHEMA_VERSION && !out.problems.includes('newer-version')) out.problems.push('newer-version');
   if (out.problems.length) return out;
-  for (const e of entries) if (e.name.startsWith('files/')) out.blobs.set(e.name.slice(6), e.data);
+  out.blobs = blobs;
   for (const f of m.files) {
-    const data = out.blobs.get(f.id);
+    const data = blobs.get(f.id);
     if (!data) { out.problems.push('file-missing'); break; }
-    if (f.sha256 && (await sha256Hex(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)) !== f.sha256) { out.problems.push('file-mismatch'); break; }
+    if (f.sha256 && (await sha256Hex(u8buf(data))) !== f.sha256) { out.problems.push('file-mismatch'); break; }
   }
   out.manifest = m; out.files = m.files.length;
   for (const c of COLLECTIONS) out.counts[c] = (m.records[c] ?? []).length;
