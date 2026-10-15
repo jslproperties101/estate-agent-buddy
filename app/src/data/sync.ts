@@ -27,6 +27,8 @@ import { isSampleKey } from './sample';
 import { hash53, recordHash } from './hash';
 import { applyChoices, merge3 } from './merge';
 import { syncFiles, FileSyncOptions } from './filesync';
+import { syncShared, sharedWorkspaces } from '../team/sharedSync';
+import { TeamError, dropAllShared } from '../team/api';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -117,13 +119,16 @@ export function confirmOwner(store: Store): void {
   if (ws) store.setSingleton('meta', { syncWorkspaceId: ws, ownerUnknown: undefined });
 }
 
-interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
+export interface CloudRow { collection: string; id: string; data: Rec | null; deleted: boolean; rev: number; seq?: number }
 
-export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number }
+export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number;
+  /** Change 010: shared records taken in / dropped because access ended; the Team Workspace part failed (network). */
+  sharedIn?: number; sharedGone?: number; teamFailed?: boolean }
 
 /** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
  *  "Synced" after the cloud really answered. */
-export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch, opts: FileSyncOptions = {}): Promise<SyncResult> {
+export type SyncOptions = FileSyncOptions & { /** false: skip the Change 010 Team Workspace part. */ team?: boolean };
+export async function syncNow(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch, opts: SyncOptions = {}): Promise<SyncResult> {
   if (!configured(cfg)) throw new SyncError('not-configured');
   if (!store.getState().meta.syncSession) throw new SyncError('not-signed-in');
   if (store.syncing) return { pushed: 0, pulled: 0, removed: 0, conflicts: 0 };   // one sync at a time
@@ -150,7 +155,7 @@ const isSampleData = (d: Rec | null) => !!(d && (d as { sample?: boolean }).samp
 type Taken = 'skipped' | 'applied' | 'removed' | 'repush' | 'conflict' | 'cleared';
 
 /** Takes one cloud row into this phone. Never overwrites a change that is still waiting to be sent. */
-function takeRemote(store: Store, row: CloudRow, role: string | undefined): Taken {
+export function takeRemote(store: Store, row: CloudRow, role: string | undefined): Taken {
   if (!(COLLECTIONS as string[]).includes(row.collection) || isSampleData(row.data)) return 'skipped';
   const c = row.collection as CollectionName;
   const key = `${c}:${row.id}`;
@@ -226,14 +231,17 @@ async function pullAll(store: Store, cfg: SyncConfig, session: Session, ws: stri
 interface PushOut { collection: string; id: string; status: 'ok' | 'conflict' | 'ref_conflict' | 'denied'; rev?: number; deleted?: boolean; data?: Rec | null;
   ref_no?: number; ref?: string; other_ref?: string; other_id?: string | null; other_title?: string | null; other_visible?: boolean }
 
-async function pushAll(store: Store, cfg: SyncConfig, session: Session, ws: string, fetchFn: FetchFn, tally: SyncResult): Promise<boolean> {
-  if (session.role === 'limited') return false;
+/** Sends waiting changes to workspace `ws`. `only` picks which waiting records belong there (Change 010: my own records go
+ *  to my workspace; a record another agent shares with me goes to THEIR workspace). Default: every waiting record. */
+export async function pushAll(store: Store, cfg: SyncConfig, session: Session, ws: string, fetchFn: FetchFn, tally: SyncResult, only?: (key: string) => boolean, asRole?: string): Promise<boolean> {
+  if ((asRole ?? session.role) === 'limited') return false;
   const m = metaNow(store);
   const blocked = new Set((m.conflicts ?? []).map(c => c.key));
   const deviceId = m.deviceId ?? 'device';
   const rows: (Rec & { _hash: string; _key: string })[] = [];
   for (const key of m.dirty) {
     if (blocked.has(key)) continue;
+    if (only && !only(key)) continue;
     const rec = find(store, key);
     if (rec?.sample || (!rec && isSampleKey(key))) { clearPending(store, key); continue; }   // sample data never goes up
     const base = store.getBase(key);
@@ -285,13 +293,18 @@ async function pushAll(store: Store, cfg: SyncConfig, session: Session, ws: stri
   return again;
 }
 
-async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: FileSyncOptions): Promise<SyncResult> {
+async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: SyncOptions): Promise<SyncResult> {
   const start = metaNow(store);
   if (!start.syncSession) throw new SyncError('not-signed-in');
   let session = await fresh(cfg, start.syncSession, fetchFn);
   // Checked on every sync, so a deactivated account or a changed role is noticed straight away (and "no access" is
   // never reported as "synced").
-  session = await membership(cfg, session, fetchFn);
+  try { session = await membership(cfg, session, fetchFn); }
+  catch (e) {
+    // Access switched off (or the account disabled): nothing another agent shared stays readable on this phone.
+    if (e instanceof SyncError && e.code === 'no-access' && Object.keys(metaNow(store).shared ?? {}).length) { dropAllShared(store); store.setSingleton('meta', { team: undefined }); }
+    throw e;
+  }
   // Another team's records are still on this phone: stop before anything is read, changed or sent.
   if (holdsOtherWorkspaceData(store.getState(), session.workspaceId)) throw new SyncError('other-workspace');
   if (ownerUnknownWithData(store.getState(), session.workspaceId)) throw new SyncError('owner-unknown');
@@ -313,18 +326,36 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: F
   }
 
   const tally: SyncResult = { pushed: 0, pulled: 0, removed: 0, conflicts: 0 };
+  // Change 010: records another agent shares with me are sent to THEIR workspace by syncShared, never to mine.
+  const mine = (key: string) => !metaNow(store).shared?.[key];
   let again = await pullAll(store, cfg, session, ws, fetchFn, tally);
-  again = (await pushAll(store, cfg, session, ws, fetchFn, tally)) || again;
+  again = (await pushAll(store, cfg, session, ws, fetchFn, tally, mine)) || again;
   for (let round = 0; again && round < 3; round++) {
     again = await pullAll(store, cfg, session, ws, fetchFn, tally);
-    again = (await pushAll(store, cfg, session, ws, fetchFn, tally)) || again;
+    again = (await pushAll(store, cfg, session, ws, fetchFn, tally, mine)) || again;
+  }
+  // Change 010: Team Workspace, records shared with me (fetch new, drop revoked, send my edits). A cloud without the
+  // Change 010 functions simply has no Team Workspace; that never fails the sync of my own records.
+  if (opts.team !== false) {
+    try { await syncShared(store, cfg, session, fetchFn, tally); }
+    catch (e) {
+      if (!(e instanceof TeamError && e.code === 'unavailable')) tally.teamFailed = true;
+      else if (metaNow(store).team || Object.keys(metaNow(store).shared ?? {}).length) { dropAllShared(store); store.setSingleton('meta', { team: undefined }); }
+    }
   }
   tally.conflicts = (metaNow(store).conflicts ?? []).length;
   // Pictures and documents go after the records they belong to. One bad file never fails the sync.
   try {
-    const f = await syncFiles(store, cfg, session, ws, fetchFn, opts);
+    const f = await syncFiles(store, cfg, session, ws, fetchFn, { ...opts, only: r => !metaNow(store).shared?.[`${r.collection}:${r.recordId}`] });
     tally.filesUp = f.uploaded; tally.filesDown = f.downloaded; tally.filesFailed = f.failed;
   } catch { tally.filesFailed = (tally.filesFailed ?? 0) + 1; }
+  // Pictures of records shared with me live in their owner's workspace.
+  for (const [sws, level] of sharedWorkspaces(store)) {
+    try {
+      const f = await syncFiles(store, cfg, session, sws, fetchFn, { ...opts, noCleanup: true, readOnly: level !== 'edit', only: r => metaNow(store).shared?.[`${r.collection}:${r.recordId}`]?.workspaceId === sws });
+      tally.filesUp = (tally.filesUp ?? 0) + f.uploaded; tally.filesDown = (tally.filesDown ?? 0) + f.downloaded; tally.filesFailed = (tally.filesFailed ?? 0) + f.failed;
+    } catch { tally.filesFailed = (tally.filesFailed ?? 0) + 1; }
+  }
   // "Synced" needs a finished sync. Whatever is still waiting (an edit made during the upload, a record that is in
   // conflict) keeps its own waiting/conflict state and the overall line will not say Synced.
   patchMeta(store, () => ({ lastSync: Date.now(), syncError: undefined }));

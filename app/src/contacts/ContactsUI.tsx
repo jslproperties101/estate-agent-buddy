@@ -13,6 +13,9 @@ import { FieldHelp } from '../ui/FieldHelp';
 import { IconBuyer, IconVendor } from '../icons';
 import { OptionSelect } from '../ui/OptionSelect';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
+import { visible, can } from '../team/access';
+import { SharingLine } from '../team/TeamUI';
+import { teamStrings } from '../team/strings';
 import { TaskRow } from '../agenda/AgendaUI';
 import { completeTask, sortTasks } from '../domain/workflow';
 import { cardTitle, normalisePhone, phoneDigits, usablePhone } from '../listing/model';
@@ -88,7 +91,8 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
   const toast = useToast();
   const [q, setQ] = useState('');
   const [lead, setLead] = useState<LeadStatus | VendorStatus | 'all'>('all');
-  const all = useMemo(() => state.contacts.filter(c => inRole(c, role)), [state.contacts, role]);
+  // Change 010: only the workspace being looked at (Personal or Team).
+  const all = useMemo(() => visible(state, 'contacts', state.contacts).filter(c => inRole(c, role)), [state, role]);
   const statusOf = (c: Contact) => (role === 'vendor' ? c.vendorStatus : c.leadStatus);
   const shown = all
     .filter(c => lead === 'all' || statusOf(c) === lead)
@@ -158,9 +162,12 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
   const tasks = sortTasks(state.tasks.filter(x => x.contactId === c.id));
   const isVendor = inRole(c, 'vendor');
   const isBuyer = inRole(c, 'buyer') || !isVendor;
+  const canEdit = can(state, 'edit', 'contacts', c.id);
+  const setStatus = (patch: Partial<typeof c>) => { if (can(store.getState(), 'edit', 'contacts', c.id)) store.upsert('contacts', { ...c, ...patch }); };
   return (
     <section className="stack" data-testid="contact-detail">
       {!c.sample && <RecordStatus lang={lang} collection="contacts" id={c.id} go={go} />}
+      <SharingLine lang={lang} collection="contacts" id={c.id} go={go} />
       {c.sample && <p className="notice sample-note" data-testid="sample-note">{t.sampleNote}</p>}
       <div className="card stack-sm" style={isBuyer && c.leadStatus ? { borderLeft: `6px solid ${LEAD_COLOURS[c.leadStatus] ?? '#9CA3AF'}` } : isVendor && c.vendorStatus ? { borderLeft: `6px solid ${VENDOR_COLOURS[c.vendorStatus]}` } : undefined}>
         <h2 className="contact-name">{c.name}</h2>
@@ -175,7 +182,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         {c.notes && <p className="pre small">{c.notes}</p>}
         <small className="muted">{c.lastInteraction ? s.lastInteraction(fmtDate(c.lastInteraction, lang)) : s.never}</small>
         <div className="rec-actions">
-          <button className="btn primary" onClick={() => go({ name: 'contactForm', id: c.id })}>{t.c.edit}</button>
+          {canEdit && <button className="btn primary" onClick={() => go({ name: 'contactForm', id: c.id })}>{t.c.edit}</button>}
           {usablePhone(c.phone) && <a className="btn secondary" href={`tel:+${phoneDigits(c.phone)}`}>{t.c.call}</a>}
           {usablePhone(c.phone) && <a className="btn secondary" href={`https://wa.me/${phoneDigits(c.phone)}`} target="_blank" rel="noreferrer">{t.c.whatsapp}</a>}
         </div>
@@ -183,8 +190,8 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         {!c.phone && c.whatsapp && <small className="muted">{s.aliasOnly(c.whatsapp)}</small>}
       </div>
       <div className="card stack-sm">
-        {isVendor && <VendorStatusPicker lang={lang} value={c.vendorStatus} onChange={v => store.upsert('contacts', { ...c, vendorStatus: v })} />}
-        {isBuyer && <LeadPicker lang={lang} value={c.leadStatus} onChange={v => store.upsert('contacts', { ...c, leadStatus: v })} />}
+        {canEdit && isVendor && <VendorStatusPicker lang={lang} value={c.vendorStatus} onChange={v => setStatus({ vendorStatus: v })} />}
+        {canEdit && isBuyer && <LeadPicker lang={lang} value={c.leadStatus} onChange={v => setStatus({ leadStatus: v })} />}
       </div>
       {c.roles.some(r => BUYER_ROLES.includes(r)) && <BuyerRequirementsCard lang={lang} c={c} go={go} />}
       <SectionCard title={s.properties}>
@@ -255,11 +262,12 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         <label className="ff">{s.f.notes}<textarea rows={3} value={d.notes ?? ''} onChange={e => setD(x => ({ ...x, notes: e.target.value || undefined }))} /></label>
       </div>
       {d.roles.some(r => BUYER_ROLES.includes(r)) && <div className="card stack-sm"><RequirementsEditor lang={lang} value={d.requirements ?? []} onChange={v => setD(x => ({ ...x, requirements: v.length ? v : undefined }))} /></div>}
-      {existing && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{t.c.delete}</button>}
+      {existing && can(state, 'delete', 'contacts', existing.id) && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{t.c.delete}</button>}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{t.c.cancel}</button>
         <button className="btn primary" data-testid="save-contact" onClick={() => {
           if (!d.name.trim()) { setErr(true); return; }
+          if (existing && !can(store.getState(), 'edit', 'contacts', existing.id)) { toast(teamStrings[lang].notAllowed, 'error'); return; }
           const saved = store.upsert('contacts', { ...d, name: d.name.trim(), phone: normalisePhone(d.phone), whatsapp: d.whatsapp?.trim() || undefined, roles: d.roles.length ? d.roles : ['other'],
             vendorStatus: formVendor ? d.vendorStatus : undefined });
           draft.clear();
@@ -270,7 +278,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
       {replace && <Confirm lang={lang} title={s.replaceQ} danger={false} okLabel={s.replaceOk}
         body={s.replaceBody([d.name, d.phone].filter(Boolean).join(' · '), [replace.name, replace.tel].filter(Boolean).join(' · '))}
         onCancel={() => setReplace(null)} onOk={() => { apply(replace); setReplace(null); }} />}
-      {del && existing && <Confirm lang={lang} title={t.c.deleteQ} body={s.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('contacts', existing.id); go({ name: 'home' }); }} />}
+      {del && existing && <Confirm lang={lang} title={t.c.deleteQ} body={s.deleteBody} onCancel={() => setDel(false)} onOk={() => { if (can(store.getState(), 'delete', 'contacts', existing.id)) store.remove('contacts', existing.id); go({ name: 'home' }); }} />}
     </section>
   );
 }

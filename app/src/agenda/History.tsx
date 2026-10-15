@@ -13,6 +13,7 @@ import { fmtDateTime } from '../lib/dates';
 import { cardTitle } from '../listing/model';
 import type { Appointment, Inquiry } from '../data/types';
 import { strings } from '../i18n';
+import { can } from '../team/access';
 
 export function InquiryHistory({ lang, go, propertyId, contactId, plain }: { lang: Lang; go: Go; propertyId?: string; contactId?: string; plain?: boolean }) {
   const { state, store } = useApp();
@@ -114,11 +115,12 @@ export function ViewingItem({ lang, v, go, showProperty }: { lang: Lang; v: Appo
       {v.fromInquiry && <small className="muted">{a.view.fromInquiry(fmtDateTime(v.fromInquiry.at, lang))}{v.fromInquiry.message ? `: “${v.fromInquiry.message}”` : ''}</small>}
       {v.outcome && <small>{v.outcome}</small>}
       <div className="row-wrap">
-        {open && <button className="btn small primary" onClick={() => {
+        {open && can(state, 'edit', 'appointments', v.id) && <button className="btn small primary" onClick={() => {
+          if (!can(store.getState(), 'edit', 'appointments', v.id)) return;
           store.upsert('appointments', setApptStatus(v, 'completed'));
-          if (contact) store.upsert('contacts', touchContact(contact));
+          if (contact && can(store.getState(), 'edit', 'contacts', contact.id)) store.upsert('contacts', touchContact(contact));
         }}>{a.view.markViewed}</button>}
-        {open && <button className="btn small secondary" onClick={() => store.upsert('appointments', setApptStatus(v, 'cancelled'))}>{a.view.cancelIt}</button>}
+        {open && can(state, 'edit', 'appointments', v.id) && <button className="btn small secondary" onClick={() => { if (can(store.getState(), 'edit', 'appointments', v.id)) store.upsert('appointments', setApptStatus(v, 'cancelled')); }}>{a.view.cancelIt}</button>}
         <button className="btn small secondary" onClick={() => go({ name: 'apptForm', id: v.id })}>{strings[lang].c.edit}</button>
       </div>
     </li>

@@ -25,6 +25,7 @@ import { FieldHelp } from '../ui/FieldHelp';
 import { config, supabaseInputProblem } from '../config';
 import { authStrings } from '../auth/strings';
 import { AccountCard } from '../auth/AccountUI';
+import { TeamEntryCard } from '../team/TeamEntry';
 import { DataSafetyCard } from '../sync/SyncUI';
 import { permission, requestPermission } from '../lib/notify';
 import { loadSampleInto } from '../data/sample';
@@ -291,6 +292,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         }}>{t.saveSettings}</button>
       </div>
       <AccountCard lang={lang} />
+      <TeamEntryCard lang={lang} go={go} />
       <DataSafetyCard lang={lang} go={go} />
       <AboutCard lang={lang} />
       <div className="card stack-sm">

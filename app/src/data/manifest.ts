@@ -37,14 +37,17 @@ export async function buildBackupManifest(store: Store, now = Date.now()): Promi
   const st = store.getState();
   const m = st.meta;
   const records: Record<string, unknown[]> = {};
-  for (const c of COLLECTIONS) records[c] = (st[c] as unknown as { sample?: boolean }[]).filter(r => !r.sample);
+  // Change 010: records another agent shares with me are theirs, never mine to back up or restore (that would copy them
+  // into my workspace, i.e. share them onward). Only my own records, their history and their files go in.
+  const foreign = (key: string) => !!m.shared?.[key];
+  for (const c of COLLECTIONS) records[c] = (st[c] as unknown as { id: string; sample?: boolean }[]).filter(r => !r.sample && !foreign(`${c}:${r.id}`));
   const revisions: BackupManifest['revisions'] = {};
-  for (const { key, value } of await store.listLocal('rev:')) revisions[key.slice(4)] = (value as { at: number; source: string; data: unknown }[]).map(r => ({ at: r.at, source: r.source, data: r.data }));
-  const deleted = (await store.listLocal('del:')).map(({ key, value }) => ({ key: key.slice(4), deletedAt: (value as { at: number }).at, pendingInCloud: m.tombstones.includes(key.slice(4)) }));
+  for (const { key, value } of await store.listLocal('rev:')) if (!foreign(key.slice(4))) revisions[key.slice(4)] = (value as { at: number; source: string; data: unknown }[]).map(r => ({ at: r.at, source: r.source, data: r.data }));
+  const deleted = (await store.listLocal('del:')).filter(({ key }) => !foreign(key.slice(4))).map(({ key, value }) => ({ key: key.slice(4), deletedAt: (value as { at: number }).at, pendingInCloud: m.tombstones.includes(key.slice(4)) }));
   const cloudVersions: BackupManifest['cloudVersions'] = {};
-  for (const k of store.baseKeys()) { const b = store.getBase(k)!; cloudVersions[k] = { rev: b.rev, hash: b.hash, deleted: b.deleted }; }
+  for (const k of store.baseKeys()) { if (foreign(k)) continue; const b = store.getBase(k)!; cloudVersions[k] = { rev: b.rev, hash: b.hash, deleted: b.deleted }; }
   const ws = m.syncSession?.workspaceId ?? m.syncWorkspaceId;
-  const files: ManifestFile[] = fileRefs(st).map(r => {
+  const files: ManifestFile[] = fileRefs(st).filter(r => !foreign(`${r.collection}:${r.recordId}`)).map(r => {
     const e = store.fileEntry(r.fileId);
     return { id: r.fileId, collection: r.collection, recordId: r.recordId, kind: r.kind, name: r.name, sha256: e?.sha256, bytes: e?.bytes, status: e?.status ?? 'local', cloudPath: ws && e?.sha256 ? `${ws}/${e.sha256}` : undefined };
   });
@@ -52,7 +55,7 @@ export async function buildBackupManifest(store: Store, now = Date.now()): Promi
     format: 'eab-backup-manifest', version: MANIFEST_VERSION, localSchema: LOCAL_SCHEMA_VERSION, createdAt: now,
     workspaceId: ws, deviceId: m.deviceId, lastSeq: m.lastSeq,
     records, deleted, revisions, cloudVersions,
-    pending: { dirty: [...m.dirty], tombstones: [...m.tombstones], conflicts: structuredClone(m.conflicts ?? []), errors: { ...(m.recErrors ?? {}) } },
+    pending: { dirty: m.dirty.filter(k => !foreign(k)), tombstones: m.tombstones.filter(k => !foreign(k)), conflicts: structuredClone((m.conflicts ?? []).filter(c => !foreign(c.key))), errors: Object.fromEntries(Object.entries(m.recErrors ?? {}).filter(([k]) => !foreign(k))) },
     files,
   };
 }

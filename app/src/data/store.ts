@@ -46,6 +46,11 @@ export const RECENTLY_DELETED_MS = 30 * 24 * 3600_000;
 
 type Listener = () => void;
 
+/** Change 010: a local change to a record this person may not make (another agent's record shared View Only, or an
+ *  action only its owner may take). Thrown by the store itself, so no screen or command can get round it; the cloud
+ *  refuses the same change again. */
+export class AccessError extends Error { constructor(public key: string, public why: 'view-only' | 'owner-only') { super(`not allowed (${why}): ${key}`); } }
+
 export class Store {
   private state: AppState;
   private listeners = new Set<Listener>();
@@ -135,6 +140,7 @@ export class Store {
     const list = this.state[c] as Collections[K][];
     const i = list.findIndex(x => x.id === next.id);
     const key = `${c}:${next.id}`;
+    if (!keepTime) this.checkWrite(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, false);
     if (i >= 0 && !next.sample) this.keepRevision(key, list[i] as unknown as Record<string, unknown>, source, note);
     const updated = i >= 0 ? list.map((x, j) => (j === i ? next : x)) : [next, ...list];
     this.state = { ...this.state, [c]: updated };
@@ -151,6 +157,7 @@ export class Store {
     const old = list.find(x => x.id === id);
     if (!old) return;
     const key = `${c}:${id}`;
+    if (!fromSync) this.checkWrite(key, old as unknown as Record<string, unknown>, null, true);
     if (!old.sample) {
       this.keepRevision(key, old as unknown as Record<string, unknown>, source, undefined, true);
       const at = Date.now();
@@ -159,6 +166,41 @@ export class Store {
     this.state = { ...this.state, [c]: list.filter(x => x.id !== id) };
     this.write(() => this.backend.remove(recKey(c, id)));
     if (!fromSync) this.markDirty(key, true);
+    this.emit();
+  }
+
+  /** Change 010: the store's own access check for local changes to records other agents share with me (meta.shared).
+   *  View Only: nothing. View and Edit: edits and restore; a To-Do / Calendar entry may also be deleted; a property is
+   *  never archived or deleted by anyone but its owner (they get a deletion request instead). */
+  private checkWrite(key: string, before: Record<string, unknown> | undefined, after: Record<string, unknown> | null, removing: boolean) {
+    const info = this.state.meta.shared?.[key];
+    if (!info) return;
+    if (info.level !== 'edit') throw new AccessError(key, 'view-only');
+    const c = key.slice(0, key.indexOf(':'));
+    if (removing && c !== 'tasks' && c !== 'appointments') throw new AccessError(key, 'owner-only');
+    if (!removing && c === 'properties' && after?.archived && !before?.archived) throw new AccessError(key, 'owner-only');
+  }
+
+  /** Change 010: forgets a record that is no longer shared with me: the record, its history, its cloud bookkeeping, any
+   *  draft and any change still waiting to be sent, and the pictures only it used. Nothing of it stays readable here. */
+  forgetRecord(c: CollectionName, id: string) {
+    const key = `${c}:${id}`;
+    const list = this.state[c] as { id: string; photos?: { fileId?: string }[]; documents?: { fileId?: string }[]; photoFileId?: string }[];
+    const old = list.find(x => x.id === id);
+    const m = this.state.meta;
+    this.state = {
+      ...this.state, [c]: list.filter(x => x.id !== id),
+      meta: { ...m, dirty: m.dirty.filter(k => k !== key), tombstones: m.tombstones.filter(k => k !== key),
+        conflicts: (m.conflicts ?? []).filter(x => x.key !== key),
+        recErrors: m.recErrors && key in m.recErrors ? Object.fromEntries(Object.entries(m.recErrors).filter(([k]) => k !== key)) : m.recErrors },
+    };
+    const meta = this.state.meta;
+    this.write(() => this.backend.put(singleKey('meta'), meta));
+    this.write(() => this.backend.remove(recKey(c, id)));
+    for (const k of [`rev:${key}`, `del:${key}`, `base:${key}`, `audit:${key}`]) this.write(() => this.backend.removeLocal(k));
+    this.bases.delete(key);
+    for (const d of this.allDrafts()) if (d.draft.recordKey === key) this.discardDraft(d.key);
+    if (old) for (const f of [...(old.photos ?? []), ...(old.documents ?? []), { fileId: old.photoFileId }]) if (f.fileId) this.discardFile(f.fileId);
     this.emit();
   }
 

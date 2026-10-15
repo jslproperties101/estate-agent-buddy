@@ -52,7 +52,12 @@ export type Screen =
   | { name: 'voice' }
   | { name: 'voiceDiag' }
   | { name: 'comingSoon'; key: 'subsale' | 'project' | 'market' | 'cobrokeMap' }
-  | { name: 'cobroke' };
+  | { name: 'cobroke' }
+  // Change 010
+  | { name: 'team' }
+  | { name: 'manageSharing'; focus?: string }
+  | { name: 'auditSearch'; collection?: CollectionName; id?: string }
+  | { name: 'exports'; section?: 'saved' | 'deleted' };
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */
 export type Go = (s: Screen, opts?: { replace?: boolean }) => void;

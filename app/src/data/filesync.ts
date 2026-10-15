@@ -19,6 +19,12 @@ export interface FileSyncOptions {
   /** Makes the copy that is uploaded. Default: shrink large pictures; leave everything else as it is. */
   prepare?: (blob: Blob, ref: FileRef) => Promise<Blob>;
   now?: () => number;
+  /** Change 010: only these files (e.g. the files of records one other agent shares with me). Default: every file. */
+  only?: (ref: FileRef) => boolean;
+  /** Change 010: download only (records shared with me as View Only), and no clean-up of files in this workspace. */
+  readOnly?: boolean;
+  /** Change 010: no clean-up pass (used for another agent's workspace). */
+  noCleanup?: boolean;
 }
 export interface FileSyncResult { uploaded: number; downloaded: number; failed: number }
 
@@ -129,7 +135,7 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
   const now = (opts.now ?? Date.now)();
   const prepare = opts.prepare ?? defaultPrepare;
   const res: FileSyncResult = { uploaded: 0, downloaded: 0, failed: 0 };
-  const refs = fileRefs(store.getState());
+  const refs = fileRefs(store.getState()).filter(r => !opts.only || opts.only(r));
   const toDownload: FileRef[] = [];
 
   for (const ref of refs) {
@@ -149,7 +155,7 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
       continue;
     }
     if (e.status === 'denied' && session.role !== 'limited') { /* try again: a role may have changed */ }
-    if (session.role === 'limited') continue;
+    if (session.role === 'limited' || opts.readOnly) continue;
     if ((e.nextTry ?? 0) > now) continue;                       // waiting before the next try
     if (!recordInCloud(store, ref)) continue;                   // the record goes first
     try { await upload(store, cfg, session, ws, fetchFn, ref, e, prepare); const after = store.fileEntry(ref.fileId); if (after?.status === 'uploaded') res.uploaded++; }
@@ -159,7 +165,7 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
   try { res.downloaded = await download(store, cfg, session, ws, fetchFn, toDownload, now); } catch { res.failed++; }
 
   // Files no record uses any more: switch the cloud row off (the stored content stays until the owner cleans up).
-  if (!store.getState().meta.dirty.length && session.role !== 'limited') {
+  if (!store.getState().meta.dirty.length && session.role !== 'limited' && !opts.readOnly && !opts.noCleanup) {
     const used = new Set(refs.map(r => r.fileId));
     const h = supabaseHeaders(cfg, session.accessToken);
     for (const e of store.allFileEntries()) {

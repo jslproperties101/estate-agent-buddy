@@ -43,7 +43,8 @@ import { buildBanner, activeBanners } from '../domain/banners';
 import { ymd } from '../lib/dates';
 import { contactStrings } from '../contacts/strings';
 import { VERIFY_STATES, VerifyState, isVerifiable, shownState, withVerification } from './verify';
-import { deleteListing } from './deleteListing';
+import { can, isForeign, myId } from '../team/access';
+import { teamStrings } from '../team/strings';
 import { IconMic } from '../icons';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 
@@ -399,6 +400,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   }
 
   function save(skipReview = false) {
+    // Change 010: checked again at the moment of saving (sharing can change while the form is open).
+    if (initial && !can(store.getState(), 'edit', 'properties', initial.id)) { setRefErr(teamStrings[lang].notAllowed); return; }
     if (needsReview && !skipReview) { setAskUnchecked(true); return; }
     if (refProblem) { setRefErr(refText(refProblem)); setOpen(o => new Set([...o, 'basics'])); setTimeout(() => document.getElementById('sec-basics')?.scrollIntoView({ block: 'start' }), 0); return; }
     const clean: Listing = { ...d, refNo, ref: makeRef(d.refPrefix!, refNo!), refPrefix: d.refPrefix!.toUpperCase() };
@@ -432,7 +435,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       next = v;
     }
     // A typed owner becomes a vendor record in the Vendor List, so there is one record per person.
-    if (!next.vendorId && next.ownerName) {
+    if (!next.vendorId && next.ownerName && !(initial && isForeign(store.getState(), 'properties', initial.id))) {
       const now = Date.now();
       const v = store.upsert('contacts', { id: newId(), created: now, updated: now, name: next.ownerName, phone: next.ownerPhone, whatsapp: next.ownerWhatsapp, roles: ['vendor'] });
       next = { ...next, vendorId: v.id, ownerName: undefined, ownerPhone: undefined, ownerWhatsapp: undefined };
@@ -851,7 +854,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         })}
       </Sec>
 
-      {initial && <button className="btn ghost danger-text" onClick={() => setConfirmDelete(true)}>{s.deleteProperty}</button>}
+      {initial && can(state, 'archive', 'properties', initial.id) && <button className="btn ghost danger-text" onClick={() => setConfirmDelete(true)}>{s.deleteProperty}</button>}
 
       {/* Save from anywhere: this bar floats at the bottom of the screen while the long form scrolls under it. */}
       <div className="save-bar floating" data-testid="save-floating">
@@ -862,8 +865,13 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </div>
 
       {confirmDelete && initial && (
-        <Confirm lang={lang} title={`${s.deleteProperty}?`} body={s.deleteBody} okLabel={c.delete} onCancel={() => setConfirmDelete(false)}
-          onOk={() => { deleteListing(store, state, initial); go({ name: 'listing' }); }} />
+        <Confirm lang={lang} title={teamStrings[lang].archiveQ} body={teamStrings[lang].archiveBody} okLabel={c.delete} onCancel={() => setConfirmDelete(false)}
+          onOk={() => {
+            // Change 010: deleting archives the property (recoverable from the Archived section); only its owner may.
+            const cur = store.getState().properties.find(x => x.id === initial.id);
+            if (cur && can(store.getState(), 'archive', 'properties', cur.id)) { draft.clear(); store.upsert('properties', { ...cur, archived: { at: Date.now(), by: myId(store.getState()) } }); }
+            go({ name: 'listing' });
+          }} />
       )}
       {askUnchecked && <Confirm lang={lang} title={s.reviewQ} body={s.reviewBody(unchecked.length)} danger={false} okLabel={s.reviewSave}
         onCancel={() => { setAskUnchecked(false); setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}

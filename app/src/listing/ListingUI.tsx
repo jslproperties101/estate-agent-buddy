@@ -33,6 +33,13 @@ import { deleteListing } from './deleteListing';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
 import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
+import { visible, can, myId } from '../team/access';
+import { WorkspaceSwitch, CreatorTag, SharingLine } from '../team/TeamUI';
+import { teamStrings } from '../team/strings';
+import { requestDelete, teamErrorOf } from '../team/api';
+import { config } from '../config';
+import { useToast } from '../ui/toast';
+import { fmtDateTime } from '../lib/dates';
 
 export type Layout = 'grid' | 'large';
 
@@ -131,7 +138,11 @@ const typeOnly = (l: Listing, s: ListingStrings) => typeLabel(s, l.type);
 export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; initial?: Filters }) {
   const { state, store } = useApp();
   const s = listingStrings[lang];
-  const listings = state.properties;
+  const ts = teamStrings[lang];
+  // Change 010: only the workspace being looked at (Personal or Team); archived properties go to their own section at the end.
+  const inWorkspace = visible(state, 'properties', state.properties);
+  const listings = inWorkspace.filter(l => !l.archived);
+  const archivedList = inWorkspace.filter(l => l.archived).sort((a, b) => (b.archived?.at ?? 0) - (a.archived?.at ?? 0));
   const layout: Layout = state.settings.layout === 'large' ? 'large' : 'grid';
   const setLayout = (x: Layout) => store.setSingleton('settings', { layout: x });
   const [f, setF] = useState<Filters>(initial ?? {});
@@ -144,6 +155,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
 
   return (
     <section className="stack listing" data-testid="listing">
+      <WorkspaceSwitch lang={lang} />
       <button className="btn primary add-property" onClick={() => go({ name: 'listingForm' })}><span aria-hidden="true">＋</span> {s.add}</button>
       <div className="lc-toolbar">
         <input aria-label={s.f.location} placeholder={s.search} value={f.location ?? ''} onChange={e => set({ location: e.target.value || undefined })} />
@@ -231,6 +243,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
                 <span className="gc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</span>
                 <span className="gc-meta">{typeOnly(l, s) || '—'}</span>
                 <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
+                <CreatorTag state={state} collection="properties" id={l.id} />
               </button>
               <div className="gc-actions">
                 <LocationButton l={l} s={s} go={go} className="gc-loc" />
@@ -254,6 +267,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
                 {l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
                 <div className="between lc-foot">
                   <span className="lc-owner">{ownerName(l) ? `${s.owner}: ${ownerName(l)}` : ''}</span>
+                  <CreatorTag state={state} collection="properties" id={l.id} />
                   <span className="row-gap">
                     <LocationButton l={l} s={s} go={go} />
                     <button className="open-gold" data-testid="card-open" onClick={e => { e.stopPropagation(); openIt(l); }} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
@@ -263,6 +277,24 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
             </li>
           ))}
         </ul>
+      )}
+
+      {archivedList.length > 0 && (
+        <details className="card stack-sm archived-section" data-testid="archived-section">
+          <summary><strong>{ts.archivedN(archivedList.length)}</strong></summary>
+          <small className="muted">{ts.archivedHelp}</small>
+          <ul className="archived-list">
+            {archivedList.map(l => (
+              <li key={l.id} data-testid="archived-card">
+                <button className="link-row" onClick={() => openIt(l)}>
+                  <strong>{cardTitle(l) || s.untitled}</strong>
+                  <small className="muted">{ts.archivedOn(fmtDateTime(l.archived!.at, lang))}</small>
+                  <CreatorTag state={state} collection="properties" id={l.id} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </section>
   );
@@ -286,7 +318,13 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const l = state.properties.find(x => x.id === id);
   const [photoId, setPhotoId] = useState<string | undefined>(undefined);
   const [askDelete, setAskDelete] = useState(false);
+  const [askPermanent, setAskPermanent] = useState(false);
+  const [askRequest, setAskRequest] = useState(false);
+  const toast = useToast();
+  const ts = teamStrings[lang];
   if (!l) return <p className="muted">{s.none}</p>;
+  // Change 010: what I may do with this record right now (asked again when a button is pressed).
+  const canEdit = can(state, 'edit', 'properties', l.id);
   const photos = orderedPhotos(l);
   const shownPhoto = photos.find(p => p.id === photoId) ?? mainPhoto(l)!;
   const yrs = yearsRemaining(l);
@@ -298,7 +336,8 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const phone = vendor?.phone ?? l.ownerPhone;
   const whatsapp = vendor?.whatsapp ?? l.ownerWhatsapp;
   const missing = missingDetails(l);
-  const edit = (section: FormSection) => () => go({ name: 'listingForm', id: l.id, section });
+  const edit = (section: FormSection) => (canEdit && !l.archived ? () => go({ name: 'listingForm', id: l.id, section }) : undefined);
+  const guarded = (action: Parameters<typeof can>[1], f: () => void) => () => { if (can(store.getState(), action, 'properties', l.id)) f(); else toast(ts.notAllowed, 'error'); };
   const vs = (k: string) => shownState(l, k);
   // A detail: its value in the check colour plus the check word (the full view always says it in words too).
   const row = (k: string, v?: string | number) => (v === undefined || v === '' ? null : (
@@ -329,6 +368,16 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   return (
     <section className="stack listing" data-testid="listing-details">
       {!l.sample && <RecordStatus lang={lang} collection="properties" id={l.id} go={go} />}
+      <SharingLine lang={lang} collection="properties" id={l.id} go={go} />
+      {l.archived && (
+        <div className="card stack-sm archived-banner" data-testid="archived-banner">
+          <strong>{ts.archived}</strong><small className="muted">{ts.archivedOn(fmtDateTime(l.archived.at, lang))} · {ts.archivedHelp}</small>
+          <div className="two">
+            {can(state, 'restore', 'properties', l.id) && <button className="btn primary" data-testid="restore-archived" onClick={guarded('restore', () => { store.upsert('properties', { ...l, archived: undefined }, false, 'restore'); toast(ts.restored); })}>{ts.restore}</button>}
+            {can(state, 'deletePermanent', 'properties', l.id) && <button className="btn danger" data-testid="delete-permanent" onClick={() => setAskPermanent(true)}>{ts.deletePermanent}</button>}
+          </div>
+        </div>
+      )}
       <div className="lc-card">
         <span className="lc-photo tall">
           <StoredImage fileId={shownPhoto.fileId} url={shownPhoto.url} />
@@ -358,17 +407,23 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       </div>
 
       <div className="rec-actions">
-        <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>
-        {/* Change 009: the voice button here became a red Delete, with confirmation (the same safe delete as before). */}
-        <button className="btn danger" data-testid="detail-delete" onClick={() => setAskDelete(true)}>🗑 {s.n9.del}</button>
+        {canEdit && !l.archived && <button className="btn primary" onClick={() => go({ name: 'listingForm', id: l.id })}>{s.edit}</button>}
+        {/* Change 009: the voice button here became a red Delete, with confirmation. Change 010: Delete archives the
+            property (recoverable); someone it is shared with as View and Edit asks the owner instead. */}
+        {!l.archived && can(state, 'archive', 'properties', l.id) && <button className="btn danger" data-testid="detail-delete" onClick={() => setAskDelete(true)}>🗑 {s.n9.del}</button>}
+        {!l.archived && can(state, 'requestDelete', 'properties', l.id) && <button className="btn danger" data-testid="request-delete" onClick={() => setAskRequest(true)}>🗑 {ts.requestDelete}</button>}
         <button className="btn secondary" onClick={() => go({ name: 'buyerPdf', propertyId: l.id })} data-testid="open-buyer-pdf">📄 {buyerStrings[lang].open}</button>
         <button className="btn secondary" onClick={() => go({ name: 'marketingStudio', propertyId: l.id })} data-testid="open-marketing-studio">🎨 {marketingStrings[lang].open}</button>
         {callable && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
         {callable && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>
       {phone && !callable && <p className="small warn-text" role="status" data-testid="phone-invalid">{s.phoneInvalid}</p>}
-      {askDelete && <Confirm lang={lang} title={s.n9.deleteQ} body={`${cardTitle(l) || s.untitled} — ${s.deleteBody}`}
-        onCancel={() => setAskDelete(false)} onOk={() => { deleteListing(store, state, l); setAskDelete(false); go({ name: 'listing' }, { replace: true }); }} />}
+      {askDelete && <Confirm lang={lang} title={ts.archiveQ} body={`${cardTitle(l) || s.untitled} — ${ts.archiveBody}`}
+        onCancel={() => setAskDelete(false)} onOk={guarded('archive', () => { store.upsert('properties', { ...l, archived: { at: Date.now(), by: myId(store.getState()) } }); setAskDelete(false); toast(ts.archivedToast); go({ name: 'listing' }, { replace: true }); })} />}
+      {askPermanent && <Confirm lang={lang} title={ts.deletePermanentQ} body={`${cardTitle(l) || s.untitled} — ${ts.deletePermanentBody}`} okLabel={ts.deletePermanent}
+        onCancel={() => setAskPermanent(false)} onOk={guarded('deletePermanent', () => { deleteListing(store, store.getState(), l); setAskPermanent(false); go({ name: 'listing' }, { replace: true }); })} />}
+      {askRequest && <Confirm lang={lang} title={ts.requestDeleteQ} body={ts.requestDeleteBody} okLabel={ts.requestDelete}
+        onCancel={() => setAskRequest(false)} onOk={() => { setAskRequest(false); void requestDelete(store, config(store.getState().settings), 'properties', l.id).then(() => toast(ts.requested), e => toast(ts.err[teamErrorOf(e).code] ?? ts.err.other, 'error')); }} />}
 
       <SectionCard title={s.sec.missing} className={missing.length ? 'missing' : ''} testId="missing" onEdit={edit(missing.includes('lat') && missing.length === 1 ? 'location' : 'basics')} editLabel={EL}>
         {unsure.length > 0 && <p className="small" data-testid="verify-summary"><strong>⚠ {s.verify.summary(unsure.length)}:</strong> {unsure.map(k => s.l[k] ?? k).join(', ')}</p>}

@@ -8,6 +8,9 @@ import { newId } from '../data/store';
 import { agendaStrings } from './strings';
 import { Go } from '../nav';
 import { InquiryHistory, ViewingHistory, ViewingItem } from './History';
+import { visible, can } from '../team/access';
+import { SharingLine } from '../team/TeamUI';
+import { teamStrings } from '../team/strings';
 import { ContactSelect, PropertySelect, ReminderPicker, LeadPicker, LeadDot, Tabs, Empty, Confirm, SampleTag } from '../ui/common';
 import { useToast } from '../ui/toast';
 import {
@@ -75,7 +78,7 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
       next = { ...next, followUpTaskId: task.id };
     }
     store.upsert('inquiries', next);
-    if (contact && !existing) store.upsert('contacts', touchContact(contact));
+    if (contact && !existing && can(store.getState(), 'edit', 'contacts', contact.id)) store.upsert('contacts', touchContact(contact));
     return next;
   }
 
@@ -141,12 +144,15 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
   });
   const contact = state.contacts.find(x => x.id === d.contactId);
   const statusLabel = (s: string) => (d.kind === 'viewing' ? a.view.status[s] : a.appt.status[s]);
+  // Change 010: a calendar entry another agent shares with me as View Only is shown but cannot be saved or deleted.
+  const readOnly = !!existing && !can(state, 'edit', 'appointments', existing.id);
+  const mayDelete = !!existing && can(state, 'delete', 'appointments', existing.id);
 
   function save(): Appointment {
     const start = joinDT(dDate, dTime);
     const next = { ...d, start, completedAt: d.status === 'completed' ? d.completedAt ?? Date.now() : undefined };
     store.upsert('appointments', next);
-    if (contact && next.status === 'completed' && existing?.status !== 'completed') store.upsert('contacts', touchContact(contact));
+    if (contact && next.status === 'completed' && existing?.status !== 'completed' && can(store.getState(), 'edit', 'contacts', contact.id)) store.upsert('contacts', touchContact(contact));
     return next;
   }
 
@@ -173,14 +179,16 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
         <label className="ff">{a.appt.duration}<input inputMode="numeric" value={d.durationMin ?? ''} onChange={e => setD(x => ({ ...x, durationMin: Number(e.target.value.replace(/\D/g, '')) || undefined }))} /></label>
         <PropertySelect lang={lang} value={d.propertyId} onChange={v => setD(x => ({ ...x, propertyId: v }))} />
         <ContactSelect lang={lang} roles={d.kind === 'viewing' ? ['buyer'] : ['other']} value={d.contactId} onChange={v => setD(x => ({ ...x, contactId: v }))} />
-        {contact && <LeadPicker lang={lang} value={contact.leadStatus} onChange={v => store.upsert('contacts', { ...contact, leadStatus: v })} />}
+        {contact && can(state, 'edit', 'contacts', contact.id) && <LeadPicker lang={lang} value={contact.leadStatus} onChange={v => store.upsert('contacts', { ...contact, leadStatus: v })} />}
         <label className="ff">{a.appt.place}<input value={d.place ?? ''} onChange={e => setD(x => ({ ...x, place: e.target.value || undefined }))} /></label>
         <label className="ff">{strings[lang].c.notes}<textarea rows={2} value={d.notes ?? ''} onChange={e => setD(x => ({ ...x, notes: e.target.value || undefined }))} /></label>
         {(d.status === 'completed' || d.outcome) && <label className="ff">{d.kind === 'viewing' ? a.view.outcome : a.appt.outcome}<textarea rows={2} value={d.outcome ?? ''} onChange={e => setD(x => ({ ...x, outcome: e.target.value || undefined }))} /></label>}
         <ReminderPicker lang={lang} value={d.reminders} onChange={r => setD(x => ({ ...x, reminders: r }))} />
         <small className="muted">{strings[lang].reminders.note}</small>
       </div>
-      {existing && (
+      {readOnly && <p className="notice" data-testid="read-only-note">{teamStrings[lang].readOnlyNote}</p>}
+      {existing && existing.id && <SharingLine lang={lang} collection="appointments" id={existing.id} />}
+      {existing && !readOnly && (
         <div className="row-wrap">
           <button className="btn secondary" onClick={() => {
             const saved = save();
@@ -189,14 +197,17 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
             store.upsert('tasks', followUpTask({ id: `${saved.id}:fu`, title: a.appt.followUpTitle(name), due, contactId: saved.contactId, propertyId: saved.propertyId, appointmentId: saved.id }));
             toast(c.saved);
           }}>{a.appt.followUp}</button>
-          <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>
+          {mayDelete && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>}
         </div>
       )}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
-        <button className="btn primary" data-testid="save-appt" onClick={() => { save(); draft.clear(); toast(c.saved); back(); }}>{c.save}</button>
+        <button className="btn primary" data-testid="save-appt" disabled={readOnly} onClick={() => {
+          if (existing && !can(store.getState(), 'edit', 'appointments', existing.id)) { toast(teamStrings[lang].notAllowed, 'error'); return; }
+          save(); draft.clear(); toast(c.saved); back();
+        }}>{c.save}</button>
       </div></div>
-      {del && existing && <Confirm lang={lang} title={a.appt.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('appointments', existing.id); back(); }} />}
+      {del && existing && <Confirm lang={lang} title={a.appt.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { if (can(store.getState(), 'delete', 'appointments', existing.id)) store.remove('appointments', existing.id); back(); }} />}
     </section>
   );
 }
@@ -208,10 +219,10 @@ export function TodoScreen({ lang, go }: { lang: Lang; go: Go }) {
   const now = new Date();
   const buckets = useMemo(() => {
     const b: Record<TaskBucket, Task[]> = { overdue: [], today: [], upcoming: [], someday: [], done: [] };
-    for (const t of state.tasks) b[taskBucket(t, now)].push(t);
+    for (const t of visible(state, 'tasks', state.tasks)) b[taskBucket(t, now)].push(t);
     for (const k of Object.keys(b) as TaskBucket[]) b[k] = sortTasks(b[k]);
     return b;
-  }, [state.tasks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.tasks, state.meta.shared, state.meta.team, state.settings.workspaceView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState<TaskBucket>(buckets.overdue.length ? 'overdue' : 'today');
   const order: TaskBucket[] = ['overdue', 'today', 'upcoming', 'someday', 'done'];
   return (
@@ -222,10 +233,11 @@ export function TodoScreen({ lang, go }: { lang: Lang; go: Go }) {
       {buckets[tab].length === 0 ? <Empty>{a.todo.none[tab]}</Empty> : (
         <ul className="task-list">
           {buckets[tab].map(t => <TaskRow key={t.id} lang={lang} t={t} go={go} onToggle={() => {
+            if (!can(store.getState(), 'edit', 'tasks', t.id)) return;
             const next = completeTask(t, !t.done);
             store.upsert('tasks', next);
             const contact = state.contacts.find(c => c.id === t.contactId);
-            if (next.done && contact) store.upsert('contacts', touchContact(contact));
+            if (next.done && contact && can(store.getState(), 'edit', 'contacts', contact.id)) store.upsert('contacts', touchContact(contact));
           }} />)}
         </ul>
       )}
@@ -298,17 +310,20 @@ export function TaskForm({ lang, back, id, prefill }: { lang: Lang; back: () => 
         <ReminderPicker lang={lang} value={d.reminders} onChange={r => setD(x => ({ ...x, reminders: r }))} />
         {existing && <label className="check"><input type="checkbox" checked={d.done} onChange={e => setD(x => completeTask(x, e.target.checked))} /> {strings[lang].c.done}</label>}
       </div>
-      {existing && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>}
+      {existing && <SharingLine lang={lang} collection="tasks" id={existing.id} />}
+      {existing && !can(state, 'edit', 'tasks', existing.id) && <p className="notice" data-testid="read-only-note">{teamStrings[lang].readOnlyNote}</p>}
+      {existing && can(state, 'delete', 'tasks', existing.id) && <button className="btn ghost danger-text" onClick={() => setDel(true)}>{c.delete}</button>}
       <div className="save-bar"><div className="two">
         <button className="btn secondary" onClick={back}>{c.cancel}</button>
-        <button className="btn primary" data-testid="save-task" onClick={() => {
+        <button className="btn primary" data-testid="save-task" disabled={!!existing && !can(state, 'edit', 'tasks', existing.id)} onClick={() => {
           if (!d.title.trim()) { setErr(true); return; }
+          if (existing && !can(store.getState(), 'edit', 'tasks', existing.id)) { toast(teamStrings[lang].notAllowed, 'error'); return; }
           store.upsert('tasks', { ...d, title: d.title.trim(), due: joinDT(dDate, dTime) });
           draft.clear();
           toast(c.saved); back();
         }}>{c.save}</button>
       </div></div>
-      {del && existing && <Confirm lang={lang} title={a.todo.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { store.remove('tasks', existing.id); back(); }} />}
+      {del && existing && <Confirm lang={lang} title={a.todo.deleteQ} body={c.deleteBody} onCancel={() => setDel(false)} onOk={() => { if (can(store.getState(), 'delete', 'tasks', existing.id)) store.remove('tasks', existing.id); back(); }} />}
     </section>
   );
 }
@@ -327,11 +342,11 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
   const weekdayNames = weekOf(new Date(2026, 9, 12)).map(d => d.toLocaleDateString(localeOf(lang), { weekday: 'short' }));
   const counts = useMemo(() => {
     const m = new Map<string, { appts: number; tasks: number }>();
-    for (const ap of state.appointments) if (ap.start && ap.status !== 'cancelled') { const k = ap.start.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.appts++; m.set(k, v); }
-    for (const t of state.tasks) if (t.due && !t.done) { const k = t.due.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.tasks++; m.set(k, v); }
+    for (const ap of visible(state, 'appointments', state.appointments)) if (ap.start && ap.status !== 'cancelled') { const k = ap.start.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.appts++; m.set(k, v); }
+    for (const t of visible(state, 'tasks', state.tasks)) if (t.due && !t.done) { const k = t.due.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.tasks++; m.set(k, v); }
     return m;
-  }, [state.appointments, state.tasks]);
-  const items = dayItems(sel, state.appointments, state.tasks);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = dayItems(sel, visible(state, 'appointments', state.appointments), visible(state, 'tasks', state.tasks));
   const appts = items.appts.filter(x => filter === 'all' || (filter === 'open' ? isOpenAppt(x) : x.status === filter));
   const shift = (n: number) => {
     if (view === 'month') setMonth(p => { const d = new Date(p.y, p.m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });

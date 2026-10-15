@@ -36,7 +36,8 @@ const dec = new TextDecoder();
 /** Every stored file a real record (or the profile) uses. */
 function usedFileIds(store: Store): string[] {
   const st = store.getState();
-  const ids = new Set(fileRefs(st).map(r => r.fileId));
+  // Change 010: never the pictures of records another agent shares with me.
+  const ids = new Set(fileRefs(st).filter(r => !st.meta.shared?.[`${r.collection}:${r.recordId}`]).map(r => r.fileId));
   for (const k of ['photoFileId', 'cardFrontFileId', 'cardBackFileId'] as const) { const v = st.profile[k]; if (v) ids.add(v); }
   return [...ids];
 }

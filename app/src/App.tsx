@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
 import { openBackend } from './data/backend';
-import { Store } from './data/store';
+import { Store, AccessError } from './data/store';
 import { StoreContext, useApp, useSaveState } from './data/useStore';
 import { Screen, Go } from './nav';
 import { ToastContext, ToastKind, TOAST_OK_MS, TOAST_ERROR_MS } from './ui/toast';
@@ -71,6 +71,16 @@ import { STALE_MS } from './backup/BackupUI';
 import { leadReviewStrings } from './data/leadReviewStrings';
 import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
+import { TeamScreen, ManageSharingScreen, WorkspaceSwitch, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
+import { teamStrings } from './team/strings';
+import { visible } from './team/access';
+import { AuditSearchScreen } from './audit/AuditUI';
+import { auditStrings } from './audit/strings';
+import { ExportManagementScreen } from './exports/ExportsUI';
+import { exportStrings } from './exports/strings';
+
+// Change 010: a Team Workspace invitation link the app was opened with is kept until the person deals with it.
+if (typeof window !== 'undefined') captureInviteFromUrl();
 
 /** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
  *  card: it lives inside Agent Profile. News is no longer a card: News / Announcements is a section of Notifications.
@@ -195,6 +205,17 @@ function Shell() {
   }, [store]);
   useEffect(() => { if (!toast) return; const x = setTimeout(() => setToast(null), toast.kind === 'error' ? TOAST_ERROR_MS : TOAST_OK_MS); return () => clearTimeout(x); }, [toast]);
   useEffect(() => { store.onWriteError = () => setToast({ text: t.storage.writeError, kind: 'error' }); }, [store, t]);
+  // Change 010: the store refuses changes this person may not make (see data/store.ts AccessError). Whatever screen or
+  // command tried, the person is told plainly instead of the change silently going nowhere.
+  useEffect(() => {
+    const onErr = (e: ErrorEvent | PromiseRejectionEvent) => {
+      const err = 'reason' in e ? e.reason : e.error;
+      if (err instanceof AccessError) { e.preventDefault(); setToast({ text: teamStrings[lang].notAllowed, kind: 'error' }); }
+    };
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onErr);
+    return () => { window.removeEventListener('error', onErr); window.removeEventListener('unhandledrejection', onErr); };
+  }, [lang]);
   // When syncing to the cloud starts failing, say so once (the changes themselves are still saved on this phone).
   // Buyers still marked with the retired status "Inactive" (from an older version, or from another phone) become Dropped,
   // with a report. Runs on opening and again whenever a sync brings such a record in; it does nothing otherwise.
@@ -359,6 +380,10 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'voiceDiag': return diagStrings[lang].title;
     case 'comingSoon': return s.key === 'cobrokeMap' ? gs.cobrokeMap : t.tiles[s.key];
     case 'cobroke': return t.cobrokeTop;
+    case 'team': return teamStrings[lang].teamTitle;
+    case 'manageSharing': return teamStrings[lang].manageSharing;
+    case 'auditSearch': return auditStrings[lang].searchTitle;
+    case 'exports': return exportStrings[lang].manageTitle;
   }
 }
 
@@ -427,6 +452,10 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
       </section>
     );
     case 'cobroke': return <Cobroke lang={lang} go={go} />;
+    case 'team': return <TeamScreen lang={lang} go={go} />;
+    case 'manageSharing': return <ManageSharingScreen key={s.focus ?? ''} lang={lang} focus={s.focus} />;
+    case 'auditSearch': return <AuditSearchScreen key={`${s.collection ?? ''}:${s.id ?? ''}`} lang={lang} go={go} collection={s.collection} id={s.id} />;
+    case 'exports': return <ExportManagementScreen lang={lang} go={go} section={s.section} />;
   }
 }
 
@@ -435,9 +464,12 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const t = strings[lang];
   const ls = listingStrings[lang];
   const today = todayCounts(state.tasks, state.appointments, new Date());
-  const recent = [...state.properties].sort((a, b) => b.updated - a.updated).slice(0, 3);
+  const recent = visible(state, 'properties', state.properties).filter(p => !p.archived).sort((a, b) => b.updated - a.updated).slice(0, 3);
+  const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
   return (
     <section className="stack home">
+      <WorkspaceSwitch lang={lang} />
+      {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
           <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''} ${tile.soon ? 'soon' : ''}`} data-tile={i + 1} onClick={() => go(tile.target)}

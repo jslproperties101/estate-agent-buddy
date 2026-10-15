@@ -823,3 +823,36 @@ label.btn { position: relative; cursor: pointer; }
 /* Opportunities → Co-broke Opportunities card (owner, 15 Oct). */
 .link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--ink); min-height: 88px; border: 1px solid var(--gold-lo); cursor: pointer; }
 .link-card strong { color: var(--gold-hi); font-size: 18px; }
+
+/* ---------- Change 010: Team Workspace, sharing, archive, audit history, exports ---------- */
+.ws-switch { width: 100%; }
+.ws-switch button { flex: 1 1 0; }
+/* Creator of a shared card: bottom-right, in a colour no other card text uses (teal on the dark theme). */
+.creator-tag { align-self: flex-end; margin-left: auto; font-size: 14px; font-weight: 700; color: #5EEAD4; background: #0F2E2B; border: 1px solid #1F5F58;
+  border-radius: 8px; padding: 0 8px; max-width: 100%; overflow-wrap: anywhere; }
+.gc .creator-tag { margin: 2px 8px 0 auto; }
+.sharing-line { border-left: 4px solid #1F5F58; }
+.gear-btn { min-height: 44px; min-width: 44px; }
+.share-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.share-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.share-row select { max-width: 100%; }
+.archived-section summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.archived-section { opacity: .78; }
+.archived-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.archived-list .link-row { display: flex; flex-direction: column; align-items: flex-start; width: 100%; filter: grayscale(.6); }
+.archived-banner { border-left: 4px solid var(--amber); }
+.wrap-anywhere { overflow-wrap: anywhere; word-break: break-all; font-size: 14px; }
+.audit-entry { border-top: 1px solid var(--line); padding-top: 6px; }
+.audit-entry summary { cursor: pointer; min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+.audit-changes { margin: 4px 0 0; padding-left: 16px; }
+.audit-changes li { overflow-wrap: anywhere; }
+.audit-before { color: var(--red); text-decoration: line-through; }
+.audit-after { color: var(--ok); }
+.act-edit { color: var(--blue); } .act-archive, .act-delete { color: var(--red); } .act-restore { color: var(--ok); }
+.act-permission { color: var(--amber); } .act-membership { color: #C4B5FD; } .act-export { color: #5EEAD4; }
+.confidential { color: var(--red); font-weight: 800; letter-spacing: .08em; }
+.progress { width: 100%; height: 10px; border-radius: 6px; background: var(--card-2); overflow: hidden; border: 1px solid var(--line-2); }
+.progress > span { display: block; height: 100%; background: var(--gold-grad); }
+.export-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; border-top: 1px solid var(--line); padding-top: 8px; }
+.export-row .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.export-row input[type=checkbox] { width: 24px; height: 24px; margin-top: 4px; }
