@@ -8,6 +8,7 @@ import { Store } from '../src/data/store';
 import { backupToDrive, backupDue, driveUsable, listBackups, ensureFolder, downloadBackup, runDriveBackup, KEEP_COPIES, FOLDER_NAME, DriveError } from '../src/backup/drive';
 import { createBackup, inspectBackup, restoreBackup } from '../src/backup/backup';
 import type { Contact } from '../src/data/types';
+import { createFakeDrive } from './support/fakeDrive.mjs';
 
 interface F { id: string; name: string; parents: string[]; mime: string; createdTime: string; trashed: boolean; data: Uint8Array }
 function fakeDrive(opts: { failUploadSize?: boolean; status?: number; body?: string; throwNet?: boolean } = {}) {
@@ -101,28 +102,30 @@ test('D4 failures are named honestly: not signed in to Google, offline, storage 
   assert.equal(await code({ status: 403, body: 'accessNotConfigured' }), 'auth');
 });
 
-test('D5 runDriveBackup records the outcome on the phone; a refused token disconnects Drive; success is never recorded for a failure', async () => {
+test('D5 runDriveBackup records the outcome on the phone; a refused token disconnects Drive; success is never recorded for a failure (Change 006: a restore point, no more .zip uploads)', async () => {
   const s = await Store.open(new MemoryBackend());
   s.upsert('contacts', { id: 'c1', created: 1, updated: 1, name: 'Ahmad', roles: ['buyer'] } as Contact);
   const now = Date.now();
-  assert.deepEqual(await runDriveBackup(s, fakeDrive().fetchFn, now), { ok: false, error: 'notConnected' });
+  assert.deepEqual(await runDriveBackup(s, createFakeDrive().fetchFn, now), { ok: false, error: 'notConnected' });
   s.setSingleton('meta', { drive: { token: 'WRONG', expiresAt: now + 3600_000, connectedAt: now } });
-  const r1 = await runDriveBackup(s, fakeDrive().fetchFn, now);
-  assert.deepEqual(r1, { ok: false, error: 'auth' });
+  const r1 = await runDriveBackup(s, createFakeDrive().fetchFn, now);
+  assert.equal(r1.ok, false); assert.equal(r1.error, 'auth');
   assert.equal(s.getState().meta.drive, undefined, 'the refused token is forgotten');
   assert.equal(s.getState().meta.driveLastOkAt, undefined);
   assert.equal(s.getState().meta.driveLast?.ok, false);
   s.setSingleton('meta', { drive: { token: 'TOK', expiresAt: now + 3600_000, connectedAt: now } });
-  const d = fakeDrive();
+  const d = createFakeDrive();
   const r2 = await runDriveBackup(s, d.fetchFn, now + 5);
-  assert.equal(r2.ok, true);
+  assert.equal(r2.ok, true); assert.ok(r2.point);
   assert.equal(s.getState().meta.driveLastOkAt, now + 5);
   assert.equal(s.getState().meta.lastBackupAt, now + 5);
-  const text = [...d.files.values()].filter(f => f.name.endsWith('.zip')).map(f => new TextDecoder().decode(f.data)).join('');
-  assert.ok(!text.includes('"token":"TOK"') && !text.includes('driveLast'), 'the Drive token is never inside a backup file');
+  assert.ok(![...d.files.values()].some((f: { name: string }) => f.name.endsWith('.zip')), 'no backup .zip is uploaded any more');
+  const text = [...d.files.values()].map((f: { data: Uint8Array }) => new TextDecoder().decode(f.data)).join('');
+  assert.ok(text.includes('Ahmad'));
+  assert.ok(!text.includes('"token":"TOK"') && !text.includes('driveLast'), 'the Drive token is never inside a backup');
 });
 
-test('D6 a backup downloaded from Drive restores onto a new phone', async () => {
+test('D6 an older backup .zip on Drive (made before Change 006) still restores onto a new phone', async () => {
   const s = await Store.open(new MemoryBackend());
   s.upsert('contacts', { id: 'c1', created: 1, updated: 1, name: 'Ahmad', roles: ['buyer'] } as Contact);
   const d = fakeDrive(); const b = await createBackup(s);
