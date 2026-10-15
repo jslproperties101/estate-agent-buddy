@@ -300,6 +300,8 @@ export interface Meta {
   drive?: { token: string; expiresAt: number; connectedAt: number };
   driveLastOkAt?: number;
   driveLast?: { at: number; ok: boolean; error?: string; copies?: number; fileName?: string };
+  /** Change 006 Layer 2: the last update of the readable Drive folders (status, and how many items wait or failed). */
+  driveTree?: { at: number; ok: boolean; status?: 'complete' | 'partial'; waiting?: number; failed?: number; editedOutside?: number; error?: string };
   syncSession?: {
     accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string;
     /** From the Google account (via Supabase). */

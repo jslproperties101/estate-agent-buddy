@@ -1,15 +1,23 @@
-// Google Drive copy of the backup file. Uses only the Drive REST API with the "drive.file" permission, which lets the
-// app see ONLY the files and folder it created itself (never the rest of the person's Drive). Backups live in a visible
-// folder "Estate Agent AI Buddy backups", one .zip per backup, and the newest 30 are kept: older ones go to the Drive
-// bin (recoverable for 30 days), never straight to permanent deletion, and only files whose names match the backup
-// pattern are ever touched.
+// Google Drive: the daily run (Change 006 Layers 1-3) and the older backup-file (.zip) folder.
+//
+// Uses only the Drive REST API with the "drive.file" permission, which lets the app see ONLY the files and folders it
+// created itself (never the rest of the person's Drive).
+//
+// Since the Change 006 integration (app 2.2.0, release 2.0.010) each run writes:
+//   - a verified restore point under "Estate Agent AI Buddy/Disaster Recovery" (restorePoints.ts; newest 30 kept), and
+//   - the readable folders with their Recovery copies under "Estate Agent AI Buddy" (driveTree.ts).
+// It no longer uploads .zip files. Older versions put them in the folder "Estate Agent AI Buddy backups"; those stay
+// there, are still listed, and still restore (listBackups / downloadBackup and backup.ts's inspectBackup). The upload and
+// pruning functions for that folder are kept for those older copies and their tests; the app does not call them.
 //
 // What this cannot do: Google gives the app a short-lived access token (about an hour) when the person connects Drive,
-// and the phone cannot renew it quietly. So a backup runs when the person connects or presses "Back up now" (and once a
-// day at app start while that token is still valid). A backup that runs every day on its own, without the app open,
-// needs a scheduled server job holding Google's long-lived refresh token; that is NOT built (docs/MASTER_REQUIREMENTS_AUDIT.md).
+// and the phone cannot renew it quietly. So a run happens when the person connects or presses "Back up now", and once a
+// day at app start while that token is still valid. Owner decision (Oct 2026): backups only while the app is open; no
+// server holding a long-lived refresh token.
 import type { Store } from '../data/store';
-import { createBackup } from './backup';
+import { DriveClient } from './driveApi';
+import { createRestorePoint, PointRun } from './restorePoints';
+import { exportTree, TreeRun } from './driveTree';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const FOLDER_NAME = 'Estate Agent AI Buddy backups';
@@ -17,25 +25,11 @@ export const KEEP_COPIES = 30;
 export const DUE_AFTER_MS = 20 * 3600_000;
 export const BACKUP_NAME = /^EstateAgentBuddy-backup-\d{4}-\d{2}-\d{2}-\d{4}\.zip$/;
 
-export type DriveFailure = 'auth' | 'network' | 'quota' | 'server' | 'notVerified' | 'notConnected';
-export class DriveError extends Error { constructor(public code: DriveFailure, message?: string) { super(message ?? code); } }
+import { API, call, DriveError, DriveFailure, q, UPLOAD } from './driveApi';
+export { DriveError } from './driveApi';
+export type { DriveFailure } from './driveApi';
 
 type FetchFn = typeof fetch;
-const API = 'https://www.googleapis.com/drive/v3';
-const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
-
-async function call(fetchFn: FetchFn, token: string, url: string, init: RequestInit = {}): Promise<Response> {
-  let r: Response;
-  try { r = await fetchFn(url, { ...init, headers: { ...(init.headers as Record<string, string> | undefined), authorization: `Bearer ${token}` } }); }
-  catch { throw new DriveError('network'); }
-  if (r.ok) return r;
-  const body = await r.text().catch(() => '');
-  if (r.status === 401) throw new DriveError('auth', body.slice(0, 200));
-  if (r.status === 403 && /storageQuotaExceeded|quotaExceeded|userRateLimit/i.test(body)) throw new DriveError(/storage/i.test(body) ? 'quota' : 'server', body.slice(0, 200));
-  if (r.status === 403 || r.status === 404) throw new DriveError(r.status === 404 ? 'server' : 'auth', body.slice(0, 200));
-  throw new DriveError('server', `${r.status} ${body.slice(0, 160)}`);
-}
-const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 export interface DriveFile { id: string; name: string; createdTime: string; size?: string }
 
@@ -109,18 +103,47 @@ export const backupDue = (lastOkAt: number | undefined, now = Date.now()) => !la
 /** The Drive permission is usable only while Google's short-lived token has not run out. */
 export const driveUsable = (d: { token: string; expiresAt: number } | undefined, now = Date.now()) => !!d && d.expiresAt - now > 60_000;
 
-/** Makes a backup and puts it on Drive. Records the outcome on the phone (meta.driveLast / driveLastOkAt). */
-export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now = Date.now()): Promise<{ ok: true; run: DriveRun } | { ok: false; error: DriveFailure }> {
+export interface DriveRunResult {
+  ok: boolean;
+  error?: DriveFailure;
+  /** The restore point made by this run (Layer 3), when one was due or asked for. */
+  point?: PointRun;
+  pointError?: DriveFailure;
+  /** The readable folders update (Layer 2). */
+  tree?: TreeRun;
+  treeError?: DriveFailure;
+}
+
+/** One Drive run (Change 006), while the app is open and Google's short-lived permission is valid:
+ *   1. a verified restore point (Layer 3) when one is due (once a day) or `force` is set ("Back up now");
+ *   2. the readable folders and their Recovery copies (Layers 2 and 1), every run.
+ *  The two fail independently: a failed folder update never undoes a good restore point, and the other way round.
+ *  Outcomes are recorded on the phone (meta.driveLast / driveLastOkAt for restore points, meta.driveTree for folders).
+ *  Since this version the app no longer uploads backup .zip files to Drive; older ones stay listed and restorable. */
+export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now = Date.now(), opts: { force?: boolean; tree?: boolean } = {}): Promise<DriveRunResult> {
   const d = store.getState().meta.drive;
   if (!driveUsable(d, now)) return { ok: false, error: 'notConnected' };
-  try {
-    const b = await createBackup(store, now);
-    const run = await backupToDrive(fetchFn, d!.token, b.fileName, b.bytes);
-    store.setSingleton('meta', { driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: run.copies, fileName: run.fileName } });
-    return { ok: true, run };
-  } catch (e) {
-    const error = e instanceof DriveError ? e.code : 'server';
-    store.setSingleton('meta', { driveLast: { at: now, ok: false, error }, ...(error === 'auth' ? { drive: undefined } : {}) });
-    return { ok: false, error };
+  const client = new DriveClient(fetchFn, d!.token);
+  const out: DriveRunResult = { ok: true };
+  const failure = (e: unknown): DriveFailure => (e instanceof DriveError ? e.code : 'server');
+  if (opts.force || backupDue(store.getState().meta.driveLastOkAt, now)) {
+    try {
+      out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now);
+      store.setSingleton('meta', { driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: out.point.kept, fileName: out.point.name } });
+    } catch (e) {
+      out.pointError = failure(e); out.ok = false; out.error = out.pointError;
+      store.setSingleton('meta', { driveLast: { at: now, ok: false, error: out.pointError }, ...(out.pointError === 'auth' ? { drive: undefined } : {}) });
+      if (out.pointError === 'auth') return out;
+    }
   }
+  if (opts.tree !== false) {
+    try {
+      out.tree = await exportTree(store, client, now);
+      store.setSingleton('meta', { driveTree: { at: now, ok: true, status: out.tree.status, waiting: out.tree.waiting.length, failed: out.tree.failed.length, editedOutside: out.tree.editedOutside.length } });
+    } catch (e) {
+      out.treeError = failure(e); out.ok = false; out.error = out.error ?? out.treeError;
+      store.setSingleton('meta', { driveTree: { at: now, ok: false, error: out.treeError }, ...(out.treeError === 'auth' ? { drive: undefined } : {}) });
+    }
+  }
+  return out;
 }
