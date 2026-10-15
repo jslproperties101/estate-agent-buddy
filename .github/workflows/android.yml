@@ -76,6 +76,12 @@ jobs:
       - name: Proposed block on old-app direct writes (local PostgreSQL, not applied anywhere)
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
         run: bash supabase/tests/write-block-test.sh
+      - name: Change 010 proposal - Team Workspace, sharing, audit (local PostgreSQL, not applied anywhere)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/change010-test.sh
+      - name: Existing roles and row-level security again, with the Change 010 proposal on top
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres, EAB_WITH_CHANGE010: '1' }
+        run: bash supabase/tests/rls-test.sh
 
   android:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).

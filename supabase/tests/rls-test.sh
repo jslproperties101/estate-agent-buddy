@@ -113,6 +113,11 @@ $P -c "insert into eab_records (workspace_id, user_id, collection, id, data, upd
   ('$WSA','$A','properties','legacy2','{\"ref\":\"A2001\",\"refNo\":2001,\"refPrefix\":\"A\",\"headline\":\"Legacy two\"}',11),
   ('$WSA','$A','properties','legacy3','{\"ref\":\"P2002\",\"refNo\":2002,\"refPrefix\":\"P\",\"headline\":\"Legacy three\"}',12)" >/dev/null
 check "phase 2 migration applies on existing data (no error)" "0" "$($DB -f supabase/migrations/20261014000000_phase2_sync_refs_files.sql 2>&1 | grep -ci "error")"
+# EAB_WITH_CHANGE010=1: every check below runs again with the Change 010 proposal in place (it must not widen access).
+if [ "${EAB_WITH_CHANGE010:-}" = "1" ]; then
+  $P -c "alter table auth.users add column if not exists banned_until timestamptz, add column if not exists deleted_at timestamptz" >/dev/null
+  check "Change 010 proposal applies on top (no error)" "0" "$($DB -f supabase/proposed/20261016000000_change010_team_sharing_audit.sql 2>&1 | grep -ci "error")"
+fi
 check "every existing row got a seq"   "0"                  "$($P -c "select count(*) from eab_records where seq is null")"
 check "existing rows start at rev 1"   "1"                  "$($P -c "select count(distinct rev) from eab_records")"
 check "registry holds the oldest legacy property"  "legacy1" "$($P -c "select property_id from eab_property_refs where workspace_id='$WSA' and ref_no=2001")"

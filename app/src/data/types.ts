@@ -275,6 +275,10 @@ export interface Settings {
   startChoice?: 'sample' | 'empty';
   /** Remind about contacts with no interaction for this many days; 0 = off. Default 30. Never changes a contact. */
   followUpDays?: number;
+  /** Change 010: which workspace the lists show (switching needs no sign-out). Team only while in a Team Workspace. */
+  workspaceView?: 'personal' | 'team';
+  /** Change 010 Q120: the Export Management section used last (Saved Exports or Deleted Exports). */
+  exportSection?: 'saved' | 'deleted';
 }
 
 export interface CustomOption { value: string; added: number; used: number }
@@ -328,7 +332,39 @@ export interface Meta {
   conflicts?: Conflict[];
   /** Records whose last send was refused for a reason other than a conflict, e.g. "denied": "collection:id" → why. */
   recErrors?: Record<string, string>;
+  /** Change 010: my Team Workspace as the cloud last described it (eab_team_status). Absent = no Team Workspace known. */
+  team?: TeamState;
+  /** Change 010: records another agent shares with me right now ("collection:id" → owner and my access). Everything
+   *  NOT listed here is my own record. Kept up to date by every sync; an entry disappears the moment access ends. */
+  shared?: Record<string, SharedInfo>;
 }
+
+// ---------- Change 010: Team Workspace and sharing ----------
+export type ShareLevel = 'view' | 'edit';
+/** Share All categories. Calculator and every other kind of record are never shared. */
+export type ShareScope = 'properties' | 'buyers' | 'vendors' | 'tasks' | 'appointments';
+export const SHARE_SCOPES: ShareScope[] = ['properties', 'buyers', 'vendors', 'tasks', 'appointments'];
+export interface TeamMember { userId: string; email: string; name?: string; joinedAt?: string }
+export interface TeamInvite { id: string; email?: string | null; fromEmail?: string; fromName?: string | null; createdAt: string; expiresAt: string }
+export interface DeleteRequest { id: string; workspaceId: string; collection: CollectionName; recordId: string; ownerId: string; requesterId: string; createdAt: string }
+export interface TeamState {
+  /** Absent when I am in no Team Workspace (invitations for me may still be listed). */
+  id?: string;
+  /** The agent who created the Team Workspace (the "team owner"). */
+  createdBy?: string;
+  createdAt?: string;
+  members: TeamMember[];
+  invitesSent: TeamInvite[];
+  invitesForMe: TeamInvite[];
+  sharesGiven: { workspaceId: string; collection: CollectionName; recordId: string; level: ShareLevel }[];
+  shareAllGiven: { scope: ShareScope; level: ShareLevel }[];
+  shareAllReceived: { scope: ShareScope; level: ShareLevel; ownerId: string }[];
+  deleteRequests: DeleteRequest[];
+  /** When this was read from the cloud (ms). */
+  at: number;
+}
+/** A record that another agent owns and shares with me. */
+export interface SharedInfo { workspaceId: string; ownerId: string; ownerEmail: string; ownerName?: string | null; level: ShareLevel }
 
 /** One field that differs between this phone and the cloud. */
 export interface FieldConflict { field: string; local: unknown; remote: unknown }

@@ -191,6 +191,9 @@ export interface Listing {
   notes?: string;
   documents?: Doc[];
   history?: ChangeEntry[];
+  /** Change 010: set when the property was deleted. It moves to the Archived section (kept until an authorised person
+   *  deletes it permanently); Restore clears it. `by` is the user id (or "local" when signed out). */
+  archived?: { at: number; by?: string; byName?: string };
   /** Where each value came from: typed by hand, or taken from what the agent said (voice). */
   filledFrom?: Partial<Record<keyof Listing, 'typed' | 'words'>>;
   /** How far each important fact can be trusted (listing/verify.ts). A field with no entry has not been marked yet. */
