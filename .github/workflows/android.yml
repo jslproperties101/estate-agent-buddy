@@ -11,6 +11,8 @@
 #   EAB_SUPABASE_URL          Supabase project URL (login and cloud sync)
 #   EAB_SUPABASE_ANON_KEY     Supabase anon (public) key
 #   EAB_EXPERT_API_URL        optional Ask Expert AI function URL
+#   EAB_QA_SUPABASE_URL       the separate TEST Supabase project's URL, for the QA APK only (optional)
+#   EAB_QA_SUPABASE_ANON_KEY  that test project's anon (public) key, for the QA APK only (optional)
 name: Build
 
 on:
@@ -106,8 +108,11 @@ jobs:
       EAB_QA: ${{ matrix.variant == 'qa' && '1' || '' }}
       PUBLISH_APK: ${{ (matrix.variant == 'qa' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update') && '1' || '' }}
       EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
-      EAB_SUPABASE_URL: ${{ secrets.EAB_SUPABASE_URL }}
-      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_SUPABASE_ANON_KEY }}
+      # The QA APK never gets the production Supabase project built in: it uses the separate TEST project's secrets
+      # (EAB_QA_SUPABASE_URL / EAB_QA_SUPABASE_ANON_KEY) when they exist; without them the QA app asks for the
+      # connection on its sign-in screen (Connection settings). Production builds are unchanged.
+      EAB_SUPABASE_URL: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_URL || matrix.variant != 'qa' && secrets.EAB_SUPABASE_URL || '' }}
+      EAB_SUPABASE_ANON_KEY: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_ANON_KEY || matrix.variant != 'qa' && secrets.EAB_SUPABASE_ANON_KEY || '' }}
       EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:

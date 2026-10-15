@@ -20,7 +20,10 @@ Files used
   from `feature/change-010-team-audit-exports` (your approval) or the web version opened from a local build.
   The Supabase URL and anon key are typed in Settings on each device and are never committed.
   **Integrated release 2.0.010:** use the QA APK from branch `feature/qa-v2.0.10-integrated` (release `qa-<commit>` on GitHub).
-  Never install the normal debug APK for this test.
+  Never install the normal debug APK for this test. The QA APK has **no** Supabase project built in (the production
+  project is deliberately kept out of QA builds): on its sign-in screen open **Connection settings** and type the TEST
+  project's URL and anon key (or add them once as repository secrets `EAB_QA_SUPABASE_URL` and
+  `EAB_QA_SUPABASE_ANON_KEY`, then rebuild the QA branch). Never type the production project there.
 - For the Change 006 Drive checks (Part 3): the Google Cloud project behind the **test** sign-in, with the
   `https://www.googleapis.com/auth/drive.file` scope added to its OAuth consent screen and both test accounts listed as
   test users.

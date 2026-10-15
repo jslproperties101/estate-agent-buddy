@@ -41,6 +41,12 @@ Status key: **IT** implemented and tested automatically (Node, Chromium 384 × 8
 | Advert screenshots missing from `fileRefs` | not in any backup, never synced | included (cloud kind "other") | FX1 |
 | Two restore points in the same second | one folder with two manifests | separate names with milliseconds | RP7, U92 |
 
+### Distribution safeguard added at the QA step
+The first QA APK of this branch (`qa-96e2803`) was built, like earlier QA builds, with the **production** Supabase
+project as its default connection (from the repository secrets). That is replaced: QA builds now take only the
+separate test project's secrets (`EAB_QA_SUPABASE_URL` / `EAB_QA_SUPABASE_ANON_KEY`), and without them the QA app asks
+for the connection on its sign-in screen. Test W2. Use the QA APK built after this change, not `qa-96e2803`.
+
 ### Shared systems checked across Changes 006 and 010
 Backups and restore points carry only the account's own records, history, audit entries and files: never records
 shared in by another agent, never Team Workspace events (RP1, E5). The readable Drive folders apply the same rule and
@@ -52,7 +58,7 @@ SQL, policy or access-check file was changed by this integration.
 |---|---|
 | TypeScript strict | 0 errors |
 | Lint (incl. EN/BM/ZH) | passed, 225 files |
-| Unit tests (Node) | 397 / 397 (368 before; +29: Change 006 Drive 22, Layer 1 5, version 1, workflow 1) |
+| Unit tests (Node) | 398 / 398 (368 before; +30: Change 006 Drive 22, Layer 1 5, version 1, workflow 2) |
 | Browser tests (Chromium 384 × 824, stand-ins) | 115 / 115 (U92 rewritten for the Drive layers, U30 for the release label) |
 | Production build (no publishing) | built (`scripts/build.mjs --no-env`); QA build inside U99 |
 | DB: RLS / rollback / write-block / Change 010 / RLS + 010 | 125/125 · 18/18 · 22/22 · 122/122 · 126/126 |

@@ -15,3 +15,12 @@ test('W1 QA branches build only the QA APK; feature branches publish no normal-p
   assert.match(wf, /if: github\.ref == 'refs\/heads\/main' \|\| github\.ref == 'refs\/heads\/feature\/v2-full-update'\n\s+environment: \{ name: github-pages/, 'web deploy only from main / v2-full-update');
   assert.match(wf, /node scripts\/verify-apk\.mjs "\$APK" com\.jslproperties\.estateagentbuddy\.qa "EAB QA" qa/, 'the QA APK is checked for its own package and name');
 });
+
+test('W2 the QA APK never has the production Supabase project built in (test-project secrets only, or none)', () => {
+  const url = /EAB_SUPABASE_URL: (.+)/.exec(wf.slice(wf.indexOf('  android:')))![1];
+  const key = /EAB_SUPABASE_ANON_KEY: (.+)/.exec(wf.slice(wf.indexOf('  android:')))![1];
+  for (const v of [url, key]) {
+    assert.match(v, /matrix\.variant == 'qa' && secrets\.EAB_QA_SUPABASE_/);
+    assert.match(v, /matrix\.variant != 'qa' && secrets\.EAB_SUPABASE_/);
+  }
+});
