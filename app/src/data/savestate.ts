@@ -8,11 +8,11 @@
 //                 sync finished well
 //   phone         saved on this phone (not signed in, or changes are waiting for the next sync)
 import type { Store } from './store';
-import { fileRefs } from './fileRefs';
+import { cloudFileRefs } from './fileRefs';
 
 /** Pictures and documents that a saved record uses but the cloud does not have yet. */
 export function pendingFileCount(store: Store): number {
-  const used = new Set(fileRefs(store.getState()).map(r => r.fileId));
+  const used = new Set(cloudFileRefs(store.getState()).map(r => r.fileId));
   const have = new Map(store.allFileEntries().map(e => [e.id, e]));
   let n = 0;
   for (const id of used) {

@@ -10,7 +10,7 @@
 //  - Pictures are sent as they are kept on the phone (already shrunk when added). A picture that is still large (over
 //    2.5 MB) is shrunk for the upload only; the copy on the phone is never changed.
 import type { Store, FileEntry } from './store';
-import { fileRefs, FileRef } from './fileRefs';
+import { cloudFileRefs, fileRefs, FileRef } from './fileRefs';
 import { sha256Hex } from './hash';
 import { SyncConfig, SyncError, Session, supabaseHeaders } from './sync';
 
@@ -41,7 +41,8 @@ export async function defaultPrepare(blob: Blob): Promise<Blob> {
 }
 
 const backoff = (tries: number) => Math.min(30_000 * 2 ** Math.max(0, tries - 1), 3600_000);
-const kindOf = (r: FileRef) => r.kind;
+/** The cloud's eab_files.kind allows photo, document, banner and other: advert screenshots are stored as "other". */
+const kindOf = (r: FileRef) => (r.kind === 'advert' ? 'other' : r.kind);
 
 async function raw(fetchFn: FetchFn, url: string, init: RequestInit): Promise<Response> {
   try { return await fetchFn(url, init); } catch (e) { throw new SyncError('network', String(e)); }
@@ -135,7 +136,8 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
   const now = (opts.now ?? Date.now)();
   const prepare = opts.prepare ?? defaultPrepare;
   const res: FileSyncResult = { uploaded: 0, downloaded: 0, failed: 0 };
-  const refs = fileRefs(store.getState()).filter(r => !opts.only || opts.only(r));
+  // Confidential documents are never sent or fetched: they stay on the phone that holds them (see data/fileRefs.ts).
+  const refs = cloudFileRefs(store.getState()).filter(r => !opts.only || opts.only(r));
   const toDownload: FileRef[] = [];
 
   for (const ref of refs) {
@@ -181,10 +183,11 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
 
 /** Number of a record's files in each state, for the small line under its pictures. */
 export function recordFileSummary(store: Store, collection: string, recordId: string) {
-  const out = { total: 0, uploaded: 0, waiting: 0, failed: 0, missing: 0, denied: 0 };
+  const out = { total: 0, uploaded: 0, waiting: 0, failed: 0, missing: 0, denied: 0, phoneOnly: 0 };
   for (const r of fileRefs(store.getState())) {
     if (r.collection !== collection || r.recordId !== recordId) continue;
     out.total++;
+    if (r.confidential) { out.phoneOnly++; continue; }
     const e = store.fileEntry(r.fileId);
     if (!e) out.waiting++;
     else if (e.status === 'uploaded') out.uploaded++;

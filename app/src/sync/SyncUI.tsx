@@ -78,7 +78,8 @@ export function RecordStatus({ lang, collection, id, go }: { lang: Lang; collect
 
 function FilesLine({ lang, summary }: { lang: Lang; summary: ReturnType<typeof recordFileSummary> }) {
   const y = syncStrings[lang];
-  const bits = [y.fileLine(summary.uploaded, summary.total)];
+  const bits = [y.fileLine(summary.uploaded, summary.total - summary.phoneOnly)];
+  if (summary.phoneOnly) bits.push(y.filePhoneOnly(summary.phoneOnly));
   if (summary.waiting) bits.push(y.fileWaiting(summary.waiting));
   if (summary.failed) bits.push(y.fileFailed(summary.failed));
   if (summary.missing) bits.push(y.fileMissing(summary.missing));
