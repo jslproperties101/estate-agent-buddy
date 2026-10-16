@@ -31,22 +31,24 @@ test('S3-1 the four agreed states are exactly Confirmed, Owner stated, Need to c
 });
 
 test('S3-2 setting, changing and clearing a state changes only that field and never touches the value', () => {
-  const a = prop('p1', { askingPrice: 500000, tenure: 'freehold' });
-  const b = withVerification(a, 'askingPrice', 'owner');
-  assert.equal(verifyStateOf(b, 'askingPrice'), 'owner');
-  assert.equal(b.askingPrice, 500000);
+  const a = prop('p1', { landSqft: 500000, tenure: 'freehold' });
+  const b = withVerification(a, 'landSqft', 'owner');
+  assert.equal(verifyStateOf(b, 'landSqft'), 'owner');
+  assert.equal(b.landSqft, 500000);
   assert.equal(a.verification, undefined, 'the original is not changed');
-  const c = withVerification(withVerification(b, 'tenure', 'confirmed'), 'askingPrice', 'check');
-  assert.deepEqual(c.verification, { askingPrice: 'check', tenure: 'confirmed' });
-  const d = withVerification(withVerification(c, 'askingPrice', undefined), 'tenure', undefined);
+  const c = withVerification(withVerification(b, 'tenure', 'confirmed'), 'landSqft', 'check');
+  assert.deepEqual(c.verification, { landSqft: 'check', tenure: 'confirmed' });
+  const d = withVerification(withVerification(c, 'landSqft', undefined), 'tenure', undefined);
   assert.equal(d.verification, undefined, 'clearing the last mark leaves no empty object');
   assert.equal(withVerification(a, 'headline', 'confirmed'), a, 'a field that is not verifiable is ignored');
   assert.equal(isVerifiable('headline'), false);
-  assert.ok(VERIFIABLE_FIELDS.includes('askingPrice') && VERIFIABLE_FIELDS.includes('ownerPhone'));
+  assert.ok(VERIFIABLE_FIELDS.includes('landSqft') && VERIFIABLE_FIELDS.includes('ownerPhone'));
+  // Owner, 17 Oct 2026: Asking Price and Monthly Rent have no check status.
+  assert.ok(!(VERIFIABLE_FIELDS as readonly string[]).includes('askingPrice') && !(VERIFIABLE_FIELDS as readonly string[]).includes('monthlyRent'));
 });
 
 test('S3-3 unknown or damaged values are never shown as a state; "to check" lists Need to check and Unknown only', () => {
-  const l = prop('p1', { verification: { askingPrice: 'owner', tenure: 'check', titleType: 'unknown', bedrooms: 'confirmed', parking: 'bogus' as never, headline: 'check' as never } });
+  const l = prop('p1', { verification: { landSqft: 'owner', tenure: 'check', titleType: 'unknown', bedrooms: 'confirmed', parking: 'bogus' as never, headline: 'check' as never } });
   assert.equal(verifyStateOf(l, 'parking'), undefined);
   assert.deepEqual(toCheck(l).sort(), ['tenure', 'titleType']);
   assert.deepEqual(verifyCounts(l), { confirmed: 1, owner: 1, check: 1, unknown: 1 });
@@ -55,37 +57,37 @@ test('S3-3 unknown or damaged values are never shown as a state; "to check" list
 test('S3-4 the state is stored with the record: it survives closing and reopening, and an empty field keeps its mark', async () => {
   const backend = new MemoryBackend();
   const s = await Store.open(backend);
-  s.upsert('properties', prop('p1', { verification: { askingPrice: 'owner', furnishing: 'unknown' } }));
+  s.upsert('properties', prop('p1', { verification: { landSqft: 'owner', furnishing: 'unknown' } }));
   await s.flush();
   const again = await Store.open(backend);
   const p = get(again, 'p1');
-  assert.deepEqual(p.verification, { askingPrice: 'owner', furnishing: 'unknown' });
+  assert.deepEqual(p.verification, { landSqft: 'owner', furnishing: 'unknown' });
   assert.equal(p.furnishing, undefined, 'Unknown on an empty field is kept');
 });
 
 test('S3-5 a change of state is a recorded change: the earlier version stays in the record history', async () => {
   const s = await Store.open(new MemoryBackend());
-  s.upsert('properties', prop('p1', { askingPrice: 1, verification: { askingPrice: 'check' } }));
-  s.upsert('properties', { ...get(s, 'p1'), verification: { askingPrice: 'confirmed' } }, false, 'merge');
+  s.upsert('properties', prop('p1', { landSqft: 1, verification: { landSqft: 'check' } }));
+  s.upsert('properties', { ...get(s, 'p1'), verification: { landSqft: 'confirmed' } }, false, 'merge');
   const h = await s.revisions('properties:p1');
   assert.equal(h.length >= 1, true);
-  assert.deepEqual((h[0].data as Listing).verification, { askingPrice: 'check' });
+  assert.deepEqual((h[0].data as Listing).verification, { landSqft: 'check' });
 });
 
 test('S3-6 states sync to the other phone; different fields marked on two phones both survive; the same field marked differently is a conflict, not a silent overwrite', async () => {
   const cloud = new FakeCloud();
   const a = await phone(cloud, 'o@x.c'); const b = await phone(cloud, 'o@x.c');
-  a.store.upsert('properties', prop('p1', { askingPrice: 400000, tenure: 'freehold' }));
+  a.store.upsert('properties', prop('p1', { landSqft: 400000, tenure: 'freehold' }));
   await sync(a.store, cloud); await sync(b.store, cloud);
-  assert.equal(get(b.store, 'p1').askingPrice, 400000);
+  assert.equal(get(b.store, 'p1').landSqft, 400000);
   // phone A marks price, phone B marks tenure
-  a.store.upsert('properties', withVerification(get(a.store, 'p1'), 'askingPrice', 'owner'));
+  a.store.upsert('properties', withVerification(get(a.store, 'p1'), 'landSqft', 'owner'));
   b.store.upsert('properties', withVerification(get(b.store, 'p1'), 'tenure', 'confirmed'));
   await sync(a.store, cloud); await sync(b.store, cloud); await sync(a.store, cloud);
-  for (const ph of [a, b]) assert.deepEqual(get(ph.store, 'p1').verification, { askingPrice: 'owner', tenure: 'confirmed' });
+  for (const ph of [a, b]) assert.deepEqual(get(ph.store, 'p1').verification, { landSqft: 'owner', tenure: 'confirmed' });
   // both mark the price, differently
-  a.store.upsert('properties', withVerification(get(a.store, 'p1'), 'askingPrice', 'confirmed'));
-  b.store.upsert('properties', withVerification(get(b.store, 'p1'), 'askingPrice', 'check'));
+  a.store.upsert('properties', withVerification(get(a.store, 'p1'), 'landSqft', 'confirmed'));
+  b.store.upsert('properties', withVerification(get(b.store, 'p1'), 'landSqft', 'check'));
   await sync(a.store, cloud);
   const r = await sync(b.store, cloud);
   assert.ok(r.conflicts >= 1 || (b.store.getState().meta.conflicts ?? []).length >= 1, 'the clash is reported for review');
@@ -117,7 +119,7 @@ test('S3-9 sample verification marks never sync as real data, and loading sample
   loadSampleInto(a.store);
   assert.equal(loadSampleInto(a.store), 0);
   assert.ok(a.store.getState().properties.some(p => p.verification && p.sample));
-  a.store.upsert('properties', prop('real', { verification: { askingPrice: 'owner' } }));
+  a.store.upsert('properties', prop('real', { verification: { landSqft: 'owner' } }));
   await sync(a.store, cloud);
   const ids = [...cloud.rows.keys()].map(k => k.split('|')[2]);
   assert.deepEqual(ids, ['real']);

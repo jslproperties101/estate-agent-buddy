@@ -274,16 +274,30 @@ function joinParts(parts: (string | undefined)[]): string {
   return out.join(', ');
 }
 
-/** The card's address (Change 009): Unit/Lot Number and street together, then township and town, each once. */
+/** Owner, 17 Oct 2026: addresses are shown in Title Case wherever they appear, including the part after a "/"
+ *  ("jalan bbn 1/3a" → "Jalan Bbn 1/3A"). Display only: the stored values are never changed. A word already written with
+ *  a capital after its first letter (BBN, PJS, KLIA) stays as typed; words without capital letters (Chinese) are unchanged. */
+export function addressCase(text: string): string {
+  return text.split(/(\s+)/).map(w => {
+    if (!w || /^\s+$/.test(w)) return w;
+    const core = w.replace(/^[^\p{L}\p{N}]+/u, '');
+    if (/\p{Lu}/u.test(core.slice(1))) return w;
+    // After a "/" or "(" the next letter is a capital too; after a hyphen it is left as typed (Kedua-dua, Seri-indah).
+    return w.split(/([/(])/).map(p => p.replace(/\p{L}/u, c => c.toLocaleUpperCase())).join('');
+  }).join('');
+}
+
+/** The title wherever a property is named (cards, lists, pickers, history, PDFs). Owner, 17 Oct 2026:
+ *  Unit/Lot Number and Street, then Neighbourhood, then Township and City, each once, in Title Case. */
 export function title(l: Listing): string {
-  return joinParts([unitLot(l), l.street, l.township, l.city]);
+  return addressCase(joinParts([unitLot(l), l.street, l.neighborhood, l.township, l.city]));
 }
 /** Cards and lists are titled by the address, never by the marketing headline (which stays for Marketing Studio). */
 export const cardTitle = (l: Listing) => title(l);
 
 /** Full address, in the agreed order from the most specific part. */
 export function addressLine(l: Listing): string {
-  return joinParts([unitLot(l), l.street, l.township, l.city, l.state, l.country]);
+  return addressCase(joinParts([unitLot(l), l.street, l.neighborhood, l.township, l.city, l.state, l.country]));
 }
 
 /** Photos in their saved order. The first is the main photo (Change 009). Older records that chose another main photo
@@ -405,7 +419,7 @@ export function activeCount(f: Filters): number {
 export function applyFilters(list: Listing[], f: Filters): Listing[] {
   const q = f.location?.trim().toLowerCase();
   return list.filter(l => {
-    if (q && ![l.street, l.township, l.city, l.state, l.unitNo, l.lotNo, unitLot(l), l.headline, l.ref].some(v => (v ?? '').toLowerCase().includes(q))) return false;
+    if (q && ![l.street, l.neighborhood, l.township, l.city, l.state, l.unitNo, l.lotNo, unitLot(l), l.headline, l.ref].some(v => (v ?? '').toLowerCase().includes(q))) return false;
     if (f.type && l.type !== f.type) return false;
     if (f.typeWord && !(l.type ?? '').toLowerCase().includes(f.typeWord.toLowerCase())) return false;
     if (f.category && categoryOf(l) !== f.category) return false;

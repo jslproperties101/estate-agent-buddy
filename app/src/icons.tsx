@@ -38,6 +38,8 @@ export const IconContacts = svg('M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20a6
 export const IconChat = svg('M4 5h16v11H9l-5 4zM8.5 10.5c1-1.6 2.2-2.4 3.5-2.4s2.5.8 3.5 2.4c-1 1.6-2.2 2.4-3.5 2.4s-2.5-.8-3.5-2.4zM12 10.5h0');
 /** Settings: a gear. */
 export const IconGear = svg('M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1');
+export const IconPencil = svg('M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4zM14.5 5.5l3 3');
+export const IconPin = svg('M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z');
 /** Change 015: the X that closes a popup. */
 export const IconClose = svg('M6 6l12 12M18 6L6 18');
 export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3M8 21h8');

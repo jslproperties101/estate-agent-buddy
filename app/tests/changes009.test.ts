@@ -94,15 +94,18 @@ test('C9-6 Google Maps link: coordinates only when the link itself holds them; s
 });
 
 test('C9-7 verification: an unmarked fact with a value counts as Need to check; marks are kept; Unknown is also to check', () => {
-  const l = L({ askingPrice: 500000, bedrooms: 3, tenure: 'freehold', verification: { tenure: 'confirmed', bedrooms: 'owner' } });
-  assert.equal(shownState(l, 'askingPrice'), 'check');
+  const l = L({ builtUpSqft: 1500, bedrooms: 3, tenure: 'freehold', verification: { tenure: 'confirmed', bedrooms: 'owner' } });
+  assert.equal(shownState(l, 'builtUpSqft'), 'check');
   assert.equal(shownState(l, 'tenure'), 'confirmed');
   assert.equal(shownState(l, 'bedrooms'), 'owner');
   assert.equal(shownState(l, 'landSqft'), undefined, 'no value, no mark: nothing to show');
   assert.equal(shownState(l, 'headline'), undefined, 'not a verifiable fact');
-  assert.deepEqual(toCheck(l), ['askingPrice']);
+  assert.deepEqual(toCheck(l), ['builtUpSqft']);
   assert.deepEqual(toCheck(L({ verification: { landSqft: 'unknown' } })), ['landSqft']);
-  const pdf = buyerFields(l, 'en', 2026).find(f => f.key === 'askingPrice')!;
+  // Owner, 17 Oct 2026: a price has no check status, so it is never "to check".
+  assert.equal(shownState(L({ askingPrice: 500000, monthlyRent: 2000 }), 'askingPrice'), undefined);
+  assert.deepEqual(toCheck(L({ askingPrice: 500000, monthlyRent: 2000 })), []);
+  const pdf = buyerFields(l, 'en', 2026).find(f => f.key === 'builtUpSqft')!;
   assert.deepEqual([pdf.status, pdf.confirmed], ['Need to Check', false], 'the buyer PDF never shows an unmarked fact as confirmed');
 });
 

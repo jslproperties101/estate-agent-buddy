@@ -8,7 +8,9 @@ import { readFileSync } from 'node:fs';
 const wf = readFileSync(new URL('../../.github/workflows/android.yml', import.meta.url), 'utf8');
 
 test('W1 QA branches build only the QA APK; feature branches publish no normal-package APK; web deploy stays limited', () => {
-  assert.match(wf, /variant: \$\{\{ fromJSON\(contains\(github\.ref_name, 'qa'\) && '\["qa"\]' \|\| '\["prod"\]'\) \}\}/);
+  // Owner, 17 Oct 2026: a dated change branch (2.0.26.10.17.1) is a QA build too, and is pushed-to builds.
+  assert.match(wf, /variant: \$\{\{ fromJSON\(\(contains\(github\.ref_name, 'qa'\) \|\| startsWith\(github\.ref_name, '2\.'\)\) && '\["qa"\]' \|\| '\["prod"\]'\) \}\}/);
+  assert.match(wf, /branches: \[main, 'feature\/\*\*', '2\.\*'\]/);
   assert.match(wf, /PUBLISH_APK: \$\{\{ \(matrix\.variant == 'qa' \|\| github\.ref == 'refs\/heads\/main' \|\| github\.ref == 'refs\/heads\/feature\/v2-full-update'\) && '1' \|\| '' \}\}/);
   const release = wf.slice(wf.indexOf('- name: Release with the APK'));
   assert.match(release.split('\n').slice(0, 3).join('\n'), /if: env\.PUBLISH_APK == '1'/, 'the release step is gated');

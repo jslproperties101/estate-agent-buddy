@@ -26,7 +26,7 @@ export function sampleData(now = Date.now()) {
       features: '2-storey office, 28 ft ceiling, 150 kVA, wide side land.', status: 'available', vendorId: 'v1', arrangement: 'direct',
       notes: 'Owner open to offers. Keys with guard house.',
       extraComments: 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).',
-      verification: { askingPrice: 'owner', tenure: 'confirmed', titleType: 'confirmed', landSqft: 'confirmed', builtUpSqft: 'check', frontageFt: 'confirmed', ownerPhone: 'confirmed' },
+      verification: { tenure: 'confirmed', titleType: 'confirmed', landSqft: 'confirmed', builtUpSqft: 'check', frontageFt: 'confirmed', ownerPhone: 'confirmed' },
       marketing: { advertised: 'yes', ads: [
         { id: 'a1', platform: 'PropertyGuru', start: day(-40), end: day(50), ref: 'PG-sample-001', status: 'live' },
         { id: 'a2', platform: 'Facebook Marketplace', start: day(-30), status: 'needs_update', notes: 'Price changed; update the post.' },
@@ -37,20 +37,20 @@ export function sampleData(now = Date.now()) {
       unitNo: 'No. 6', purpose: 'sale', type: 'Semi-D factory',
       state: NS, city: 'Nilai', township: 'Kawasan Perindustrian Nilai', street: 'Jalan Sampel Industri 1', landSqft: 8000, builtUpSqft: 6200, parking: 3,
       lotType: 'intermediate', tenure: 'freehold', askingPrice: 3050000, negotiable: 'no', commissionPct: 2, availability: 'immediate',
-      status: 'in_progress', handledBy: 'Negotiator B (sample)', verification: { askingPrice: 'check', builtUpSqft: 'owner', landSqft: 'unknown' }, vendorId: 'v2', arrangement: 'cobroke', arrangementNote: 'Co-broke with Agency M (sample)', marketing: noAds,
+      status: 'in_progress', handledBy: 'Negotiator B (sample)', verification: { tenure: 'check', builtUpSqft: 'owner', landSqft: 'unknown' }, vendorId: 'v2', arrangement: 'cobroke', arrangementNote: 'Co-broke with Agency M (sample)', marketing: noAds,
     }),
     mk('s3', 1003, {
       unitNo: 'Lot 21', purpose: 'sale', type: 'Detached factory',
       street: 'Jalan Sampel Industri 5', state: NS, city: 'Nilai', township: 'Kawasan Perindustrian Nilai', landSqft: 43560, builtUpSqft: 20000, parking: 10,
       ceilingFt: 35, powerKva: 400, loadingBays: 2, lotType: 'single', tenure: 'leasehold', leaseExpiryYear: 2077, titleType: 'Individual title', landUse: 'industry',
-      askingPrice: 7800000, availability: 'immediate', status: 'needs_check', verification: { tenure: 'check', leaseExpiryYear: 'check', titleType: 'unknown', askingPrice: 'owner' }, vendorId: 'v3', arrangement: 'referral', arrangementNote: 'Referred by Banker R (sample)', marketing: noAds,
+      askingPrice: 7800000, availability: 'immediate', status: 'needs_check', verification: { tenure: 'check', leaseExpiryYear: 'check', titleType: 'unknown' }, vendorId: 'v3', arrangement: 'referral', arrangementNote: 'Referred by Banker R (sample)', marketing: noAds,
     }),
     mk('s4', 1004, {
       unitNo: 'No. 18', purpose: 'sale', type: 'Terrace house',
       state: NS, city: 'Nilai', township: 'Bandar Baru Nilai', street: 'Jalan Sampel 3/1', bedrooms: 4, bathrooms: 3, floors: 2, parking: 2,
       landSqft: 1540, builtUpSqft: 1800, frontageFt: 22, depthFt: 70, lotType: 'intermediate', tenure: 'freehold', landUse: 'building', furnishing: 'partly', condition: 'renovated',
       askingPrice: 580000, negotiable: 'yes', commissionPct: 3, availability: 'immediate', status: 'available', vendorId: 'v4', arrangement: 'direct',
-      notes: 'Owner wants to sell urgently.', extraComments: 'Sample comment: new roof tiles in 2024 (owner stated).', verification: { askingPrice: 'owner', bedrooms: 'confirmed', condition: 'owner', furnishing: 'unknown' }, marketing: { advertised: 'yes', ads: [{ id: 'a3', platform: 'Mudah', start: day(-10), status: 'live' }], custom: {} },
+      notes: 'Owner wants to sell urgently.', extraComments: 'Sample comment: new roof tiles in 2024 (owner stated).', verification: { bedrooms: 'confirmed', condition: 'owner', furnishing: 'unknown' }, marketing: { advertised: 'yes', ads: [{ id: 'a3', platform: 'Mudah', start: day(-10), status: 'live' }], custom: {} },
     }),
     mk('s5', 1005, {
       unitNo: 'No. 2', purpose: 'sale', type: 'Semi-D house',

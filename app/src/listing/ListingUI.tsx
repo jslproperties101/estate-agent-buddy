@@ -6,7 +6,7 @@
 // the marketing headline. The list has one Add New Property button at the top (no floating copy) and no voice button.
 // Verification is shown by the colour of a value: Confirmed green, Owner stated blue, Need to check / Unknown red; a value
 // with no mark counts as Need to check.
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { RecordStatus, FileBadge } from '../sync/SyncUI';
 import { BannerDot } from '../gps/BannersUI';
 import { activeBanners } from '../domain/banners';
@@ -43,7 +43,9 @@ import { fmtDateTime } from '../lib/dates';
 import { c11Strings } from '../ui/c011Strings';
 import { FeedAd, withFeedAds } from '../adverts/AdBar';
 import { c15Strings } from '../ui/c015Strings';
-import { IconGear } from '../icons';
+import { IconPencil, IconPin } from '../icons';
+import { c1017Strings } from '../ui/c1017Strings';
+import { LocationMenu } from './LocationMenu';
 import { transactionLabels, specLines, checkAndMissing } from './change015';
 
 export type Layout = 'grid' | 'large';
@@ -238,7 +240,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
       <ul className={layout === 'grid' ? 'lc-grid sc-list' : 'lc-list sc-list'} data-layout={layout}>
         {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
           <SubsaleCard key={x.item.id} l={x.item} lang={lang} large={layout === 'large'} owner={ownerName(x.item)}
-            onOpen={() => openIt(x.item)} onEdit={() => editIt(x.item)} />
+            onOpen={() => openIt(x.item)} onEdit={() => editIt(x.item)} go={go} />
         ))}
       </ul>
 
@@ -583,21 +585,38 @@ export function GridCardButton({ l, s, onOpen, extra }: { l: Listing; s: Listing
   );
 }
 
-/** Change 015: one Subsale List card (Grid and Large). The whole card opens the property (one stretched button under the
- *  content); the small gold gear at the far right of the title row is a separate button that opens the form, so a tap on
- *  it never opens the card. Under the gear: FOR SALE and / or FOR RENT from the property's own purpose. On the photo:
- *  the status (green AVAILABLE) at the top right, no purpose badge. Then the price, the specification lines in the agreed
- *  order, tenure and restriction, the two counts, and "Click to open" at the bottom centre (plain text, not a button). */
-function SubsaleCard({ l, lang, large, owner, onOpen, onEdit }: { l: Listing; lang: Lang; large: boolean; owner?: string; onOpen: () => void; onEdit: () => void }) {
+/** Change 015: one Subsale List card (Grid and Large), as changed by the owner on 17 Oct 2026. The whole card opens the
+ *  property (one stretched button under the content); the small gold pencil at the far right of the title row is a
+ *  separate button that opens the form, so a tap on it never opens the card. On the photo: FOR SALE and / or FOR RENT at
+ *  the top left, the status (green AVAILABLE) at the top right. Then the price; the type line (type, storeys, lot,
+ *  spaced, no commas); tenure and restriction; bedrooms and bathrooms; land and built-up on one line. No parking and no
+ *  availability line. The counts row has the location button at its right, two lines tall, under the pencil: with a saved
+ *  map point it opens Share Location / Open in Google Maps; without one a "Location Not Set" bubble shows for 1.5 s. */
+function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing; lang: Lang; large: boolean; owner?: string; onOpen: () => void; onEdit: () => void; go: Go }) {
   const { state } = useApp();
   const s = listingStrings[lang];
   const t = c15Strings[lang].card;
+  const t17 = c1017Strings[lang];
   const label = cardTitle(l) || s.untitled;
   const p = mainPhoto(l)!;
   const tx = transactionLabels(l);
   const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] : undefined });
   const { check, missing } = checkAndMissing(l);
-  const avail = availabilityText(l, s, lang);
+  const [menu, setMenu] = useState(false);
+  const [bubble, setBubble] = useState(false);
+  const bubbleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(bubbleTimer.current), []);
+  function onLocation() {
+    if (hasPosition(l)) { setMenu(true); return; }
+    clearTimeout(bubbleTimer.current);
+    setBubble(true);
+    bubbleTimer.current = setTimeout(() => setBubble(false), LOCATION_BUBBLE_MS);
+  }
+  const specLine = (ln: ReturnType<typeof specLines>[number]) => (
+    <span key={ln.key} className={`sc-spec ${ln.spaced ? 'spaced' : ''}`} data-testid="card-spec" data-spec={ln.key}>
+      {ln.parts.map((x, i) => <span key={x.k} className="sc-part">{!ln.spaced && i > 0 && ', '}<VVal l={l} k={x.k}>{x.text}</VVal></span>)}
+    </span>
+  );
   return (
     <li className={`sc ${large ? 'sc-large' : 'sc-grid'}`} data-testid="listing-card" data-id={l.id}>
       {/* A tap anywhere on the card opens it; the full-size button under the content gives keyboards and screen readers
@@ -606,6 +625,7 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit }: { l: Listing; la
         <button type="button" className="sc-open" data-testid="card-open-area" aria-label={t.openOf(label)} />
         <span className={`sc-photo ${large ? 'wide' : ''}`}>
           <StoredImage fileId={p.fileId} url={p.url} />
+          {tx.length > 0 && <span className="sc-txs">{tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}</span>}
           {l.status && <span className={`sc-status st-${l.status}`} data-testid="card-status" data-status={l.status}>{s.status[l.status]}</span>}
           {(p.sample || l.sample) && <span className="lc-sample">{p.sample ? s.samplePic : s.sample}</span>}
         </span>
@@ -613,32 +633,35 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit }: { l: Listing; la
           <div className="sc-head">
             <div className="sc-side">
               <button type="button" className="sc-gear" data-testid="card-edit" aria-label={t.editOf(label)} title={t.edit}
-                onClick={e => { e.stopPropagation(); onEdit(); }}><IconGear size={18} /></button>
-              {tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}
+                onClick={e => { e.stopPropagation(); onEdit(); }}><IconPencil size={17} /></button>
             </div>
             <div className="sc-title" data-testid="card-address">{label}</div>
           </div>
           <strong className="sc-price"><PriceLine l={l} s={s} short={!large} /></strong>
-          {lines.map(ln => (
-            <span key={ln.key} className="sc-spec" data-testid="card-spec" data-spec={ln.key}>
-              {ln.parts.map((x, i) => <span key={x.k}>{i > 0 && ', '}<VVal l={l} k={x.k}>{x.text}</VVal></span>)}
-            </span>
-          ))}
-          {l.parking !== undefined && <span className="sc-spec" data-testid="card-spec" data-spec="parking"><VVal l={l} k="parking">{t.parking(l.parking)}</VVal></span>}
-          {avail && <span className="lc-meta">{avail}</span>}
+          {lines.filter(x => x.key === 'type').map(specLine)}
           <TenureLine l={l} s={s} noStoreys />
-          {(check.length > 0 || missing.length > 0) && (
+          {lines.filter(x => x.key !== 'type').map(specLine)}
+          <div className="sc-locrow" data-testid="card-location-row">
+            <span className="sc-loc-blank" aria-hidden="true">{'\u00a0'}</span>
             <span className="sc-counts" data-testid="card-counts">
               {check.length > 0 && <span className="sc-count sc-check" data-testid="card-to-check" data-n={check.length}>{t.toCheck(check.length)}</span>}
               {missing.length > 0 && <span className="sc-count sc-missing" data-testid="card-not-filled" data-n={missing.length}>{t.notFilled(missing.length)}</span>}
             </span>
-          )}
+            <button type="button" className={`sc-gear sc-pin ${hasPosition(l) ? '' : 'unset'}`} data-testid="card-location" data-set={hasPosition(l) ? 'yes' : 'no'}
+              aria-label={t17.locationOf(label)} title={t17.locationOf(label)}
+              onClick={e => { e.stopPropagation(); onLocation(); }}><IconPin size={18} /></button>
+            {bubble && <span className="sc-bubble" role="status" data-testid="card-location-bubble">{t17.notSet}</span>}
+          </div>
           {large && l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
           {large && owner && <span className="lc-owner">{`${s.owner}: ${owner}`}</span>}
           <CreatorTag state={state} collection="properties" id={l.id} />
           <span className="sc-hint" data-testid="card-click-to-open" aria-hidden="true">{t.clickToOpen}</span>
         </div>
       </article>
+      {menu && <LocationMenu lang={lang} l={l} go={go} onClose={() => setMenu(false)} />}
     </li>
   );
 }
+
+/** How long the "Location Not Set" bubble stays (owner, 17 Oct 2026). */
+export const LOCATION_BUBBLE_MS = 1500;

@@ -9,7 +9,8 @@ import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
 import { mapStrings } from './strings';
 import { MapView, MapsNotice, useGoogleMaps } from './MapView';
-import { reverseGeocode, GeocodeResult } from './google';
+import { reverseGeocode, geocodeAddress, searchPlaces, GeocodeResult, Suggestion } from './google';
+import { c1017Strings } from '../ui/c1017Strings';
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
@@ -44,6 +45,31 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
   const [choices, setChoices] = useState<Partial<Record<FieldKey, Choice>>>({});
   const [typing, setTyping] = useState<Partial<Record<FieldKey, string>>>({});
   const [picking, setPicking] = useState<FieldKey | null>(null);
+  // Owner, 17 Oct 2026: a search bar above the map (supersedes Change 015's "no search here"). Choosing a result only
+  // moves the pin there; nothing is saved until "Use this location".
+  const t17 = c1017Strings[lang];
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<Suggestion[] | null>(null);
+  async function runSearch() {
+    const q = query.trim();
+    if (!maps || !q || searching) return;
+    setSearching(true); setResults(null);
+    try {
+      let found = await searchPlaces(maps, q, pos ?? undefined).catch(() => [] as Suggestion[]);
+      if (!found.length) {
+        // No Places library for this key, or nothing suggested: one plain address look-up instead.
+        const g = await geocodeAddress(maps, q).catch(() => null);
+        if (g) found = [{ text: g.formatted || q, select: async () => g }];
+      }
+      setResults(found);
+    } finally { setSearching(false); }
+  }
+  async function chooseResult(x: Suggestion) {
+    const g = await x.select().catch(() => null);
+    setResults(null);
+    if (g) await readAt(g.lat, g.lng); else setResults([]);
+  }
 
   const savedFor = (f: typeof FIELDS[number]) => f.list ? [...f.builtIns(), ...(state.options[f.list] ?? []).map(o => o.value)] : [];
 
@@ -100,8 +126,9 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
 
   // Change 015 (supersedes Change 011's "hidden while the picker is open"): a larger popup, but not full screen. It sits
   // near the top with a small margin and ends above the fixed bottom advert, which stays visible, and never reaches the
-  // phone's navigation area. No place / address search here (no Places request); opening it asks for nothing: the map
-  // follows you only when location was already allowed, and the ◎ button on the map stays.
+  // phone's navigation area. Owner, 17 Oct 2026: Hybrid view only (no Map / Satellite / Hybrid buttons) and a search bar;
+  // opening it still asks for nothing (a search runs only when the agent presses Search): the map follows you only when
+  // location was already allowed, and the ◎ button on the map stays.
   const mapH = usePopupMapHeight();
   return (
     <div className="sheet-scrim lp-scrim" role="presentation">
@@ -111,8 +138,17 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
         <MapsNotice lang={lang} status={status} />
         {maps && (
           <>
+            <form className="lp-search" role="search" data-testid="picker-search" onSubmit={(e: { preventDefault: () => void }) => { e.preventDefault(); void runSearch(); }}>
+              <input type="search" aria-label={t17.mapSearch} placeholder={t17.mapSearch} value={query} onChange={e => setQuery(e.target.value)} data-testid="picker-search-input" />
+              <button type="submit" className="btn primary small" disabled={!query.trim() || searching} data-testid="picker-search-btn">{searching ? t17.mapSearching : t17.mapSearchBtn}</button>
+            </form>
+            {results && (results.length === 0
+              ? <small className="warn-text" role="status" data-testid="picker-search-none">{t17.mapNoResults}</small>
+              : <div className="lp-results" data-testid="picker-search-results">{results.map((x, i) => (
+                  <button key={i} type="button" onClick={() => void chooseResult(x)} data-testid="picker-search-result"><strong>{x.text}</strong>{x.secondary && <small className="muted">{x.secondary}</small>}</button>
+                ))}</div>)}
             <small className="muted">{m.tapHint}</small>
-            <MapView maps={maps} center={pos ?? undefined} zoom={pos ? 17 : 13} height={mapH} testId="picker-map" compactTypes
+            <MapView maps={maps} center={pos ?? undefined} zoom={pos ? 17 : 13} height={mapH - (results?.length ? 120 : 52)} testId="picker-map" fixedType="hybrid"
               markers={pos ? [{ id: 'pick', lat: pos.lat, lng: pos.lng, kind: 'pick' }] : []}
               onMapClick={(lat, lng) => void readAt(lat, lng)} onMarkerDrag={(_, lat, lng) => void readAt(lat, lng)} />
             {pos && <small className="ok-text" data-testid="picker-pos">{pointOnly ? `✓ ${ls.n9.pointChosen}` : ls.position(pos.lat.toFixed(5), pos.lng.toFixed(5))}</small>}

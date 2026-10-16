@@ -79,12 +79,14 @@ test('MK5 only facts the record marks Confirmed go without a *; others are marke
   assert.equal(ok.unverified.length, 0); assert.equal(ok.footnote, undefined);
   assert.ok([...ok.prices, ...ok.facts].every(f => !f.unverified));
   const un = make(rec({ verification: { ...allConfirmed, askingPrice: 'owner', bedrooms: 'check', tenure: 'unknown' } as Listing['verification'] }));
-  assert.deepEqual(un.unverified.sort(), ['Asking Price (RM)', 'Bedrooms', 'Tenure'].sort());
+  // Owner, 17 Oct 2026: a price has no check status, so an old Owner Stated mark on it does not add a *.
+  assert.deepEqual(un.unverified.sort(), ['Bedrooms', 'Tenure'].sort());
   assert.match(un.footnote!, /^\* Not yet verified/);
-  assert.equal(un.prices[0].unverified, true);
+  assert.equal(un.prices[0].unverified, false);
   assert.equal(un.facts.find(f => f.key === 'builtUpSqft')!.unverified, false);
   const unmarked = make(rec({ verification: {} }));
-  assert.ok(unmarked.unverified.includes('Asking Price (RM)'), '"Not marked" counts as not confirmed');
+  assert.ok(unmarked.unverified.includes('Tenure'), '"Not marked" counts as not confirmed');
+  assert.ok(!unmarked.unverified.includes('Asking Price (RM)'), 'a price has no check status');
 });
 
 test('MK6 price: asking price for a sale, rent per month for a rental; both when both are ticked; price formatted as RM', () => {

@@ -68,7 +68,8 @@ test('BP5 each important fact keeps its check-status label; anything but Confirm
   const l = full({ verification: { askingPrice: 'confirmed', landSqft: 'owner', builtUpSqft: 'check', tenure: 'unknown' } });
   const rows = (buildBuyerDoc(input(l)).blocks.filter(b => b.t === 'rows') as Extract<Block, { t: 'rows' }>[]).flatMap(b => b.rows);
   const by = (k: string) => rows.find(r => r.k.startsWith(k))!;
-  assert.deepEqual([by('Asking Price').tag, by('Asking Price').warn], ['Confirmed', false]);
+  // Owner, 17 Oct 2026: Asking Price has no check status, so it carries no mark (an old mark on the record is not shown).
+  assert.deepEqual([by('Asking Price').tag, by('Asking Price').warn], [undefined, undefined]);
   assert.deepEqual([by('Land Area').tag, by('Land Area').warn], ['Owner Stated', true]);
   assert.deepEqual([by('Built-Up').tag, by('Built-Up').warn], ['Need to Check', true]);
   assert.deepEqual([by('Tenure').tag, by('Tenure').warn], ['Unknown', true]);

@@ -27,26 +27,28 @@ test('C15-1 transaction labels follow the property’s own purpose: sale, rent, 
   }
   assert.equal(en.forSale, 'FOR SALE');
   assert.equal(en.forRent, 'FOR RENT');
-  assert.equal(en.clickToOpen, 'Click to open');
+  assert.equal(en.clickToOpen, 'Click to Open', 'Title Case (owner, 17 Oct 2026)');
 });
 
-test('C15-2 specification order: type, storeys, corner; then bedrooms and bathrooms; then land; then built-up', () => {
+test('C15-2 specification order (owner, 17 Oct 2026): type, storeys, corner spaced; bedrooms and bathrooms; land and built-up on one spaced line', () => {
   const l = L({ type: 'Terrace house', floors: 2.5, lotType: 'corner', bedrooms: 4, bathrooms: 3, landSqft: 1650, builtUpSqft: 2200 });
   const lines = specLines(l, words(l));
-  assert.deepEqual(lines.map(x => x.key), ['type', 'rooms', 'land', 'builtUp']);
+  assert.deepEqual(lines.map(x => x.key), ['type', 'rooms', 'area']);
+  assert.deepEqual(lines.map(x => x.spaced), [true, false, true], 'the type line and the area line use a wider gap, not commas');
   const t = text(l);
-  assert.match(t[0], /^Terrace.*, 2\.5 storeys, Corner$/);
-  assert.equal(t[1], '4 bedrooms, 3 bathrooms');
-  assert.equal(t[2], 'Land 1,650 sq ft');
-  assert.equal(t[3], 'Built-up 2,200 sq ft');
+  assert.match(t[0], /^Terrace.*, 2\.5 Storeys, Corner$/);
+  assert.equal(t[1], '4 Bedrooms, 3 Bathrooms');
+  assert.equal(t[2], 'Land 1,650 sq ft, Built-Up 2,200 sq ft');
+  assert.deepEqual(lines[2].parts.map(p => p.k), ['landSqft', 'builtUpSqft']);
   // Each part keeps its field key, so the Change 009 check colour stays on the value.
   assert.deepEqual(lines[0].parts.map(p => p.k), ['type', 'floors', 'lotType']);
 });
 
 test('C15-3 only real values are shown; empty lines are left out; acres from one acre up', () => {
   assert.deepEqual(text(L({})), []);
-  assert.deepEqual(text(L({ bathrooms: 1 })), ['1 bathroom']);
-  assert.deepEqual(text(L({ floors: 1, landSqft: 87120 })), ['1 storey', 'Land 2.0 acres']);
+  assert.deepEqual(text(L({ bathrooms: 1 })), ['1 Bathroom']);
+  assert.deepEqual(text(L({ floors: 1, landSqft: 87120 })), ['1 Storey', 'Land 2.0 acres']);
+  assert.deepEqual(text(L({ builtUpSqft: 900 })), ['Built-Up 900 sq ft'], 'built-up alone still has its line');
   const noType = specLines(L({ lotType: 'end' }), { ...en, lotType: 'End lot' });
   assert.deepEqual(noType.map(x => x.parts.map(p => p.text)), [['End lot']]);
 });
@@ -59,9 +61,10 @@ test('C15-4 counts use the established rules and never count one field twice', (
   assert.deepEqual(missing, missingDetails(l).map(String));
   assert.deepEqual(check, toCheck(l));
   assert.deepEqual(cardCounts(l), { toCheck: check.length, notFilled: missing.length });
-  assert.ok(check.includes('askingPrice') && check.includes('tenure'));
+  assert.ok(check.includes('landSqft') && check.includes('tenure'));
+  assert.ok(!check.includes('askingPrice'), 'owner, 17 Oct 2026: the price has no check status');
   // Confirming a field takes it off "to check".
-  const confirmed = withVerification(l, 'askingPrice', 'confirmed');
+  const confirmed = withVerification(l, 'landSqft', 'confirmed');
   assert.equal(cardCounts(confirmed).toCheck, cardCounts(l).toCheck - 1);
   // An empty field marked Unknown is counted once, as "not filled", not also as "to check".
   const empty = withVerification(L({ type: 'Terrace house', purpose: 'sale' }), 'landSqft', 'unknown');
@@ -86,8 +89,8 @@ test('C15-5 counts on a record with nothing in it, odd marks or zero values do n
   assert.ok(c.check.includes('bedrooms'), 'zero is a real value: it is to check, not missing');
   assert.ok(!c.check.includes('landSqft'), 'confirmed stays confirmed');
   assert.ok(!c.missing.includes('bedrooms') && !c.missing.includes('landSqft'));
-  assert.equal(en.toCheck(11), '* 11 to check');
-  assert.equal(en.notFilled(3), '* 3 not filled');
+  assert.equal(en.toCheck(11), '* 11 To Check');
+  assert.equal(en.notFilled(3), '* 3 Not Filled');
 });
 
 const P = (id: string): Photo => ({ id, name: id, fileId: `f-${id}` });
@@ -144,12 +147,12 @@ test('C15-8 location labels and order in every language: City, Township, Neighbo
   assert.deepEqual([...vorder].sort((a, b) => a - b), vorder, 'property page order');
 });
 
-test('C15-9 source guarantees: no place search or GPS button in Add Location, no Use my current location on the form', () => {
+test('C15-9 source guarantees: no GPS button in Add Location, no Use my current location on the form (search bar is back, 17 Oct 2026)', () => {
   const picker = readFileSync('src/maps/LocationPicker.tsx', 'utf8');
-  assert.ok(!/searchPlaces|search-box|searchPh/.test(picker), 'no place / address search in the popup');
+  assert.ok(/picker-search/.test(picker) && /fixedType="hybrid"/.test(picker), 'owner, 17 Oct 2026: a search bar and Hybrid view only');
   assert.ok(!/getCurrentPosition|picker-gps|myLocation/.test(picker), 'no "Use my current location" in the popup');
   assert.ok(!/useImmersive/.test(picker), 'the bottom advert stays visible: the popup ends above it');
-  assert.ok(/picker-close/.test(picker) && /compactTypes/.test(picker));
+  assert.ok(/picker-close/.test(picker));
   const form = readFileSync('src/listing/ListingForm.tsx', 'utf8');
   assert.ok(!/useMyLocation|getCurrentPosition/.test(form), 'no "Use my current location" on the form');
   assert.ok(/clearPosition/.test(form), 'Remove Position stays');

@@ -130,6 +130,15 @@ async function expandForm(page) {
   if ((await page.getByTestId('toggle-all').innerText()).match(/Open|Buka|展开/)) await page.getByTestId('toggle-all').click();
 }
 async function newProperty(page) { await page.locator('.add-property').click(); await expandForm(page); }
+/** Owner, 17 Oct 2026 (no Google Maps link field any more): places the property with Add Location (needs phone({ maps: true })). */
+async function pickPoint(page, lat, lng) {
+  if (await page.locator('#sec-location').getAttribute('data-open') !== 'yes') await page.locator('[data-sec="location"]').click();
+  await page.getByTestId('gmap-add').click();
+  await page.waitForSelector('[data-testid="picker-map"]');
+  await page.evaluate(([a, b]) => window.__mapClick(a, b), [lat, lng]);
+  await page.getByTestId('apply-location').click();
+  await page.getByTestId('location-picker').waitFor({ state: 'detached' });
+}
 async function home(page) { while (await page.locator('header button[aria-label="Back"], header button[aria-label="Kembali"], header button[aria-label="返回"]').count()) await page.locator('header .icon-btn').first().click(); }
 async function loadSample(page) {
   await tile(page, 'Agent Profile');
@@ -235,7 +244,8 @@ test('U2 Smart Capture is removed everywhere; voice is the capture path', async 
   assert.equal(await page.getByText(/Smart Capture/i).count(), 0);
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
   assert.equal(await page.getByText(/Smart Capture/i).count(), 0);
-  assert.equal(await page.getByTestId('voice-fill').count(), 1, 'the form is filled by voice instead');
+  // Owner, 17 Oct 2026: no Fill with Voice button on the form either (voice commands stay on their own card).
+  assert.equal(await page.getByTestId('voice-fill-btn').count(), 0, 'no Fill with Voice on the form');
   const js = await (await fetch(`${base}main.js`)).text();
   assert.ok(!/pdfjs|GlobalWorkerOptions|word\/document\.xml/.test(js), 'no PDF or Word reading code in the app');
   await page.context().close();
@@ -382,7 +392,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.context().close();
 });
 
-test('U8 Change 009 Add Location: only the map point is saved, the typed address never changes; Google Maps Link kept and opened; no latitude/longitude boxes', async () => {
+test('U8 Change 009 Add Location: only the map point is saved, the typed address never changes; no Google Maps Link field (17 Oct 2026); no latitude/longitude boxes', async () => {
   const page = await phone({ maps: true });
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
@@ -407,22 +417,17 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   assert.match(await page.getByTestId('pos-text').innerText(), /Location saved/i);
   assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Sampel 9', 'street unchanged');
   assert.match(await page.getByTestId('opt-township').innerText(), /Taman Desa Nilai/i, 'township unchanged');
-  // Google Maps Link: example placeholder, kept as typed; a full link that holds the point also places it.
-  const link = page.locator('[data-field="mapsLink"]');
-  assert.equal(await link.getAttribute('placeholder'), 'https://maps.app.goo.gl/ExampleLink');
-  await link.fill('https://maps.app.goo.gl/AbCdEf123');
-  assert.match(await page.getByTestId('maps-link-note').innerText(), /short links hide it/i);
-  assert.equal(await page.getByTestId('open-maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
+  // Owner, 17 Oct 2026: no Google Maps link field on the form; Add Location is the way to place the property.
+  assert.equal(await page.locator('[data-field="mapsLink"]').count() + await page.getByTestId('open-maps-link').count(), 0, 'no Google Maps link field');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   const loc = page.getByTestId('sec-location-view');
   assert.match(await loc.innerText(), /Location saved/i);
   assert.ok(!/2\.81|101\.79/.test(await loc.innerText()), 'the details show no latitude or longitude');
-  assert.equal(await loc.getByTestId('maps-link').getAttribute('href'), 'https://maps.app.goo.gl/AbCdEf123');
   assert.ok(await loc.getByRole('link', { name: 'Navigate' }).isVisible(), 'navigation still uses the saved point');
   const stored = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const all = r.result.transaction('records').objectStore('records').getAll(); all.onsuccess = () => { res(all.result.find(x => x && x.street === 'Jalan Sampel 9')); r.result.close(); }; }; }));
   assert.equal(stored.township, 'Taman Desa Nilai');
-  assert.equal(stored.mapsLink, 'https://maps.app.goo.gl/AbCdEf123');
+  assert.equal(stored.mapsLink, undefined, 'no link is made up');
   assert.ok(Math.abs(stored.lat - 2.8123) < 1e-6 && Math.abs(stored.lng - 101.7956) < 1e-6, 'the point is kept for maps and GPS Assistance');
   await shot(page, '05-location-saved');
   await page.context().close();
@@ -1038,8 +1043,7 @@ test('U27 My Banner Location: four GPS cards, banner placed by GPS and by map, s
   assert.equal(await page.locator('#sec-location').getAttribute('data-open'), 'no', 'other sections start closed');
   await page.locator('#sec-banner [data-field="bannerStatus"]').selectOption('not_yet');
   // give the property a map position so it shows on My Property Map (open the closed Location section first)
-  await page.locator('[data-sec="location"]').click();
-  await page.locator('[data-field="mapsLink"]').fill('https://www.google.com/maps/@2.82,101.80,17z');
+  await pickPoint(page, 2.82, 101.80);
   await page.getByTestId('save-property').click();
   assert.match(await page.getByTestId('sec-banner-view').innerText(), /Not yet/i);
   await page.getByRole('button', { name: 'Show on map' }).click();
@@ -1171,7 +1175,7 @@ test('U29 maps: My Location recentres after moving the map, follows until dragge
   await tile(page, 'Property List'); await newProperty(page);
   await page.locator('[data-field="street"]').fill('Jalan Peta 1');
   // Change 009: no latitude/longitude boxes; a full Google Maps link that holds the point places the property.
-  await page.locator('[data-field="mapsLink"]').fill('https://www.google.com/maps/@2.8300,101.8100,17z');
+  await pickPoint(page, 2.83, 101.81);
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-map').click();
   await page.waitForFunction(() => window.__markers?.some(m => m.o.icon?.fillColor === '#4285F4'));
@@ -2238,22 +2242,17 @@ test('U60 property form: the headline sits in Marketing (lower), Type & Purpose 
   await page.context().close();
 });
 
-test('U61 Fill by Voice: a big centred button; filled fields must be reviewed before saving; typing or "I have checked them" clears the review', async () => {
+test('U61 no Fill with Voice on the form (owner, 17 Oct 2026); voice-command details must be reviewed before saving; "I have checked them" clears the review', async () => {
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click();
-  const btn = page.getByTestId('voice-fill-btn');
-  const box = await btn.boundingBox();
-  assert.ok(box.height >= 56 && box.width >= 240, `prominent (${box.width}x${box.height})`);
-  assert.ok(Math.abs(box.x + box.width / 2 - 192) < 6, 'centred on the 384px screen');
-  assert.equal(await page.getByTestId('voice-panel').count(), 0, 'the panel opens on tap');
-  assert.equal(await page.locator('details[data-testid="voice-fill"]').count(), 0, 'no longer a small collapsed row');
-  await shot(page, '60-fill-by-voice', false);
-  await btn.click();
-  await page.getByTestId('voice-panel').locator('textarea').first().fill('terrace house in Nilai 4 bedrooms 3 bathrooms asking price 580000 freehold');
-  await page.getByTestId('voice-fill-apply').click();
+  assert.equal(await page.getByTestId('voice-fill-btn').count() + await page.getByTestId('voice-panel').count(), 0, 'no Fill with Voice button or panel');
+  await home(page); await tile(page, 'Voice Command');
+  await page.getByTestId('voice-cmd').locator('textarea').first().fill('Create a new terrace house in Nilai for sale, asking price RM580,000, four bedrooms, three bathrooms, freehold.');
+  await page.getByRole('button', { name: 'Show proposed details' }).click();
+  await page.getByRole('button', { name: 'Open in the form to review' }).click();
+  await expandForm(page);
   const banner = page.getByTestId('review-banner');
   await banner.waitFor();
-  assert.match(await banner.innerText(), /filled from your words/i);
   // Save asks first; "Cancel" returns to the form with nothing saved.
   await page.getByTestId('save-property').click();
   await page.getByRole('alertdialog').waitFor();
@@ -2297,22 +2296,24 @@ test('U63 verification: four states, stored with the record, shown the same way 
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
   // Change 009: no "Not marked"; a fact without a mark shows as Need to Check.
-  assert.equal(await page.locator('[data-verify="askingPrice"] option').count(), 4, 'the four states only');
-  assert.deepEqual(await page.locator('[data-verify="askingPrice"] option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
-  assert.equal(await page.locator('[data-verify="askingPrice"]').inputValue(), 'check', 'unmarked = Need to Check');
+  assert.equal(await page.locator('[data-verify="tenure"] option').count(), 4, 'the four states only');
+  assert.deepEqual(await page.locator('[data-verify="tenure"] option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
+  assert.equal(await page.locator('[data-verify="builtUpSqft"]').inputValue(), 'check', 'unmarked = Need to Check');
   assert.equal(await page.locator('[data-verify="headline"]').count(), 0, 'only facts that need checking carry a state');
-  await page.locator('[data-field="askingPrice"]').fill('450000');
-  await page.locator('[data-verify="askingPrice"]').selectOption('owner');
+  // Owner, 17 Oct 2026: the price has no status picker; Built-Up is used for the Owner Stated example instead.
+  assert.equal(await page.locator('[data-verify="askingPrice"]').count(), 0, 'no status on Asking Price');
+  await page.locator('[data-field="builtUpSqft"]').fill('1450');
+  await page.locator('[data-verify="builtUpSqft"]').selectOption('owner');
   await page.locator('[data-verify="tenure"]').selectOption('check');
   await page.locator('[data-verify="titleType"]').selectOption('unknown');     // an empty field can be "Unknown"
   await page.locator('[data-verify="landSqft"]').selectOption('confirmed');
   await page.locator('[data-field="landSqft"]').fill('1500');
-  assert.equal(await page.locator('[data-verify="askingPrice"]').getAttribute('aria-label'), 'Check status: Asking Price (RM)');
+  assert.equal(await page.locator('[data-verify="builtUpSqft"]').getAttribute('aria-label'), 'Check status: Built-Up (sq ft)');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
   const row = k => page.locator(`[data-row="${k}"] [data-verify-state]`);
-  assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'owner');
-  assert.match(await row('askingPrice').innerText(), /Owner Stated/i, 'a word as well as a colour');
-  assert.equal(await page.locator('[data-row="askingPrice"] .vval').getAttribute('data-verify'), 'owner', 'the value itself is in the Owner Stated colour');
+  assert.equal(await row('builtUpSqft').getAttribute('data-verify-state'), 'owner');
+  assert.match(await row('builtUpSqft').innerText(), /Owner Stated/i, 'a word as well as a colour');
+  assert.equal(await page.locator('[data-row="builtUpSqft"] .vval').getAttribute('data-verify'), 'owner', 'the value itself is in the Owner Stated colour');
   assert.match(await row('landSqft').innerText(), /Confirmed/i);
   // Change 015: one row per field, and one list per field: Tenure is marked but empty, so it is "Not filled" (not also
   // "To check"); Title Type (Unknown) is to check.
@@ -2323,38 +2324,38 @@ test('U63 verification: four states, stored with the record, shown the same way 
   // Still there after closing the app.
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List'); await page.getByTestId('listing-card').first().click();
-  assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'owner');
+  assert.equal(await row('builtUpSqft').getAttribute('data-verify-state'), 'owner');
   // Edit: values shown, change one, clear one.
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
-  assert.equal(await page.locator('[data-verify="askingPrice"]').inputValue(), 'owner');
+  assert.equal(await page.locator('[data-verify="builtUpSqft"]').inputValue(), 'owner');
   assert.equal(await page.locator('[data-verify="titleType"]').inputValue(), 'unknown');
-  await page.locator('[data-verify="askingPrice"]').selectOption('confirmed');
+  await page.locator('[data-verify="builtUpSqft"]').selectOption('confirmed');
   await page.locator('[data-verify="tenure"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
-  assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'confirmed');
+  assert.equal(await row('builtUpSqft').getAttribute('data-verify-state'), 'confirmed');
   assert.match(await page.getByTestId('verify-summary').innerText(), /To check \(1\)/i);
   // Changing the value itself does not touch the mark.
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
-  await page.locator('[data-field="askingPrice"]').fill('460000'); await page.getByTestId('save-property').click();
+  await page.locator('[data-field="builtUpSqft"]').fill('1460'); await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
-  assert.equal(await row('askingPrice').getAttribute('data-verify-state'), 'confirmed');
+  assert.equal(await row('builtUpSqft').getAttribute('data-verify-state'), 'confirmed');
   await page.context().close();
 });
 
-test('U64 verification marks of a field that no longer applies go with it (sale → rent only drops the sale price mark)', async () => {
+test('U64 Asking Price and Monthly Rent have no check status (owner, 17 Oct 2026): no picker, no mark on the page, nothing stored', async () => {
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
-  await page.locator('[data-field="purpose"]').selectOption('sale');
-  await page.locator('[data-field="askingPrice"]').fill('300000'); await page.locator('[data-verify="askingPrice"]').selectOption('owner');
+  await page.locator('[data-field="purpose"]').selectOption('sale_or_rent');
+  await page.locator('[data-field="askingPrice"]').fill('300000');
+  await page.locator('[data-field="monthlyRent"]').fill('1800');
+  assert.equal(await page.locator('[data-verify="askingPrice"], [data-verify="monthlyRent"]').count(), 0, 'no status picker on either price');
+  await page.locator('[data-field="landSqft"]').fill('1500');
+  assert.equal(await page.locator('[data-verify="landSqft"]').count(), 1, 'other facts keep theirs');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
-  await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
-  await page.locator('[data-field="purpose"]').selectOption('rent');
-  await page.locator('[data-field="monthlyRent"]').fill('1800'); await page.locator('[data-verify="monthlyRent"]').selectOption('confirmed');
-  await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
-  assert.equal(await page.locator('[data-row="askingPrice"]').count(), 0);
-  assert.equal(await page.locator('[data-row="monthlyRent"] [data-verify-state]').getAttribute('data-verify-state'), 'confirmed');
-  const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => { res(q.result.find(x => x && x.verification)); r.result.close(); }; }; }));
-  assert.deepEqual(rec.verification, { monthlyRent: 'confirmed' });
+  assert.equal(await page.locator('[data-row="askingPrice"] [data-verify-state], [data-row="monthlyRent"] [data-verify-state]').count(), 0);
+  assert.equal(await page.getByTestId('to-check-row').filter({ hasText: /Asking Price|Monthly Rent/ }).count(), 0, 'prices are never listed as to check');
+  const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const q = r.result.transaction('records').objectStore('records').getAll(); q.onsuccess = () => { res(q.result.find(x => x && x.askingPrice === 300000)); r.result.close(); }; }; }));
+  assert.equal(rec.verification?.askingPrice, undefined); assert.equal(rec.verification?.monthlyRent, undefined);
   await page.context().close();
 });
 
@@ -2373,10 +2374,10 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   const s1 = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
   assert.equal(await s1.getByTestId('card-address').innerText(), 'No. 7, Lot 2/14, Jalan Sampel Industri 1, Kawasan Perindustrian Nilai');
   assert.ok(!/Nilai/.test(await s1.locator('[data-spec="type"]').first().innerText()), 'the line under the address is the type, not the town again');
-  // Change 015: no Open button; a gold gear and "Click to open" instead.
+  // Change 015: no Open button; a gold edit button (a pencil since 17 Oct 2026) and "Click to Open" instead.
   assert.equal(await s1.getByTestId('card-open').count(), 0);
   assert.match(await s1.getByTestId('card-edit').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/i, 'gold gear');
-  assert.equal(await s1.getByTestId('card-click-to-open').innerText(), 'Click to open');
+  assert.equal(await s1.getByTestId('card-click-to-open').innerText(), 'Click to Open');
   // A long press (hold, release) and a right-click do nothing special: no preview; the press just counts as a tap.
   const b = await s1.locator('.sc-photo').boundingBox();
   await page.mouse.move(b.x + b.width / 2, b.y + 30);
@@ -2405,10 +2406,10 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
   await page.getByRole('button', { name: 'Large cards' }).click();
   const big = cards.filter({ hasText: 'No. 7, Lot 2/14' }).first();
   assert.match(await big.getByTestId('card-tenure').innerText(), /Freehold[\s\S]*NON Bumiputera/i);
-  assert.match(await big.locator('[data-spec="type"]').innerText(), /2 storeys, Corner$/i);
+  assert.match(await big.locator('[data-spec="type"]').innerText(), /2 Storeys\s+Corner$/, 'spaced, no commas (17 Oct 2026)');
   assert.equal(await big.getByTestId('card-comments').innerText(), 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).');
-  // Change 011: no Location button on the cards. Change 015: no Delete or Open buttons on the cards either.
-  assert.equal(await big.getByTestId('card-location').count(), 0);
+  // Owner, 17 Oct 2026 (supersedes Change 011): one location button on each card. Change 015: no Delete or Open buttons.
+  assert.equal(await big.getByTestId('card-location').count(), 1);
   assert.equal(await big.getByTestId('card-delete').count() + await big.getByTestId('card-open').count(), 0);
   await shot(page, '62-cards-large', false);
   await big.locator('.sc-photo').click();
@@ -2515,7 +2516,7 @@ test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', 
   await loadSample(page);
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   for (const [aria, voice, verifyOwner, openLabel, delLabel] of [
-    ['Bahasa Malaysia', 'Isi dengan Suara', 'Dinyatakan Pemilik', 'Klik untuk buka', 'Padam'],
+    ['Bahasa Malaysia', 'Isi dengan Suara', 'Dinyatakan Pemilik', 'Klik untuk Buka', 'Padam'],
     ['中文', '语音填写', '屋主所述', '点击打开', '删除'],
   ]) {
     await pickLang(page, `[aria-label="${aria}"]`);
@@ -2527,10 +2528,10 @@ test('U69 Bahasa Malaysia and Chinese: the new Stage 3 screens are translated', 
     await page.locator('.sc-card').first().click();
     assert.match(await page.getByTestId('detail-delete').innerText(), new RegExp(delLabel));
     await page.goBack(); await page.getByTestId('listing').waitFor();
-    // form → voice button, verification choices
+    // form → verification choices (no Fill with Voice button since 17 Oct 2026; `voice` is kept for the label list)
+    void voice;
     await page.locator('.add-property').click(); await expandForm(page);
-    assert.match(await page.getByTestId('voice-fill-btn').innerText(), new RegExp(voice));
-    assert.ok((await page.locator('[data-verify="askingPrice"] option').allInnerTexts()).includes(verifyOwner));
+    assert.ok((await page.locator('[data-verify="tenure"] option').allInnerTexts()).includes(verifyOwner));
     await shot(page, `64-stage3-${aria === '中文' ? 'zh' : 'bm'}`, false);
     await home(page);
     await tile(page, aria === 'Bahasa Malaysia' ? 'Profil Ejen' : '经纪人资料');
@@ -2765,7 +2766,9 @@ test('U74 Buyer PDF: choose details and photos, never offered: owner, commission
   const text = await screen.innerText();
   for (const never of ['Owner name', 'Owner Name', 'Owner phone', 'Owner Phone', 'Commission', 'Internal notes', 'Internal Notes', 'Current tenant', 'Tenant Name', 'Arrangement', 'Handled by', 'Handled By', 'Owner WhatsApp']) assert.ok(!text.includes(never), `${never} must not be offered`);
   assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Asking price.*RM 580,000/i);
-  assert.match(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated/i, 'the existing check-status label is shown with the fact');
+  // Owner, 17 Oct 2026: the price has no check status; other facts keep their label.
+  assert.doesNotMatch(await screen.getByTestId('bf-askingPrice').innerText(), /Owner stated|Need to check|Confirmed|Unknown/i, 'no status on the price');
+  assert.match(await screen.getByTestId('bf-condition').innerText(), /Owner stated/i, 'the existing check-status label is shown with the fact');
   assert.match(await screen.getByTestId('buyer-pdf-count').innerText(), /\d+ of \d+ ticked/i);
   assert.equal(await screen.getByTestId('bf-street').locator('input').isChecked(), false, 'the exact address starts unticked');
   assert.equal(await screen.getByTestId('bf-askingPrice').locator('input').isChecked(), true);
@@ -3409,8 +3412,10 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
   await page.getByText('No. 18, Jalan Sampel 3/1, Bandar Baru Nilai').first().click();
   await page.getByTestId('open-marketing-studio').click();
   assert.match(await page.getByTestId('ms-warn-sample').innerText(), /says SAMPLE/i);
-  assert.match(await page.getByTestId('mf-askingPrice').innerText(), /Owner stated/i);
-  assert.match(await page.getByTestId('ms-warn-unverified').innerText(), /Not confirmed yet, marked \* on the design: .*Asking price/i);
+  // Owner, 17 Oct 2026: the price has no check status, so it is never marked *; other facts still are.
+  assert.doesNotMatch(await page.getByTestId('mf-askingPrice').innerText(), /Owner stated/i);
+  assert.match(await page.getByTestId('ms-warn-unverified').innerText(), /Not confirmed yet, marked \* on the design: /i);
+  assert.doesNotMatch(await page.getByTestId('ms-warn-unverified').innerText(), /Asking price/i);
   await page.getByTestId('ms-make').click();
   await page.getByTestId('ms-result').waitFor();
   await shot(page, '85a-marketing-sample', false);
@@ -4126,7 +4131,8 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   assert.match(await page.getByTestId('banner-picked').innerText(), /Banner location chosen/i);
   await page.locator('[data-field="street"]').fill('Jalan Sampel Banner 1');
   await page.locator('[data-field="askingPrice"]').fill('600000');
-  await page.locator('[data-verify="askingPrice"]').selectOption('confirmed');
+  await page.locator('[data-field="landSqft"]').fill('1800');
+  await page.locator('[data-verify="landSqft"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   assert.match(await page.getByTestId('tenancy').innerText(), /Encik Penyewa[\s\S]*\+60 12-345 6789[\s\S]*@penyewa_ns/i);
   assert.match(await page.getByTestId('banner-summary').innerText(), /1 banner up/i);
@@ -4137,8 +4143,8 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Large cards' }).click();
   const card = page.getByTestId('listing-card').filter({ hasText: 'Jalan Sampel Banner 1' });
-  assert.equal(await card.locator('[data-vkey="askingPrice"]').getAttribute('data-verify'), 'confirmed');
-  assert.equal(await card.locator('[data-vkey="askingPrice"]').evaluate(e => getComputedStyle(e).color), 'rgb(111, 212, 155)', 'green');
+  assert.equal(await card.locator('[data-vkey="landSqft"]').getAttribute('data-verify'), 'confirmed');
+  assert.equal(await card.locator('[data-vkey="landSqft"]').evaluate(e => getComputedStyle(e).color), 'rgb(111, 212, 155)', 'green');
   assert.ok(!/Confirmed|Need to Check|Owner Stated/.test(await card.innerText()), 'colour only on cards, no repeated status words');
   await page.context().close();
 });
@@ -4241,8 +4247,8 @@ test('U101 Change 011 (with Change 015): one fixed advert area above the phone n
   assert.equal(await page.getByTestId('listing-card').count(), n0, 'restored, no duplicate');
   assert.equal(await page.getByTestId('listing-card').filter({ hasText: addr }).count(), 1);
   await waitStored(page, 'records', `all.filter(v => v && v.street && ${JSON.stringify(addr)}.includes(v.street) && !v.archived).length === 1`);
-  // Ad Location (the location button) is not on cards; it is on the property's own page
-  assert.equal(await page.getByTestId('card-location').count(), 0);
+  // Owner, 17 Oct 2026 (supersedes Change 011): every card has its location button.
+  assert.equal(await page.getByTestId('card-location').count(), await page.getByTestId('listing-card').count());
   // PDF preview fills the screen: no advert while it is open, back afterwards
   await page.getByTestId('listing-card').first().locator('.sc-card').click();
   await page.getByTestId('sec-location-view').waitFor();
@@ -4382,7 +4388,7 @@ test('U22 no requests leave the phone without a configured service, and no error
 
 // ---------- Change 015 (owner, 16 Oct 2026) ----------
 /** A property made through the form with the Change 015 specification fields. */
-async function c15Property(page, { street, purpose = 'sale', status = 'available' }) {
+async function c15Property(page, { street, purpose = 'sale', status = 'available', tenure }) {
   await tile(page, 'Property List'); await newProperty(page);
   await page.locator('[data-testid="opt-type"] .opt-btn').click();
   await page.getByTestId('opt-type').getByRole('option', { name: /^Terrace house$/i }).click();
@@ -4397,19 +4403,20 @@ async function c15Property(page, { street, purpose = 'sale', status = 'available
   await page.locator('[data-field="landSqft"]').fill('1650');
   await page.locator('[data-field="builtUpSqft"]').fill('2200');
   await page.locator('[data-field="status"]').selectOption(status);
+  if (tenure) await page.locator('[data-field="tenure"]').selectOption(tenure);
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   await waitStored(page, 'records', `all.some(v => v && v.street === ${JSON.stringify(street)})`);
 }
 
-test('U115 Change 015 cards: far-right gold gear (long titles too) opens the form, not the card; FOR SALE / FOR RENT under it; AVAILABLE top right of the photo; spec order; counts; "Click to open"; no Delete or Open buttons', async () => {
+test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (long titles too) opens the form, not the card; FOR SALE / FOR RENT top left of the photo; AVAILABLE top right; spaced spec lines with tenure after the type; counts; "Click to Open"; no Delete or Open buttons', async () => {
   const page = await phone();
   const long = 'Jalan Ceria Indah Permai Satu Dua Tiga Empat Lima Enam Tujuh Lapan Sembilan Sepuluh';
   await c15Property(page, { street: long, purpose: 'sale' });
   await home(page);
   await c15Property(page, { street: 'Jalan Sewa 2', purpose: 'rent', status: 'in_progress' });
   await home(page);
-  await c15Property(page, { street: 'Jalan Kedua-dua 3', purpose: 'sale_or_rent' });
+  await c15Property(page, { street: 'Jalan Kedua-dua 3', purpose: 'sale_or_rent', tenure: 'freehold' });
   await home(page);
   await tile(page, 'Property List');
   for (const layout of ['grid', 'large']) {
@@ -4427,13 +4434,15 @@ test('U115 Change 015 cards: far-right gold gear (long titles too) opens the for
       assert.ok(Math.abs(gear.y - title.y) <= 6, `${layout} ${i}: gear on the title row`);
       assert.ok(gear.width >= 28 && Math.abs(gear.width - gear.height) <= 1, `${layout} ${i}: small square gear`);
       assert.equal(await c.getByTestId('card-edit').getAttribute('aria-label'), `Edit property: ${await c.getByTestId('card-address').innerText()}`);
-      assert.equal(await c.getByText('Click to open', { exact: true }).count(), 1);
+      assert.equal(await c.getByText('Click to Open', { exact: true }).count(), 1);
+      assert.equal(await c.getByTestId('card-edit').locator('path').getAttribute('d'), 'M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4zM14.5 5.5l3 3', `${layout} ${i}: a pencil, not a gear`);
       const hint = c.getByTestId('card-click-to-open');
       assert.equal(await hint.evaluate(h => h.closest('button, a') === null && h.tagName === 'SPAN'), true, 'not a button');
       const hb = await hint.boundingBox();
       assert.ok(Math.abs(hb.x + hb.width / 2 - (card.x + card.width / 2)) <= 3, `${layout} ${i}: centred`);
       assert.ok(card.y + card.height - (hb.y + hb.height) <= 12, `${layout} ${i}: at the very bottom`);
-      assert.equal(await c.locator('.lc-purpose').count(), 0, 'no FOR SALE badge on the photo');
+      assert.equal(await c.locator('.lc-purpose').count(), 0, 'no old purpose badge');
+      assert.equal(await c.locator('.sc-body [data-testid="card-tx"]').count(), 0, 'no FOR SALE / FOR RENT under the title');
     }
     // The long title wraps (not cut) and the gear stays at the top right.
     const lc = cards.filter({ hasText: 'Sembilan Sepuluh' });
@@ -4442,16 +4451,16 @@ test('U115 Change 015 cards: far-right gold gear (long titles too) opens the for
     assert.ok(lt.height > 30, `${layout}: the long title wraps to more lines (${lt.height})`);
     assert.match(await lc.getByTestId('card-address').innerText(), /Sembilan Sepuluh/);
     assert.ok(Math.abs(lg.y - lt.y) <= 6, `${layout}: gear anchored on the first line`);
-    // Transaction labels: sale only, rent only, both stacked (FOR SALE above FOR RENT), right-aligned under the gear.
+    // Transaction labels: sale only, rent only, both stacked (FOR SALE above FOR RENT), at the photo's top left.
     const tx = async hasText => cards.filter({ hasText }).getByTestId('card-tx').evaluateAll(xs => xs.map(x => x.textContent));
     assert.deepEqual(await tx('Sembilan'), ['FOR SALE']);
     assert.deepEqual(await tx('Jalan Sewa 2'), ['FOR RENT']);
     assert.deepEqual(await tx('Kedua-dua'), ['FOR SALE', 'FOR RENT']);
     const both = cards.filter({ hasText: 'Kedua-dua' });
     const [s1, r1] = [await both.getByTestId('card-tx').nth(0).boundingBox(), await both.getByTestId('card-tx').nth(1).boundingBox()];
-    const g1 = await both.getByTestId('card-edit').boundingBox();
-    assert.ok(s1.y >= g1.y + g1.height - 1 && r1.y >= s1.y + s1.height - 1, `${layout}: gear, then FOR SALE, then FOR RENT`);
-    assert.ok(Math.abs((s1.x + s1.width) - (g1.x + g1.width)) <= 2 && Math.abs((r1.x + r1.width) - (g1.x + g1.width)) <= 2, `${layout}: right-aligned with the gear`);
+    const pb = await both.locator('.sc-photo').boundingBox();
+    assert.ok(s1.x - pb.x <= 12 && s1.y - pb.y <= 12, `${layout}: FOR SALE at the photo's top left`);
+    assert.ok(r1.y >= s1.y + s1.height - 1 && Math.abs(r1.x - s1.x) <= 1, `${layout}: FOR RENT under FOR SALE`);
     // AVAILABLE, green, at the photo's top right; another status is kept in the same place.
     const st = both.getByTestId('card-status');
     assert.equal(await st.innerText(), 'AVAILABLE');
@@ -4459,16 +4468,25 @@ test('U115 Change 015 cards: far-right gold gear (long titles too) opens the for
     const ph = await both.locator('.sc-photo').boundingBox(); const sb = await st.boundingBox();
     assert.ok(ph.x + ph.width - (sb.x + sb.width) <= 12 && sb.y - ph.y <= 12, `${layout}: AVAILABLE at the top right of the photo`);
     assert.match(await cards.filter({ hasText: 'Jalan Sewa 2' }).getByTestId('card-status').innerText(), /SALE IN PROGRESS/);
-    // Specification order.
-    const spec = await both.getByTestId('card-spec').evaluateAll(xs => xs.map(x => [x.dataset.spec, x.textContent.replace(/\u00a0/g, ' ')]));
-    assert.deepEqual(spec.map(x => x[0]), ['type', 'rooms', 'land', 'builtUp']);
-    assert.match(spec[0][1], /^Terrace house, 2\.5 storeys, Corner$/i);
-    assert.equal(spec[1][1], '4 bedrooms, 3 bathrooms');
-    assert.equal(spec[2][1], 'Land 1,650 sq ft');
-    assert.equal(spec[3][1], 'Built-up 2,200 sq ft');
+    // Specification lines (owner, 17 Oct 2026): type line spaced, tenure next, rooms, land and built-up on one spaced line;
+    // no parking and no availability.
+    const spec = await both.getByTestId('card-spec').evaluateAll(xs => xs.map(x => [x.dataset.spec, [...x.querySelectorAll('.sc-part')].map(p => p.textContent.replace(/\u00a0/g, ' '))]));
+    assert.deepEqual(spec.map(x => x[0]), ['type', 'rooms', 'area']);
+    assert.deepEqual(spec[0][1].map(t => t.toLowerCase()), ['terrace house', '2.5 storeys', 'corner']);
+    assert.deepEqual(spec[0][1].slice(1), ['2.5 Storeys', 'Corner'], 'Title Case');
+    assert.deepEqual(spec[1][1], ['4 Bedrooms', ', 3 Bathrooms']);
+    assert.deepEqual(spec[2][1], ['Land 1,650 sq ft', 'Built-Up 2,200 sq ft']);
+    assert.ok(!(await both.locator('[data-spec="type"]').innerText()).includes(','), 'no commas on the type line');
+    assert.ok(!(await both.locator('[data-spec="area"]').innerText()).includes(','.repeat(1) + ' Built'), 'no comma between land and built-up');
+    const [tl, te, rl, al] = [await both.locator('[data-spec="type"]').boundingBox(), await both.getByTestId('card-tenure').boundingBox(), await both.locator('[data-spec="rooms"]').boundingBox(), await both.locator('[data-spec="area"]').boundingBox()];
+    assert.ok(tl.y < te.y && te.y < rl.y && rl.y < al.y, `${layout}: type, tenure, rooms, area in that order`);
+    const p0 = await both.locator('[data-spec="area"] .sc-part').nth(0).boundingBox(); const p1 = await both.locator('[data-spec="area"] .sc-part').nth(1).boundingBox();
+    if (Math.abs(p0.y - p1.y) < 3) assert.ok(p1.x - (p0.x + p0.width) >= 10, `${layout}: a wider space between land and built-up`);
+    assert.equal(await both.locator('[data-spec="parking"]').count(), 0, 'no parking line');
+    assert.doesNotMatch(await both.innerText(), /Available now/i, 'no "Available Now"');
     // Counts: two compact numbers under the tenure line, no field names on the card.
     const counts = both.getByTestId('card-counts');
-    assert.match(await counts.innerText(), /^\* \d+ to check\s+\* \d+ not filled$/);
+    assert.match(await counts.innerText(), /^\* \d+ To Check\s+\* \d+ Not Filled$/);
     assert.doesNotMatch(await counts.innerText(), /Tenure|Price|Owner|Street/i);
     await shot(page, `115-cards-${layout}`, false);
   }
@@ -4495,7 +4513,7 @@ test('U115 Change 015 cards: far-right gold gear (long titles too) opens the for
   assert.equal(new Set(keys).size, keys.length, 'no field in both lists');
   await home(page); await tile(page, 'Property List');
   const cardN = page.getByTestId('listing-card').filter({ hasText: 'Kedua-dua' });
-  assert.match(await cardN.getByTestId('card-counts').innerText(), new RegExp(`\\* ${rows} to check\\s+\\* ${missRows} not filled`), 'card numbers match the detail rows');
+  assert.match(await cardN.getByTestId('card-counts').innerText(), new RegExp(`\\* ${rows} To Check\\s+\\* ${missRows} Not Filled`), 'card numbers match the detail rows');
   await page.context().close();
 });
 
@@ -4571,7 +4589,7 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   await page.context().close();
 });
 
-test('U118 Change 015 Add Location popup: larger but not full screen, above the visible advert; bigger map; small map-type buttons; X closes; no search and no place / geocoding request; Cancel keeps the saved position', async () => {
+test('U118 Change 015 Add Location popup (as changed 17 Oct 2026): larger but not full screen, above the visible advert; big map in Hybrid only, no map-type buttons; a search bar; X closes; nothing requested until Search; Cancel keeps the saved position', async () => {
   const page = await phone({ maps: true });
   await page.evaluate(() => { window.__geoCalls = 0; window.__placeCalls = 0; });
   await tile(page, 'Property List'); await newProperty(page);
@@ -4586,12 +4604,12 @@ test('U118 Change 015 Add Location popup: larger but not full screen, above the 
   assert.ok(sb.y + sb.height <= ad.y + 1, 'ends above the advert');
   assert.ok(sb.height < vh - ad.height, 'not full screen');
   assert.match(await sheet.locator('h2').innerText(), /Add Location/i);
-  assert.equal(await sheet.locator('input').count(), 0, 'no search field');
-  assert.equal(await sheet.getByRole('button', { name: /search|Use my current location/i }).count(), 0);
+  assert.equal(await sheet.getByTestId('picker-search-input').count(), 1, 'a search bar');
+  assert.equal(await sheet.getByRole('button', { name: /Use my current location/i }).count(), 0);
   const map = await page.getByTestId('picker-map').boundingBox();
-  assert.ok(map.height >= 400, `much larger map (${map.height})`);
-  const typeBtn = await sheet.locator('[data-testid="map-types"] button').first().boundingBox();
-  assert.ok(typeBtn.height >= 30 && typeBtn.height < 44, `smaller map-type buttons (${typeBtn.height})`);
+  assert.ok(map.height >= 350, `a large map (${map.height})`);
+  assert.equal(await sheet.getByTestId('map-types').count(), 0, 'no Map / Satellite / Hybrid buttons');
+  assert.equal(await page.evaluate(() => window.__mapType), 'hybrid', 'Hybrid view');
   await shot(page, '118-add-location-open', false);
   // Choose a point and save it.
   await page.evaluate(() => window.__mapClick?.(2.8123, 101.8)); await page.getByTestId('apply-location').click();
@@ -4610,7 +4628,75 @@ test('U118 Change 015 Add Location popup: larger but not full screen, above the 
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   await waitStored(page, 'records', `all.some(v => v && v.street === 'Jalan Popup 1' && v.lat === 2.8123)`);
-  assert.equal(external.filter(u => /places|geocode|maps\.googleapis/i.test(u)).length, 0, 'no place search or geocoding request');
+  assert.equal(external.filter(u => /places|geocode|maps\.googleapis/i.test(u)).length, 0, 'no place search or geocoding request unless Search is pressed');
+  await page.context().close();
+});
+
+test('U121 owner 17 Oct 2026: Add Location search moves the pin; the card location button: "Location Not Set" for 1.5 s, or Share Location / Open in Google Maps; share to a buyer or vendor on WhatsApp, or a new contact from the phone book', async () => {
+  const page = await phone({ maps: true });
+  // A buyer and a vendor to share with.
+  for (const [list, btn, name, tel] of [['Buyer List', 'New buyer', 'Bella Buyer', '012-345 6789'], ['Vendor List', 'New vendor', 'Victor Vendor', '013-222 3333']]) {
+    await tile(page, list); await page.getByRole('button', { name: btn }).click();
+    await page.locator('[data-field="name"]').fill(name);
+    await page.locator('[data-field="phone"]').fill(tel);
+    await page.getByTestId('save-contact').click();
+    await waitStored(page, 'records', `all.some(v => v && v.name === ${JSON.stringify(name)})`);
+    await home(page);
+  }
+  await c15Property(page, { street: 'jalan tiada lokasi 1/2a', purpose: 'sale' });
+  await home(page);
+  await tile(page, 'Property List'); await newProperty(page);
+  await page.locator('[data-field="street"]').fill('Jalan Ada Lokasi 5');
+  await page.getByTestId('gmap-add').click();
+  const sheet = page.getByTestId('location-picker'); await sheet.waitFor();
+  await sheet.getByTestId('picker-search-input').fill('Nilai Square');
+  await sheet.getByTestId('picker-search-btn').click();
+  await sheet.getByTestId('picker-search-result').first().click();
+  await page.getByTestId('picker-pos').waitFor();
+  await page.getByTestId('apply-location').click(); await sheet.waitFor({ state: 'detached' });
+  await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
+  await waitStored(page, 'records', `all.some(v => v && v.street === 'Jalan Ada Lokasi 5' && v.lat === 2.8 && v.lng === 101.8)`);
+  await home(page); await tile(page, 'Property List');
+  for (const layout of ['grid', 'large']) {
+    await page.getByRole('group', { name: /Layout/i }).getByRole('button').nth(layout === 'grid' ? 0 : 1).click();
+    const noLoc = page.getByTestId('listing-card').filter({ hasText: 'Tiada Lokasi' });
+    // Title Case on the card, including after the "/"; the record keeps what was typed.
+    assert.equal(await noLoc.getByTestId('card-address').innerText(), 'Jalan Tiada Lokasi 1/2A');
+    // The location button: right side of the counts row, two lines tall, aligned under the pencil.
+    const pin = noLoc.getByTestId('card-location'); const pen = noLoc.getByTestId('card-edit');
+    const [pb, eb, cb] = [await pin.boundingBox(), await pen.boundingBox(), await noLoc.getByTestId('card-counts').boundingBox()];
+    assert.ok(Math.abs((pb.x + pb.width) - (eb.x + eb.width)) <= 2, `${layout}: right-aligned with the pencil`);
+    const row = await noLoc.getByTestId('card-location-row').boundingBox();
+    assert.ok(cb.y > row.y + 8, `${layout}: an empty line above the counts (${JSON.stringify({ row, cb, pb })})`);
+    assert.ok(pb.y >= row.y - 1 && pb.y + pb.height <= row.y + row.height + 1 && pb.height >= 28, `${layout}: the button sits in the two-line row, at the right`);
+    // Not set: a bubble for 1.5 seconds, the card does not open.
+    await pin.click();
+    const bubble = noLoc.getByTestId('card-location-bubble');
+    assert.equal(await bubble.innerText(), 'Location Not Set');
+    assert.equal(await page.getByTestId('listing-details').count(), 0, 'the card did not open');
+    await page.waitForTimeout(1200); assert.equal(await bubble.count(), 1, 'still there after 1.2 s');
+    await bubble.waitFor({ state: 'detached', timeout: 1500 });
+    await shot(page, `121-location-${layout}`, false);
+  }
+  // Set: the menu.
+  const yes = page.getByTestId('listing-card').filter({ hasText: 'Jalan Ada Lokasi' });
+  await yes.getByTestId('card-location').click();
+  const menu = page.getByTestId('location-menu'); await menu.waitFor();
+  assert.equal(await page.getByTestId('listing-details').count(), 0, 'the card did not open');
+  assert.equal(await menu.getByTestId('location-open-maps').getAttribute('href'), 'https://www.google.com/maps/search/?api=1&query=2.800000,101.800000');
+  await menu.getByTestId('location-share').click();
+  const buyer = menu.getByTestId('share-buyers').getByTestId('share-contact');
+  assert.equal(await buyer.count(), 1);
+  const href = await buyer.getAttribute('href');
+  assert.ok(href.startsWith('https://wa.me/60123456789?text='), href);
+  assert.equal(decodeURIComponent(href.split('text=')[1]), 'Jalan Ada Lokasi 5\nhttps://www.google.com/maps/search/?api=1&query=2.800000,101.800000');
+  assert.equal(await menu.getByTestId('share-vendors').getByTestId('share-contact').count(), 1);
+  await menu.getByTestId('share-search').fill('victor');
+  assert.equal(await menu.getByTestId('share-buyers').count(), 0); assert.equal(await menu.getByTestId('share-vendors').getByTestId('share-contact').count(), 1);
+  assert.equal(await menu.getByTestId('share-phonebook').count(), 1, 'new contact from the phone book');
+  await shot(page, '121-share-location', false);
+  await menu.getByTestId('location-menu-close').click(); await menu.waitFor({ state: 'detached' });
+  assert.equal(await page.getByTestId('listing-details').count(), 0, 'closing the menu does not open the card');
   await page.context().close();
 });
 

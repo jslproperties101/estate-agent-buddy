@@ -17,7 +17,7 @@ import {
   Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
   FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
   rm, yearsRemaining, commissionRm, rentCommissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
-  ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, parseMapsLink, RENT_COMMISSION_MONTHS, SALE_COMMISSION_TYPES, RENT_COMMISSION_TYPES,
+  ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, RENT_COMMISSION_MONTHS, SALE_COMMISSION_TYPES, RENT_COMMISSION_TYPES,
 } from './model';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
@@ -29,9 +29,7 @@ import { newId } from '../data/store';
 import { Go, FormSection } from '../nav';
 import { OptionSelect } from '../ui/OptionSelect';
 import { StoredImage, Confirm } from '../ui/common';
-import { SpeechBox } from '../ui/SpeechBox';
 import { MoneyInput } from '../ui/MoneyInput';
-import { readDetails, ChangeKey } from './commands';
 import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix, numberChoices } from '../domain/refs';
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
@@ -47,7 +45,6 @@ import { contactStrings } from '../contacts/strings';
 import { VERIFY_STATES, VerifyState, isVerifiable, shownState, withVerification } from './verify';
 import { can, isForeign, myId } from '../team/access';
 import { teamStrings } from '../team/strings';
-import { IconMic } from '../icons';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
@@ -56,7 +53,7 @@ const SECTION_KEYS: Record<string, string[]> = {
   basics: ['type', 'purpose'],
   tenure: ['askingPrice', 'negotiable', 'commissionPct', 'commissionFlat', 'monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat', 'securityDepositMonths', 'utilityDepositMonths',
     'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
-  location: ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo', 'mapsLink', 'lat'],
+  location: ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo', 'lat'],
   details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'extraComments', 'maintenanceFee'],
   specs: ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse', 'roadAccess', 'specs'],
   availability: ['availability', 'availableFrom', 'condition', 'features'],
@@ -106,9 +103,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [refNoText, setRefNoText] = useState(String(d.refNo ?? ''));
   const refNoInit = useRef(refNoText);
   const [busy, setBusy] = useState(false);
-  const [words, setWords] = useState('');
-  const [wordsMsg, setWordsMsg] = useState('');
-  const [voiceOpen, setVoiceOpen] = useState(false);
   const [checked, setChecked] = useState(false);       // the agent pressed "I have checked them" for the voice-filled fields
   const [askUnchecked, setAskUnchecked] = useState(false);
   const [ownerPick, setOwnerPick] = useState<PickedContact | null>(null);
@@ -124,7 +118,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
-  const [mapsLinkText, setMapsLinkText] = useState(d.mapsLink ?? '');
   const [bannerPicker, setBannerPicker] = useState(false);
   const [bannerPick, setBannerPick] = useState<{ lat: number; lng: number } | null>(null);
   const [tenantPick, setTenantPick] = useState<PickedContact | null>(null);
@@ -293,40 +286,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     setPicker(false);
   }
   /** Google Maps Link: kept as typed. If the link itself holds the point, the map position is taken from it as well. */
-  function setMapsLink(text: string) {
-    setMapsLinkText(text);
-    const v = text.trim() || undefined;
-    const at = parseMapsLink(v);
-    setD(prev => ({ ...prev, mapsLink: v, ...(at ? { lat: at.lat, lng: at.lng, geoSource: 'manual' as const, geoAccuracy: undefined, placeId: undefined } : {}) }));
-  }
-  const linkPoint = parseMapsLink(d.mapsLink);
-
-  /** Voice fill: only empty fields, each marked "from your words". */
-  function fillFromWords() {
-    if (!words.trim()) return;
-    const places = [...(state.options.township ?? []), ...(state.options.city ?? [])].map(o => o.value);
-    const { changes } = readDetails(words.trim(), places);
-    const filled: ChangeKey[] = [];
-    setChecked(false);
-    setD(prev => {
-      const next: Listing = { ...prev, filledFrom: { ...(prev.filledFrom ?? {}) } };
-      const rec = next as unknown as Record<string, unknown>;
-      for (const ch of changes) {
-        if (ch.key.startsWith('tenancy.') || ch.key === 'notes') continue;
-        if (rec[ch.key] !== undefined && rec[ch.key] !== '') continue;
-        rec[ch.key] = ch.value;
-        (next.filledFrom as Record<string, string>)[ch.key] = 'words';
-        filled.push(ch.key);
-      }
-      return next;
-    });
-    setTimeout(() => {
-      setWordsMsg(s.wordsDone(filled.length));
-      // Open the sections that received details, so the agent can check them.
-      const secs = SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => filled.includes(k as ChangeKey)));
-      if (secs.length) setOpen(o => new Set([...o, ...secs]));
-    }, 0);
-  }
 
   const setTen = (k: keyof NonNullable<Listing['tenancy']>, v: string | number | undefined) => setD(prev => {
     const t = { ...(prev.tenancy ?? {}), [k]: v };
@@ -473,20 +432,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         <button type="button" className="btn small ghost" data-testid="toggle-all" onClick={() => setOpen(allOpen ? new Set() : new Set(SECTION_IDS))}>{allOpen ? s.collapseAll : s.expandAll}</button>
       </div>
 
-      <div className="voice-hero" data-testid="voice-fill">
-        <button type="button" className="btn primary big voice-hero-btn" aria-expanded={voiceOpen} aria-controls="voice-panel" data-testid="voice-fill-btn" onClick={() => setVoiceOpen(o => !o)}>
-          <IconMic /> {s.voiceBig}
-        </button>
-        <small className="muted voice-hero-hint">{s.voiceBigHint}</small>
-        {voiceOpen && (
-          <div id="voice-panel" className="card stack-sm words" data-testid="voice-panel">
-            <small className="muted">{s.voiceFillHint}</small>
-            <SpeechBox lang={lang} value={words} onChange={setWords} label={s.voice.textLabel} />
-            <button className="btn secondary" disabled={!words.trim()} onClick={fillFromWords} data-testid="voice-fill-apply">{s.voiceFillBtn}</button>
-            {wordsMsg && <small role="status" className="ok-text">{wordsMsg}</small>}
-          </div>
-        )}
-      </div>
+      {/* Owner, 17 Oct 2026: no "Fill with voice" button on the form (voice commands elsewhere are unchanged). */}
       {dups.length > 0 && (
         <div className="notice" role="status" data-testid="duplicate-warning">
           <strong>{dupStrings[lang].title}</strong>
@@ -625,13 +571,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
         {/* Change 015: no "Use my current location" here; Remove Position works as before. */}
         <button className="btn secondary" data-testid="remove-position" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
-        <label className="ff">
-          <span>{s.l.mapsLink}</span>
-          <input data-field="mapsLink" type="url" inputMode="url" autoComplete="off" placeholder={s.n9.mapsLinkPh} value={mapsLinkText} onChange={e => setMapsLink(e.target.value)} />
-          <small className="muted">{s.n9.mapsLinkHint}</small>
-        </label>
-        {d.mapsLink && <small className={linkPoint ? 'ok-text' : 'muted'} data-testid="maps-link-note">{linkPoint ? s.n9.linkPosition : s.n9.linkNoPosition}</small>}
-        {d.mapsLink && /^https?:\/\//i.test(d.mapsLink) && <a className="btn small secondary" href={d.mapsLink} target="_blank" rel="noreferrer" data-testid="open-maps-link">🗺 {s.n9.openMapsLink}</a>}
+        {/* Owner, 17 Oct 2026: no Google Maps link field; a link saved before stays on the record, unchanged. */}
       </Sec>
       {picker && <LocationPicker lang={lang} current={d} pointOnly title={s.n9.addLocation} onCancel={() => setPicker(false)} onApply={applyLocation} />}
 

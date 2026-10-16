@@ -17,7 +17,8 @@ name: Build
 
 on:
   push:
-    branches: [main, 'feature/**']
+    # Owner, 17 Oct 2026: dated change branches (for example 2.0.26.10.17.1) build too, as the isolated QA APK only.
+    branches: [main, 'feature/**', '2.*']
   workflow_dispatch:
 
 permissions:
@@ -97,13 +98,14 @@ jobs:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).
     # "qa"   = the isolated QA APK (separate package name and storage, automatic updates OFF, release tag qa-<commit>).
     # Integrated release 2.0.010 (Oct 2026), narrowest safe change:
-    #   - a branch whose name contains "qa" builds ONLY the QA APK (no normal-package APK is built or offered there);
+    #   - a branch whose name contains "qa", or a dated change branch starting with "2." (owner, 17 Oct 2026), builds
+    #     ONLY the QA APK (no normal-package APK is built or offered there);
     #   - every other branch still builds and checks the normal APK, but only main and feature/v2-full-update attach
     #     it to a GitHub Release (feature branches no longer publish an APK that installs over the real app).
     strategy:
       fail-fast: false
       matrix:
-        variant: ${{ fromJSON(contains(github.ref_name, 'qa') && '["qa"]' || '["prod"]') }}
+        variant: ${{ fromJSON((contains(github.ref_name, 'qa') || startsWith(github.ref_name, '2.')) && '["qa"]' || '["prod"]') }}
     name: android (${{ matrix.variant }})
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app } }
