@@ -212,7 +212,7 @@ test('X7 photos: one per row, small handle and menu, Set as Main Photo and red D
   await page.getByTestId('photo-viewer-stage').dispatchEvent('pointerdown', { pointerId: 1, clientX: st.x + 100, clientY: st.y + 200 });
   await page.getByTestId('photo-viewer-stage').dispatchEvent('pointermove', { pointerId: 1, clientX: st.x + 260, clientY: st.y + 205 });
   await page.getByTestId('photo-viewer-stage').dispatchEvent('pointerup', { pointerId: 1, clientX: st.x + 260, clientY: st.y + 205 });
-  assert.equal(await page.getByTestId('photo-viewer-count').innerText(), '1 / 2', 'swiped back');
+  await page.waitForFunction(() => document.querySelector('[data-testid="photo-viewer-count"]')?.textContent === '1 / 2', null, { timeout: 3000 });   // swiped back
   // pinch: two fingers moving apart zoom in
   const stage = page.getByTestId('photo-viewer-stage');
   await stage.dispatchEvent('pointerdown', { pointerId: 1, clientX: 150, clientY: 400 });
@@ -220,7 +220,7 @@ test('X7 photos: one per row, small handle and menu, Set as Main Photo and red D
   await stage.dispatchEvent('pointermove', { pointerId: 2, clientX: 330, clientY: 400 });
   await stage.dispatchEvent('pointerup', { pointerId: 2, clientX: 330, clientY: 400 });
   await stage.dispatchEvent('pointerup', { pointerId: 1, clientX: 150, clientY: 400 });
-  assert.ok(Number(await v.getAttribute('data-scale')) > 2, 'pinched in');
+  await page.waitForFunction(() => Number(document.querySelector('[data-testid="photo-viewer"]')?.getAttribute('data-scale')) > 2, null, { timeout: 3000 });   // pinched in
   await shot(page, 'cc001-07-viewer');
   await page.getByTestId('photo-viewer-close').click();
   await v.waitFor({ state: 'detached' });

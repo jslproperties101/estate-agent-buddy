@@ -18,8 +18,17 @@ type PEv = { pointerId: number; clientX: number; clientY: number; currentTarget:
 export function PhotoViewer({ lang, photos, start, onClose }: { lang: Lang; photos: Photo[]; start: number; onClose: () => void }) {
   const t = cc001Strings[lang].photo;
   const [i, setI] = useState(() => Math.min(Math.max(0, start), photos.length - 1));
-  const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
-  const [swipe, setSwipe] = useState(0);
+  const [view, setViewState] = useState({ scale: 1, x: 0, y: 0 });
+  const [swipe, setSwipeState] = useState(0);
+  // The gesture reads these refs, not the screen state: the finger can lift before the screen has redrawn, and a swipe
+  // or pinch must never be missed because of that.
+  const viewRef = useRef(view);
+  const swipeRef = useRef(0);
+  const setView = (v: { scale: number; x: number; y: number } | ((p: { scale: number; x: number; y: number }) => { scale: number; x: number; y: number })) => {
+    const next = typeof v === 'function' ? v(viewRef.current) : v;
+    viewRef.current = next; setViewState(next);
+  };
+  const setSwipe = (n: number) => { swipeRef.current = n; setSwipeState(n); };
   const pts = useRef(new Map<number, Pt>());
   const g = useRef<{ dist?: number; scale: number; x: number; y: number; start?: Pt; lastTap?: number; moved?: boolean }>({ scale: 1, x: 0, y: 0 });
   const n = photos.length;
@@ -37,7 +46,8 @@ export function PhotoViewer({ lang, photos, start, onClose }: { lang: Lang; phot
   function down(e: PEv) {
     try { (e.currentTarget as Element).setPointerCapture?.(e.pointerId); } catch { /* not every pointer can be captured; the stage still follows it */ }
     pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    g.current = { ...g.current, scale: view.scale, x: view.x, y: view.y, start: { x: e.clientX, y: e.clientY }, moved: false };
+    const v = viewRef.current;
+    g.current = { ...g.current, scale: v.scale, x: v.x, y: v.y, start: { x: e.clientX, y: e.clientY }, moved: false };
     if (pts.current.size === 2) g.current.dist = dist();
   }
   function move(e: PEv) {
@@ -53,7 +63,7 @@ export function PhotoViewer({ lang, photos, start, onClose }: { lang: Lang; phot
     if (pts.current.size !== 1 || !s0.start) return;
     const dx = e.clientX - s0.start.x; const dy = e.clientY - s0.start.y;
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) s0.moved = true;
-    if (view.scale > 1) setView(v => ({ ...v, x: s0.x + dx, y: s0.y + dy }));
+    if (viewRef.current.scale > 1) setView(v => ({ ...v, x: s0.x + dx, y: s0.y + dy }));
     else setSwipe(dx);
   }
   function up(e: PEv) {
@@ -61,11 +71,13 @@ export function PhotoViewer({ lang, photos, start, onClose }: { lang: Lang; phot
     pts.current.delete(e.pointerId);
     if (pts.current.size === 1) {   // one finger left after a pinch: carry on from here
       const [p] = [...pts.current.values()];
-      g.current = { ...s0, scale: view.scale, x: view.x, y: view.y, start: p, dist: undefined };
+      const v = viewRef.current;
+      g.current = { ...s0, scale: v.scale, x: v.x, y: v.y, start: p, dist: undefined };
       return;
     }
     if (pts.current.size) return;
-    if (view.scale === 1 && Math.abs(swipe) > SWIPE) go(swipe < 0 ? 1 : -1);
+    const sw = swipeRef.current;
+    if (viewRef.current.scale === 1 && Math.abs(sw) > SWIPE) go(sw < 0 ? 1 : -1);
     setSwipe(0);
     if (!s0.moved) {   // a tap: a second one soon after zooms in or out
       const now = Date.now();
