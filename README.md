@@ -4,6 +4,14 @@ Field app for a Malaysian property negotiator working mainly in Nilai and Sepang
 "Property Explorer"). The Android package id stays `com.jslproperties.estateagentbuddy`, so new APKs install over the old one.
 Target: a native Android app (Capacitor) for the Samsung S23 Ultra, with Supabase (Singapore) as the cloud backend.
 
+## ClaudeChanges001 (17 Oct 2026, QA build only)
+
+The owner's agreed changes 1–12 on `feature/qa-claude-changes-001` (based on `2.0.26.10.17.1`): section 1 "Basic Info
+and Availability" with the merged Availability list and Co-broke / Direct, no "Saved on This Phone" line (a sync banner
+on the main page instead), Commission (RM) / (%), remembered options per location level, one photo per row with a
+full-screen viewer, the contact box on separate lines, Booking / Sale / Rental pages, Track My Sales and the Calendar &
+To-Do card. No database change. Details, tests and what is not proven: [`docs/CLAUDE_CHANGES_001.md`](docs/CLAUDE_CHANGES_001.md).
+
 ## Integrated release 2.0.010 (version 2.2.0, native version 3 — QA candidate, not released)
 
 Changes 001–010 in one build on `feature/v2.0.10-integrated`, with Change 006's four-layer backup implemented:

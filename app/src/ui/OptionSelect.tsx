@@ -5,6 +5,8 @@
 // The list opens inside the page (not a floating pop-up), so long words in any language wrap instead of being cut.
 // Change 009: a longer list opens with a search box: typing filters the list at once (letters anywhere in the value), and
 // a value that is not in the list can be added straight from the search ("Add …"), then it is remembered with an ✕.
+// ClaudeChanges001 (owner, 17 Oct 2026): every list has the search box (change 9), and a remembered value shows only its
+// ✕, without "Saved by you" (change 6).
 import { ReactNode, useId, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { strings, Lang } from '../i18n';
@@ -30,8 +32,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   const [q, setQ] = useState('');
   const customs = [...(state.options[listKey] ?? [])].sort((a, b) => b.used - a.used)
     .filter(o => !builtIns.some(b => b.value.toLowerCase() === o.value.toLowerCase()));
-  const total = customs.length + builtIns.length;
-  const searchable = total > 6;
+  const searchable = true;   // ClaudeChanges001 change 9: every list can be searched
   const norm = (x: string) => x.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
   const match = (x: string) => !q.trim() || norm(x).includes(norm(q.trim()));
   const shownCustoms = customs.filter(o => match(o.value));
@@ -66,7 +67,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
         <div className="opt-list" role="listbox" aria-labelledby={`${id}-l`}>
           {searchable && (
             <div className="opt-search">
-              <input type="search" autoFocus aria-label={`${c.search}: ${label}`} placeholder={c.search} value={q} data-testid={testId ? `${testId}-search` : undefined}
+              <input type="search" aria-label={`${c.search}: ${label}`} placeholder={c.search} value={q} data-testid={testId ? `${testId}-search` : undefined}
                 onChange={e => { setQ(e.target.value); setErr(null); }}
                 onKeyDown={e => {
                   if (e.key !== 'Enter') return;
@@ -82,7 +83,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
           {shownCustoms.map(o => (
             <div key={`c-${o.value}`} className="opt-row">
               <button type="button" role="option" aria-selected={value === o.value} className="opt-item custom" onClick={() => pick(o.value)}>
-                {o.value}<small className="muted"> · {c.savedByYou}</small>
+                {o.value}
               </button>
               <button type="button" className="opt-x" aria-label={c.removeValue(o.value)} title={c.removeValue(o.value)}
                 onClick={() => { store.removeOption(listKey, o.value); }}>✕</button>

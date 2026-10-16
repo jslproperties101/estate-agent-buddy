@@ -3,6 +3,10 @@
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
 // Fields that may not be obvious have a "?" (ui/FieldHelp).
+// ClaudeChanges001 (owner, 17 Oct 2026): section 1 is "Basic Info and Availability" (ID, Availability, Property Type, Sale
+// or Rent, Arrangement); Status is merged into Availability and the Availability and Condition / Listing Arrangement and
+// Status sections are gone (Condition moved to Property Details, Special Features deleted). Choosing Booked, Sold or
+// Rented offers the deal page. Location options belong to the level above. Photos are one per row and open full screen.
 // Change 009 (owner, Oct 2026): section 2 is "Price, Tenure and Title Info" (asking price, commission, negotiable, rent,
 // deposits, tenure, title); the old "Price, rental and fees" section is gone and Maintenance Fee is in Property Details,
 // with a large Extra Comments box under Furnishing. One Unit/Lot Number field. Add Location saves only a map point (the
@@ -14,7 +18,7 @@ import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { listingStrings } from './strings';
 import {
-  Listing, TYPES, TENURES, LOT_TYPES, STATUSES, TITLE_TYPES, PURPOSES, ARRANGEMENTS, AVAILABILITY, CONDITIONS,
+  Listing, TYPES, TENURES, LOT_TYPES, TITLE_TYPES, PURPOSES, CONDITIONS,
   FURNISHING, LAND_USES, RESTRICTIONS, DOC_CATEGORIES, CONFIDENTIAL_DOCS, PLATFORMS, AD_STATUSES, MAX_CUSTOM_FIELDS, BANNER_STATUSES,
   rm, yearsRemaining, commissionRm, rentCommissionRm, normalisePhone, Photo, Doc, DocCategory, Advert, fieldsFor, FormField, forRent, forSale,
   ALL_FORM_FIELDS, hasPosition, cardTitle, forEditing, movePhoto, RENT_COMMISSION_MONTHS, SALE_COMMISSION_TYPES, RENT_COMMISSION_TYPES,
@@ -46,19 +50,24 @@ import { VERIFY_STATES, VerifyState, isVerifiable, shownState, withVerification 
 import { can, isForeign, myId } from '../team/access';
 import { teamStrings } from '../team/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
+import { ChoiceDialog } from '../ui/common';
+import { cc001Strings } from '../ui/cc001Strings';
+import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, ARRANGEMENT_CHOICES, LocationLevel, locationListKey, clearBelow } from './cc001';
+import { PhotoViewer } from '../ui/PhotoViewer';
+import { ContactPick } from '../ui/ContactPick';
+import type { Screen, DealKind } from '../nav';
+import { saveTypedContact } from '../deals/contacts';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
-const SECTION_IDS = ['basics', 'tenure', 'location', 'photos', 'details', 'availability', 'tenancy', 'owner', 'specs', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
+const SECTION_IDS = ['basics', 'tenure', 'location', 'photos', 'details', 'tenancy', 'owner', 'specs', 'banner', 'marketing', 'notes', 'docs'];
 const SECTION_KEYS: Record<string, string[]> = {
-  basics: ['type', 'purpose'],
+  basics: ['availability', 'type', 'purpose', 'arrangement'],
   tenure: ['askingPrice', 'negotiable', 'commissionPct', 'commissionFlat', 'monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat', 'securityDepositMonths', 'utilityDepositMonths',
     'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
   location: ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo', 'lat'],
-  details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'extraComments', 'maintenanceFee'],
+  details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'condition', 'extraComments', 'maintenanceFee'],
   specs: ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse', 'roadAccess', 'specs'],
-  availability: ['availability', 'availableFrom', 'condition', 'features'],
   owner: ['vendorId', 'ownerName', 'ownerPhone', 'ownerWhatsapp'],
-  arrangement: ['arrangement', 'arrangementNote', 'status', 'handledBy'],
   banner: ['bannerStatus'],
   marketing: ['headline'],
   notes: ['notes'],
@@ -90,7 +99,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const c = strings[lang].c;
   const initial = id ? state.properties.find(x => x.id === id) : undefined;
   // "money" was its own section before Change 009; links to it now open Price, Tenure and Title Info.
-  const startSection = section === 'money' ? 'tenure' : section;
+  const startSection = section === 'money' ? 'tenure' : section === 'availability' || section === 'arrangement' ? 'basics' : section;
   // Change 010: reference numbers belong to each agent's own workspace; records shared by the other agent never count.
   const ownProps = useMemo(() => state.properties.filter(p => !isForeign(state, 'properties', p.id)), [state]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [d, setD] = useState<Listing>(() => {
@@ -128,6 +137,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const addedFiles = useRef<string[]>([]);
   const removedFiles = useRef<string[]>([]);
   const c15 = c15Strings[lang];
+  const x1 = cc001Strings[lang];
+  /** Change 7: the photo open full screen (index), and the photo waiting for "Delete this photo?". */
+  const [viewer, setViewer] = useState<number | null>(null);
+  const [askPhotoDelete, setAskPhotoDelete] = useState<string | null>(null);
+  /** Change 11: Booked / Sold / Rented was just chosen; ask whether to fill in the details now. */
+  const [dealAsk, setDealAsk] = useState<AvailChoice | null>(null);
+  const afterSave = useRef<Screen | null>(null);
+  /** "Sold by me / by others", answered in the Sold question; written with the save. */
+  const soldByRef = useRef<'me' | 'others' | undefined>(undefined);
   /** Change 015: the photo whose small menu is open (one at a time); any tap elsewhere closes it. */
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   useEffect(() => {
@@ -206,11 +224,20 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </select>
     </label>
   ));
-  const Opt = ({ k, listKey, builtIns, labels }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string> }) => withVp(k as string, (
+  const Opt = ({ k, listKey, builtIns, labels, onPick }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void }) => withVp(k as string, (
     <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
       builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined}
-      onChange={v => set(k, v as never)} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
+      onChange={v => (onPick ? onPick(v) : set(k, v as never))} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
   ));
+  /** Change 5: one level of the location chain. Its remembered options are the ones saved under the level above; choosing
+   *  a different value clears every level below it. */
+  const Loc = (k: LocationLevel, builtIns: readonly string[], labels?: Record<string, string>) => Opt({
+    k, listKey: locationListKey(d, k), builtIns, labels,
+    onPick: v => setD(prev => {
+      if ((prev[k] ?? undefined) === (v ?? undefined)) return prev;
+      return { ...prev, ...clearBelow(k), [k]: v, filledFrom: { ...(prev.filledFrom ?? {}), [k]: 'typed' } };
+    }),
+  });
   const pair = (...els: (JSX.Element | null | false)[]) => {
     const xs = els.filter(Boolean) as JSX.Element[];
     if (!xs.length) return null;
@@ -375,16 +402,33 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     delete clean.lotNo;
     clean.mainPhotoId = clean.photos[0]?.id;
     // A neighborhood typed before it became a dropdown is remembered too, so it is offered next time.
-    if (clean.neighborhood?.trim() && !(state.options['neighborhood'] ?? []).some(o => o.value === clean.neighborhood)) store.addOption('neighborhood', clean.neighborhood.trim());
+    if (clean.neighborhood?.trim() && !(state.options[locationListKey(clean, 'neighborhood')] ?? []).some(o => o.value === clean.neighborhood)) store.addOption(locationListKey(clean, 'neighborhood'), clean.neighborhood.trim());
     if (!clean.extraComments?.trim()) delete clean.extraComments;
+    // ClaudeChanges001: Special Features and Handled By are gone from the form (changes 8 and 10), so they go from the record.
+    delete clean.features; delete clean.handledBy;
+    if (soldByRef.current) { clean.deal = { ...(clean.deal ?? {}), soldBy: soldByRef.current }; soldByRef.current = undefined; }
+    if (clean.arrangement !== 'cobroke') delete clean.cobroke;
+    // The neighbourhood typed before it became a dropdown: see above. A street typed here is remembered under its parents (change 5).
+    if (clean.street?.trim() && !(state.options[locationListKey(clean, 'street')] ?? []).some(o => o.value === clean.street)) store.addOption(locationListKey(clean, 'street'), clean.street.trim());
     let next: Listing = {
       ...clean, ownerPhone: linked ? undefined : normalisePhone(d.ownerPhone), ownerName: linked ? undefined : d.ownerName,
       ownerWhatsapp: linked ? undefined : aliasValue(d.ownerWhatsapp),
-      handledBy: d.status === 'in_progress' ? d.handledBy : undefined,
       leaseExpiryYear: d.tenure === 'leasehold' ? d.leaseExpiryYear : undefined,
       availableFrom: d.availability === 'from_date' ? d.availableFrom : undefined,
-      arrangementNote: d.arrangement && d.arrangement !== 'direct' ? d.arrangementNote : undefined,
+      arrangementNote: d.arrangement && d.arrangement !== 'direct' && d.arrangement !== 'cobroke' ? d.arrangementNote : undefined,
     };
+    // Changes 3 and 8: Commission (RM) and Availability have no check status; a mark saved before is removed with the save.
+    if (next.verification && ('commissionFlat' in next.verification || 'availability' in next.verification)) {
+      const v = { ...next.verification }; delete v.commissionFlat; delete v.availability;
+      next = { ...next, verification: Object.keys(v).length ? v : undefined };
+    }
+    // Change 9: a tenant or co-broke agent typed or picked here is saved as a contact (once per phone number) for next time.
+    const own = !(initial && isForeign(store.getState(), 'properties', initial.id));
+    if (own && next.tenancy?.tenant) saveTypedContact(store, { name: next.tenancy.tenant, phone: next.tenancy.tenantPhone, whatsapp: next.tenancy.tenantWhatsapp }, 'tenant');
+    if (own && next.cobroke?.name) {
+      const cid = saveTypedContact(store, { name: next.cobroke.name, phone: next.cobroke.phone, whatsapp: next.cobroke.whatsapp }, 'other', next.cobroke.agency);
+      next = { ...next, cobroke: { ...next.cobroke, contactId: cid } };
+    }
     // Marks that no longer apply go with the field they described (an empty field keeps its mark: "Unknown" is meaningful).
     if (next.verification) {
       const dropped = (k: string) => (ALL_FORM_FIELDS as readonly string[]).includes(k) && !vf.has(k as FormField)
@@ -414,7 +458,17 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     for (const f of removedFiles.current) store.removeFile(f);
     if (isNew) store.setSingleton('settings', { lastPrefix: next.refPrefix });
     if (next.refPrefix && !(BUILTIN_PREFIXES as readonly string[]).includes(next.refPrefix)) store.touchOption('refPrefix', next.refPrefix);
-    if (isNew) go({ name: 'listingDetail', id: next.id }); else back();
+    const then = afterSave.current;
+    afterSave.current = null;
+    if (then) go(then);
+    else if (isNew) go({ name: 'listingDetail', id: next.id }); else back();
+  }
+  /** Change 11: save the property, then open its Booking / Sale / Rental page. */
+  function saveAndOpen(kind: DealKind, soldBy?: 'me' | 'others') {
+    setDealAsk(null);
+    soldByRef.current = soldBy;
+    afterSave.current = { name: 'deal', propertyId: d.id, kind };
+    save();
   }
   function cancel() {
     // Leaving without saving keeps the draft (and the pictures it uses) so it can be picked up again; with no draft the
@@ -449,7 +503,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </div>
       )}
 
-      {/* 1. Type & Purpose (with the reference) */}
+      {/* 1. Basic Info and Availability (ClaudeChanges001): ID, Availability, Property Type, Sale or Rent, Arrangement. */}
       <Sec id="basics" title={`1 · ${s.sec.basics}`} testId="sec-basics-form" {...secProps('basics')}>
         <div className="ref-row">
           <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false} help={<FieldHelp lang={lang} topic="refPrefix" label={s.l.refPrefix} />}
@@ -491,9 +545,48 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             {(refProblem === 'numberTaken' || refProblem === 'refTaken') && <button className="btn small secondary" onClick={() => { setRefNoText(String(suggestion)); setRefErr(null); }}>{s.useSuggested(suggestion)}</button>}
           </div>
         )}
+        {/* Change 8 / 10: Availability, with Status merged into it, no check status. */}
+        <label className="ff">
+          <span>{x1.avail.label}<FieldHelp lang={lang} topic="availability" label={x1.avail.label} /></span>
+          <select data-field="availability" value={availChoice(d) ?? ''} onChange={e => {
+            const v = (e.target.value || undefined) as AvailChoice | undefined;
+            setD(prev => ({ ...prev, ...availPatch(v, prev.availableFrom), filledFrom: { ...(prev.filledFrom ?? {}), availability: 'typed', status: 'typed' } }));
+            if (v === 'rented') setOpen(o => new Set([...o, 'tenancy']));
+            if (v === 'booked' || v === 'sold' || v === 'rented') setDealAsk(v);
+          }}>
+            <option value="">{s.notSet}</option>
+            {AVAIL_CHOICES.map(o => <option key={o} value={o}>{x1.avail[o]}</option>)}
+          </select>
+        </label>
+        {availChoice(d) === 'available_from' && (
+          <label className="ff">{x1.avail.fromMonth}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
+        )}
         {Opt({ k: 'type', listKey: 'type', builtIns: TYPES, labels: s.types })}
         {!d.type && <small className="muted">{s.chooseTypeFirst}</small>}
         {Select({ k: 'purpose', options: PURPOSES, labels: s.purpose })}
+        {/* Change 10: Co-broke or Direct; for Co-broke the other agent's name, agency and contact. */}
+        <label className="ff">
+          <span>{s.l.arrangement}<FieldHelp lang={lang} topic="arrangement" label={s.l.arrangement} /></span>
+          <select data-field="arrangement" value={d.arrangement === 'cobroke' || d.arrangement === 'direct' ? d.arrangement : ''}
+            onChange={e => set('arrangement', (e.target.value || undefined) as Listing['arrangement'])}>
+            <option value="">{s.notSet}</option>
+            {ARRANGEMENT_CHOICES.map(o => <option key={o} value={o}>{x1.arrangement[o]}</option>)}
+          </select>
+        </label>
+        {d.arrangement === 'cobroke' && (
+          <div className="sub-card stack-sm" data-testid="cobroke-details">
+            <ContactBox lang={lang} idPrefix="cobroke" contacts={state.contacts} fields={{ name: 'cobroke.name', phone: 'cobroke.phone', whatsapp: 'cobroke.whatsapp' }}
+              labels={{ name: x1.cobroke.agent, phone: x1.cobroke.phone, whatsapp: x1.cobroke.whatsapp }}
+              value={{ name: d.cobroke?.name, phone: d.cobroke?.phone, whatsapp: d.cobroke?.whatsapp }}
+              onChange={patch => setD(prev => ({ ...prev, cobroke: { ...(prev.cobroke ?? {}), ...patch } }))}
+              onPicked={p => setD(prev => ({ ...prev, cobroke: { ...(prev.cobroke ?? {}), name: p.name || prev.cobroke?.name, phone: normalisePhone(p.tel) ?? prev.cobroke?.phone } }))}
+              onSuggest={c => setD(prev => ({ ...prev, cobroke: { name: c.name, phone: c.phone, whatsapp: c.whatsapp, agency: c.company ?? prev.cobroke?.agency, contactId: c.id } }))}
+              pickLabel={x1.pickPhone} suggestLabel={s.n9.fromContacts} useLabel={s.n9.suggestionUse} phonePh={s.n9.phonePh} whatsappPh={s.n9.whatsappPh} />
+            <label className="ff">{x1.cobroke.agency}
+              <input data-field="cobroke.agency" value={d.cobroke?.agency ?? ''} onChange={e => setD(prev => ({ ...prev, cobroke: { ...(prev.cobroke ?? {}), agency: e.target.value || undefined } }))} />
+            </label>
+          </div>
+        )}
       </Sec>
 
       {/* 2. Price, Tenure and Title Info (Change 009): price, commission and rent first, then tenure and title. */}
@@ -552,20 +645,20 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           </>
         )}
         {Opt({ k: 'titleType', listKey: 'titleType', builtIns: TITLE_TYPES, labels: s.titleTypes })}
-        {show('landUse') && Select({ k: 'landUse', options: LAND_USES, labels: s.landUse })}
+        {show('landUse') && Opt({ k: 'landUse', listKey: 'landUse', builtIns: LAND_USES, labels: s.landUse })}
         {Opt({ k: 'restriction', listKey: 'restriction', builtIns: RESTRICTIONS, labels: s.restrictions })}
       </Sec>
 
       {/* 3. Location (Change 014: straight after section 2; street first, then the unit/lot number) */}
       <Sec id="location" title={`3 · ${s.sec.location}`} testId="sec-location" {...secProps('location')}>
-        {Opt({ k: 'country', listKey: 'country', builtIns: COUNTRIES, labels: s.countries })}
-        {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
-        {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
-        {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
-        {/* Change 015: Country → State → City → Township → Neighborhood → Street → Unit Number or Lot Number. */}
-        {/* Owner, 17 Oct 2026: Neighborhood is a dropdown of the entries used before (newest first, ✕ removes one; Others… adds). */}
-        {Opt({ k: 'neighborhood', listKey: 'neighborhood', builtIns: [] })}
-        {Text({ k: 'street' })}
+        {/* ClaudeChanges001 change 5: Country → State → City → Township → Neighborhood → Street. Each level offers the values
+            saved under the level above it (a blank level is skipped); choosing a different value clears the levels below. */}
+        {Loc('country', COUNTRIES, s.countries)}
+        {Loc('state', (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [])}
+        {Loc('city', (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [])}
+        {Loc('township', (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [])}
+        {Loc('neighborhood', [])}
+        {Loc('street', [])}
         {Text({ k: 'unitNo' })}
         <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
         <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
@@ -580,12 +673,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         <small className="muted">{s.photosNote}</small>
         {d.photos.length > 1 && <small className="muted" data-testid="drag-hint">{s.n9.dragHint}</small>}
         {d.photos.length > 0 && (
-          <div className="photo-grid" data-testid="photo-grid">
+          <div className="photo-grid photo-list" data-testid="photo-grid">
             {d.photos.map((p, i) => (
               <div key={p.id} data-photo-index={i}
                 className={`pg-item ${i === 0 ? 'main' : ''} ${dragFrom === i ? 'dragging' : ''} ${dragFrom !== null && dragOver === i && dragFrom !== i ? 'drop-target' : ''}`}
                 data-testid="form-photo" data-photo-id={p.id}>
-                <StoredImage fileId={p.fileId} url={p.url} />
+                {/* Change 7: one photo per row; a tap on the picture opens it full screen (pinch to zoom, swipe between photos). */}
+                <button type="button" className="pg-open" aria-label={x1.photo.open(i + 1)} data-testid="photo-open" onClick={() => setViewer(i)}>
+                  <StoredImage fileId={p.fileId} url={p.url} />
+                </button>
                 <button type="button" className="pg-handle" aria-label={s.n9.dragLabel(i + 1)} title={s.n9.dragHint} data-testid="photo-drag" {...dragProps(i)}>⠿</button>
                 {i === 0 && <span className="pg-main" data-testid="photo-main">{s.mainPhoto}</span>}
                 {/* Change 015: one small menu per photo, with exactly Make as Main Photo and Remove (no arrows, no Remove button). */}
@@ -597,13 +693,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
                       <button type="button" role="menuitem" data-testid="photo-make-main" disabled={i === 0} onClick={() => {
                         setPhotoMenu(null);
                         setD(prev => ({ ...prev, ...makeMainPhoto(prev.photos, p.id) }));
-                      }}>{c15.photo.makeMain}</button>
-                      <button type="button" role="menuitem" className="danger-text" data-testid="photo-remove" onClick={() => {
-                        setPhotoMenu(null);
-                        // Same as before: the file is only removed from the phone when the property is saved.
-                        if (p.fileId) removedFiles.current.push(p.fileId);
-                        setD(prev => { const r = removePhoto(prev.photos, p.id); return { ...prev, photos: r.photos, mainPhotoId: r.mainPhotoId }; });
-                      }}>{c15.photo.remove}</button>
+                      }}>{x1.photo.setMain}</button>
+                      {/* Change 7: Delete, in red, asks first. */}
+                      <button type="button" role="menuitem" className="danger-text" data-testid="photo-remove" onClick={() => { setPhotoMenu(null); setAskPhotoDelete(p.id); }}>{x1.photo.delete}</button>
                     </div>
                   )}
                 </div>
@@ -628,37 +720,17 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {pair(show('landSqft') && Text({ k: 'landSqft', numeric: true }), show('builtUpSqft') && Text({ k: 'builtUpSqft', numeric: true }))}
         {pair(show('frontageFt') && Text({ k: 'frontageFt', numeric: true }), show('depthFt') && Text({ k: 'depthFt', numeric: true }))}
         {/* Change 014: Lot Type directly under Frontage and Depth, each with its own check status. */}
-        {show('lotType') && Select({ k: 'lotType', options: LOT_TYPES, labels: s.lotType })}
+        {show('lotType') && Opt({ k: 'lotType', listKey: 'lotType', builtIns: LOT_TYPES, labels: s.lotType })}
         {pair(show('bedrooms') && Text({ k: 'bedrooms', numeric: true }), show('bathrooms') && Text({ k: 'bathrooms', numeric: true }))}
         {pair(show('floors') && Text({ k: 'floors', numeric: true }), show('parking') && Text({ k: 'parking', numeric: true }))}
-        {show('furnishing') && Select({ k: 'furnishing', options: FURNISHING, labels: s.furnishing })}
+        {show('furnishing') && Opt({ k: 'furnishing', listKey: 'furnishing', builtIns: FURNISHING, labels: s.furnishing })}
+        {/* ClaudeChanges001: Condition moved here when the Availability and Condition section was removed. */}
+        {show('condition') && Opt({ k: 'condition', listKey: 'condition', builtIns: CONDITIONS, labels: s.condition })}
         <label className="ff">
           <span>{s.l.extraComments}</span>
           <textarea data-field="extraComments" className="big-text" rows={5} value={d.extraComments ?? ''} onChange={e => set('extraComments', e.target.value || undefined)} />
         </label>
         {show('maintenanceFee') && Text({ k: 'maintenanceFee', money: true })}
-      </Sec>
-
-      <Sec id="availability" title={s.sec.availability} {...secProps('availability')}>
-        {withVp('availability', (
-          <label className="ff" key="availability">
-            <span>{s.l.availability}<FieldHelp lang={lang} topic="availability" label={s.l.availability} /></span>
-            <select data-field="availability" value={d.availability ?? ''} onChange={e => {
-              const v = (e.target.value || undefined) as Listing['availability'];
-              set('availability', v);
-              // Tenanted reveals the tenant's contact box straight away (Change 009).
-              if (v === 'tenanted') setOpen(o => new Set([...o, 'tenancy']));
-            }}>
-              <option value="">{s.notSet}</option>
-              {AVAILABILITY.map(o => <option key={o} value={o}>{s.availability[o]}</option>)}
-            </select>
-          </label>
-        ))}
-        {d.availability === 'from_date' && (
-          <label className="ff">{s.l.availableFrom}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
-        )}
-        {show('condition') && Select({ k: 'condition', options: CONDITIONS, labels: s.condition })}
-        {Text({ k: 'features', area: true })}
       </Sec>
 
       {(rentMode || d.availability === 'tenanted' || d.tenancy) && (
@@ -677,12 +749,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       )}
 
       <Sec id="owner" title={s.sec.owner} testId="sec-owner" {...secProps('owner')}>
-        <label className="ff"><span>{s.l.vendorId}<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} /></span>
-          <select data-field="vendorId" value={d.vendorId ?? ''} onChange={e => set('vendorId', e.target.value || undefined)}>
-            <option value="">{s.vendorNone}</option>
-            {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
-        </label>
+        {/* Change 9: the saved contacts in one searchable list (name or number). */}
+        <ContactPick lang={lang} label={s.l.vendorId} help={<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} />} contacts={vendors}
+          value={d.vendorId} noneLabel={x1.vendorNone} onChange={v => set('vendorId', v)} testId="vendor-pick" field="vendorId" />
         {linked ? <small className="muted">{s.vendorLinked}{linked.phone ? ` ${linked.phone}` : ''}{linked.whatsapp ? ` · ${linked.whatsapp}` : ''}</small> : <>
           <ContactBox lang={lang} idPrefix="owner" fields={{ name: 'ownerName', phone: 'ownerPhone', whatsapp: 'ownerWhatsapp' }} contacts={state.contacts.filter(x => x.roles.some(r => r === 'vendor' || r === 'landlord'))}
             labels={{ name: s.l.ownerName, phone: s.l.ownerPhone, whatsapp: s.l.ownerWhatsapp }}
@@ -706,17 +775,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </Sec>
       )}
 
-
-      <Sec id="arrangement" title={s.sec.arrangement} {...secProps('arrangement')}>
-        {Select({ k: 'arrangement', options: ARRANGEMENTS, labels: s.arrangement })}
-        {d.arrangement && d.arrangement !== 'direct' && Text({ k: 'arrangementNote' })}
-        {Select({ k: 'status', options: STATUSES, labels: s.status })}
-        {d.status === 'in_progress' && (
-          <label className="ff"><span>{s.l.handledBy}</span>
-            <input data-field="handledBy" placeholder={s.handledByHint} value={d.handledBy ?? ''} onChange={e => set('handledBy', e.target.value || undefined)} />
-          </label>
-        )}
-      </Sec>
 
       <Sec id="banner" title={s.sec.banner} testId="sec-banner-form" {...secProps('banner')}>
         {Select({ k: 'bannerStatus', options: BANNER_STATUSES, labels: s.banner })}
@@ -831,11 +889,34 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           }} />
       )}
       {askUnchecked && <Confirm lang={lang} title={s.reviewQ} body={s.reviewBody(unchecked.length)} danger={false} okLabel={s.reviewSave}
-        onCancel={() => { setAskUnchecked(false); setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}
+        onCancel={() => { setAskUnchecked(false); afterSave.current = null; soldByRef.current = undefined; setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}
         onOk={() => { setAskUnchecked(false); save(true); }} />}
       {tenantPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
         body={contactStrings[lang].replaceBody([tenant.name, tenant.phone].filter(Boolean).join(' · '), [tenantPick.name, tenantPick.tel].filter(Boolean).join(' · '))}
         onCancel={() => setTenantPick(null)} onOk={() => { applyTenant(tenantPick); setTenantPick(null); }} />}
+      {dealAsk === 'sold' && (
+        <ChoiceDialog lang={lang} title={x1.deal.soldQ} body={x1.deal.soldBody} testId="deal-ask" cancelLabel={x1.deal.later} onCancel={() => setDealAsk(null)}
+          choices={[
+            { label: x1.deal.byMe, primary: true, testId: 'deal-by-me', onPick: () => saveAndOpen('sale', 'me') },
+            { label: x1.deal.byOthers, testId: 'deal-by-others', onPick: () => saveAndOpen('others', 'others') },
+          ]} />
+      )}
+      {(dealAsk === 'booked' || dealAsk === 'rented') && (
+        <ChoiceDialog lang={lang} title={dealAsk === 'booked' ? x1.deal.bookedQ : x1.deal.rentedQ} body={dealAsk === 'booked' ? x1.deal.bookedBody : x1.deal.rentedBody}
+          testId="deal-ask" cancelLabel={x1.deal.later} onCancel={() => setDealAsk(null)}
+          choices={[{ label: x1.deal.fillNow, primary: true, testId: 'deal-fill-now', onPick: () => saveAndOpen(dealAsk === 'booked' ? 'booking' : 'rental') }]} />
+      )}
+      {askPhotoDelete && (
+        <Confirm lang={lang} title={x1.photo.deleteQ} body={x1.photo.deleteBody} okLabel={x1.photo.delete} onCancel={() => setAskPhotoDelete(null)}
+          onOk={() => {
+            const pid = askPhotoDelete; setAskPhotoDelete(null);
+            const p = d.photos.find(x => x.id === pid);
+            // Same as before: the file is only removed from the phone when the property is saved.
+            if (p?.fileId) removedFiles.current.push(p.fileId);
+            setD(prev => { const r = removePhoto(prev.photos, pid); return { ...prev, photos: r.photos, mainPhotoId: r.mainPhotoId }; });
+          }} />
+      )}
+      {viewer !== null && d.photos.length > 0 && <PhotoViewer lang={lang} photos={d.photos} start={viewer} onClose={() => setViewer(null)} />}
       {ownerPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
         body={contactStrings[lang].replaceBody([d.ownerName, d.ownerPhone].filter(Boolean).join(' · '), [ownerPick.name, ownerPick.tel].filter(Boolean).join(' · '))}
         onCancel={() => setOwnerPick(null)} onOk={() => { applyOwner(ownerPick); setOwnerPick(null); }} />}

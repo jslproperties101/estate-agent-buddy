@@ -19,7 +19,7 @@ const en = {
   langSwitch: 'Language',
   home: 'Home',
   tiles: {
-    todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Subsale List', creative: 'Creative Media', matching: 'Buyer Matching',
+    agenda: 'Calendar & To‑Do', sales: 'Track My Sales', todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Subsale List', creative: 'Creative Media', matching: 'Buyer Matching',
     vendor: 'Vendor List', buyer: 'Buyer List', gps: 'GPS Assistance', finance: 'Agent Financial',
     calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'Voice Command',
     subsale: 'Subsale', project: 'Project', cobroke: 'Co-broke',
@@ -159,7 +159,7 @@ const bm: Strings = {
   langSwitch: 'Bahasa',
   home: 'Utama',
   tiles: {
-    todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Subsale', creative: 'Media Kreatif', matching: 'Padanan Pembeli',
+    agenda: 'Kalendar & Tugasan', sales: 'Jejak Jualan Saya', todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Subsale', creative: 'Media Kreatif', matching: 'Padanan Pembeli',
     vendor: 'Senarai Penjual', buyer: 'Senarai Pembeli', gps: 'Bantuan GPS', finance: 'Kewangan Ejen',
     calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Suara',
     subsale: 'Subsale', project: 'Projek', cobroke: 'Co-broke',
@@ -297,7 +297,7 @@ const zh: Strings = {
   langSwitch: '语言',
   home: '主页',
   tiles: {
-    todo: '待办事项', calendar: '日历', opportunities: '商机', property: '二手房列表', creative: '创意媒体', matching: '买家配对',
+    agenda: '日历与待办', sales: '我的成交追踪', todo: '待办事项', calendar: '日历', opportunities: '商机', property: '二手房列表', creative: '创意媒体', matching: '买家配对',
     vendor: '卖家列表', buyer: '买家列表', gps: 'GPS 助手', finance: '代理财务',
     calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: '语音指令',
     subsale: '二手房', project: '新项目', cobroke: '联合代理',

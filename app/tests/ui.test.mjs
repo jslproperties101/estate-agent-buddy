@@ -84,6 +84,33 @@ async function chooseStart(page, which) {
   await page.getByTestId('start-choice').waitFor({ state: 'detached' });
 }
 const shot = (page, name, fullPage = true) => page.screenshot({ path: `${SHOTS}${name}.png`, fullPage });
+
+/** ClaudeChanges001 change 5: Street is a remembered dropdown (saved under the levels above it), not a text box. Types the
+ *  value in the list's search box and adds it ("Add …"), or picks it when it is already in the list. */
+async function setStreet(page, value) {
+  const box = page.locator('[data-testid="opt-street"]');
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  const v = String(value ?? '');
+  if (!v) { await box.getByRole('option').first().click(); return; }
+  await page.getByTestId('opt-street-search').fill(v);
+  const add = page.getByTestId('opt-street-add');
+  if (await add.count()) await add.click();
+  else await box.getByRole('option', { name: v, exact: true }).click();
+}
+/** ClaudeChanges001 change 7: Delete in the photo menu asks first. */
+async function confirmPhotoDelete(page) { await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click(); await page.getByRole('alertdialog').waitFor({ state: 'detached' }); }
+/** Picks a built-in value in a remembered list (OptionSelect). */
+async function pickOpt(page, testId, name) {
+  const box = page.getByTestId(testId);
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  await box.getByRole('option', { name, exact: true }).click();
+}
+/** The Street shown on the form (ClaudeChanges001). */
+async function streetValue(page) {
+  const t = (await page.locator('[data-testid="opt-street"] .opt-btn').innerText()).replace(/\s*▾\s*$/, '').trim();
+  return ['not set', 'belum ditetapkan', '未设置'].includes(t.toLowerCase()) ? '' : t;
+}
+
 /** Opens a dashboard card. Buyers and vendors are inside the Contacts card since 13 Oct 2026. */
 /** Waits until the phone's own storage (IndexedDB) really holds what the screen says it saved — `expr` is evaluated with
  *  `all` = every value in that store. This replaces sleeping for a fixed time: it passes as soon as the data is stored and
@@ -112,6 +139,12 @@ async function tile(page, name) {
   if (name === 'Buyer List' || name === 'Vendor List') {
     await page.locator('nav.grid > button', { hasText: 'Contacts' }).first().click();
     await page.getByTestId(name === 'Buyer List' ? 'hub-buyers' : 'hub-vendors').click();
+    return;
+  }
+  // ClaudeChanges001 change 12: Calendar and To-Do share card 1, which asks which one to open.
+  if (['To-Do', 'Calendar', 'Tugasan', 'Kalendar', '待办事项', '日历'].includes(name)) {
+    await page.locator('nav.grid > button[data-key="agenda"]').click();
+    await page.getByTestId(['Calendar', 'Kalendar', '日历'].includes(name) ? 'agenda-calendar' : 'agenda-todo').click();
     return;
   }
   await page.locator('nav.grid > button', { hasText: name }).first().click();
@@ -173,20 +206,25 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
   // Change 011 + owner's answers of 16 Oct 2026: Creative Media takes card 4, the property list becomes "Subsale List" at
   // card 14 (bottom centre), Agent Profile moves to the top bar, Buyer Matching uses the freed card 10 (Change 013).
-  assert.deepEqual(names, ['To-Do', 'Calendar', 'Opportunities', 'Creative Media', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
+  // ClaudeChanges001 change 12: card 1 is Calendar & To-Do (asks which), card 2 is Track My Sales.
+  assert.deepEqual(names, ['Calendar & To\u2011Do', 'Track My Sales', 'Opportunities', 'Creative Media', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
     'Agent Financial', 'Property Calculator', 'Buyer Matching', 'Ask Expert', 'Market Intelligence',
     'Project', 'Subsale List', 'Voice Command']);
   assert.equal(await page.locator('nav.grid > button[data-key="property"]').getAttribute('data-tile'), '14', 'Subsale List is card 14');
   assert.equal(await page.locator('nav.grid > button[data-key="creative"]').getAttribute('data-tile'), '4', 'Creative Media is card 4');
   assert.equal(await page.locator('nav.grid').getByText(/Coming Soon|Soon/i).count(), 0, 'no Coming Soon label on any card');
   for (const gone of ['Property List', 'Agent Profile', 'Subsale']) assert.ok(!names.includes(gone), `no ${gone} card`);
-  // No Today and no Recent Properties sections; the title is at the top with Saved on This Phone right under it.
+  // No Today and no Recent Properties sections. ClaudeChanges001 change 2: no "Saved on This Phone" line any more, and no
+  // sync banner while nothing is wrong.
   assert.equal(await page.getByTestId('today').count(), 0, 'no Today section');
   assert.equal(await page.locator('.photo-cards').count(), 0, 'no Recent Properties');
   assert.equal(await page.getByText(/Recent properties/i).count(), 0);
-  const titleBox = await page.locator('header h1').boundingBox(); const saveBox = await page.getByTestId('save-status').boundingBox();
-  assert.ok(await page.locator('header [data-testid="save-status"]').count() === 1, 'Saved on This Phone is in the header');
-  assert.ok(saveBox.y >= titleBox.y + titleBox.height - 1, 'Saved on This Phone directly under the title');
+  assert.equal(await page.getByTestId('save-status').count(), 0, 'no Saved on This Phone line');
+  assert.equal(await page.getByTestId('sync-banner').count(), 0, 'no banner when nothing is wrong');
+  await page.locator('nav.grid > button[data-key="agenda"]').click();
+  await page.getByTestId('agenda-ask').waitFor();
+  assert.match(await page.getByTestId('agenda-ask').innerText(), /Calendar or To-Do\?/);
+  await page.getByTestId('agenda-ask-cancel').click();
   assert.equal(await page.getByTestId('top-profile').getAttribute('aria-label'), 'Agent Profile', 'Agent Profile is a top-bar button');
   await page.getByTestId('top-profile').click();
   await page.getByRole('button', { name: /Settings/i }).waitFor();
@@ -289,7 +327,7 @@ test('U4 saved data is permanent: a new property is still there after closing an
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="headline"]').fill('Persistence test house');
-  await page.locator('[data-field="street"]').fill('Jalan Persistence 1');
+  await setStreet(page, 'Jalan Persistence 1');
   await page.locator('[data-field="askingPrice"]').fill('450000');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
@@ -308,7 +346,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   await loadSample(page);
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: P1011', 'P1010 exists → P1011');
+  assert.equal(await page.getByTestId('ref-preview').innerText(), 'ID: P1011', 'P1010 exists → P1011');
   // a number already used by another property, whatever the prefix
   await page.locator('[data-field="refNo"]').fill('1004');
   assert.match(await page.getByTestId('ref-error').innerText(), /already.*1011/i);
@@ -320,7 +358,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   await list.getByRole('button', { name: 'Others…' }).click();
   await list.locator('.opt-new input').fill('kl');
   await list.getByRole('button', { name: 'Add' }).click();
-  assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: KL1011');
+  assert.equal(await page.getByTestId('ref-preview').innerText(), 'ID: KL1011');
   await page.locator('[data-field="headline"]').fill('KL test');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
@@ -328,7 +366,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   // next new property: KL is the default and on top of the list
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  assert.equal(await page.getByTestId('ref-preview').innerText(), 'Reference: KL1012');
+  assert.equal(await page.getByTestId('ref-preview').innerText(), 'ID: KL1012');
   await page.getByTestId('ref-prefix').locator('.opt-btn').click();
   const items = await page.getByTestId('ref-prefix').locator('.opt-list [role="option"]').evaluateAll(b => b.map(x => x.textContent.split('·')[0].trim()));
   assert.deepEqual(items.slice(0, 3), ['KL', 'P', 'A'], 'latest custom prefix first');
@@ -345,7 +383,8 @@ test('U6 detail page: each section has its own Edit button that opens the form a
   await page.getByTestId('listing-card').first().click();
   const sections = page.locator('.sec-card');
   const n = await sections.count();
-  assert.ok(n >= 14, `${n} section cards`);
+  // ClaudeChanges001 change 8 / 10: the Availability and Condition and the Listing Arrangement and Status cards are gone.
+  assert.ok(n >= 12, `${n} section cards`);
   for (let i = 0; i < n; i++) assert.equal(await sections.nth(i).locator('.sec-foot .edit-mini').count(), 1, `section ${i} has an Edit button`);
   const pos = await page.locator('.sec-card .edit-mini').first().evaluate(b => { const r = b.getBoundingClientRect(), c = b.closest('.sec-card').getBoundingClientRect(); return { right: c.right - r.right, bottom: c.bottom - r.bottom }; });
   assert.ok(pos.right < 20 && pos.bottom < 20, 'Edit sits at the bottom right of its card');
@@ -402,7 +441,7 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   await town.locator('.opt-new input').fill('Taman Desa Nilai');
   await town.getByRole('button', { name: 'Add' }).click();
   await page.locator('[data-field="unitNo"]').fill('No. 5');
-  await page.locator('[data-field="street"]').fill('Jalan Sampel 9');
+  await setStreet(page, 'Jalan Sampel 9');
   assert.equal(await page.locator('[data-field="lat"], [data-field="lng"], [data-field="lotNo"]').count(), 0, 'no latitude, longitude or separate lot boxes');
   assert.match(await page.getByTestId('gmap-add').innerText(), /Add Location/i);
   await page.getByTestId('gmap-add').click();
@@ -415,7 +454,7 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   assert.equal(await page.getByTestId('geo-result').count() + await page.getByTestId('discrepancies').count(), 0, 'no address review');
   await page.getByTestId('apply-location').click();
   assert.match(await page.getByTestId('pos-text').innerText(), /Location saved/i);
-  assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Sampel 9', 'street unchanged');
+  assert.equal(await streetValue(page), 'Jalan Sampel 9', 'street unchanged');
   assert.match(await page.getByTestId('opt-township').innerText(), /Taman Desa Nilai/i, 'township unchanged');
   // Owner, 17 Oct 2026: no Google Maps link field on the form; Add Location is the way to place the property.
   assert.equal(await page.locator('[data-field="mapsLink"]').count() + await page.getByTestId('open-maps-link').count(), 0, 'no Google Maps link field');
@@ -772,8 +811,9 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
     ['detail', async () => { await page.locator('nav.grid > button').nth(13).click(); await page.getByTestId('listing-card').first().click(); }],
     ['buyer history', async () => { await page.locator('nav.grid > button').nth(13).click(); await page.getByTestId('listing-card').first().click(); await page.getByTestId('open-buyer-history').click(); }],
     ['form', async () => { await page.locator('nav.grid > button').nth(13).click(); await newProperty(page); }],
-    ['todo', async () => { await page.locator('nav.grid > button').nth(0).click(); }],
-    ['calendar', async () => { await page.locator('nav.grid > button').nth(1).click(); }],
+    ['todo', async () => { await tile(page, 'To-Do'); }],
+    ['calendar', async () => { await tile(page, 'Calendar'); }],
+    ['track sales', async () => { await page.locator('nav.grid > button').nth(1).click(); }],
     ['creative', async () => { await page.locator('nav.grid > button').nth(3).click(); }],
     ['activity', async () => { await page.locator('nav.grid > button').nth(5).click(); }],
     ['gps', async () => { await page.locator('nav.grid > button').nth(6).click(); }],
@@ -825,7 +865,8 @@ test('U21 readability: no text under 14 px and no button under 44 px on the main
     }
     return { small, short };
   });
-  for (const i of [-1, 0, 3, 5, 8]) {
+  // ClaudeChanges001: card 1 asks Calendar or To-Do (checked elsewhere); card 2 is Track My Sales.
+  for (const i of [-1, 1, 3, 5, 8]) {
     await home(page);
     if (i >= 0) await page.locator('nav.grid > button').nth(i).click();
     const r = await check();
@@ -848,7 +889,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
       labelColour: label ? getComputedStyle(label).color : null, labelSize: label ? parseFloat(getComputedStyle(label).fontSize) : null };
   });
   const forms = [
-    ['property form', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="street"]'],
+    ['property form', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="unitNo"]'],
     ['property form dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="purpose"]'],
     ['property form custom dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '.opt-btn'],
     ['property form money', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="askingPrice"]'],
@@ -906,7 +947,7 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await price.fill('RM 580,000.50');
   assert.equal(await price.inputValue(), '580,000.50');
   await price.fill('588000');
-  await page.locator('[data-field="street"]').fill('Jalan Wang 1');
+  await setStreet(page, 'Jalan Wang 1');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   const saved = await page.evaluate(() => new Promise(res => {
@@ -1132,9 +1173,8 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   assert.ok(seen.includes('POST /rest/v1/rpc/eab_invite'));
   assert.ok(seen.some(x => x === 'GET /rest/v1/eab_records'), 'synced after sign-in');
   await shot(page, '28b-account-team', false);
-  // Save status: signed in, nothing waiting, and the (stand-in) cloud answered the sync: "Synced", not just "Saved".
-  await page.locator('[data-testid="save-status"][data-state="synced"]').waitFor({ timeout: 5000 });
-  assert.equal((await page.getByTestId('save-status').innerText()).trim(), 'Synced');
+  // ClaudeChanges001 change 2: no status line on any screen (the banner on the main page appears only on a problem).
+  assert.equal(await page.getByTestId('save-status').count(), 0);
   // Easy Bug Report while signed in: screenshot + description are sent, and success is shown only after the service accepted them.
   await page.getByTestId('open-bug-report').click();
   await page.getByTestId('bug-file').setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
@@ -1173,7 +1213,7 @@ test('U29 maps: My Location recentres after moving the map, follows until dragge
   const meAt = () => page.evaluate(() => window.__markers.find(m => m.o.icon?.fillColor === '#4285F4')?.o.position);
   // A property with a saved position.
   await tile(page, 'Property List'); await newProperty(page);
-  await page.locator('[data-field="street"]').fill('Jalan Peta 1');
+  await setStreet(page, 'Jalan Peta 1');
   // Change 009: no latitude/longitude boxes; a full Google Maps link that holds the point places the property.
   await pickPoint(page, 2.83, 101.81);
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
@@ -1431,7 +1471,7 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click();
   const secs = page.locator('[data-testid="listing-form"] .form-sec');
-  assert.ok(await secs.count() >= 12);
+  assert.ok(await secs.count() >= 10, 'ClaudeChanges001: two sections fewer (Availability and Condition, Listing Arrangement and Status)');
   assert.deepEqual([...new Set(await secs.evaluateAll(x => x.map(e => e.dataset.open)))], ['no'], 'all closed at first');
   await page.locator('[data-sec="marketing"]').click();
   await page.locator('[data-field="headline"]').fill('Collapsible test');
@@ -1583,8 +1623,9 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   });
   const page = await ctx.newPage();
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
-  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'phone');
-  assert.match(await page.getByTestId('save-status').innerText(), /Saved on this phone/i);
+  // ClaudeChanges001 change 2: no status line, and no banner while the phone's storage works.
+  assert.equal(await page.getByTestId('save-status').count(), 0);
+  assert.equal(await page.getByTestId('sync-banner').count(), 0);
   // Good save: the message shows, then goes in about two seconds.
   await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
   await page.locator('[data-field="name"]').fill('Timing Buyer');
@@ -1606,8 +1647,11 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   assert.match(await page.getByTestId('toast').innerText(), /Could not save to the phone’s storage/i);
   await page.waitForTimeout(400);
   assert.equal(await page.getByText('Saved on this phone.', { exact: true }).count(), 0, 'no success message after a failed write');
-  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'failed-phone');
-  assert.equal(await page.getByTestId('save-status').getAttribute('role'), 'alert');
+  // The main page says so (ClaudeChanges001 change 2: the one banner below the header line).
+  await home(page);
+  assert.equal(await page.getByTestId('sync-banner').getAttribute('data-state'), 'failed-phone');
+  assert.equal(await page.getByTestId('sync-banner').getAttribute('role'), 'alert');
+  assert.match(await page.getByTestId('sync-banner').innerText(), /Not saved: the phone’s storage failed/);
   // An error message stays longer than a success message.
   const e0 = Date.now();
   await page.getByTestId('toast').waitFor({ state: 'detached', timeout: 9000 });
@@ -1618,7 +1662,8 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   await page.locator('[data-field="name"]').fill('Saved Again');
   await page.getByTestId('save-contact').click();
   await page.locator('[data-testid="toast"][data-kind="ok"]').waitFor();
-  assert.equal(await page.getByTestId('save-status').getAttribute('data-state'), 'phone');
+  await home(page);
+  assert.equal(await page.getByTestId('sync-banner').count(), 0, 'the banner goes once saving works again');
   await ctx.close();
 });
 
@@ -1765,7 +1810,7 @@ test('U49 property cards: no "Unit" prefix on any card or view, and the stored u
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="unitNo"]').fill('12A');
-  await page.locator('[data-field="street"]').fill('Jalan Prefix Test');
+  await setStreet(page, 'Jalan Prefix Test');
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
   assert.doesNotMatch(await page.locator('main').innerText(), /\bUnit 12A\b/i, 'detail page');
@@ -1841,7 +1886,7 @@ test('U51 the long property form keeps its draft too, and Save then leaves a sin
   const page = await phone();
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  await page.locator('[data-field="street"]').fill('Jalan Draft Test');
+  await setStreet(page, 'Jalan Draft Test');
   await page.locator('[data-field="unitNo"]').fill('9B');
   await page.getByTestId('draft-saved').waitFor();
   await page.reload(); await page.waitForSelector('nav.grid');
@@ -1849,7 +1894,7 @@ test('U51 the long property form keeps its draft too, and Save then leaves a sin
   assert.equal(await page.getByTestId('listing-card').count(), 0, 'no property was created by typing');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.getByTestId('draft-banner').waitFor();
-  assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Draft Test');
+  assert.equal(await streetValue(page), 'Jalan Draft Test');
   assert.equal(await page.locator('[data-field="unitNo"]').inputValue(), '9B');
   await page.getByTestId('save-property').click();
   await page.getByTestId('listing-details').waitFor();
@@ -1894,8 +1939,9 @@ test('U53 record status chip, History with restore, and Recently deleted with re
   await page.locator('[data-field="name"]').fill('Ahmad History');
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
+  // ClaudeChanges001 change 2: no sync status words on a record; only its History button.
   assert.equal(await page.getByTestId('record-status').getAttribute('data-state'), 'phone');
-  assert.match(await page.getByTestId('record-status').innerText(), /Saved on this phone/i);
+  assert.doesNotMatch(await page.getByTestId('record-status').innerText(), /Saved on this phone|Synced|Waiting|Sync failed/i);
   await shot(page, '50-record-status', false);
   // Edit: the earlier version goes to History.
   await page.getByRole('button', { name: 'Edit' }).first().click();
@@ -1970,8 +2016,8 @@ test('U54 sync review: a same-field conflict, a property number already used, an
     db.close();
   }, SB);
   await page.reload(); await page.waitForSelector('nav.grid');
-  await page.locator('[data-testid="save-status"][data-state="conflict"]').waitFor({ timeout: 8000 });
-  assert.match(await page.getByTestId('save-status').innerText(), /3 need review/i, 'the status line does not say Synced');
+  await page.locator('[data-testid="sync-banner"][data-state="conflict"]').waitFor({ timeout: 8000 });
+  assert.match(await page.getByTestId('sync-banner').innerText(), /3 records need your review/i, 'the banner does not say Synced');
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   await page.getByTestId('open-sync-review').click();
   await page.getByTestId('sync-review').waitFor();
@@ -2229,7 +2275,7 @@ test('U60 property form: the headline sits in Marketing (lower), Type & Purpose 
   const y = id => page.locator(id).evaluate(e => e.getBoundingClientRect().top + scrollY);
   assert.ok(await y('#sec-marketing [data-field="headline"]') > await y('#sec-location'), 'below Location');
   assert.ok(await y('#sec-marketing [data-field="headline"]') > await y('#sec-owner'), 'below Owner');
-  assert.match(await page.locator('#sec-basics .card-title').innerText(), /Type & Purpose/i);
+  assert.match(await page.locator('#sec-basics .card-title').innerText(), /Basic Info and Availability/i);
   await page.locator('#sec-marketing [data-field="headline"]').fill('Corner shop, Nilai');
   await page.locator('[data-sec="marketing"]').click();
   assert.match(await page.locator('[data-sec="marketing"]').innerText(), /1 filled/i);
@@ -3005,7 +3051,7 @@ async function bareProperty(page, name = 'Bare minimum house') {
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   await page.locator('[data-field="headline"]').fill(name);
   // Change 009: cards show the address, so the test property's street carries its name too.
-  await page.locator('[data-field="street"]').fill(name);
+  await setStreet(page, name);
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
 }
@@ -3463,7 +3509,7 @@ test('U86 Marketing Studio: a full property (photos, facts, long headline, agent
   await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
   await page.locator('[data-field="askingPrice"]').fill('780000');
   for (const [k, v] of [['bedrooms', '4'], ['bathrooms', '3'], ['parking', '2'], ['builtUpSqft', '1800'], ['landSqft', '2400']]) await page.locator(`[data-field="${k}"]`).first().fill(v);
-  await page.locator('[data-field="features"]').first().fill('Corner lot with side land, renovated kitchen, new roof, 5 minutes to the highway and shopping centre.');
+  // ClaudeChanges001 change 8: Special Features is gone from the form.
   await page.getByTestId('photo-input').setInputFiles(await Promise.all(['#3a7', '#a53', '#37a', '#aa3'].map(async (c, i) => ({ name: `p${i}.jpg`, mimeType: 'image/jpeg', buffer: await makePhoto(page, c) }))));
   await page.waitForFunction(() => document.querySelectorAll('[data-testid="listing-form"] img').length >= 4);
   await page.getByTestId('save-property').click();
@@ -3830,7 +3876,7 @@ test('U95 duplicate warning: typing an address that is already in the list shows
   await tile(page, 'Property List');
   await newProperty(page);
   assert.equal(await page.getByTestId('duplicate-warning').count(), 0, 'no warning before anything is typed');
-  await page.locator('[data-field="street"]').fill(stored.street);
+  await setStreet(page, stored.street);
   await page.locator('[data-field="unitNo"]').fill(stored.unitNo);
   await page.getByTestId('duplicate-warning').waitFor();
   assert.match(await page.getByTestId('duplicate-warning').innerText(), /may already be in your list/i);
@@ -3976,7 +4022,7 @@ test('U100 Change 009 form: section order, price/commission in Price, Tenure and
   await page.locator('[data-field="rentCommissionMonths"]').selectOption('2');
   await page.locator('[data-field="securityDepositMonths"]').fill('2');
   await comments.fill('Line one of the comment.\nLine two, still here.');
-  await page.locator('[data-field="street"]').fill('Jalan Sampel Ujian 1');
+  await setStreet(page, 'Jalan Sampel Ujian 1');
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   const money = await page.getByTestId('sec-tenure-view').innerText();
   assert.match(money, /Commission \(Months of Rent\)[\s\S]*2 months of rent/i);
@@ -4052,14 +4098,14 @@ test('U102 Change 009 photos: a visible loading spinner, errors named, no Make M
   assert.deepEqual(await names(), [ids0[0], ids0[2], ids0[1]], 'dragged to the front');
   assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1);
   // Deleting the main photo makes the next one main; deleting all leaves a safe empty list.
-  await page.getByTestId('form-photo').first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click();
+  await page.getByTestId('form-photo').first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click(); await confirmPhotoDelete(page);
   assert.deepEqual(await names(), [ids0[2], ids0[1]]);
   assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1);
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   const rec = await page.evaluate(() => new Promise(res => { const r = indexedDB.open('estate-agent-buddy'); r.onsuccess = () => { const all = r.result.transaction('records').objectStore('records').getAll(); all.onsuccess = () => { res(all.result.find(x => x && Array.isArray(x.photos) && x.photos.length)); r.result.close(); }; }; }));
   assert.equal(rec.mainPhotoId, rec.photos[0].id, 'the saved main photo is the first photo');
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
-  for (let i = 0; i < 2; i++) { await page.getByTestId('form-photo').first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click(); }
+  for (let i = 0; i < 2; i++) { await page.getByTestId('form-photo').first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click(); await confirmPhotoDelete(page); }
   assert.equal(await page.getByTestId('form-photo').count(), 0);
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   await page.context().close();
@@ -4091,7 +4137,10 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   const lands = types.map((t, i) => [t, i]).filter(([t]) => / Land$/.test(t)).map(([, i]) => i);
   assert.equal(lands.length, 4); assert.equal(lands[3] - lands[0], 3, `land types together: ${types.join(', ')}`);
   await page.getByTestId('opt-type').getByRole('option', { name: 'Terrace House' }).click();
-  assert.ok((await page.locator('[data-field="landUse"] option').allInnerTexts()).includes('NIL'));
+  // ClaudeChanges001 change 4: Land Use is a remembered list with Others.
+  await page.locator('[data-testid="opt-landUse"] .opt-btn').click();
+  assert.ok((await page.getByTestId('opt-landUse').getByRole('option').allInnerTexts()).includes('NIL'));
+  await page.locator('[data-testid="opt-landUse"] .opt-btn').click();
   await page.locator('[data-testid="opt-restriction"] .opt-btn').click();
   const r = await page.getByTestId('opt-restriction').getByRole('option').allInnerTexts();
   assert.ok(r.includes('NON Bumiputera') && !r.some(x => /No restriction/i.test(x)), r.join(', '));
@@ -4101,6 +4150,9 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   await home(page); await tile(page, 'Property List'); await newProperty(page);
   assert.equal(await page.locator('[data-field="ownerName"]').inputValue(), '', 'no owner copied');
+  // ClaudeChanges001 change 5: a township is remembered under its state and city, so they are chosen first.
+  await pickOpt(page, 'opt-state', 'Selangor');
+  await pickOpt(page, 'opt-city', 'Klang');
   const t2 = page.getByTestId('opt-township');
   await t2.locator('.opt-btn').click();
   assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).count(), 1, 'remembered, with ✕');
@@ -4114,7 +4166,10 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   await tile(page, 'Property List'); await newProperty(page);
   await page.locator('[data-field="purpose"]').selectOption('sale');
   assert.equal(await page.getByTestId('tenant-box').count(), 0, 'no tenant box for a vacant sale listing');
-  await page.locator('[data-field="availability"]').selectOption('tenanted');
+  // ClaudeChanges001 change 10: "Rented" (Status merged into Availability) reveals the tenant box; the rental-page
+  // question is answered "Later".
+  await page.locator('[data-field="availability"]').selectOption('rented');
+  await page.getByTestId('deal-ask-cancel').click();
   await page.getByTestId('tenant-box').waitFor();
   assert.equal(await page.locator('#sec-tenancy').getAttribute('data-open'), 'yes', 'opened by itself');
   await page.locator('[data-field="tenancy.tenant"]').fill('Encik Penyewa');
@@ -4129,7 +4184,7 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   await page.evaluate(() => window.__mapClick(2.8311, 101.8122));
   await page.getByTestId('apply-location').click();
   assert.match(await page.getByTestId('banner-picked').innerText(), /Banner location chosen/i);
-  await page.locator('[data-field="street"]').fill('Jalan Sampel Banner 1');
+  await setStreet(page, 'Jalan Sampel Banner 1');
   await page.locator('[data-field="askingPrice"]').fill('600000');
   await page.locator('[data-field="landSqft"]').fill('1800');
   await page.locator('[data-verify="landSqft"]').selectOption('confirmed');
@@ -4184,7 +4239,8 @@ test('U99 Change 007: the QA build has no orange QA banner; About still says QA;
   await page.goto('https://qa.test/'); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   assert.equal(await page.getByTestId('qa-bar').count(), 0, 'no orange QA banner');
   assert.equal(await page.locator('.qa-bar').count(), 0);
-  assert.ok(await page.locator('[data-testid="save-status"], .save-status').first().isVisible(), 'the save / sync status line is still shown');
+  // ClaudeChanges001 change 2: there is no save / sync status line at all now.
+  assert.equal(await page.locator('[data-testid="save-status"], .save-status').count(), 0);
   // No empty strip: the save status line follows the header directly.
   const gap = await page.evaluate(() => { const h = document.querySelector('header.topbar').getBoundingClientRect(); const n = h.bottom; const next = document.querySelector('header.topbar').nextElementSibling.getBoundingClientRect(); return next.top - n; });
   assert.ok(gap < 2, `nothing left between the header and the next line (${gap}px)`);
@@ -4354,7 +4410,7 @@ test('U104 Change 014: Location straight after section 2 with the street first; 
   await tile(page, 'Subsale List'); await newProperty(page);
   const heads = await page.locator('[data-testid="listing-form"] > .card[id] .sec-head .card-title').allInnerTexts();
   assert.match(heads[0], /^1 · /); assert.match(heads[1], /^2 · /); assert.match(heads[2], /^3 · Location/i); assert.match(heads[3], /^4 · Photos/i);
-  const street = await page.locator('#sec-location [data-field="street"]').boundingBox();
+  const street = await page.locator('#sec-location [data-testid="opt-street"]').boundingBox();
   const unit = await page.locator('#sec-location [data-field="unitNo"]').boundingBox();
   assert.ok(unit.y > street.y, 'Unit / Lot Number comes under the street');
   await page.locator('[data-testid="opt-type"] .opt-btn').click();
@@ -4395,14 +4451,16 @@ async function c15Property(page, { street, purpose = 'sale', status = 'available
   await page.locator('[data-field="purpose"]').selectOption(purpose);
   if (purpose !== 'rent') await page.locator('[data-field="askingPrice"]').fill('650000');
   if (purpose !== 'sale') await page.locator('[data-field="monthlyRent"]').fill('2200');
-  await page.locator('[data-field="street"]').fill(street);
+  await setStreet(page, street);
   await page.locator('[data-field="floors"]').fill('2.5');
-  await page.locator('[data-field="lotType"]').selectOption('corner');
+  await pickOpt(page, 'opt-lotType', 'Corner');
   await page.locator('[data-field="bedrooms"]').fill('4');
   await page.locator('[data-field="bathrooms"]').fill('3');
   await page.locator('[data-field="landSqft"]').fill('1650');
   await page.locator('[data-field="builtUpSqft"]').fill('2200');
-  await page.locator('[data-field="status"]').selectOption(status);
+  // ClaudeChanges001 change 10: the status is chosen in Availability; Booked asks about the booking page ("Later").
+  await page.locator('[data-field="availability"]').selectOption({ available: 'available_now', in_progress: 'booked', sold: 'sold', rented: 'rented', off_market: 'withdrawn' }[status]);
+  if (['in_progress', 'sold', 'rented'].includes(status)) await page.getByTestId('deal-ask-cancel').click();
   if (tenure) await page.locator('[data-field="tenure"]').selectOption(tenure);
   await page.getByTestId('save-property').click();
   await page.waitForSelector('[data-testid="listing-details"]');
@@ -4467,7 +4525,7 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
     assert.equal(await st.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(31, 138, 76)');
     const ph = await both.locator('.sc-photo').boundingBox(); const sb = await st.boundingBox();
     assert.ok(ph.x + ph.width - (sb.x + sb.width) <= 12 && sb.y - ph.y <= 12, `${layout}: AVAILABLE at the top right of the photo`);
-    assert.match(await cards.filter({ hasText: 'Jalan Sewa 2' }).getByTestId('card-status').innerText(), /SALE IN PROGRESS/);
+    assert.match(await cards.filter({ hasText: 'Jalan Sewa 2' }).getByTestId('card-status').innerText(), /BOOKED/);
     // Specification lines (owner, 17 Oct 2026): type line spaced, tenure next, rooms, land and built-up on one spaced line;
     // no parking and no availability.
     const spec = await both.getByTestId('card-spec').evaluateAll(xs => xs.map(x => [x.dataset.spec, [...x.querySelectorAll('.sc-part')].map(p => p.textContent.replace(/\u00a0/g, ' '))]));
@@ -4496,7 +4554,7 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
   await page.waitForSelector('[data-testid="listing-form"]');
   assert.equal(await page.getByTestId('listing-details').count(), 0, 'the card did not open as well');
   await expandForm(page);
-  assert.equal(await page.locator('[data-field="street"]').inputValue(), 'Jalan Sewa 2');
+  assert.equal(await streetValue(page), 'Jalan Sewa 2');
   assert.equal(await page.locator('[data-field="monthlyRent"]').inputValue(), '2,200');
   await page.locator('header .icon-btn').first().click();
   // The card body opens the property page.
@@ -4562,7 +4620,7 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   await nb.getByRole('button', { name: 'Others…' }).click();
   await nb.locator('.opt-new input').fill('Taman Bukit');
   await nb.getByRole('button', { name: 'Add' }).click();
-  await page.locator('[data-field="street"]').fill('Jalan Order 7');
+  await setStreet(page, 'Jalan Order 7');
   await page.locator('[data-field="unitNo"]').fill('No. 7');
   // Set a point, then Remove Position clears it.
   await page.getByTestId('gmap-add').click();
@@ -4593,7 +4651,7 @@ test('U118 Change 015 Add Location popup (as changed 17 Oct 2026): larger but no
   const page = await phone({ maps: true });
   await page.evaluate(() => { window.__geoCalls = 0; window.__placeCalls = 0; });
   await tile(page, 'Property List'); await newProperty(page);
-  await page.locator('[data-field="street"]').fill('Jalan Popup 1');
+  await setStreet(page, 'Jalan Popup 1');
   await page.getByTestId('gmap-add').click();
   const sheet = page.getByTestId('location-picker');
   await sheet.waitFor();
@@ -4646,7 +4704,7 @@ test('U121 owner 17 Oct 2026: Add Location search moves the pin; the card locati
   await c15Property(page, { street: 'jalan tiada lokasi 1/2a', purpose: 'sale' });
   await home(page);
   await tile(page, 'Property List'); await newProperty(page);
-  await page.locator('[data-field="street"]').fill('Jalan Ada Lokasi 5');
+  await setStreet(page, 'Jalan Ada Lokasi 5');
   await page.getByTestId('gmap-add').click();
   const sheet = page.getByTestId('location-picker'); await sheet.waitFor();
   await sheet.getByTestId('picker-search-input').fill('Nilai Square');
@@ -4711,7 +4769,8 @@ test('U119 Change 015 photos: no arrows or Remove button; a small menu with exac
   const ids0 = await photos.evaluateAll(xs => xs.map(x => x.dataset.photoId));
   await photos.nth(2).getByTestId('photo-menu').click();
   const items = await page.getByTestId('photo-menu-list').getByRole('menuitem').allInnerTexts();
-  assert.deepEqual(items, ['Make as Main Photo', 'Remove']);
+  // ClaudeChanges001 change 7: the menu says Set as Main Photo and Delete.
+  assert.deepEqual(items, ['Set as Main Photo', 'Delete']);
   await page.getByTestId('photo-make-main').click();
   assert.deepEqual(await photos.evaluateAll(xs => xs.map(x => x.dataset.photoId)), [ids0[2], ids0[0], ids0[1]]);
   assert.equal(await photos.first().getByTestId('photo-main').count(), 1);
@@ -4722,7 +4781,7 @@ test('U119 Change 015 photos: no arrows or Remove button; a small menu with exac
   assert.deepEqual(await photos.evaluateAll(xs => xs.map(x => x.dataset.photoId)), [ids0[2], ids0[0], ids0[1]], 'kept after reopening');
   // Remove the main photo: the next one becomes main.
   await photos.first().getByTestId('photo-menu').click();
-  await page.getByTestId('photo-remove').click();
+  await page.getByTestId('photo-remove').click(); await confirmPhotoDelete(page);
   assert.deepEqual(await photos.evaluateAll(xs => xs.map(x => x.dataset.photoId)), [ids0[0], ids0[1]]);
   assert.equal(await photos.first().getByTestId('photo-main').count(), 1);
   await page.getByTestId('save-property').click();
@@ -4730,7 +4789,7 @@ test('U119 Change 015 photos: no arrows or Remove button; a small menu with exac
   await waitStored(page, 'records', `all.some(v => v && v.headline === 'Photo house' && v.photos.length === 2 && v.mainPhotoId === ${JSON.stringify(ids0[0])})`);
   // Removing every photo leaves an empty, working photo section.
   await page.getByRole('button', { name: 'Edit' }).first().click(); await expandForm(page);
-  for (let i = 0; i < 2; i++) { await photos.first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click(); }
+  for (let i = 0; i < 2; i++) { await photos.first().getByTestId('photo-menu').click(); await page.getByTestId('photo-remove').click(); await confirmPhotoDelete(page); }
   assert.equal(await photos.count(), 0);
   assert.equal(await page.getByTestId('photo-grid').count(), 0, 'no empty photo grid');
   assert.equal(await page.getByTestId('photo-input').count(), 1, 'Add photos still there');

@@ -6,11 +6,11 @@ import type { Lang } from '../i18n';
 import type { Go, Screen } from '../nav';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
-import { RecordState, recordStateOf } from '../data/recordstate';
+import { recordStateOf } from '../data/recordstate';
 import { resolveConflict, confirmOwner } from '../data/sync';
 import { signOutRemote } from '../data/auth';
 import { runSync } from '../data/syncRunner';
-import { recordFileSummary, retryFile } from '../data/filesync';
+import { retryFile } from '../data/filesync';
 import { fileRefs } from '../data/fileRefs';
 import type { Revision } from '../data/store';
 import type { CollectionName, Conflict, FieldConflict } from '../data/types';
@@ -54,37 +54,19 @@ export function RecordStatus({ lang, collection, id, go }: { lang: Lang; collect
   const { state, store } = useApp();
   const s = saveStrings[lang].rec;
   const y = syncStrings[lang];
-  const [busy, setBusy] = useState(false);
-  // Read through the store each time anything changes (the state depends on the sync, the drafts and the record itself).
-  void state;
-  const st: RecordState = recordStateOf(store, collection, id);
+  // ClaudeChanges001 change 2 (owner, 17 Oct 2026): no sync status on individual records ("Saved on this phone", "Synced"…).
+  // A sync problem shows as the banner on the main page and in Notifications. What stays here is not a status: the way to
+  // the record's History (earlier versions can be restored), and "you can view but not change this" when that applies.
   const denied = state.meta.recErrors?.[`${collection}:${id}`] === 'denied';
-  const files = collection === 'properties' ? recordFileSummary(store, collection, id) : null;
   return (
-    <div className={`rec-status ${st}`} data-testid="record-status" data-state={st}>
+    <div className="rec-status plain" data-testid="record-status" data-state={recordStateOf(store, collection, id)}>
       <div className="between">
-        <span role={st === 'failed' ? 'alert' : 'status'}><span className="save-dot" aria-hidden="true" /> {s[st]}</span>
-        <span className="row-wrap">
-          {(st === 'failed' && !denied) && <button className="btn small secondary" disabled={busy} data-testid="rec-retry" onClick={async () => { setBusy(true); await runSync(store, config(store.getState().settings)); setBusy(false); }}>{busy ? y.syncing : s.retry}</button>}
-          {st === 'conflict' && <button className="btn small secondary" data-testid="rec-review" onClick={() => go({ name: 'syncReview' })}>{s.review}</button>}
-          <button className="btn small ghost" data-testid="rec-history" onClick={() => go({ name: 'history', collection, id })}>{y.history}</button>
-        </span>
+        <span />
+        <button className="btn small ghost" data-testid="rec-history" onClick={() => go({ name: 'history', collection, id })}>{y.history}</button>
       </div>
       {denied && <small className="warn-text">{s.denied}</small>}
-      {files && files.total > 0 && <FilesLine lang={lang} summary={files} />}
     </div>
   );
-}
-
-function FilesLine({ lang, summary }: { lang: Lang; summary: ReturnType<typeof recordFileSummary> }) {
-  const y = syncStrings[lang];
-  const bits = [y.fileLine(summary.uploaded, summary.total - summary.ownerOnly)];
-  if (summary.ownerOnly) bits.push(y.fileOwnerOnly(summary.ownerOnly));
-  if (summary.waiting) bits.push(y.fileWaiting(summary.waiting));
-  if (summary.failed) bits.push(y.fileFailed(summary.failed));
-  if (summary.missing) bits.push(y.fileMissing(summary.missing));
-  if (summary.denied) bits.push(y.fileDenied(summary.denied));
-  return <small className="muted" data-testid="files-line">{y.files}: {bits.join(' · ')}</small>;
 }
 
 /** A small label for a picture or document that is not on this phone (or not in the cloud). */

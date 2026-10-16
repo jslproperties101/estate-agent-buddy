@@ -137,7 +137,8 @@ test('C15-8 location labels and order in every language: City, Township, Neighbo
   // The form and the property page list the fields in this order.
   const form = readFileSync('src/listing/ListingForm.tsx', 'utf8');
   const sec = form.slice(form.indexOf('<Sec id="location"'), form.indexOf('{/* 4. Photos */}'));
-  const order = ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo'].map(k => sec.indexOf(`k: '${k}'`));
+  // ClaudeChanges001 change 5: the levels from Country to Street are drawn by Loc('<level>', …); Unit/Lot by Text({ k: 'unitNo' }).
+  const order = ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo'].map(k => Math.max(sec.indexOf(`k: '${k}'`), sec.indexOf(`Loc('${k}'`)));
   assert.ok(order.every(i => i > 0), 'every location field is on the form');
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'form order');
   const view = readFileSync('src/listing/ListingUI.tsx', 'utf8');

@@ -14,12 +14,14 @@ export type VerifyState = (typeof VERIFY_STATES)[number];
 // an old mark stored on a record is kept on the record, it is just not shown or counted).
 // Owner, 17 Oct 2026: Asking Price and Monthly Rent have no check status any more (no picker on the form, not counted
 // as "to check"); their values and every calculation are unchanged, and an old mark stays on the record, unshown.
+// ClaudeChanges001 (owner, 17 Oct 2026): Commission (RM) and Availability have no check status any more (changes 3 and 8);
+// their stored marks are removed when the property is saved (ListingForm).
 export const VERIFIABLE_FIELDS = [
-  'maintenanceFee', 'commissionFlat', 'rentCommissionMonths', 'rentCommissionFlat',
+  'maintenanceFee', 'rentCommissionMonths', 'rentCommissionFlat',
   'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction',
   'landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'lotType', 'bedrooms', 'bathrooms', 'floors', 'parking', 'furnishing',
   'ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse',
-  'condition', 'availability', 'ownerName', 'ownerPhone',
+  'condition', 'ownerName', 'ownerPhone',
 ] as const;
 export type VerifiableField = (typeof VERIFIABLE_FIELDS)[number];
 export const isVerifiable = (k: string): k is VerifiableField => (VERIFIABLE_FIELDS as readonly string[]).includes(k);

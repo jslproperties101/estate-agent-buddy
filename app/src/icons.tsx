@@ -55,3 +55,6 @@ export const IconLogo = ({ size = 28, big, splash }: P & { big?: boolean; splash
 export const IconCreative = svg('M4 6h11v12H4zM4 15l3.5-3.5 3 3 2-2 2.5 2.5M8.5 9.5h0M18 3l.8 2.2L21 6l-2.2.8L18 9l-.8-2.2L15 6l2.2-.8z');
 export const IconMatch = svg('M7 10a3 3 0 100-6 3 3 0 000 6zM2 20a5 5 0 0110 0M14 13l4-3.5 4 3.5M15 12.5V20h6v-7.5M10.5 13.5h3M12.5 11.5l2 2-2 2');
 export const IconGlobe = svg('M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3z');
+// ClaudeChanges001 change 12: Calendar and To-do in one tile, and Track My Sales.
+export const IconAgenda = svg('M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M7.5 14.5l1.5 1.5 3-3M14 15h3');
+export const IconSales = svg('M4 20h16M6.5 16.5v-3M10.5 16.5v-6M14.5 16.5v-4M18.5 16.5V7M4.5 11l5-4.5 4 3 6-5');

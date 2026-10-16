@@ -22,6 +22,10 @@ import { shownState, VerifyState } from './verify';
 import { Change } from './commands';
 import { adStrings } from '../adverts/strings';
 import { photoStrings } from '../photos/strings';
+import { PhotoViewer } from '../ui/PhotoViewer';
+import { cc001Strings } from '../ui/cc001Strings';
+import { availChoice } from './cc001';
+import { DealLinks } from '../deals/DealUI';
 import { marketingStrings } from '../marketing/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { PropertyBuyersCard } from '../contacts/MatchUI';
@@ -72,12 +76,6 @@ export function PriceLine({ l, s, short }: { l: Listing; s: ListingStrings; shor
   return <>{sale}{sale && rent ? ' · ' : null}{rent}</>;
 }
 
-function availabilityText(l: Listing, s: ListingStrings, lang: Lang): string | undefined {
-  if (!l.availability) return undefined;
-  if (l.availability === 'from_date' && l.availableFrom) return s.availableFrom(monthText(l.availableFrom, lang));
-  if (l.availability === 'tenanted' && l.tenancy?.end) return s.tenantedUntil(monthText(l.tenancy.end, lang));
-  return s.availability[l.availability];
-}
 
 /** Tenure together with the restriction, then storeys and lot type (Change 009). Each value in its check colour. */
 function TenureLine({ l, s, noStoreys }: { l: Listing; s: ListingStrings; noStoreys?: boolean }) {
@@ -90,7 +88,7 @@ function TenureLine({ l, s, noStoreys }: { l: Listing; s: ListingStrings; noStor
   const more: JSX.Element[] = [];
   // Change 015: on Subsale List cards storeys and lot type are in the specification lines instead.
   if (!noStoreys && l.floors !== undefined) more.push(<VVal key="floors" l={l} k="floors">{`${l.floors} ${s.l.floors}`}</VVal>);
-  if (!noStoreys && l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType]}</span>);
+  if (!noStoreys && l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType] ?? l.lotType}</span>);
   if (!parts.length && !more.length) return null;
   return (
     <span className="lc-tenure" data-testid="card-tenure">
@@ -286,6 +284,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const [askDelete, setAskDelete] = useState(false);
   const [askPermanent, setAskPermanent] = useState(false);
   const [askRequest, setAskRequest] = useState(false);
+  const [viewer, setViewer] = useState<number | null>(null);
   const toast = useToast();
   const ts = teamStrings[lang];
   if (!l) return <p className="muted">{s.none}</p>;
@@ -344,7 +343,10 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         </div>
       )}
       <div className="lc-card">
-        <span className="lc-photo tall">
+        {/* ClaudeChanges001 change 7: the layout stays; a tap on the photo opens it full screen (pinch to zoom, swipe). */}
+        <span className="lc-photo tall" role={photos.length ? 'button' : undefined} tabIndex={photos.length ? 0 : undefined} data-testid="detail-photo"
+          aria-label={photos.length ? cc001Strings[lang].photo.open(Math.max(1, photos.findIndex(p => p.id === shownPhoto.id) + 1)) : undefined}
+          onClick={() => { if (photos.length) setViewer(Math.max(0, photos.findIndex(p => p.id === shownPhoto.id))); }}>
           <StoredImage fileId={shownPhoto.fileId} url={shownPhoto.url} />
           <span className="lc-shade" /><span className="lc-badges"><Badges l={l} s={s} /></span>
           {shownPhoto.sample && <span className="lc-sample">{s.samplePic}</span>}
@@ -413,9 +415,17 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       <SectionCard title={s.sec.basics} onEdit={edit('basics')} editLabel={EL} testId="sec-basics">
         <dl className="dl">
           <div className="dl-row" data-testid="ref-row"><dt>{s.l.ref}</dt><dd className="ref-text">{l.ref || <span className="muted">{s.notSet}</span>}</dd></div>
+          {/* ClaudeChanges001: Availability (Status merged into it), then type, purpose and the arrangement. */}
+          {(() => { const ch = availChoice(l); return ch ? <div className="dl-row" data-row="availability"><dt>{cc001Strings[lang].avail.label}</dt><dd data-testid="detail-availability">{ch === 'available_from' && l.availableFrom ? s.availableFrom(monthText(l.availableFrom, lang)) : cc001Strings[lang].avail[ch]}</dd></div> : null; })()}
           {row('type', typeLabel(s, l.type))}{row('purpose', l.purpose && s.purpose[l.purpose])}
+          {row('arrangement', l.arrangement && (cc001Strings[lang].arrangement[l.arrangement] ?? s.arrangement[l.arrangement]))}
+          {l.arrangement === 'cobroke' && l.cobroke && <>
+            {row('cobrokeAgent', [l.cobroke.name, l.cobroke.phone, l.cobroke.whatsapp].filter(Boolean).join(' · ') || undefined)}
+            {row('cobrokeAgency', l.cobroke.agency)}
+          </>}
         </dl>
       </SectionCard>
+      <DealLinks lang={lang} l={l} go={go} />
 
       {/* Change 009: one section for price, commission, rent and deposits with tenure and title. */}
       <SectionCard title={s.sec.tenure} onEdit={edit('tenure')} editLabel={EL} testId="sec-tenure-view">
@@ -427,7 +437,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
               {numRow('securityDepositMonths', s.months)}{numRow('utilityDepositMonths', s.months)}</>}
             {row('tenure', l.tenure && s.tenure[l.tenure])}{row('leaseExpiryYear', l.leaseExpiryYear)}
             {yrs !== undefined && <div className="dl-row"><dt /><dd className="ok-text">{s.yearsLeft(yrs)}</dd></div>}
-            {row('titleType', l.titleType && (s.titleTypes[l.titleType] ?? l.titleType))}{row('landUse', l.landUse && s.landUse[l.landUse])}{row('restriction', restriction && (s.restrictions[restriction] ?? restriction))}
+            {row('titleType', l.titleType && (s.titleTypes[l.titleType] ?? l.titleType))}{row('landUse', l.landUse && (s.landUse[l.landUse] ?? l.landUse))}{row('restriction', restriction && (s.restrictions[restriction] ?? restriction))}
           </dl>
         ) : empty}
         {comm !== undefined && <small className="muted" data-testid="detail-commission">{s.commission(rm(comm))}</small>}
@@ -437,7 +447,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       </SectionCard>
 
       <SectionCard title={s.sec.photos} onEdit={edit('photos')} editLabel={EL} testId="sec-photos-view">
-        {photos.length ? <div className="photo-strip">{photos.map(p => <button key={p.id} onClick={() => setPhotoId(p.id)} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div> : empty}
+        {photos.length ? <div className="photo-strip">{photos.map((p, i) => <button key={p.id} data-testid="strip-photo" onClick={() => { setPhotoId(p.id); setViewer(i); }} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div> : empty}
         {photos.length > 0 && <button className="btn small secondary" onClick={() => go({ name: 'photoStudio', propertyId: l.id, photoId: shownPhoto.id })} data-testid="open-photo-studio">🖼️ {photoStrings[lang].open}</button>}
       </SectionCard>
 
@@ -459,12 +469,13 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       </SectionCard>
 
       <SectionCard title={s.sec.details} onEdit={edit('details')} editLabel={EL} testId="sec-details-view">
-        {hasAny(l.landSqft, l.builtUpSqft, l.frontageFt, l.depthFt, l.bedrooms, l.bathrooms, l.floors, l.parking, l.lotType, l.furnishing, l.maintenanceFee, l.extraComments) ? (
+        {hasAny(l.landSqft, l.builtUpSqft, l.frontageFt, l.depthFt, l.bedrooms, l.bathrooms, l.floors, l.parking, l.lotType, l.furnishing, l.condition, l.maintenanceFee, l.extraComments) ? (
           <dl className="dl">
             {numRow('landSqft', landText)}{numRow('builtUpSqft', sqft)}
             {l.frontageFt !== undefined || l.depthFt !== undefined ? row('frontageFt', `${l.frontageFt ?? '?'} ft × ${l.depthFt ?? '?'} ft`) : null}
             {numRow('bedrooms')}{numRow('bathrooms')}{numRow('floors')}{numRow('parking')}
-            {row('lotType', l.lotType && s.lotType[l.lotType])}{row('furnishing', l.furnishing && s.furnishing[l.furnishing])}
+            {row('lotType', l.lotType && (s.lotType[l.lotType] ?? l.lotType))}{row('furnishing', l.furnishing && (s.furnishing[l.furnishing] ?? l.furnishing))}
+            {row('condition', l.condition && (s.condition[l.condition] ?? l.condition))}
             {numRow('maintenanceFee', rm)}
           </dl>
         ) : empty}
@@ -481,12 +492,6 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         </SectionCard>
       )}
 
-      <SectionCard title={s.sec.availability} onEdit={edit('availability')} editLabel={EL}>
-        {hasAny(l.availability, l.condition, l.features) ? (
-          <dl className="dl">{row('availability', availabilityText(l, s, lang))}{row('condition', l.condition && s.condition[l.condition])}{row('features', l.features)}</dl>
-        ) : empty}
-      </SectionCard>
-
       <SectionCard title={s.sec.owner} onEdit={edit('owner')} editLabel={EL}>
         {owner ? <dl className="dl">{row('ownerName', owner)}{row('ownerPhone', phone)}{row('ownerWhatsapp', whatsapp)}</dl> : empty}
         {vendor && <button className="btn small ghost" onClick={() => go({ name: 'contactDetail', id: vendor.id })}>{s.vendorLinked} →</button>}
@@ -494,14 +499,6 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
       {/* Change 009: Building specifications come after Owner / vendor. */}
       {specsCard}
-
-      <SectionCard title={s.sec.arrangement} onEdit={edit('arrangement')} editLabel={EL}>
-        <dl className="dl">
-          {row('status', l.status && s.status[l.status])}{l.status === 'in_progress' ? row('handledBy', l.handledBy) : null}
-          {row('arrangement', l.arrangement && s.arrangement[l.arrangement])}{row('arrangementNote', l.arrangementNote)}
-        </dl>
-        {!hasAny(l.status, l.arrangement) && empty}
-      </SectionCard>
 
       <SectionCard title={s.sec.banner} onEdit={edit('banner')} editLabel={EL} testId="sec-banner-view">
         {(() => {
@@ -553,6 +550,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       )}
       {/* Change 010: View History, collapsed, always last. */}
       {!l.sample && <ViewHistory lang={lang} collection="properties" id={l.id} go={go} />}
+      {viewer !== null && photos.length > 0 && <PhotoViewer lang={lang} photos={photos} start={viewer} onClose={() => setViewer(null)} />}
     </section>
   );
 }
@@ -600,7 +598,7 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
   const label = cardTitle(l) || s.untitled;
   const p = mainPhoto(l)!;
   const tx = transactionLabels(l);
-  const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] : undefined });
+  const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] ?? l.lotType : undefined });
   const { check, missing } = checkAndMissing(l);
   const [menu, setMenu] = useState(false);
   const [bubble, setBubble] = useState(false);

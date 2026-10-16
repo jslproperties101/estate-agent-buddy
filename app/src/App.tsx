@@ -7,7 +7,10 @@ import { Store, AccessError } from './data/store';
 import { StoreContext, useApp, useSaveState } from './data/useStore';
 import { Screen, Go } from './nav';
 import { ToastContext, ToastKind, TOAST_OK_MS, TOAST_ERROR_MS } from './ui/toast';
-import { SaveStatus } from './ui/SaveStatus';
+import { SyncBanner } from './ui/SyncBanner';
+import { DealScreen, TrackSalesScreen } from './deals/DealUI';
+import { cc001Strings } from './ui/cc001Strings';
+import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
 import { beginStartup, startupLang, StartupPhase } from './startup/startup';
 import { startupStrings } from './startup/strings';
@@ -51,7 +54,7 @@ import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
-  IconBack, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
+  IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
   IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconMarket, IconCreative, IconMatch, IconGlobe,
 } from './icons';
 import { BottomAd } from './adverts/AdBar';
@@ -64,7 +67,7 @@ import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
 import { configured, holdsOtherWorkspaceData, ownerUnknownWithData } from './data/sync';
-import { runSync } from './data/syncRunner';
+import { runSync, setNextAutoSync } from './data/syncRunner';
 import { syncStrings } from './sync/strings';
 import { SyncReviewScreen, HistoryScreen, RecentlyDeletedScreen, DraftsList, OtherWorkspaceScreen, OwnerUnknownScreen } from './sync/SyncUI';
 import { pendingFileCount } from './data/savestate';
@@ -96,8 +99,9 @@ if (typeof window !== 'undefined') captureInviteFromUrl();
  *  the top bar, beside the language button), 12 Market Intelligence, 14 Subsale List (the property list, bottom centre).
  *  No card carries a Coming Soon label any more; Project and Market Intelligence still open honest "not built yet" screens. */
 export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] = [
-  { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
-  { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
+  // ClaudeChanges001 change 12: Calendar and To-do in one tile (it asks which), and Track My Sales in the Calendar's place.
+  { key: 'agenda', icon: () => <IconAgenda />, target: { name: 'calendar' } },
+  { key: 'sales', icon: () => <IconSales />, target: { name: 'trackSales' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
   { key: 'creative', icon: () => <IconCreative />, target: { name: 'creativeMedia' } },
   { key: 'contacts', icon: () => <IconContacts />, target: { name: 'contactsHome' } },
@@ -186,7 +190,8 @@ function useAutoSync() {
       finally { busy.current = false; }
     };
     void run(true);
-    const t = setInterval(() => void run(), 60_000);
+    setNextAutoSync(Date.now() + 60_000);
+    const t = setInterval(() => { setNextAutoSync(Date.now() + 60_000); void run(); }, 60_000);
     const online = () => void run(true);
     window.addEventListener('online', online);
     return () => { clearInterval(t); window.removeEventListener('online', online); };
@@ -290,12 +295,11 @@ function Shell() {
       <div className="shell">
         <header className={screen.name === 'home' ? 'topbar home' : 'topbar'}>
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
-          {/* Change 011: the title at the very top, and "Saved on This Phone" straight under it (no separate line any more). */}
+          {/* ClaudeChanges001 change 2: no "Saved on This Phone" line under the title; a problem shows as a banner on the main page. */}
           <div className="title-col">
             {screen.name === 'home'
               ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
               : <h1>{title}</h1>}
-            <SaveStatus lang={lang} />
           </div>
           {screen.name === 'home' && <>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
@@ -406,6 +410,8 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'auditSearch': return auditStrings[lang].searchTitle;
     case 'exports': return exportStrings[lang].manageTitle;
     case 'auditExport': return exportStrings[lang].exportTitle;
+    case 'deal': { const d = cc001Strings[lang].deal; return s.kind === 'booking' ? d.titleBooking : s.kind === 'sale' ? d.titleSale : s.kind === 'rental' ? d.titleRental : d.titleOthers; }
+    case 'trackSales': return cc001Strings[lang].sales.title;
   }
 }
 
@@ -483,6 +489,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'auditSearch': return <AuditSearchScreen key={`${s.collection ?? ''}:${s.id ?? ''}`} lang={lang} go={go} collection={s.collection} id={s.id} />;
     case 'exports': return <ExportManagementScreen lang={lang} go={go} section={s.section} />;
     case 'auditExport': return <AuditExportScreen key={s.keys.join(',')} lang={lang} go={go} keys={s.keys} person={s.person} actions={s.actions} />;
+    case 'deal': return <DealScreen key={`${s.propertyId}-${s.kind}`} lang={lang} propertyId={s.propertyId} kind={s.kind} go={go} back={back} />;
+    case 'trackSales': return <TrackSalesScreen lang={lang} go={go} />;
   }
 }
 
@@ -492,18 +500,29 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
   const t = strings[lang];
   const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
+  const x1 = cc001Strings[lang];
+  const [askAgenda, setAskAgenda] = useState(false);
+  const tileLabel = (key: string) => t.tiles[key];
   return (
     <section className="stack home">
+      {/* ClaudeChanges001 change 2: below the header line, above the cards, only when something did not sync. */}
+      <SyncBanner lang={lang} onReview={() => go({ name: 'syncReview' })} />
       <WorkspaceSwitch lang={lang} />
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
-          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => go(tile.target)}
-            aria-label={t.tiles[tile.key]}>
-            <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{t.tiles[tile.key]}</span>
+          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
+            aria-label={tileLabel(tile.key)}>
+            <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
           </button>
         ))}
       </nav>
+      {askAgenda && (
+        <ChoiceDialog lang={lang} title={x1.agendaQ} testId="agenda-ask" onCancel={() => setAskAgenda(false)} choices={[
+          { label: x1.calendar, primary: true, testId: 'agenda-calendar', onPick: () => { setAskAgenda(false); go({ name: 'calendar' }); } },
+          { label: x1.todo, primary: true, testId: 'agenda-todo', onPick: () => { setAskAgenda(false); go({ name: 'todo' }); } },
+        ]} />
+      )}
     </section>
   );
 }

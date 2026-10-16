@@ -1,5 +1,5 @@
 // Name + phone number + WhatsApp alias, the same way everywhere a property captures a person (owner, tenant), Change 009.
-//  - The phone-book icon sits at the end of the NAME row: tap it, Android asks for Contacts permission (the system prompt,
+//  - The phone-book icon sits at the end of the NAME row and of the PHONE row (ClaudeChanges001): tap it, Android asks for Contacts permission (the system prompt,
 //    not a "go to Settings" message), then its contact picker opens; name and number land in the normal boxes and stay
 //    editable. A refused permission, a closed picker or a browser without a phone book each say so under the row.
 //  - The phone box shows a ready "+"; the WhatsApp box a ready "@". They are display prefixes: what is stored is the number
@@ -64,21 +64,24 @@ export function ContactBox({ lang, idPrefix, labels, value, onChange, onPicked, 
         </div>
         {msg && <p className={msg.error ? 'error pb-msg' : 'muted small pb-msg'} role={msg.error ? 'alert' : 'status'} data-testid={`${idPrefix}-pick-msg`}>{msg.text}</p>}
       </div>
-      <div className="two">
-        <div className="ff">
-          <label htmlFor={`${idPrefix}-phone`}>{labels.phone}</label>
-          <div className="prefixed"><span className="prefix" aria-hidden="true">+</span>
+      {/* ClaudeChanges001 change 9: the phone and the WhatsApp username each have their own full line; the phone book
+          icon is on the phone row too (either one fills both name and number); the "@" sits inside the typing box. */}
+      <div className="ff">
+        <label htmlFor={`${idPrefix}-phone`}>{labels.phone}</label>
+        <div className="combo">
+          <div className="prefixed grow"><span className="prefix" aria-hidden="true">+</span>
             <input id={`${idPrefix}-phone`} data-field={f.phone} type="tel" inputMode="tel" autoComplete="off" placeholder={phonePh}
               value={(value.phone ?? '').replace(/^\+/, '')} onChange={e => onChange({ phone: phoneTyped(e.target.value) })}
               onBlur={() => onChange({ phone: normalisePhone(value.phone) })} />
           </div>
+          <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={pickLabel} title={pickLabel} aria-busy={busy} data-testid={`${idPrefix}-pick-phone`}><PhonebookIcon /></button>
         </div>
-        <div className="ff">
-          <label htmlFor={`${idPrefix}-wa`}>{labels.whatsapp}</label>
-          <div className="prefixed"><span className="prefix" aria-hidden="true">@</span>
-            <input id={`${idPrefix}-wa`} data-field={f.whatsapp} autoComplete="off" autoCapitalize="none" placeholder={whatsappPh}
-              value={(value.whatsapp ?? '').replace(/^@+/, '')} onChange={e => onChange({ whatsapp: aliasValue(e.target.value) })} />
-          </div>
+      </div>
+      <div className="ff">
+        <label htmlFor={`${idPrefix}-wa`}>{labels.whatsapp}</label>
+        <div className="prefixed inside"><span className="prefix" aria-hidden="true">@</span>
+          <input id={`${idPrefix}-wa`} data-field={f.whatsapp} autoComplete="off" autoCapitalize="none" placeholder={whatsappPh}
+            value={(value.whatsapp ?? '').replace(/^@+/, '')} onChange={e => onChange({ whatsapp: aliasValue(e.target.value) })} />
         </div>
       </div>
       {suggestions.length > 0 && (

@@ -63,7 +63,13 @@ export type Screen =
   | { name: 'manageSharing'; focus?: string }
   | { name: 'auditSearch'; collection?: CollectionName; id?: string }
   | { name: 'exports'; section?: 'saved' | 'deleted' }
-  | { name: 'auditExport'; keys: string[]; person?: string; actions?: ('edit' | 'delete' | 'restore' | 'permission' | 'membership' | 'export')[] };
+  | { name: 'auditExport'; keys: string[]; person?: string; actions?: ('edit' | 'delete' | 'restore' | 'permission' | 'membership' | 'export')[] }
+  // ClaudeChanges001: the Booked / Sold / Rented pages and Track My Sales
+  | { name: 'deal'; propertyId: string; kind: DealKind }
+  | { name: 'trackSales' };
+
+/** Which deal page (ClaudeChanges001 change 11). */
+export type DealKind = 'booking' | 'sale' | 'rental' | 'others';
 
 /** Opens a screen. With replace, the current screen is not kept for Back (used after saving a form). */
 export type Go = (s: Screen, opts?: { replace?: boolean }) => void;

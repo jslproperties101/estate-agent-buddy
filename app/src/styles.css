@@ -1057,3 +1057,49 @@ html { background: #000; }
 .sc-grid .sc-txs .sc-tx { font-size: 8px; padding: 1px 2px; letter-spacing: -.02em; line-height: 1.15; white-space: nowrap; }
 .sc-grid .sc-status { top: 3px; right: 3px; max-width: 52%; font-size: 8px; padding: 1px 3px; line-height: 1.15; letter-spacing: -.02em;
   overflow-wrap: normal; word-break: normal; text-align: right; }
+
+/* ---------- ClaudeChanges001 (owner, 17 Oct 2026) ---------- */
+/* Change 2: the one sync banner on the main page, below the header line and above the cards. */
+.sync-banner { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; border-radius: 12px; font-size: 15px; font-weight: 700; text-align: left;
+  border: 1px solid #8A6A1C; background: #2A1F08; color: #F3DFA6; }
+.sync-banner.failed[role="alert"] { border-color: #9B3B30; background: #2A0F0C; color: #F6C2BA; }
+button.sync-banner { cursor: pointer; }
+/* Change 9: the "@" inside the WhatsApp username box. */
+.prefixed.inside { position: relative; display: block; }
+.prefixed.inside .prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); border: 0; background: none; padding: 0; pointer-events: none; font-size: 17px; }
+.prefixed.inside input { padding-left: 32px; border-radius: 10px; width: 100%; }
+.combo .prefixed { flex: 1 1 auto; min-width: 0; }
+/* Change 7: photos one per row; smaller drag handle and menu buttons (the touch area stays 44 px); tap opens full screen. */
+.photo-grid.photo-list { grid-template-columns: 1fr; gap: 10px; }
+.photo-list .pg-item img, .photo-list .pg-item .img-wait { height: auto; aspect-ratio: 4 / 3; max-height: 70vh; object-fit: cover; }
+.pg-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photo-list .pg-handle { top: 0; left: 0; width: 44px; height: 44px; border: 0; background: transparent; font-size: 0; }
+.photo-list .pg-handle::before { content: '⠿'; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 4px; border-radius: 7px;
+  background: rgba(0,0,0,.72); border: 1px solid var(--line-2); color: var(--gold-hi); font-size: 14px; }
+.photo-list .pg-menu-wrap { top: 0; right: 0; }
+.photo-list .pg-menu-btn { width: 44px; height: 44px; border: 0; background: transparent; font-size: 0; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px; }
+.photo-list .pg-menu-btn::before { content: '⋮'; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px;
+  background: rgba(8,8,10,.85); border: 1px solid var(--line-2); color: var(--gold-hi); font-size: 15px; font-weight: 800; }
+.lc-photo[role="button"] { cursor: zoom-in; }
+/* Change 7: full-screen photo viewer */
+.pv { position: fixed; inset: 0; z-index: 60; background: #000; display: flex; flex-direction: column; touch-action: none; user-select: none; }
+.pv-top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; color: #fff; }
+.pv-count { font-weight: 700; }
+.pv-btn { min-width: 48px; min-height: 48px; border-radius: 24px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.5); color: #fff; font-size: 24px; line-height: 1; }
+.pv-btn:disabled { opacity: .3; }
+.pv-stage { flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.pv-img { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center center; will-change: transform; }
+.pv-img img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.pv-nav { position: absolute; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: space-between; padding: 0 16px; pointer-events: none; }
+.pv-nav .pv-btn { pointer-events: auto; }
+/* Change 12: Track My Sales */
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi { border: 1px solid var(--line-2); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px; background: var(--card-2); min-width: 0; }
+.kpi strong { color: var(--gold-hi); font-size: 18px; overflow-wrap: anywhere; }
+.two-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.two-wrap > * { flex: 1 1 140px; }
+.deal-row { border-top: 1px solid var(--line-2); padding-top: 8px; }
+/* Change 2: the record line keeps only its History button (no status words). */
+.rec-status.plain { border: 0; background: none; padding: 0; }
+/* Change 7: Delete in the photo menu is red. */
+.pg-menu button.danger-text { color: var(--red); }

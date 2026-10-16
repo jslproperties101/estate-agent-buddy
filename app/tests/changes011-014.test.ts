@@ -132,7 +132,8 @@ test('C13-1 PDF photos sit in the middle of their frame at their own shape — p
 test('C14-1 check status: Frontage, Depth, Lot Type and the building specifications have one each; Other Specification and the commission type / percentage do not', () => {
   for (const k of ['frontageFt', 'depthFt', 'lotType', 'ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse']) assert.ok(isVerifiable(k), `${k} has a check status`);
   for (const k of ['specs', 'commissionType', 'commissionPct']) assert.ok(!isVerifiable(k), `${k} has no check status`);
-  assert.ok(VERIFIABLE_FIELDS.includes('commissionFlat'), 'only Commission Type and Commission Percentage lost theirs');
+  // ClaudeChanges001 change 3 (owner, 17 Oct 2026): Commission (RM) lost its check status too.
+  assert.ok(!(VERIFIABLE_FIELDS as readonly string[]).includes('commissionFlat'), 'Commission (RM) has no check status since ClaudeChanges001');
   // each field keeps its own status
   let l = { id: 'p', created: 1, updated: 1, photos: [], ceilingFt: 28, zoning: 'Industrial' } as Listing;
   l = withVerification(withVerification(l, 'ceilingFt', 'confirmed'), 'zoning', 'unknown');

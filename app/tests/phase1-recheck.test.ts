@@ -59,7 +59,8 @@ test('R3 the Phase 1 screens have the same wording keys in English, Bahasa Malay
 });
 
 test('R4 the dashboard has 15 cards in the order of Change 011 / 013 (owner, 16 Oct 2026); Settings, News, Co-broke and Agent Profile are not cards', () => {
-  assert.deepEqual(TILES.map(t => t.key), ['todo', 'calendar', 'opportunities', 'creative', 'contacts', 'activity', 'gps', 'finance', 'calculator', 'matching', 'expert', 'market', 'project', 'property', 'voice']);
+  // ClaudeChanges001 change 12: card 1 is Calendar & To-Do (it asks which), card 2 is Track My Sales.
+  assert.deepEqual(TILES.map(t => t.key), ['agenda', 'sales', 'opportunities', 'creative', 'contacts', 'activity', 'gps', 'finance', 'calculator', 'matching', 'expert', 'market', 'project', 'property', 'voice']);
   assert.equal(TILES.findIndex(t => t.key === 'creative') + 1, 4, 'Creative Media is card 4');
   assert.equal(TILES.findIndex(t => t.key === 'property') + 1, 14, 'the Subsale List is card 14, bottom centre');
   assert.equal(strings.en.tiles.property, 'Subsale List');

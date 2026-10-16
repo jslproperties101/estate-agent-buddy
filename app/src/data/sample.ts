@@ -23,7 +23,7 @@ export function sampleData(now = Date.now()) {
       landSqft: 8000, builtUpSqft: 6500, frontageFt: 60, depthFt: 133, floors: 2, parking: 4, ceilingFt: 28, powerKva: 150, loadingBays: 1,
       lotType: 'corner', tenure: 'freehold', titleType: 'Individual title', landUse: 'industry', restriction: 'NON Bumiputera',
       askingPrice: 3200000, negotiable: 'yes', commissionPct: 2, maintenanceFee: 350, availability: 'immediate', condition: 'good',
-      features: '2-storey office, 28 ft ceiling, 150 kVA, wide side land.', status: 'available', vendorId: 'v1', arrangement: 'direct',
+      status: 'available', vendorId: 'v1', arrangement: 'direct',
       notes: 'Owner open to offers. Keys with guard house.',
       extraComments: 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).',
       verification: { tenure: 'confirmed', titleType: 'confirmed', landSqft: 'confirmed', builtUpSqft: 'check', frontageFt: 'confirmed', ownerPhone: 'confirmed' },
@@ -37,7 +37,7 @@ export function sampleData(now = Date.now()) {
       unitNo: 'No. 6', purpose: 'sale', type: 'Semi-D factory',
       state: NS, city: 'Nilai', township: 'Kawasan Perindustrian Nilai', street: 'Jalan Sampel Industri 1', landSqft: 8000, builtUpSqft: 6200, parking: 3,
       lotType: 'intermediate', tenure: 'freehold', askingPrice: 3050000, negotiable: 'no', commissionPct: 2, availability: 'immediate',
-      status: 'in_progress', handledBy: 'Negotiator B (sample)', verification: { tenure: 'check', builtUpSqft: 'owner', landSqft: 'unknown' }, vendorId: 'v2', arrangement: 'cobroke', arrangementNote: 'Co-broke with Agency M (sample)', marketing: noAds,
+      status: 'in_progress', verification: { tenure: 'check', builtUpSqft: 'owner', landSqft: 'unknown' }, vendorId: 'v2', arrangement: 'cobroke', cobroke: { name: 'Agent M (sample)', agency: 'Agency M (sample)' }, marketing: noAds,
     }),
     mk('s3', 1003, {
       unitNo: 'Lot 21', purpose: 'sale', type: 'Detached factory',

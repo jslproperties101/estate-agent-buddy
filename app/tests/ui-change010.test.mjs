@@ -32,6 +32,25 @@ before(async () => {
 after(async () => { await browser?.close(); server?.close(); });
 
 const shot = (page, name, fullPage = false) => page.screenshot({ path: `${SHOTS}${name}.png`, fullPage });
+
+/** ClaudeChanges001 change 5: Street is a remembered dropdown (saved under the levels above it), not a text box. Types the
+ *  value in the list's search box and adds it ("Add …"), or picks it when it is already in the list. */
+async function setStreet(page, value) {
+  const box = page.locator('[data-testid="opt-street"]');
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  const v = String(value ?? '');
+  if (!v) { await box.getByRole('option').first().click(); return; }
+  await page.getByTestId('opt-street-search').fill(v);
+  const add = page.getByTestId('opt-street-add');
+  if (await add.count()) await add.click();
+  else await box.getByRole('option', { name: v, exact: true }).click();
+}
+/** The Street shown on the form (ClaudeChanges001). */
+async function streetValue(page) {
+  const t = (await page.locator('[data-testid="opt-street"] .opt-btn').innerText()).replace(/\s*▾\s*$/, '').trim();
+  return ['not set', 'belum ditetapkan', '未设置'].includes(t.toLowerCase()) ? '' : t;
+}
+
 async function waitFor(f, timeout = 10000) { const end = Date.now() + timeout; while (!(await f())) { if (Date.now() > end) throw new Error('timed out'); await new Promise(r => setTimeout(r, 50)); } }
 
 /** A phone signed in as `email` against `cloud`, holding `records` (key → value) of its own. */
@@ -293,7 +312,7 @@ test('C9 View History: collapsed at the bottom, exact before/after, actor and Ma
   await a.page.getByRole('button', { name: 'Edit', exact: true }).first().click();
   await a.page.waitForSelector('[data-testid="listing-form"]');
   if ((await a.page.getByTestId('toggle-all').innerText()).match(/Open/)) await a.page.getByTestId('toggle-all').click();
-  await a.page.locator('[data-field="street"]').fill('Jalan Aina 99');
+  await setStreet(a.page, 'Jalan Aina 99');
   await a.page.getByTestId('save-property').click();
   if (await a.page.getByRole('alertdialog').count()) await a.page.getByRole('alertdialog').getByRole('button').last().click();
   await a.page.getByTestId('listing-details').waitFor();
@@ -326,7 +345,7 @@ async function editStreet(page, value) {
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
   await page.waitForSelector('[data-testid="listing-form"]');
   if ((await page.getByTestId('toggle-all').innerText()).match(/Open/)) await page.getByTestId('toggle-all').click();
-  await page.locator('[data-field="street"]').fill(value);
+  await setStreet(page, value);
   await page.getByTestId('save-property').click();
   if (await page.getByRole('alertdialog').count()) await page.getByRole('alertdialog').getByRole('button').last().click();
   await page.getByTestId('listing-details').waitFor();

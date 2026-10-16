@@ -4,6 +4,7 @@
 // Inquiries and viewings are separate records (data/types.ts) linked to the property by id.
 
 import { sceneUrl, sceneForType } from './illustrations';
+import type { Deal, CoBroke } from '../deals/model';
 
 export type Tenure = 'freehold' | 'leasehold';
 export type LotType = 'intermediate' | 'corner' | 'end' | 'single';
@@ -71,7 +72,9 @@ export interface Photo {
   /** The photo this copy was made from (it may since have been removed). */
   editedFrom?: string;
 }
-export interface Doc { id: string; category: DocCategory; name: string; fileId?: string; bytes?: number; mime?: string; added: number }
+export interface Doc { id: string; category: DocCategory; name: string; fileId?: string; bytes?: number; mime?: string; added: number;
+  /** ClaudeChanges001: a file added on a Booking / Sale / Rental page belongs to that page's field (for example "booking.files"). */
+  dealKey?: string }
 export interface Tenancy { tenant?: string; start?: string; end?: string; rent?: number; notes?: string; /** Tenant's phone (+ format) and WhatsApp alias (Change 009). */ tenantPhone?: string; tenantWhatsapp?: string }
 /** What kind of advert it is (Stage 6). */
 export type AdType = 'listing' | 'featured' | 'boosted' | 'social' | 'other';
@@ -185,6 +188,11 @@ export interface Listing {
   // arrangement and marketing
   arrangement?: Arrangement;
   arrangementNote?: string;
+  /** ClaudeChanges001 change 10: the other agent when the arrangement is Co-broke. */
+  cobroke?: CoBroke;
+  /** ClaudeChanges001 change 11: Booking, Sale and Rental details (deals/model.ts). Kept on the record like every other
+   *  detail, so it syncs, backs up and appears in the history; no new table. */
+  deal?: Deal;
   marketing?: Marketing;
   /** Banner placed? Where each banner stands is kept in the banners records (data/types.ts). */
   bannerStatus?: BannerStatus;

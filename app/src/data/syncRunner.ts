@@ -14,3 +14,9 @@ export async function runSync(store: Store, cfg: SyncConfig, fetchFn: typeof fet
     return { ok: false, code };
   }
 }
+
+// ClaudeChanges001 change 2: when the next automatic sync will run (the app tries every 60 seconds while signed in), so
+// the main page banner can say "Retrying in 42s" truthfully.
+let nextAt = 0;
+export function setNextAutoSync(at: number) { nextAt = at; }
+export const nextAutoSync = () => nextAt;
