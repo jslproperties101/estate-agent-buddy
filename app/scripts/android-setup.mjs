@@ -136,6 +136,8 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.RelativeLayout;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -143,6 +145,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private View content;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -151,15 +155,44 @@ public class MainActivity extends BridgeActivity {
         getWindow().setNavigationBarColor(Color.BLACK);
         if (Build.VERSION.SDK_INT >= 29) getWindow().setNavigationBarContrastEnforced(false);
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(false);
-        View content = findViewById(android.R.id.content);
+        content = findViewById(android.R.id.content);
         if (content != null) {
             ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
                 Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
                 v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                keepBannerOnTheEdge();
                 return WindowInsetsCompat.CONSUMED;
             });
+            content.getViewTreeObserver().addOnGlobalLayoutListener(this::keepBannerOnTheEdge);
             ViewCompat.requestApplyInsets(content);
         }
+    }
+
+    /** The AdMob plugin (Android 15+) gives its banner a bottom margin as tall as the navigation bar. The content above is
+     *  already padded by that height, so the margin would lift the banner a second time: a black band under it, and the
+     *  banner over the page's bottom buttons (owner's screenshot, 17 Oct 2026). Keep the banner flush with the content's
+     *  bottom, directly above the black navigation area. Only the plugin's own banner box is touched. */
+    private void keepBannerOnTheEdge() {
+        if (!(content instanceof ViewGroup) || ((ViewGroup) content).getChildCount() == 0) return;
+        View root = ((ViewGroup) content).getChildAt(0);
+        if (!(root instanceof ViewGroup)) return;
+        ViewGroup g = (ViewGroup) root;
+        for (int i = 0; i < g.getChildCount(); i++) {
+            View c = g.getChildAt(i);
+            if (!(c instanceof RelativeLayout) || !holdsAdView((ViewGroup) c)) continue;
+            ViewGroup.LayoutParams lp = c.getLayoutParams();
+            if (lp instanceof ViewGroup.MarginLayoutParams) {
+                ViewGroup.MarginLayoutParams m = (ViewGroup.MarginLayoutParams) lp;
+                if (m.bottomMargin != 0) { m.bottomMargin = 0; c.setLayoutParams(m); }
+            }
+        }
+    }
+
+    private static boolean holdsAdView(ViewGroup g) {
+        for (int i = 0; i < g.getChildCount(); i++) {
+            if (g.getChildAt(i).getClass().getName().startsWith("com.google.android.gms.ads.")) return true;
+        }
+        return false;
     }
 }
 `;

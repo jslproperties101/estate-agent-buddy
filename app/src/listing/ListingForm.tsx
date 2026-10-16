@@ -415,6 +415,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     // One Unit/Lot Number (Change 009); the first photo is the main photo.
     delete clean.lotNo;
     clean.mainPhotoId = clean.photos[0]?.id;
+    // A neighborhood typed before it became a dropdown is remembered too, so it is offered next time.
+    if (clean.neighborhood?.trim() && !(state.options['neighborhood'] ?? []).some(o => o.value === clean.neighborhood)) store.addOption('neighborhood', clean.neighborhood.trim());
     if (!clean.extraComments?.trim()) delete clean.extraComments;
     let next: Listing = {
       ...clean, ownerPhone: linked ? undefined : normalisePhone(d.ownerPhone), ownerName: linked ? undefined : d.ownerName,
@@ -615,7 +617,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
         {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
         {/* Change 015: Country → State → City → Township → Neighborhood → Street → Unit Number or Lot Number. */}
-        {Text({ k: 'neighborhood' })}
+        {/* Owner, 17 Oct 2026: Neighborhood is a dropdown of the entries used before (newest first, ✕ removes one; Others… adds). */}
+        {Opt({ k: 'neighborhood', listKey: 'neighborhood', builtIns: [] })}
         {Text({ k: 'street' })}
         {Text({ k: 'unitNo' })}
         <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>

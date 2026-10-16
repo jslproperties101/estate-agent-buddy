@@ -111,6 +111,8 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
     assert.match(act, /^package com\.jslproperties\.estateagentbuddy;/);
     assert.match(act, /setNavigationBarColor\(Color\.BLACK\)/);
     assert.match(act, /setOnApplyWindowInsetsListener/);
+    assert.match(act, /keepBannerOnTheEdge/, 'the AdMob banner is not lifted a second time on Android 15+');
+    assert.match(act, /m\.bottomMargin = 0/);
     const st = readFileSync(join(dir, 'android/app/src/main/res/values/styles.xml'), 'utf8');
     assert.match(st, /android:navigationBarColor">@android:color\/black/);
   }

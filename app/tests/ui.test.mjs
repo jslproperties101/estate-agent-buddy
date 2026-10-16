@@ -4538,7 +4538,12 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   assert.equal(await page.getByRole('button', { name: /Use my current location/i }).count(), 0, 'no Use my current location');
   const remove = page.getByTestId('remove-position');
   assert.equal(await remove.isDisabled(), true, 'Remove Position is there, disabled with no position');
-  await page.locator('[data-field="neighborhood"]').fill('Taman Bukit');
+  // Owner, 17 Oct 2026: Neighborhood is a remembered dropdown (Others… adds, ✕ removes).
+  const nb = page.getByTestId('opt-neighborhood');
+  await nb.locator('.opt-btn').click();
+  await nb.getByRole('button', { name: 'Others…' }).click();
+  await nb.locator('.opt-new input').fill('Taman Bukit');
+  await nb.getByRole('button', { name: 'Add' }).click();
   await page.locator('[data-field="street"]').fill('Jalan Order 7');
   await page.locator('[data-field="unitNo"]').fill('No. 7');
   // Set a point, then Remove Position clears it.
@@ -4555,6 +4560,14 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   const vrows = await page.locator('[data-testid="sec-location-view"] .dl-row').evaluateAll(xs => xs.map(x => x.dataset.row));
   assert.deepEqual(vrows.filter(r => ['neighborhood', 'street', 'unitNo'].includes(r)), ['neighborhood', 'street', 'unitNo']);
   assert.match(await page.locator('[data-testid="sec-location-view"] [data-row="neighborhood"]').innerText(), /Neighborhood\s+Taman Bukit/);
+  // The next property is offered the remembered neighborhood, with ✕; removing it leaves Others… available.
+  await home(page); await tile(page, 'Property List'); await newProperty(page);
+  const nb2 = page.getByTestId('opt-neighborhood');
+  await nb2.locator('.opt-btn').click();
+  assert.equal(await nb2.getByRole('option', { name: /Taman Bukit/i }).count(), 1, 'remembered');
+  await nb2.getByRole('button', { name: 'Remove Taman Bukit' }).click();
+  assert.equal(await nb2.getByRole('option', { name: /Taman Bukit/i }).count(), 0, 'removed with ✕');
+  assert.ok(await nb2.getByRole('button', { name: 'Others…' }).isVisible());
   await page.context().close();
 });
 
