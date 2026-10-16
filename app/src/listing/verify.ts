@@ -8,10 +8,15 @@ export const VERIFY_STATES = ['confirmed', 'owner', 'check', 'unknown'] as const
 export type VerifyState = (typeof VERIFY_STATES)[number];
 
 /** The facts an agent is expected to double-check before relying on them or sharing the listing. */
+// Change 014 (Oct 2026): Frontage, Depth and Lot Type, and the Building Specification facts (Ceiling Height, Power Supply,
+// Loading Bay, Zoning, Plan Approval, Current Use / Crop) each have their own check status; Other Specification has none.
+// Commission Type never had one and Commission Percentage no longer has one (its value and every calculation are unchanged;
+// an old mark stored on a record is kept on the record, it is just not shown or counted).
 export const VERIFIABLE_FIELDS = [
-  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionPct', 'commissionFlat', 'rentCommissionMonths', 'rentCommissionFlat',
+  'askingPrice', 'monthlyRent', 'maintenanceFee', 'commissionFlat', 'rentCommissionMonths', 'rentCommissionFlat',
   'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction',
-  'landSqft', 'builtUpSqft', 'bedrooms', 'bathrooms', 'floors', 'parking', 'furnishing',
+  'landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'lotType', 'bedrooms', 'bathrooms', 'floors', 'parking', 'furnishing',
+  'ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse',
   'condition', 'availability', 'ownerName', 'ownerPhone',
 ] as const;
 export type VerifiableField = (typeof VERIFIABLE_FIELDS)[number];

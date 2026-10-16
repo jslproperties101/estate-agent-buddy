@@ -75,7 +75,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   assert.equal(rp.status, 0, rp.stderr);
   const gp = readFileSync(join(prod, 'android/app/build.gradle'), 'utf8');
   assert.match(gp, /applicationId "com\.jslproperties\.estateagentbuddy"/);
-  assert.match(gp, /versionName "2\.2\.0-n3"/);
+  assert.match(gp, /versionName "2\.2\.0-n4"/, 'Change 011/013 added native plugins (AdMob, files, share), so the native version went up');
   const sp = readFileSync(join(prod, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sp, /name="app_name">Estate Agent AI Buddy</);
   assert.match(sp, /name="custom_url_scheme">com\.jslproperties\.estateagentbuddy</);
@@ -86,7 +86,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const gq = readFileSync(join(qa, 'android/app/build.gradle'), 'utf8');
   assert.match(gq, /applicationId "com\.jslproperties\.estateagentbuddy\.qa"/);
   assert.match(gq, /namespace "com\.jslproperties\.estateagentbuddy"/, 'the code package is unchanged');
-  assert.match(gq, /versionName "2\.2\.0-qa-n3"/, 'the native version stays readable by the update logic');
+  assert.match(gq, /versionName "2\.2\.0-qa-n4"/, 'the native version stays readable by the update logic');
   const sq = readFileSync(join(qa, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sq, /name="app_name">EAB QA</);
   assert.match(sq, /name="package_name">com\.jslproperties\.estateagentbuddy\.qa</);
@@ -96,6 +96,11 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const mp = readFileSync(join(prod, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
   const perms = (m: string) => [...m.matchAll(/uses-permission android:name="([^"]+)"/g)].map(x => x[1]).sort();
   assert.deepEqual(perms(mq), perms(mp));
+  // Change 011: the AdMob app ID is in both (without it the ads SDK stops the app at start); Change 013: storage only up to Android 9.
+  for (const m of [mq, mp]) {
+    assert.match(m, /<meta-data android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID" android:value="ca-app-pub-5995234129917229~3821658996" \/>/);
+    assert.match(m, /WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/);
+  }
 });
 
 test('QA4 nativeVersionOf still reads the native version from the QA version name', async () => {

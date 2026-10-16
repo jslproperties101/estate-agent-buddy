@@ -30,7 +30,6 @@ import { useApp, useStore } from '../data/useStore';
 import { Go, FormSection } from '../nav';
 import { SectionCard, StoredImage, Confirm } from '../ui/common';
 import { deleteListing } from './deleteListing';
-import { InquiryHistory, ViewingHistory } from '../agenda/History';
 import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
 import { visible, can, myId } from '../team/access';
@@ -41,6 +40,8 @@ import { requestDelete, teamErrorOf } from '../team/api';
 import { config } from '../config';
 import { useToast } from '../ui/toast';
 import { fmtDateTime } from '../lib/dates';
+import { c11Strings } from '../ui/c011Strings';
+import { FeedAd, withFeedAds } from '../adverts/AdBar';
 
 export type Layout = 'grid' | 'large';
 
@@ -125,14 +126,6 @@ function CardPhoto({ l, s, className, tall }: { l: Listing; s: ListingStrings; c
   );
 }
 
-/** Property Location on a card: the saved map point, else the saved Google Maps link, else straight to Add Location. */
-function LocationButton({ l, s, go, className = 'btn small secondary loc-btn' }: { l: Listing; s: ListingStrings; go: Go; className?: string }) {
-  const label = `${s.n9.propertyLocation}: ${cardTitle(l) || s.untitled}`;
-  if (hasPosition(l)) return <button type="button" className={className} data-testid="card-location" aria-label={label} onClick={e => { e.stopPropagation(); go({ name: 'propertyMap', id: l.id }); }}>📍 {s.n9.propertyLocation}</button>;
-  if (l.mapsLink) return <a className={className} data-testid="card-location" aria-label={label} href={l.mapsLink} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>📍 {s.n9.propertyLocation}</a>;
-  return <button type="button" className={className} data-testid="card-location" aria-label={label} onClick={e => { e.stopPropagation(); go({ name: 'listingForm', id: l.id, section: 'location' }); }}>📍 {s.n9.addLocation}</button>;
-}
-
 const typeOnly = (l: Listing, s: ListingStrings) => typeLabel(s, l.type);
 
 // ---------- list ----------
@@ -153,6 +146,31 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const set = (patch: Partial<Filters>) => setF(prev => ({ ...prev, ...patch }));
   const ownerName = (l: Listing) => state.contacts.find(c => c.id === l.vendorId)?.name ?? l.ownerName;
   const openIt = (l: Listing) => go({ name: 'listingDetail', id: l.id });
+  const c11 = c11Strings[lang];
+  const toast = useToast();
+  const [deleting, setDeleting] = useState<Listing | null>(null);
+  // Change 011: the card's red Delete is the same recoverable archive as Delete on the detail page (Change 010): the record,
+  // its ID and reference, photos, documents, notes and links all stay, and Restore brings the same record back. Someone
+  // a property is shared with as View and Edit asks its owner instead; anyone else is told they may not.
+  const askDelete = (l: Listing) => {
+    const now = store.getState();
+    if (can(now, 'archive', 'properties', l.id) || can(now, 'requestDelete', 'properties', l.id)) setDeleting(l); else toast(ts.notAllowed, 'error');
+  };
+  function archiveFromCard(l: Listing) {
+    const now = store.getState();
+    const cur = now.properties.find(x => x.id === l.id);
+    if (!cur) return;
+    if (can(now, 'archive', 'properties', cur.id)) { store.upsert('properties', { ...cur, archived: { at: Date.now(), by: myId(now) } }); toast(c11.card.archived); return; }
+    if (can(now, 'requestDelete', 'properties', cur.id)) { void requestDelete(store, config(now.settings), 'properties', cur.id).then(() => toast(ts.requested), e => toast(ts.err[teamErrorOf(e).code] ?? ts.err.other, 'error')); return; }
+    toast(ts.notAllowed, 'error');
+  }
+  function restore(l: Listing) {
+    const now = store.getState();
+    const cur = now.properties.find(x => x.id === l.id);
+    if (!cur || !can(now, 'restore', 'properties', cur.id)) { toast(ts.notAllowed, 'error'); return; }
+    store.upsert('properties', { ...cur, archived: undefined }, false, 'restore');
+    toast(c11.card.restored);
+  }
 
   return (
     <section className="stack listing" data-testid="listing">
@@ -236,26 +254,16 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
 
       {layout === 'grid' ? (
         <ul className="lc-grid" data-layout="grid">
-          {shown.map(l => (
-            <li key={l.id} data-testid="listing-card">
-              <button className="gc" onClick={() => openIt(l)} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
-                <CardPhoto l={l} s={s} className="gc-photo" />
-                <span className="gc-price"><PriceLine l={l} s={s} short /></span>
-                <span className="gc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</span>
-                <span className="gc-meta">{typeOnly(l, s) || '—'}</span>
-                <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
-                <CreatorTag state={state} collection="properties" id={l.id} />
-              </button>
-              <div className="gc-actions">
-                <LocationButton l={l} s={s} go={go} className="gc-loc" />
-                <button type="button" className="open-gold" data-testid="card-open" onClick={() => openIt(l)} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
-              </div>
+          {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
+            <li key={x.item.id} data-testid="listing-card">
+              <GridCardButton l={x.item} s={s} onOpen={() => openIt(x.item)} />
+              <CardActions l={x.item} lang={lang} onOpen={() => openIt(x.item)} onDelete={() => askDelete(x.item)} />
             </li>
           ))}
         </ul>
       ) : (
         <ul className="lc-list" data-layout="large">
-          {shown.map(l => (
+          {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (() => { const l = x.item; return (
             <li key={l.id} className="lc-card tappable" data-testid="listing-card" onClick={() => openIt(l)}>
               <CardPhoto l={l} s={s} className="lc-photo" />
               <div className="lc-body">
@@ -269,16 +277,15 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
                 <div className="between lc-foot">
                   <span className="lc-owner">{ownerName(l) ? `${s.owner}: ${ownerName(l)}` : ''}</span>
                   <CreatorTag state={state} collection="properties" id={l.id} />
-                  <span className="row-gap">
-                    <LocationButton l={l} s={s} go={go} />
-                    <button className="open-gold" data-testid="card-open" onClick={e => { e.stopPropagation(); openIt(l); }} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>{s.open}</button>
-                  </span>
                 </div>
+                <CardActions l={l} lang={lang} onOpen={() => openIt(l)} onDelete={() => askDelete(l)} />
               </div>
             </li>
-          ))}
+          ); })())}
         </ul>
       )}
+      {deleting && <Confirm lang={lang} title={ts.archiveQ} body={`${cardTitle(deleting) || s.untitled} — ${ts.archiveBody}`} okLabel={c11.card.del}
+        onCancel={() => setDeleting(null)} onOk={() => { archiveFromCard(deleting); setDeleting(null); }} />}
 
       {archivedList.length > 0 && (
         <details className="card stack-sm archived-section" data-testid="archived-section">
@@ -286,12 +293,13 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
           <small className="muted">{ts.archivedHelp}</small>
           <ul className="archived-list">
             {archivedList.map(l => (
-              <li key={l.id} data-testid="archived-card">
+              <li key={l.id} data-testid="archived-card" className="archived-item">
                 <button className="link-row" onClick={() => openIt(l)}>
                   <strong>{cardTitle(l) || s.untitled}</strong>
                   <small className="muted">{ts.archivedOn(fmtDateTime(l.archived!.at, lang))}</small>
                   <CreatorTag state={state} collection="properties" id={l.id} />
                 </button>
+                {can(state, 'restore', 'properties', l.id) && <div className="btn-row"><button type="button" className="btn small primary" data-testid="archived-restore" onClick={() => restore(l)}>{c11.card.restore}</button></div>}
               </li>
             ))}
           </ul>
@@ -418,6 +426,8 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         {callable && <a className="btn secondary" href={`tel:+${phoneDigits(phone)}`}>{s.call}</a>}
         {callable && <a className="btn secondary" href={`https://wa.me/${phoneDigits(phone)}`} target="_blank" rel="noreferrer">{s.whatsapp}</a>}
       </div>
+      {/* Change 012: one full-width Buyer's History button under the property's actions. */}
+      <button className="btn primary full buyer-history-btn" onClick={() => go({ name: 'buyerHistory', propertyId: l.id })} data-testid="open-buyer-history">👥 {c11Strings[lang].history.button}</button>
       {phone && !callable && <p className="small warn-text" role="status" data-testid="phone-invalid">{s.phoneInvalid}</p>}
       {askDelete && <Confirm lang={lang} title={ts.archiveQ} body={`${cardTitle(l) || s.untitled} — ${ts.archiveBody}`}
         onCancel={() => setAskDelete(false)} onOk={guarded('archive', () => { store.upsert('properties', { ...l, archived: { at: Date.now(), by: myId(store.getState()) } }); setAskDelete(false); toast(ts.archivedToast); go({ name: 'listing' }, { replace: true }); })} />}
@@ -565,8 +575,6 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       </SectionCard>
 
       <PropertyBuyersCard lang={lang} p={l} go={go} />
-      <InquiryHistory lang={lang} go={go} propertyId={l.id} />
-      <ViewingHistory lang={lang} go={go} propertyId={l.id} />
 
       {(l.history ?? []).length > 0 && (
         <div className="card stack-sm" data-testid="history"><div className="card-title">{s.sec.history}</div>
@@ -587,6 +595,34 @@ function DocRow({ d, s, lang }: { d: Doc; s: ListingStrings; lang: Lang }) {
         ? <button className="btn small secondary" onClick={() => void store.fileUrl(d.fileId!).then(u => { if (u) window.open(u, '_blank'); })}>{s.open1}</button>
         : <small className="muted">{s.sample}</small>}
       <FileBadge lang={lang} fileId={d.fileId} />
+    </div>
+  );
+}
+
+/** The tap area of a grid card (photo, price, address, type, status). Also used by Buyer Matching. */
+export function GridCardButton({ l, s, onOpen, extra }: { l: Listing; s: ListingStrings; onOpen: () => void; extra?: ReactNode }) {
+  const { state } = useApp();
+  return (
+    <button className="gc" onClick={onOpen} aria-label={`${s.open}: ${cardTitle(l) || s.untitled}`}>
+      <CardPhoto l={l} s={s} className="gc-photo" />
+      <span className="gc-price"><PriceLine l={l} s={s} short /></span>
+      <span className="gc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</span>
+      <span className="gc-meta">{typeOnly(l, s) || '—'}</span>
+      <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
+      {extra}
+      <CreatorTag state={state} collection="properties" id={l.id} />
+    </button>
+  );
+}
+
+/** Change 011: the card's two actions, side by side and the same size: a red Delete (a recoverable archive) and Open. */
+function CardActions({ l, lang, onOpen, onDelete }: { l: Listing; lang: Lang; onOpen: () => void; onDelete: () => void }) {
+  const t = c11Strings[lang].card;
+  const label = cardTitle(l) || listingStrings[lang].untitled;
+  return (
+    <div className="card-actions" onClick={e => e.stopPropagation()}>
+      <button type="button" className="card-del" data-testid="card-delete" aria-label={`${t.del}: ${label}`} onClick={onDelete}>{t.del}</button>
+      <button type="button" className="open-gold" data-testid="card-open" aria-label={`${t.open}: ${label}`} onClick={onOpen}>{t.open}</button>
     </div>
   );
 }

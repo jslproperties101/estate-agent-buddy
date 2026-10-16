@@ -2,7 +2,8 @@
 // The generated android/ folder is not committed; this script makes every build the same:
 //  - app name "Estate Agent AI Buddy", package com.jslproperties.estateagentbuddy (from capacitor.config.json);
 //  - permissions: precise/approximate location (GPS Assistance), camera (property and banner photos),
-//    notifications (reminders, Android 13+), internet;
+//    notifications (reminders, Android 13+), internet; storage for saved PDFs on Android 9 and older;
+//  - the AdMob app ID (Change 011);
 //  - the sign-in return link com.jslproperties.estateagentbuddy://auth-callback opens the app (Google login);
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
@@ -30,12 +31,25 @@ const PERMS = [
   'android.permission.RECORD_AUDIO',     // voice commands (Android speech recogniser)
   'android.permission.READ_CONTACTS',    // phonebook button (asked only when tapped)
 ];
+// Change 011: the AdMob app ID (public; it is inside every APK that shows AdMob ads). Read from src/adverts/admob.ts so it
+// is written in one place only. Without this entry the Google Mobile Ads SDK stops the app at start, so the build fails
+// here if it cannot be found.
+const ADMOB_APP_ID = /ADMOB_APP_ID\s*=\s*'(ca-app-pub-[0-9]+~[0-9]+)'/.exec(readFileSync(new URL('../src/adverts/admob.ts', import.meta.url), 'utf8'))?.[1];
+if (!ADMOB_APP_ID) throw new Error('AdMob app ID not found in src/adverts/admob.ts');
 edit(`${A}/AndroidManifest.xml`, s => {
   for (const p of PERMS) {
     if (!s.includes(`"${p}"`)) s = s.replace(/<\/manifest>\s*$/, `    <uses-permission android:name="${p}" />\n</manifest>\n`);
   }
   if (!s.includes('android.hardware.location.gps')) {
     s = s.replace(/<\/manifest>\s*$/, '    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>\n');
+  }
+  // Change 013: Download PDF writes to the phone's Documents folder; only Android 9 and older need this permission for it.
+  if (!s.includes('android.permission.WRITE_EXTERNAL_STORAGE')) {
+    s = s.replace(/<\/manifest>\s*$/, '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n</manifest>\n');
+  }
+  // Change 011: AdMob app ID inside <application>.
+  if (!s.includes('com.google.android.gms.ads.APPLICATION_ID')) {
+    s = s.replace(/(<application[^>]*>)/, `$1\n        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="${ADMOB_APP_ID}" />`);
   }
   // Android 11+: apps must declare that they look for the speech service, or voice reports "not available".
   if (!s.includes('android.speech.RecognitionService')) {

@@ -58,8 +58,15 @@ test('R3 the Phase 1 screens have the same wording keys in English, Bahasa Malay
   }
 });
 
-test('R4 the dashboard has 15 cards in the approved order; Settings, News and Co-broke are not cards', () => {
-  assert.deepEqual(TILES.map(t => t.key), ['todo', 'calendar', 'opportunities', 'property', 'contacts', 'activity', 'gps', 'finance', 'calculator', 'profile', 'expert', 'subsale', 'project', 'market', 'voice']);
-  assert.deepEqual(TILES.filter(t => t.soon).map(t => t.key), ['subsale', 'project', 'market']);
-  assert.equal(strings.en.tiles.profile, 'Agent Profile');
+test('R4 the dashboard has 15 cards in the order of Change 011 / 013 (owner, 16 Oct 2026); Settings, News, Co-broke and Agent Profile are not cards', () => {
+  assert.deepEqual(TILES.map(t => t.key), ['todo', 'calendar', 'opportunities', 'creative', 'contacts', 'activity', 'gps', 'finance', 'calculator', 'matching', 'expert', 'market', 'project', 'property', 'voice']);
+  assert.equal(TILES.findIndex(t => t.key === 'creative') + 1, 4, 'Creative Media is card 4');
+  assert.equal(TILES.findIndex(t => t.key === 'property') + 1, 14, 'the Subsale List is card 14, bottom centre');
+  assert.equal(strings.en.tiles.property, 'Subsale List');
+  assert.equal(strings.en.tiles.creative, 'Creative Media');
+  assert.equal(strings.en.tiles.matching, 'Buyer Matching');
+  for (const l of ['en', 'bm', 'zh'] as const) for (const t of TILES) assert.ok(strings[l].tiles[t.key], `${l} label for ${t.key}`);
+  assert.deepEqual(TILES.find(t => t.key === 'property')?.target, { name: 'listing' });
+  assert.deepEqual(TILES.find(t => t.key === 'creative')?.target, { name: 'creativeMedia' });
+  assert.deepEqual(TILES.find(t => t.key === 'matching')?.target, { name: 'buyerMatching' });
 });

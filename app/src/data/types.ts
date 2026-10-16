@@ -56,7 +56,13 @@ export interface Contact extends Base {
   lastInteraction?: number;
   /** What a buyer / tenant / investor is looking for. A buyer can have several (for example a factory and a house). */
   requirements?: BuyerRequirement[];
+  /** Change 013: properties the agent saved as matches for this buyer (a recommendation only; nothing is ever sent).
+   *  Kept on the buyer's own record, so it syncs and is backed up with it; older records simply have none. */
+  savedMatches?: SavedMatch[];
 }
+
+/** One saved buyer ↔ property match: which property, and when it was saved. */
+export interface SavedMatch { propertyId: string; at: number }
 
 export type FinancingState = 'cash' | 'approved' | 'in_progress' | 'not_started' | 'unknown';
 export const FINANCING_STATES: FinancingState[] = ['cash', 'approved', 'in_progress', 'not_started', 'unknown'];

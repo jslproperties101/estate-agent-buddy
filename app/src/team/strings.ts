@@ -84,7 +84,7 @@ const en = {
   restore: 'Restore', restored: 'Restored to the property list.',
   deletePermanent: 'Delete permanently', deletePermanentQ: 'Delete this property permanently?',
   deletePermanentBody: 'It leaves the Archived section. Only the property\'s owner can do this.',
-  archiveQ: 'Delete this property?', archiveBody: 'It moves to the Archived section at the end of the Property List, where it can be restored.',
+  archiveQ: 'Delete this property?', archiveBody: 'It moves to the Archived section at the end of the Subsale List, where it can be restored.',
   archivedToast: 'Moved to Archived.',
 };
 type TeamStrings = typeof en;
@@ -159,7 +159,7 @@ const bm: TeamStrings = {
   restore: 'Pulihkan', restored: 'Dipulihkan ke senarai hartanah.',
   deletePermanent: 'Padam secara kekal', deletePermanentQ: 'Padam hartanah ini secara kekal?',
   deletePermanentBody: 'Ia keluar dari bahagian Diarkibkan. Hanya pemilik hartanah boleh berbuat demikian.',
-  archiveQ: 'Padam hartanah ini?', archiveBody: 'Ia berpindah ke bahagian Diarkibkan di hujung Senarai Hartanah, dan boleh dipulihkan.',
+  archiveQ: 'Padam hartanah ini?', archiveBody: 'Ia berpindah ke bahagian Diarkibkan di hujung Senarai Subsale, dan boleh dipulihkan.',
   archivedToast: 'Dipindahkan ke Diarkibkan.',
 };
 

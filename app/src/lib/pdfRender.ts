@@ -1,6 +1,7 @@
 // Browser side of the PDF maker: measures and draws the laid-out pages on a canvas and turns them into JPEG pictures
 // for buildPdf(). Everything runs on the phone. See lib/pdf.ts for the layout and the file writer.
 import { Doc, Font, JpegPage, Page, PAGE_H, PAGE_W, buildPdf, layoutDocument } from './pdf';
+import { isNative, plugin, pluginMissing } from '../native/native';
 
 const SCALE = 2; // 2 pixels per point: sharp on screen and in print, still a modest file size
 const FAMILY = '"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
@@ -107,21 +108,86 @@ export async function renderPagesToPdf(pages: Page[], title: string, opts: { onP
 /** A file name that is safe on every system. */
 export const pdfFileName = (base: string) => `${(base || 'document').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'document'}.pdf`;
 
-export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'failed';
-/** Hands the PDF to the phone's share sheet when the browser/WebView can share a file (WhatsApp, email, Drive…);
- *  otherwise saves it as a download. Neither path is proven inside the Android app (see docs/STAGE5.md). */
-export async function shareOrDownload(pdf: Blob, fileName: string, title: string, mime = 'application/pdf'): Promise<ShareResult> {
-  try {
-    const file = new File([pdf], fileName, { type: mime });
-    const nav = navigator as Navigator & { canShare?: (d: object) => boolean; share?: (d: object) => Promise<void> };
-    if (nav.canShare?.({ files: [file] }) && nav.share) {
-      try { await nav.share({ files: [file], title }); return 'shared'; }
-      catch (e) { if ((e as Error)?.name === 'AbortError') return 'cancelled'; /* fall through to download */ }
+export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'failed' | 'unsupported' | 'needApk';
+
+/** Where a saved file went (Android: the Documents folder on the phone; browser: the downloads). */
+export interface SaveResult { ok: boolean; where?: string; reason?: 'failed' | 'needApk' | 'noFile' }
+
+/** Folder inside the phone's public Documents folder that saved files go to in the Android app. */
+export const SAVE_FOLDER = 'Estate Agent Buddy';
+
+/** Base64 of a file, for the native file plugin (which takes text, not binary). */
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const u = String(r.result ?? ''); res(u.slice(u.indexOf(',') + 1)); };
+    r.onerror = () => rej(r.error ?? new Error('read failed'));
+    r.readAsDataURL(blob);
+  });
+}
+
+/* Change 013 (bug: Download PDF and Share PDF did nothing in the Android app). Inside the app's Android WebView a
+ * "download" link and the browser share call do nothing, so the Android app uses its own file and share features:
+ *  - Download: the file is written to Documents/Estate Agent Buddy on the phone (Capacitor Filesystem), where the
+ *    Files app, WhatsApp and Gmail can find it;
+ *  - Share: the file is written to the app's cache and handed to Android's own share sheet (Capacitor Share, which
+ *    gives the receiving app read access through its FileProvider), so WhatsApp, Gmail and others can attach it.
+ * In a browser the normal download and share are used, and a browser that cannot share files says so. */
+type FsPlugin = {
+  writeFile(o: { path: string; data: string; directory: string; recursive?: boolean }): Promise<{ uri: string }>;
+};
+type SharePlugin = { share(o: { title?: string; dialogTitle?: string; files?: string[]; url?: string }): Promise<unknown>; canShare?: () => Promise<{ value: boolean }> };
+
+/** Saves a finished file where the person can find it again. Never throws. */
+export async function saveFile(blob: Blob | null | undefined, fileName: string): Promise<SaveResult> {
+  if (!blob || !blob.size) return { ok: false, reason: 'noFile' };
+  if (isNative()) {
+    const fs = plugin<FsPlugin>('Filesystem');
+    if (!fs || pluginMissing('Filesystem')) return { ok: false, reason: 'needApk' };
+    try {
+      const path = `${SAVE_FOLDER}/${fileName}`;
+      await fs.writeFile({ path, data: await blobToBase64(blob), directory: 'DOCUMENTS', recursive: true });
+      return { ok: true, where: `Documents/${path}` };
+    } catch { return { ok: false, reason: 'failed' }; }
+  }
+  return download(blob, fileName) ? { ok: true } : { ok: false, reason: 'failed' };
+}
+
+/** Opens the share sheet with the file attached (WhatsApp, Gmail…). In a browser that cannot share files the result is
+ *  'unsupported' (the screen offers Download instead); nothing is downloaded behind the person's back. */
+export async function shareFile(blob: Blob | null | undefined, fileName: string, title: string, mime = 'application/pdf'): Promise<ShareResult> {
+  if (!blob || !blob.size) return 'failed';
+  if (isNative()) {
+    const fs = plugin<FsPlugin>('Filesystem');
+    const sh = plugin<SharePlugin>('Share');
+    if (!fs || !sh || pluginMissing('Filesystem') || pluginMissing('Share')) return 'needApk';
+    try {
+      const w = await fs.writeFile({ path: `share/${fileName}`, data: await blobToBase64(blob), directory: 'CACHE', recursive: true });
+      await sh.share({ title, dialogTitle: title, files: [w.uri] });
+      return 'shared';
+    } catch (e) {
+      const m = String((e as Error)?.message ?? e).toLowerCase();
+      return m.includes('cancel') ? 'cancelled' : 'failed';
     }
-    return download(pdf, fileName) ? 'downloaded' : 'failed';
+  }
+  try {
+    const file = new File([blob], fileName, { type: mime });
+    const nav = navigator as Navigator & { canShare?: (d: object) => boolean; share?: (d: object) => Promise<void> };
+    if (!(nav.canShare?.({ files: [file] }) && nav.share)) return 'unsupported';
+    try { await nav.share({ files: [file], title }); return 'shared'; }
+    catch (e) { return (e as Error)?.name === 'AbortError' ? 'cancelled' : 'failed'; }
   } catch { return 'failed'; }
 }
 
+/** The older "share, else download" used by the backup and export screens: share when possible, otherwise save. */
+export async function shareOrDownload(pdf: Blob, fileName: string, title: string, mime = 'application/pdf'): Promise<ShareResult> {
+  const r = await shareFile(pdf, fileName, title, mime);
+  if (r === 'shared' || r === 'cancelled' || r === 'needApk') return r;
+  const saved = await saveFile(pdf, fileName);
+  return saved.ok ? 'downloaded' : saved.reason === 'needApk' ? 'needApk' : 'failed';
+}
+
+/** Browser download through a temporary link. Inside the Android app use saveFile(). */
 export function download(pdf: Blob, fileName: string): boolean {
   try {
     const url = URL.createObjectURL(pdf);

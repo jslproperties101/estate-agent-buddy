@@ -12,6 +12,7 @@ import { reverseGeocode, searchPlaces, GeocodeResult, Suggestion } from './googl
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
+import { useImmersive } from '../adverts/AdBar';
 
 type FieldKey = 'country' | 'state' | 'city' | 'township' | 'street';
 const FIELDS: { key: FieldKey; list?: string; builtIns: () => readonly string[] }[] = [
@@ -124,6 +125,8 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
   const label = (k: FieldKey) => m.field[k];
   const choose = (k: FieldKey, ch: Choice) => setChoices(x => ({ ...x, [k]: ch }));
 
+  // The map picker fills the screen, so the bottom advert is hidden while it is open (Change 011).
+  useImmersive(true);
   return (
     <div className="sheet-scrim" role="presentation">
       <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="lp-t" data-testid="location-picker">

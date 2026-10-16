@@ -45,3 +45,9 @@ export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 1
 export const IconLogo = ({ size = 28, big, splash }: P & { big?: boolean; splash?: boolean }) => (
   <img className="logo-img" src={splash ? (big ? splash512 : splash256) : (big ? logo512 : logo256)} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} />
 );
+
+// Change 011 / 013: Creative Media (a picture frame with a sparkle), Buyer Matching (a person linked to a house) and the
+// top-bar language button (a globe).
+export const IconCreative = svg('M4 6h11v12H4zM4 15l3.5-3.5 3 3 2-2 2.5 2.5M8.5 9.5h0M18 3l.8 2.2L21 6l-2.2.8L18 9l-.8-2.2L15 6l2.2-.8z');
+export const IconMatch = svg('M7 10a3 3 0 100-6 3 3 0 000 6zM2 20a5 5 0 0110 0M14 13l4-3.5 4 3.5M15 12.5V20h6v-7.5M10.5 13.5h3M12.5 11.5l2 2-2 2');
+export const IconGlobe = svg('M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9S9.5 5.6 12 3z');

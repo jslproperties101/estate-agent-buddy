@@ -15,7 +15,7 @@ import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './dom
 import { permission } from './lib/notify';
 import { showNow, scheduleNative, idFor } from './lib/notify';
 import { fmtDateTime } from './lib/dates';
-import { cardTitle, mainPhoto, placeName } from './listing/model';
+import { cardTitle } from './listing/model';
 import { listingStrings } from './listing/strings';
 import { agendaStrings } from './agenda/strings';
 import { contactStrings } from './contacts/strings';
@@ -24,7 +24,7 @@ import { financeStrings } from './finance/strings';
 import { calcStrings } from './calculator/strings';
 import { profileStrings } from './profile/strings';
 import { expertStrings } from './expert/strings';
-import { PropertyListing, ListingDetails, PriceLine } from './listing/ListingUI';
+import { PropertyListing, ListingDetails } from './listing/ListingUI';
 import { ListingForm } from './listing/ListingForm';
 import { ContactsList, ContactDetail, ContactForm, ContactsHome } from './contacts/ContactsUI';
 import { ActivityScreen, InquiryForm, ApptForm, TodoScreen, TaskForm, CalendarScreen } from './agenda/AgendaUI';
@@ -49,12 +49,16 @@ import { VoiceDiagnostics } from './voice/VoiceDiagUI';
 import { diagStrings } from './voice/diagStrings';
 import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
-import { StoredImage } from './ui/common';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
   IconBack, IconTodo, IconCalendar, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconSubsale, IconMarket,
+  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconMarket, IconCreative, IconMatch, IconGlobe,
 } from './icons';
+import { BottomAd } from './adverts/AdBar';
+import { c11Strings } from './ui/c011Strings';
+import { BuyerHistoryScreen } from './agenda/BuyerHistoryUI';
+import { BuyerMatchingScreen, BuyerMatchesScreen } from './contacts/BuyerMatchingUI';
+import { CreativeMediaScreen } from './marketing/CreativeMediaUI';
 import { nativeLook, hideSplash } from './native/native';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
@@ -73,7 +77,6 @@ import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 import { TeamScreen, ManageSharingScreen, WorkspaceSwitch, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
 import { teamStrings } from './team/strings';
-import { visible } from './team/access';
 import { AuditSearchScreen } from './audit/AuditUI';
 import { auditStrings } from './audit/strings';
 import { ExportManagementScreen, AuditExportScreen } from './exports/ExportsUI';
@@ -82,25 +85,25 @@ import { exportStrings } from './exports/strings';
 // Change 010: a Team Workspace invitation link the app was opened with is kept until the person deals with it.
 if (typeof window !== 'undefined') captureInviteFromUrl();
 
-/** The 15 home buttons, in the order approved on 13 Oct 2026 (3 columns × 5 rows on a phone). Settings is no longer a
- *  card: it lives inside Agent Profile. News is no longer a card: News / Announcements is a section of Notifications.
- *  Subsale, Project and Market Intelligence are honest Coming Soon screens (`soon`): nothing on them pretends to work.
- *  Notifications stays in the top bar; Co-broke Opportunities (Coming Soon) opens from the Opportunities card (owner, 15 Oct). */
-export const TILES: { key: string; icon: () => JSX.Element; target: Screen; soon?: boolean }[] = [
+/** The 15 home buttons (3 columns × 5 rows on a phone). Order approved 13 Oct 2026, changed by Change 011 / 013 and the
+ *  owner's answers of 16 Oct 2026: 4 Creative Media (where the property list was), 10 Buyer Matching (Agent Profile moved to
+ *  the top bar, beside the language button), 12 Market Intelligence, 14 Subsale List (the property list, bottom centre).
+ *  No card carries a Coming Soon label any more; Project and Market Intelligence still open honest "not built yet" screens. */
+export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] = [
   { key: 'todo', icon: () => <IconTodo />, target: { name: 'todo' } },
   { key: 'calendar', icon: () => <IconCalendar />, target: { name: 'calendar' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
-  { key: 'property', icon: () => <IconHome />, target: { name: 'listing' } },
+  { key: 'creative', icon: () => <IconCreative />, target: { name: 'creativeMedia' } },
   { key: 'contacts', icon: () => <IconContacts />, target: { name: 'contactsHome' } },
   { key: 'activity', icon: () => <IconChat />, target: { name: 'activity' } },
   { key: 'gps', icon: () => <IconGps />, target: { name: 'gps' } },
   { key: 'finance', icon: () => <IconMoney />, target: { name: 'finance' } },
   { key: 'calculator', icon: () => <IconCalc />, target: { name: 'calculator' } },
-  { key: 'profile', icon: () => <IconCard />, target: { name: 'profile' } },
+  { key: 'matching', icon: () => <IconMatch />, target: { name: 'buyerMatching' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
-  { key: 'subsale', icon: () => <IconSubsale />, target: { name: 'comingSoon', key: 'subsale' }, soon: true },
-  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' }, soon: true },
-  { key: 'market', icon: () => <IconMarket />, target: { name: 'comingSoon', key: 'market' }, soon: true },
+  { key: 'market', icon: () => <IconMarket />, target: { name: 'comingSoon', key: 'market' } },
+  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' } },
+  { key: 'property', icon: () => <IconHome />, target: { name: 'listing' } },
   { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
 ];
 
@@ -281,27 +284,35 @@ function Shell() {
       <div className="shell">
         <header className={screen.name === 'home' ? 'topbar home' : 'topbar'}>
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
-          {screen.name === 'home'
-            ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
-            : <h1>{title}</h1>}
+          {/* Change 011: the title at the very top, and "Saved on This Phone" straight under it (no separate line any more). */}
+          <div className="title-col">
+            {screen.name === 'home'
+              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
+              : <h1>{title}</h1>}
+            <SaveStatus lang={lang} />
+          </div>
           {screen.name === 'home' && <>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
               <IconBell />{notifCount > 0 && <span className="top-badge" aria-hidden="true">{notifCount > 9 ? '9+' : notifCount}</span>}
             </button>
+            {/* Owner, 16 Oct 2026: Agent Profile left the cards and sits here, beside the language button. */}
+            <button className="icon-btn top-btn" onClick={() => go({ name: 'profile' })} aria-label={c11Strings[lang].top.profile} title={c11Strings[lang].top.profile} data-testid="top-profile">
+              <IconCard />
+            </button>
           </>}
-          <div className="lang" role="group" aria-label={t.langSwitch}>
-            {LANGS.map(l => <button key={l.code} aria-pressed={lang === l.code} aria-label={l.label} onClick={() => store.setSingleton('settings', { lang: l.code })}>{l.short}</button>)}
-          </div>
+          <LangMenu lang={lang} onPick={l => store.setSingleton('settings', { lang: l })} />
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
         <UpdateBanner lang={lang} />
-        <SaveStatus lang={lang} />
 
         <main className="content">
           <ScreenView screen={screen} lang={lang} go={go} back={back} />
         </main>
 
         {needsStartChoice(state) && <StartChoice lang={lang} />}
+
+        {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
+        <BottomAd lang={lang} />
 
         {toast && (
           <div className={toast.kind === 'error' ? 'toast error' : 'toast'} role={toast.kind === 'error' ? 'alert' : 'status'} data-testid="toast" data-kind={toast.kind}>
@@ -380,6 +391,10 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'voiceDiag': return diagStrings[lang].title;
     case 'comingSoon': return s.key === 'cobrokeMap' ? gs.cobrokeMap : t.tiles[s.key];
     case 'cobroke': return t.cobrokeTop;
+    case 'creativeMedia': return t.tiles.creative;
+    case 'buyerHistory': return c11Strings[lang].history.button;
+    case 'buyerMatching': return t.tiles.matching;
+    case 'buyerMatches': return c11Strings[lang].match.open;
     case 'team': return teamStrings[lang].teamTitle;
     case 'manageSharing': return teamStrings[lang].manageSharing;
     case 'auditSearch': return auditStrings[lang].searchTitle;
@@ -453,6 +468,10 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
       </section>
     );
     case 'cobroke': return <Cobroke lang={lang} go={go} />;
+    case 'creativeMedia': return <CreativeMediaScreen key={s.propertyId ?? ''} lang={lang} go={go} propertyId={s.propertyId} />;
+    case 'buyerHistory': return <BuyerHistoryScreen key={s.propertyId} lang={lang} go={go} propertyId={s.propertyId} />;
+    case 'buyerMatching': return <BuyerMatchingScreen lang={lang} go={go} />;
+    case 'buyerMatches': return <BuyerMatchesScreen key={s.contactId} lang={lang} go={go} contactId={s.contactId} />;
     case 'team': return <TeamScreen lang={lang} go={go} />;
     case 'manageSharing': return <ManageSharingScreen key={s.focus ?? ''} lang={lang} focus={s.focus} />;
     case 'auditSearch': return <AuditSearchScreen key={`${s.collection ?? ''}:${s.id ?? ''}`} lang={lang} go={go} collection={s.collection} id={s.id} />;
@@ -461,12 +480,11 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
   }
 }
 
+/** Home (Change 011): the 15 cards and nothing else; the Today and Recent Properties sections were removed. The fixed
+ *  advert below the cards is drawn by the shell. */
 function Home({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
   const t = strings[lang];
-  const ls = listingStrings[lang];
-  const today = todayCounts(state.tasks, state.appointments, new Date());
-  const recent = visible(state, 'properties', state.properties).filter(p => !p.archived).sort((a, b) => b.updated - a.updated).slice(0, 3);
   const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
   return (
     <section className="stack home">
@@ -474,40 +492,44 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
-          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''} ${tile.soon ? 'soon' : ''}`} data-tile={i + 1} onClick={() => go(tile.target)}
-            aria-label={tile.soon ? `${t.tiles[tile.key]} (${t.comingSoon})` : t.tiles[tile.key]}>
+          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => go(tile.target)}
+            aria-label={t.tiles[tile.key]}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{t.tiles[tile.key]}</span>
-            {tile.soon && <span className="tile-soon" aria-hidden="true">{t.comingSoon}</span>}
           </button>
         ))}
       </nav>
-
-      <div className="card today-card" data-testid="today">
-        <div className="card-title">{t.today.title}</div>
-        {today.tasksDue + today.apptsToday + today.pendingViewings === 0 ? <small className="muted">{t.today.clear}</small> : (
-          <div className="row-wrap">
-            {today.tasksDue > 0 && <button className="chip-btn" onClick={() => go({ name: 'todo' })}>{t.today.tasks(today.tasksDue)}</button>}
-            {today.apptsToday > 0 && <button className="chip-btn" onClick={() => go({ name: 'calendar' })}>{t.today.appts(today.apptsToday)}</button>}
-            {today.pendingViewings > 0 && <button className="chip-btn" onClick={() => go({ name: 'activity', tab: 'viewings' })}>{t.today.pending(today.pendingViewings)}</button>}
-          </div>
-        )}
-      </div>
-
-      {recent.length > 0 && <>
-        <h2>{t.recentProperties}</h2>
-        <div className="photo-cards">
-          {recent.map(l => {
-            const p = mainPhoto(l)!;
-            return (
-              <button key={l.id} className="photo-card" onClick={() => go({ name: 'listingDetail', id: l.id })} aria-label={`${ls.open}: ${cardTitle(l) || ls.untitled}`}>
-                <span className="photo"><StoredImage fileId={p.fileId} url={p.url} /></span>
-                <strong>{cardTitle(l) || ls.untitled}</strong><small>{placeName(l) || '—'}</small><span><PriceLine l={l} s={ls} short /></span>
-              </button>
-            );
-          })}
-        </div>
-      </>}
     </section>
+  );
+}
+
+/** One language button (a globe with the current language); tapping it opens the list of languages (owner, 16 Oct 2026). */
+function LangMenu({ lang, onPick }: { lang: Lang; onPick: (l: Lang) => void }) {
+  const [open, setOpen] = useState(false);
+  const label = c11Strings[lang].top.language;
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => { if (!(e.target as Element)?.closest?.('.lang')) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', close); document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const cur = LANGS.find(l => l.code === lang) ?? LANGS[0];
+  return (
+    <div className="lang">
+      <button type="button" className="icon-btn top-btn lang-btn" aria-haspopup="menu" aria-expanded={open} aria-label={`${label}: ${cur.label}`} title={label} data-testid="lang-btn" onClick={() => setOpen(o => !o)}>
+        <IconGlobe />
+      </button>
+      {open && (
+        <div className="lang-menu" role="menu" aria-label={label} data-testid="lang-menu">
+          {LANGS.map(l => (
+            <button key={l.code} type="button" role="menuitemradio" aria-checked={lang === l.code} aria-pressed={lang === l.code} aria-label={l.label} data-lang={l.code}
+              onClick={() => { setOpen(false); onPick(l.code); }}>
+              <span className="lang-short">{l.short}</span> <span>{l.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -126,7 +126,7 @@ export function AuditExportScreen({ lang, go, keys, person: person0, actions: ac
             <div className="dl-row"><dt>{s.refCode}</dt><dd data-testid="export-ref">{result.report.ref}</dd></div>
             <div className="dl-row"><dt>{s.estSize}</dt><dd>{fmtBytes(result.blob.size)}</dd></div>
           </dl>
-          <button className="btn primary" data-testid="export-share" onClick={() => void shareOrDownload(result.blob, result.fileName, result.fileName, result.mime).then(r => toast(r === 'shared' ? s.shared : r === 'downloaded' ? s.downloaded : r === 'cancelled' ? s.cancelled : s.shareFailed, r === 'failed' ? 'error' : 'ok'))}>{s.saveShare}</button>
+          <button className="btn primary" data-testid="export-share" onClick={() => void shareOrDownload(result.blob, result.fileName, result.fileName, result.mime).then(r => toast(r === 'shared' ? s.shared : r === 'downloaded' ? s.downloaded : r === 'cancelled' ? s.cancelled : s.shareFailed, r === 'shared' || r === 'downloaded' || r === 'cancelled' ? 'ok' : 'error'))}>{s.saveShare}</button>
           <button className="btn secondary" data-testid="export-keep" disabled={keptRef === result.report.ref} onClick={() => void keepExport(store, {
             ref: result.report.ref, fileName: result.fileName, format: result.report.format, mode: result.report.mode,
             recordIds: result.report.records.map(r => r.recordId), recordKeys: result.report.records.map(r => r.key),
@@ -189,7 +189,7 @@ export function ExportManagementScreen({ lang, go, section }: { lang: Lang; go: 
     const blob = await store.getFile(e.fileId);
     if (!blob) { toast(s.openFailed, 'error'); return; }
     const r = await shareOrDownload(blob, e.fileName, e.fileName, blob.type || (e.format === 'pdf' ? 'application/pdf' : 'application/octet-stream'));
-    if (r === 'failed') toast(s.openFailed, 'error');
+    if (r === 'failed' || r === 'needApk') toast(s.openFailed, 'error');
   };
 
   return (

@@ -26,7 +26,7 @@ export function sampleData(now = Date.now()) {
       features: '2-storey office, 28 ft ceiling, 150 kVA, wide side land.', status: 'available', vendorId: 'v1', arrangement: 'direct',
       notes: 'Owner open to offers. Keys with guard house.',
       extraComments: 'Sample comment: side land can take a 40 ft container.\nAsk the guard house for the key (sample).',
-      verification: { askingPrice: 'owner', tenure: 'confirmed', titleType: 'confirmed', landSqft: 'confirmed', builtUpSqft: 'check', commissionPct: 'confirmed', ownerPhone: 'confirmed' },
+      verification: { askingPrice: 'owner', tenure: 'confirmed', titleType: 'confirmed', landSqft: 'confirmed', builtUpSqft: 'check', frontageFt: 'confirmed', ownerPhone: 'confirmed' },
       marketing: { advertised: 'yes', ads: [
         { id: 'a1', platform: 'PropertyGuru', start: day(-40), end: day(50), ref: 'PG-sample-001', status: 'live' },
         { id: 'a2', platform: 'Facebook Marketplace', start: day(-30), status: 'needs_update', notes: 'Price changed; update the post.' },

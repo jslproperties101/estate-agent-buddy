@@ -19,7 +19,7 @@ const en = {
   langSwitch: 'Language',
   home: 'Home',
   tiles: {
-    todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Property List',
+    todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Subsale List', creative: 'Creative Media', matching: 'Buyer Matching',
     vendor: 'Vendor List', buyer: 'Buyer List', gps: 'GPS Assistance', finance: 'Agent Financial',
     calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'Voice Command',
     subsale: 'Subsale', project: 'Project', cobroke: 'Co-broke',
@@ -73,7 +73,7 @@ const en = {
   sampleNote: 'This is example data, not a real record. Remove all sample data in Settings → Sample data.',
   soon: {
     subsale: 'Subsale will gather secondary-market (resale) properties and their owners, enquiries and paperwork in one place. It is not built yet: your existing properties stay in the Property List.',
-    project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Property List for now.',
+    project: 'Project will hold new developments (developer, launch, unit types, prices and booking status). It is not built yet: you can keep project units in the Subsale List for now.',
     cobrokeMap: 'The Co-broke Opportunity Map will show other agents’ listings and buyers that match yours, on the map. It needs co-broke sharing, which is not built yet.',
     market: 'Market Intelligence will show newly advertised properties and price changes in the market. It is not built yet, and it will be added only after a lawful and reliable source of listings is approved. Nothing here is live.',
     note: 'Nothing on this screen is pretending to work. Tell us what you need here and it will be built next.',
@@ -159,7 +159,7 @@ const bm: Strings = {
   langSwitch: 'Bahasa',
   home: 'Utama',
   tiles: {
-    todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Hartanah',
+    todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Subsale', creative: 'Media Kreatif', matching: 'Padanan Pembeli',
     vendor: 'Senarai Penjual', buyer: 'Senarai Pembeli', gps: 'Bantuan GPS', finance: 'Kewangan Ejen',
     calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Suara',
     subsale: 'Subsale', project: 'Projek', cobroke: 'Co-broke',
@@ -213,7 +213,7 @@ const bm: Strings = {
   sampleNote: 'Ini data contoh, bukan rekod sebenar. Buang semua data contoh di Tetapan → Data contoh.',
   soon: {
     subsale: 'Subsale akan menghimpunkan hartanah pasaran sekunder (jualan semula) bersama pemilik, pertanyaan dan dokumennya di satu tempat. Ia belum dibina: hartanah sedia ada kekal dalam Senarai Hartanah.',
-    project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Hartanah.',
+    project: 'Projek akan menyimpan pembangunan baharu (pemaju, pelancaran, jenis unit, harga dan status tempahan). Ia belum dibina: buat masa ini unit projek boleh disimpan dalam Senarai Subsale.',
     cobrokeMap: 'Peta Peluang Co-broke akan menunjukkan senarai dan pembeli ejen lain yang sepadan dengan anda, pada peta. Ia memerlukan perkongsian co-broke, yang belum dibina.',
     market: 'Risikan Pasaran akan memaparkan hartanah yang baru diiklankan dan perubahan harga di pasaran. Ia belum dibina, dan hanya akan ditambah selepas sumber penyenaraian yang sah dan boleh dipercayai diluluskan. Tiada apa di sini yang aktif.',
     note: 'Tiada apa-apa di skrin ini yang berpura-pura berfungsi. Beritahu kami apa yang anda perlukan di sini dan ia akan dibina seterusnya.',
@@ -297,7 +297,7 @@ const zh: Strings = {
   langSwitch: '语言',
   home: '主页',
   tiles: {
-    todo: '待办事项', calendar: '日历', opportunities: '商机', property: '房产列表',
+    todo: '待办事项', calendar: '日历', opportunities: '商机', property: '二手房列表', creative: '创意媒体', matching: '买家配对',
     vendor: '卖家列表', buyer: '买家列表', gps: 'GPS 助手', finance: '代理财务',
     calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: '语音指令',
     subsale: '二手房', project: '新项目', cobroke: '联合代理',
@@ -351,7 +351,7 @@ const zh: Strings = {
   sampleNote: '这是示例数据，不是真实记录。可在 设置 → 示例数据 中全部删除。',
   soon: {
     subsale: '二手房功能将把二手（转售）房产及其业主、询问和文件集中在一处。尚未建立：您现有的房产仍在房产列表中。',
-    project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在房产列表中。',
+    project: '新项目功能将记录新发展项目（发展商、推出日期、单位类型、价格和预订状态）。尚未建立：目前可将项目单位保存在二手房列表中。',
     cobrokeMap: '联合代理商机地图将在地图上显示与您匹配的其他经纪人房源和买家。它需要联合代理共享功能，目前尚未建立。',
     market: '市场情报将显示市场上新刊登的房产和价格变动。它尚未建立，只有在批准合法且可靠的房源来源之后才会加入。这里的内容都不是实时的。',
     note: '此页面没有任何假装可用的功能。告诉我们您需要什么，下一步就会建立。',

@@ -2,7 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Lang } from '../i18n';
 import type { Doc } from '../lib/pdf';
-import { download, pdfFileName, renderDocument, RenderedDoc, shareOrDownload } from '../lib/pdfRender';
+import { pdfFileName, renderDocument, RenderedDoc } from '../lib/pdfRender';
+import { FileActions } from './FileActions';
+import { BusyLine } from './BusyLine';
+import { useImmersive } from '../adverts/AdBar';
 import { titled3 } from '../lib/titleCase';
 
 const T = titled3( {
@@ -16,7 +19,6 @@ export function PdfPreview({ lang, build, title, onClose }: { lang: Lang; build:
   const t = T[lang];
   const [state, setState] = useState<'making' | 'ready' | 'failed'>('making');
   const [out, setOut] = useState<RenderedDoc | null>(null);
-  const [msg, setMsg] = useState('');
   const urls = useRef<string[]>([]);
   const name = pdfFileName(title);
 
@@ -35,18 +37,14 @@ export function PdfPreview({ lang, build, title, onClose }: { lang: Lang; build:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function share() {
-    if (!out) return;
-    const r = await shareOrDownload(out.pdf, name, title);
-    setMsg(r === 'shared' ? t.shared : r === 'downloaded' ? t.downloaded : r === 'cancelled' ? t.cancelled : t.shareFailed);
-  }
-  function save() { if (!out) return; setMsg(download(out.pdf, name) ? t.downloaded : t.shareFailed); }
+  // The preview fills the screen like a document viewer, so the bottom advert is hidden while it is open (Change 011).
+  useImmersive(true);
 
   return (
     <div className="scrim pdf-scrim" role="presentation">
       <div className="dialog pdf-dialog" role="dialog" aria-modal="true" aria-label={title} data-testid="pdf-preview">
         <h2 className="pdf-title">{title}</h2>
-        {state === 'making' && <p role="status" data-testid="pdf-making">{t.making}</p>}
+        {state === 'making' && <BusyLine text={t.making} testId="pdf-making" />}
         {state === 'failed' && <p className="warn-text" role="alert" data-testid="pdf-failed">{t.failed}</p>}
         {state === 'ready' && out && (
           <>
@@ -57,12 +55,8 @@ export function PdfPreview({ lang, build, title, onClose }: { lang: Lang; build:
             <small className="muted">{t.note}</small>
           </>
         )}
-        {msg && <p className="voice-msg" role="status" data-testid="pdf-msg">{msg}</p>}
-        <div className="two">
-          <button className="btn secondary" onClick={onClose} data-testid="pdf-close">{t.close}</button>
-          <button className="btn secondary" disabled={state !== 'ready'} onClick={save} data-testid="pdf-download">{t.save}</button>
-        </div>
-        <button className="btn primary" disabled={state !== 'ready'} onClick={share} data-testid="pdf-share">{t.share}</button>
+        <FileActions lang={lang} blob={out?.pdf} fileName={name} title={title} downloadLabel={t.save} shareLabel={t.share} disabled={state !== 'ready'} testPrefix="pdf" />
+        <button className="btn secondary" onClick={onClose} data-testid="pdf-close">{t.close}</button>
       </div>
     </div>
   );

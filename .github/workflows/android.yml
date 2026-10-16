@@ -160,7 +160,7 @@ jobs:
       - name: Build the APK
         run: |
           # Every phone feature must have its native part in the APK, or its button cannot work on the phone.
-          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"'; do
+          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"' '"@capacitor/filesystem"' '"@capacitor/share"' '"@capacitor-community/admob"'; do
             grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
           done
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace

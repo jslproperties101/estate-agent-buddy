@@ -53,6 +53,11 @@ export type Screen =
   | { name: 'voiceDiag' }
   | { name: 'comingSoon'; key: 'subsale' | 'project' | 'market' | 'cobrokeMap' }
   | { name: 'cobroke' }
+  // Changes 011–013
+  | { name: 'creativeMedia'; propertyId?: string }
+  | { name: 'buyerHistory'; propertyId: string }
+  | { name: 'buyerMatching' }
+  | { name: 'buyerMatches'; contactId: string }
   // Change 010
   | { name: 'team' }
   | { name: 'manageSharing'; focus?: string }

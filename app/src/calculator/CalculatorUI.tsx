@@ -1,5 +1,6 @@
 // Button 9 — Property Calculator (Malaysia, RM): purchase and loan, entry costs, rental yield and ROI, sale with RPGT,
 // and agent commission. Every result shows its full breakdown. Rates are editable under Assumptions.
+import { PropertyRow } from '../ui/PropertyPicker';
 import { useMemo, useState } from 'react';
 import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -131,9 +132,8 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
             <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={cx.prop.search} aria-label={cx.prop.search} data-testid="calc-search" autoFocus />
             <div className="pick-list" role="listbox" aria-label={cx.prop.label}>
               {searchProperties(state.properties, query).map(l => (
-                <button key={l.id} type="button" role="option" aria-selected={l.id === propId} className="pick-item" onClick={() => chooseProperty(l)} data-testid="calc-pick-item">
-                  <strong>{[l.ref, cardTitle(l)].filter(Boolean).join(' · ')}</strong>
-                  <small className="muted">{[l.askingPrice ? rm(l.askingPrice) : '', l.monthlyRent ? `${rm(l.monthlyRent)}/m` : ''].filter(Boolean).join(' · ')}</small>
+                <button key={l.id} type="button" role="option" aria-selected={l.id === propId} className="pick-item pp-opt" onClick={() => chooseProperty(l)} data-testid="calc-pick-item">
+                  <PropertyRow l={l} lang={lang} extra={[l.askingPrice ? rm(l.askingPrice) : '', l.monthlyRent ? `${rm(l.monthlyRent)}/m` : ''].filter(Boolean).join(' · ') || undefined} />
                 </button>
               ))}
               {!searchProperties(state.properties, query).length && <small className="muted" data-testid="calc-no-match">{cx.prop.noMatch}</small>}

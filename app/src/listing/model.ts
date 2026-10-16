@@ -358,7 +358,8 @@ export const ALL_FORM_FIELDS: FormField[] = ['bedrooms', 'bathrooms', 'floors', 
 
 const BUILT: FormField[] = ['floors', 'parking', 'builtUpSqft', 'condition', 'maintenanceFee', 'specs'];
 const LANDED: FormField[] = ['landSqft', 'frontageFt', 'depthFt', 'lotType', 'landUse'];
-const LAND_ONLY: FormField[] = ['landSqft', 'frontageFt', 'depthFt', 'roadAccess', 'landUse'];
+// Change 014: land also shows Lot Type next to Frontage and Depth.
+const LAND_ONLY: FormField[] = ['landSqft', 'frontageFt', 'depthFt', 'lotType', 'roadAccess', 'landUse'];
 
 /** Fields shown for a property type. Unknown or custom types show every field, so nothing is hidden. */
 export function fieldsFor(type?: string): Set<FormField> {

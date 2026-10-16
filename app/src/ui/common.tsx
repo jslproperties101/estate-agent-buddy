@@ -8,6 +8,7 @@ import { FieldHelp } from './FieldHelp';
 import { REMINDER_CHOICES } from '../domain/workflow';
 import { cardTitle, normalisePhone } from '../listing/model';
 import { newId } from '../data/store';
+import { PropertyPicker } from './PropertyPicker';
 
 /** A record section with its own small Edit button at the bottom right. */
 export function SectionCard({ title, onEdit, editLabel, children, testId, className = '' }: {
@@ -149,18 +150,12 @@ export function ReminderPicker({ lang, value, onChange }: { lang: Lang; value: n
   );
 }
 
+/** Change 012: the property chooser shows the main photo, listing ID and address on each row (ui/PropertyPicker.tsx). */
 export function PropertySelect({ lang, value, onChange, label }: { lang: Lang; value?: string; onChange: (id: string | undefined) => void; label?: string }) {
   const { state } = useApp();
   const c = strings[lang].c;
-  const list = state.properties.filter(p => !p.archived).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || ''));
-  return (
-    <label className="ff">{label ?? c.property}
-      <select data-field="propertyId" value={value ?? ''} onChange={e => onChange(e.target.value || undefined)}>
-        <option value="">{c.noProperty}</option>
-        {list.map(p => <option key={p.id} value={p.id}>{[p.ref, cardTitle(p)].filter(Boolean).join(' · ') || p.id}</option>)}
-      </select>
-    </label>
-  );
+  const list = state.properties.filter(p => !p.archived || p.id === value).sort((a, b) => (cardTitle(a) || '').localeCompare(cardTitle(b) || ''));
+  return <PropertyPicker lang={lang} list={list} value={value} onChange={onChange} label={label ?? c.property} />;
 }
 
 /** Choose a contact, or add one on the spot (name and phone; the rest can be filled later). */

@@ -3,7 +3,7 @@ import type { Lang } from '../i18n';
 import { titleCase, titleCaseMap, titled3 } from '../lib/titleCase';
 
 const en = {
-  title: 'Property List',
+  title: 'Subsale List',
   search: 'Search township, street, reference',
   filters: 'Filters',
   clear: 'Clear all',
@@ -212,7 +212,7 @@ const en = {
 export type ListingStrings = typeof en;
 
 const bm: ListingStrings = {
-  title: 'Senarai Hartanah',
+  title: 'Senarai Subsale',
   search: 'Cari taman, jalan, rujukan',
   filters: 'Penapis',
   clear: 'Kosongkan semua',
@@ -419,7 +419,7 @@ const bm: ListingStrings = {
 };
 
 const zh: ListingStrings = {
-  title: '房产列表',
+  title: '二手房列表',
   search: '搜索花园、街道、编号',
   filters: '筛选',
   clear: '全部清除',

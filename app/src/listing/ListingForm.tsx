@@ -1,5 +1,5 @@
-// Add / edit property form. Sections in the agreed order: 1 Type & Purpose (the headline is the advert title and sits in Marketing), 2 Tenure & Title, 3 Photos,
-// 4 the remaining property information, 5 Documents at the end. Every section can be opened and closed (closed at
+// Add / edit property form. Sections in the agreed order: 1 Type & Purpose (the headline is the advert title and sits in Marketing), 2 Tenure & Title, 3 Location (Change 014), 4 Photos,
+// then the remaining property information, 5 Documents at the end. Every section can be opened and closed (closed at
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
 // Fields that may not be obvious have a "?" (ui/FieldHelp).
@@ -49,7 +49,7 @@ import { IconMic } from '../icons';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
-const SECTION_IDS = ['basics', 'tenure', 'photos', 'location', 'details', 'availability', 'tenancy', 'owner', 'specs', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
+const SECTION_IDS = ['basics', 'tenure', 'location', 'photos', 'details', 'availability', 'tenancy', 'owner', 'specs', 'arrangement', 'banner', 'marketing', 'notes', 'docs'];
 const SECTION_KEYS: Record<string, string[]> = {
   basics: ['type', 'purpose'],
   tenure: ['askingPrice', 'negotiable', 'commissionPct', 'commissionFlat', 'monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat', 'securityDepositMonths', 'utilityDepositMonths',
@@ -174,7 +174,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     const cur = shownState(d, k) ?? 'check';
     return (
       <label className={`vp vp-${cur}`}>
-        <span className="vp-label">{s.verify.label}</span>
+        {/* Change 014: no separate "Check status" text; the dropdown shows the status itself, as tall and wide as the field above. */}
         <select data-verify={k} aria-label={s.verify.aria(label)} value={cur} className={`vc-sel vc-${cur}`}
           onChange={e => setD(prev => withVerification(prev, k, e.target.value as VerifyState))}>
           {VERIFY_STATES.map(v => <option key={v} value={v}>{s.verify[v]}</option>)}
@@ -609,8 +609,33 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Opt({ k: 'restriction', listKey: 'restriction', builtIns: RESTRICTIONS, labels: s.restrictions })}
       </Sec>
 
-      {/* 3. Photos */}
-      <Sec id="photos" title={`3 · ${s.sec.photos}`} {...secProps('photos')}>
+      {/* 3. Location (Change 014: straight after section 2; street first, then the unit/lot number) */}
+      <Sec id="location" title={`3 · ${s.sec.location}`} testId="sec-location" {...secProps('location')}>
+        {Opt({ k: 'country', listKey: 'country', builtIns: COUNTRIES, labels: s.countries })}
+        {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
+        {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
+        {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
+        {Text({ k: 'street' })}
+        {Text({ k: 'unitNo' })}
+        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
+        <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
+        <div className="two">
+          <button className="btn secondary" onClick={locate} disabled={locating}>{locating ? s.locating : s.useMyLocation}</button>
+          <button className="btn secondary" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
+        </div>
+        {posErr && <p className="error" role="alert">{s.posError}</p>}
+        <label className="ff">
+          <span>{s.l.mapsLink}</span>
+          <input data-field="mapsLink" type="url" inputMode="url" autoComplete="off" placeholder={s.n9.mapsLinkPh} value={mapsLinkText} onChange={e => setMapsLink(e.target.value)} />
+          <small className="muted">{s.n9.mapsLinkHint}</small>
+        </label>
+        {d.mapsLink && <small className={linkPoint ? 'ok-text' : 'muted'} data-testid="maps-link-note">{linkPoint ? s.n9.linkPosition : s.n9.linkNoPosition}</small>}
+        {d.mapsLink && /^https?:\/\//i.test(d.mapsLink) && <a className="btn small secondary" href={d.mapsLink} target="_blank" rel="noreferrer" data-testid="open-maps-link">🗺 {s.n9.openMapsLink}</a>}
+      </Sec>
+      {picker && <LocationPicker lang={lang} current={d} pointOnly title={s.n9.addLocation} onCancel={() => setPicker(false)} onApply={applyLocation} />}
+
+      {/* 4. Photos */}
+      <Sec id="photos" title={`4 · ${s.sec.photos}`} {...secProps('photos')}>
         <small className="muted">{s.photosNote}</small>
         {d.photos.length > 1 && <small className="muted" data-testid="drag-hint">{s.n9.dragHint}</small>}
         {d.photos.length > 0 && (
@@ -646,37 +671,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         </label>
       </Sec>
 
-      {/* 4. Remaining property information */}
-      <Sec id="location" title={`4 · ${s.sec.location}`} testId="sec-location" {...secProps('location')}>
-        {Opt({ k: 'country', listKey: 'country', builtIns: COUNTRIES, labels: s.countries })}
-        {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
-        {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
-        {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
-        {Text({ k: 'unitNo' })}
-        {Text({ k: 'street' })}
-        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
-        <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
-        <div className="two">
-          <button className="btn secondary" onClick={locate} disabled={locating}>{locating ? s.locating : s.useMyLocation}</button>
-          <button className="btn secondary" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
-        </div>
-        {posErr && <p className="error" role="alert">{s.posError}</p>}
-        <label className="ff">
-          <span>{s.l.mapsLink}</span>
-          <input data-field="mapsLink" type="url" inputMode="url" autoComplete="off" placeholder={s.n9.mapsLinkPh} value={mapsLinkText} onChange={e => setMapsLink(e.target.value)} />
-          <small className="muted">{s.n9.mapsLinkHint}</small>
-        </label>
-        {d.mapsLink && <small className={linkPoint ? 'ok-text' : 'muted'} data-testid="maps-link-note">{linkPoint ? s.n9.linkPosition : s.n9.linkNoPosition}</small>}
-        {d.mapsLink && /^https?:\/\//i.test(d.mapsLink) && <a className="btn small secondary" href={d.mapsLink} target="_blank" rel="noreferrer" data-testid="open-maps-link">🗺 {s.n9.openMapsLink}</a>}
-      </Sec>
-      {picker && <LocationPicker lang={lang} current={d} pointOnly title={s.n9.addLocation} onCancel={() => setPicker(false)} onApply={applyLocation} />}
 
       <Sec id="details" title={s.sec.details} testId="sec-details" {...secProps('details')}>
         {pair(show('landSqft') && Text({ k: 'landSqft', numeric: true }), show('builtUpSqft') && Text({ k: 'builtUpSqft', numeric: true }))}
         {pair(show('frontageFt') && Text({ k: 'frontageFt', numeric: true }), show('depthFt') && Text({ k: 'depthFt', numeric: true }))}
+        {/* Change 014: Lot Type directly under Frontage and Depth, each with its own check status. */}
+        {show('lotType') && Select({ k: 'lotType', options: LOT_TYPES, labels: s.lotType })}
         {pair(show('bedrooms') && Text({ k: 'bedrooms', numeric: true }), show('bathrooms') && Text({ k: 'bathrooms', numeric: true }))}
         {pair(show('floors') && Text({ k: 'floors', numeric: true }), show('parking') && Text({ k: 'parking', numeric: true }))}
-        {pair(show('lotType') && Select({ k: 'lotType', options: LOT_TYPES, labels: s.lotType }), show('furnishing') && Select({ k: 'furnishing', options: FURNISHING, labels: s.furnishing }))}
+        {show('furnishing') && Select({ k: 'furnishing', options: FURNISHING, labels: s.furnishing })}
         <label className="ff">
           <span>{s.l.extraComments}</span>
           <textarea data-field="extraComments" className="big-text" rows={5} value={d.extraComments ?? ''} onChange={e => set('extraComments', e.target.value || undefined)} />

@@ -31,6 +31,7 @@ import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
 import { reviewContacts, undoInactiveConversion, UndoResult } from '../data/leadReview';
 import { BuyerRequirementsCard, RequirementsEditor } from './MatchUI';
+import { c11Strings } from '../ui/c011Strings';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
 
@@ -194,6 +195,11 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
         {canEdit && isVendor && <VendorStatusPicker lang={lang} value={c.vendorStatus} onChange={v => setStatus({ vendorStatus: v })} />}
         {canEdit && isBuyer && <LeadPicker lang={lang} value={c.leadStatus} onChange={v => setStatus({ leadStatus: v })} />}
       </div>
+      {c.roles.some(r => BUYER_ROLES.includes(r)) && (
+        <button className="btn primary full" data-testid="open-buyer-matches" onClick={() => go({ name: 'buyerMatches', contactId: c.id })}>
+          🔗 {c11Strings[lang].match.open}{(c.savedMatches ?? []).length ? ` · ${c11Strings[lang].match.buyerMatches((c.savedMatches ?? []).length)}` : ''}
+        </button>
+      )}
       {c.roles.some(r => BUYER_ROLES.includes(r)) && <BuyerRequirementsCard lang={lang} c={c} go={go} />}
       <SectionCard title={s.properties}>
         {props.length === 0 ? <Empty>{s.noProperties}</Empty> : props.map(p => (

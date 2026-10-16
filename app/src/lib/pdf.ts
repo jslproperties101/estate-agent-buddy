@@ -134,12 +134,17 @@ export function layoutDocument(doc: Doc, measure: Measure): Page[] {
         const hs = row.map(p => (p.w > 0 && p.h > 0 ? Math.min(cellW * (p.h / p.w), cellW * 1.1) : cellW * 0.75));
         const rowH = Math.max(...hs) + (row.some(p => p.caption) ? 14 : 0);
         need(rowH + gap);
+        // Change 013: each photo sits in the middle of its own frame (the cell, as tall as the tallest photo of the row),
+        // both across and down, at its own shape: never stretched, never wider than its cell, never pushed to the left.
+        const imgRowH = Math.max(...hs);
         row.forEach((p, j) => {
           const h = hs[j];
           const w = p.w > 0 && p.h > 0 ? Math.min(cellW, h * (p.w / p.h)) : cellW;
-          const x = MARGIN + j * (cellW + gap);
-          cur().items.push({ k: 'image', x, y, w, h, src: p.src });
-          if (p.caption) for (const l of wrap(p.caption, F.small, cellW, measure).slice(0, 1)) cur().items.push({ k: 'text', x, y: y + h + 11, text: l, font: F.small });
+          const cellX = MARGIN + j * (cellW + gap);
+          const x = cellX + (cellW - w) / 2;
+          const top = y + (imgRowH - h) / 2;
+          cur().items.push({ k: 'image', x, y: top, w, h, src: p.src });
+          if (p.caption) for (const l of wrap(p.caption, F.small, cellW, measure).slice(0, 1)) cur().items.push({ k: 'text', x: cellX + cellW / 2, y: y + imgRowH + 11, text: l, font: F.small, align: 'center' });
         });
         y += rowH + gap;
       }

@@ -94,7 +94,7 @@ export function BackupCard({ lang }: { lang: Lang }) {
       const b = await createBackup(store);
       const r = await shareOrDownload(new Blob([b.bytes as BlobPart], { type: 'application/zip' }), b.fileName, t.title, 'application/zip');
       if (r === 'cancelled') setMsg(null);
-      else if (r === 'failed') setMsg({ text: t.makeFailed, bad: true });
+      else if (r === 'failed' || r === 'needApk') setMsg({ text: t.makeFailed, bad: true });
       else { noteBackupMade(store); setMsg({ text: `${t.made(b.records, b.files)}${b.missingFiles.length ? ` ${t.madeMissing(b.missingFiles.length)}` : ''}` }); }
     } catch { setMsg({ text: t.makeFailed, bad: true }); }
     setBusy('');

@@ -10,7 +10,9 @@ import { AgentChoice, defaultAgentChoice } from '../listing/buyerPdf';
 import { marketingStrings } from './strings';
 import { FORMATS, FORMAT_IDS, FormatId, OutputId, buildPosterContent, defaultMarketingSelection, marketingFields, marketingFileName } from './content';
 import { Theme, canWebp, drawPoster, exportPoster } from './render';
-import { download, shareOrDownload } from '../lib/pdfRender';
+import { FileActions } from '../ui/FileActions';
+import { BusyLine } from '../ui/BusyLine';
+import { c11Strings } from '../ui/c011Strings';
 import { loadImage } from '../lib/photoStudio';
 
 type Made = { blob: Blob; url: string; format: FormatId; output: OutputId; w: number; h: number; fileName: string };
@@ -33,7 +35,7 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
   const [stale, setStale] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [msg, setMsg] = useState('');
+  const making = useRef(false);
   const urls = useRef<string[]>([]);
   useEffect(() => () => { urls.current.forEach(u => URL.revokeObjectURL(u)); }, []);
 
@@ -53,8 +55,10 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
   const content = l ? buildPosterContent({ lang: dLang, listing: l, fields, selected, headline, agent: profile, agentChoice, showRef, maxFacts: format === 'a4' ? 8 : 6 }) : undefined;
 
   async function make() {
-    if (!l || !content) return;
-    setBusy(true); setFailed(false); setMsg('');
+    // One job at a time: a second tap while the design is being made does nothing (Change 013).
+    if (!l || !content || making.current) return;
+    making.current = true;
+    setBusy(true); setFailed(false);
     try {
       const imgs: (HTMLImageElement | undefined)[] = [];
       for (const p of chosen) {
@@ -73,7 +77,7 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
       const url = URL.createObjectURL(previewBlob); urls.current.push(url);
       setMade({ blob, url, format, output: out, w: canvas.width, h: canvas.height, fileName: marketingFileName(l.ref, t.fileBase, format, out) });
       setStale(false);
-    } catch { setFailed(true); setMade(null); } finally { setBusy(false); }
+    } catch { setFailed(true); setMade(null); } finally { making.current = false; setBusy(false); }
   }
 
   if (!l) return <section className="stack"><p className="warn-text" data-testid="ms-gone">{t.noProperty}</p></section>;
@@ -180,17 +184,14 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
       )}
 
       <button className="btn primary" disabled={busy} onClick={() => void make()} data-testid="ms-make">{busy ? t.making : made ? t.remake : t.make}</button>
+      {busy && <BusyLine text={c11Strings[lang].busy.ad} testId="ms-busy" />}
       {failed && <p className="warn-text" role="alert" data-testid="ms-failed">{t.failed}</p>}
       {made && (
         <div className="card stack-sm" data-testid="ms-result" data-format={made.format} data-output={made.output}>
           <small data-testid="ms-made">{t.made(t.formats[made.format], t.outputs[made.output], made.w, made.h, Math.max(1, Math.round(made.blob.size / 1024)))}</small>
           {stale && <p className="warn-text" role="status" data-testid="ms-stale">{t.stale}</p>}
           <img src={made.url} alt={made.fileName} className="ms-preview" data-testid="ms-preview" />
-          <div className="two">
-            <button className="btn secondary" onClick={() => setMsg(download(made.blob, made.fileName) ? t.downloaded : t.shareFailed)} data-testid="ms-download">{t.download}</button>
-            <button className="btn primary" onClick={async () => { const r = await shareOrDownload(made.blob, made.fileName, t.title); setMsg(r === 'shared' ? t.shared : r === 'downloaded' ? t.downloaded : r === 'cancelled' ? t.cancelled : t.shareFailed); }} data-testid="ms-share">{t.share}</button>
-          </div>
-          {msg && <p className="voice-msg" role="status" data-testid="ms-msg">{msg}</p>}
+          <FileActions lang={lang} blob={made.blob} fileName={made.fileName} title={t.title} mime={made.blob.type || undefined} downloadLabel={t.download} shareLabel={t.share} testPrefix="ms" />
         </div>
       )}
     </section>
