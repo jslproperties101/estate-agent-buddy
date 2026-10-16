@@ -68,11 +68,13 @@ export const MAP_TYPES: MapType[] = ['roadmap', 'satellite', 'hybrid'];
  *  - Map / Satellite / Hybrid, remembered for next time; switching keeps the position, zoom and every marker.
  * `follow`: the screen's `center` is a live position (House Shopping) — the map follows it until you drag.
  */
-export function MapView({ maps, markers, path, route, center, zoom = 15, fit, onMarkerClick, onMapClick, onMarkerDrag, height = 320, testId, me, meState, onLocate, follow = false, locate = true }: {
+export function MapView({ maps, markers, path, route, center, zoom = 15, fit, onMarkerClick, onMapClick, onMarkerDrag, height = 320, testId, me, meState, onLocate, follow = false, locate = true, compactTypes }: {
   maps: Maps; markers: MapMarker[]; path?: { lat: number; lng: number }[]; route?: { lat: number; lng: number }[];
   center?: { lat: number; lng: number }; zoom?: number; fit?: boolean;
   onMarkerClick?: (id: string) => void; onMapClick?: (lat: number, lng: number) => void; onMarkerDrag?: (id: string, lat: number, lng: number) => void;
   height?: number; testId?: string;
+  /** Change 015: smaller, shorter Map / Satellite / Hybrid buttons (the Add Location popup). */
+  compactTypes?: boolean;
   me?: { lat: number; lng: number; acc?: number } | null; follow?: boolean; locate?: boolean;
   /** When the screen supplies `me`: its GPS state and how to (re)start it, so the map reports refusals correctly. */
   meState?: PositionState; onLocate?: () => void;
@@ -213,7 +215,7 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
   return (
     <div className="gmap-wrap" style={{ height }}>
       <div ref={el} className="gmap" style={{ height }} data-testid={testId ?? 'gmap'} />
-      <div className="map-types" role="radiogroup" aria-label={ms.mapType} data-testid="map-types">
+      <div className={compactTypes ? 'map-types compact' : 'map-types'} role="radiogroup" aria-label={ms.mapType} data-testid="map-types">
         {MAP_TYPES.map(t => (
           <button key={t} type="button" role="radio" aria-checked={mapType === t} data-type={t}
             onClick={() => store.setSingleton('settings', { mapType: t })}>{ms.types[t]}</button>

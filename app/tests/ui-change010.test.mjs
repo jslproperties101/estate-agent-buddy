@@ -187,7 +187,7 @@ test('C4 the recipient: shared card shows the creator, Team/Personal switch, Vie
   await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Personal Workspace' }).click();
   assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).count(), 0, 'Personal Workspace: only my own');
   await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Team Workspace' }).click();
-  await card.locator('.gc').click();
+  await card.locator('.sc-card').click();
   await b.page.getByTestId('listing-details').waitFor();
   assert.match(await b.page.getByTestId('sharing-line').innerText(), /Created by Aina[\s\S]*Shared by Aina · Your access: View Only/i);
   assert.equal(await b.page.locator('.rec-actions').getByRole('button', { name: 'Edit' }).count(), 0);
@@ -206,7 +206,7 @@ test('C5 View and Edit: editor requests deletion, owner approves; the property g
   await syncNow(b.page);
   await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Team Workspace' }).click();
   await b.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).locator('.gc').click();
+  await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).locator('.sc-card').click();
   await b.page.getByTestId('listing-details').waitFor();
   assert.equal(await b.page.getByTestId('detail-delete').count(), 0, 'an editor cannot delete it');
   await b.page.getByTestId('request-delete').click();
@@ -232,7 +232,7 @@ test('C6 owner: Delete archives with confirmation; Restore; Delete permanently o
   const cloud = new FakeTeamCloud();
   const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1')]));
   await a.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByTestId('listing-card').first().locator('.sc-card').click();
   await a.page.getByTestId('detail-delete').click();
   assert.match(await a.page.getByRole('alertdialog').innerText(), /Archived section/i);
   await a.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
@@ -289,7 +289,7 @@ test('C9 View History: collapsed at the bottom, exact before/after, actor and Ma
   const cloud = new FakeTeamCloud(); cloud.available = false;
   const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1')]));
   await a.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByTestId('listing-card').first().locator('.sc-card').click();
   await a.page.getByRole('button', { name: 'Edit', exact: true }).first().click();
   await a.page.waitForSelector('[data-testid="listing-form"]');
   if ((await a.page.getByTestId('toggle-all').innerText()).match(/Open/)) await a.page.getByTestId('toggle-all').click();
@@ -311,7 +311,7 @@ test('C9 View History: collapsed at the bottom, exact before/after, actor and Ma
   const n = await vh.getByTestId('audit-entry').count();
   // Opening the record again is not logged.
   await a.page.locator('header .icon-btn').first().click();
-  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByTestId('listing-card').first().locator('.sc-card').click();
   await a.page.getByTestId('view-history').locator('summary').first().click();
   assert.equal(await a.page.getByTestId('view-history').getByTestId('audit-entry').count(), n);
   await home(a.page);
@@ -336,7 +336,7 @@ test('C10 export: preview with scope/filters/count/size, confirm, PDF and XLSX f
   const cloud = new FakeTeamCloud(); cloud.available = false;
   const a = await agent(cloud, 'aina@x.com', 'Aina', Object.fromEntries([prop('pa1', 'Jalan Aina 1', { ref: 'P1001', refNo: 1001 })]));
   await a.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await a.page.getByTestId('listing-card').first().locator('.gc').click();
+  await a.page.getByTestId('listing-card').first().locator('.sc-card').click();
   for (const v of ['Jalan Aina 2', 'Jalan Aina 3']) await editStreet(a.page, v);
   await a.page.getByTestId('view-history').locator('summary').first().click();
   await a.page.getByTestId('export-history').click();
@@ -456,7 +456,7 @@ test('C12 regression: a property shared by the other agent with the same number 
   await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [{ collection: 'properties', id: 'pa1', level: 'view' }] }) });
   await syncNow(b.page);
   await b.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' }).locator('.gc').click();
+  await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' }).locator('.sc-card').click();
   await editStreet(b.page, 'Jalan Badrul 10');
   assert.match(await b.page.getByTestId('detail-address').innerText(), /Jalan Badrul 10/);
   await a.ctx.close(); await b.ctx.close();

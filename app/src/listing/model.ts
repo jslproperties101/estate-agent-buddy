@@ -107,6 +107,8 @@ export interface Listing {
   state?: string;
   city?: string;
   township?: string;
+  /** Neighborhood / Taman (Change 015): optional, between Township and Street; kept exactly as typed. */
+  neighborhood?: string;
   /** Older records only: since Change 009 one "Unit/Lot Number" field (unitNo) holds both. Shown through unitLot(). */
   lotNo?: string;
   street?: string;

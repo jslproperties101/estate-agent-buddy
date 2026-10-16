@@ -4,15 +4,15 @@
 // pointOnly (Change 009: Add Location, and a banner's location): only the map point is chosen and saved. The address is
 // not read from Google, not compared and never changed.
 import { useEffect, useMemo, useState } from 'react';
+import { IconClose } from '../icons';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
 import { mapStrings } from './strings';
 import { MapView, MapsNotice, useGoogleMaps } from './MapView';
-import { reverseGeocode, searchPlaces, GeocodeResult, Suggestion } from './google';
+import { reverseGeocode, GeocodeResult } from './google';
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
-import { useImmersive } from '../adverts/AdBar';
 
 type FieldKey = 'country' | 'state' | 'city' | 'township' | 'street';
 const FIELDS: { key: FieldKey; list?: string; builtIns: () => readonly string[] }[] = [
@@ -41,9 +41,6 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
   const [geo, setGeo] = useState<GeocodeResult | null>(null);
   const [reading, setReading] = useState(false);
   const [noAddress, setNoAddress] = useState(false);
-  const [q, setQ] = useState('');
-  const [sugs, setSugs] = useState<Suggestion[]>([]);
-  const [searchOff, setSearchOff] = useState(false);
   const [choices, setChoices] = useState<Partial<Record<FieldKey, Choice>>>({});
   const [typing, setTyping] = useState<Partial<Record<FieldKey, string>>>({});
   const [picking, setPicking] = useState<FieldKey | null>(null);
@@ -61,17 +58,6 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
     } catch { setGeo(null); setNoAddress(true); }
     setReading(false);
   }
-
-  // Search suggestions as the agent types.
-  useEffect(() => {
-    if (!maps || q.trim().length < 3) { setSugs([]); return; }
-    let live = true;
-    const t = setTimeout(() => {
-      searchPlaces(maps, q, pos ?? undefined).then(x => { if (live) { setSugs(x); setSearchOff(x.length === 0 && !(maps as { importLibrary?: unknown }).importLibrary); } })
-        .catch(() => { if (live) { setSugs([]); setSearchOff(true); } });
-    }, 300);
-    return () => { live = false; clearTimeout(t); };
-  }, [q, maps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checks = useMemo(() => {
     const out: Partial<Record<FieldKey, FieldCheck>> = {};
@@ -109,52 +95,26 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
     onApply({ lat: pos.lat, lng: pos.lng, placeId: geo?.placeId, fields });
   }
 
-  const [gpsErr, setGpsErr] = useState<'denied' | 'off' | null>(null);
-  const [locating, setLocating] = useState(false);
-  function locate() {
-    setGpsErr(null);
-    if (!('geolocation' in navigator)) { setGpsErr('off'); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      p => { setLocating(false); void readAt(p.coords.latitude, p.coords.longitude); },
-      e => { setLocating(false); setGpsErr(e.code === 1 ? 'denied' : 'off'); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
-    );
-  }
-
   const label = (k: FieldKey) => m.field[k];
   const choose = (k: FieldKey, ch: Choice) => setChoices(x => ({ ...x, [k]: ch }));
 
-  // The map picker fills the screen, so the bottom advert is hidden while it is open (Change 011).
-  useImmersive(true);
+  // Change 015 (supersedes Change 011's "hidden while the picker is open"): a larger popup, but not full screen. It sits
+  // near the top with a small margin and ends above the fixed bottom advert, which stays visible, and never reaches the
+  // phone's navigation area. No place / address search here (no Places request); opening it asks for nothing: the map
+  // follows you only when location was already allowed, and the ◎ button on the map stays.
+  const mapH = usePopupMapHeight();
   return (
-    <div className="sheet-scrim" role="presentation">
-      <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="lp-t" data-testid="location-picker">
-        <div className="between"><h2 id="lp-t">{title ?? m.pickTitle}</h2><button className="btn small secondary" onClick={onCancel}>{c.close}</button></div>
+    <div className="sheet-scrim lp-scrim" role="presentation">
+      <div className="sheet lp-sheet" role="dialog" aria-modal="true" aria-labelledby="lp-t" data-testid="location-picker">
+        <div className="lp-head"><h2 id="lp-t">{title ?? m.pickTitle}</h2>
+          <button type="button" className="icon-btn lp-close" onClick={onCancel} aria-label={c.close} title={c.close} data-testid="picker-close"><IconClose /></button></div>
         <MapsNotice lang={lang} status={status} />
         {maps && (
           <>
-            <div className="search-box">
-              <input aria-label={m.searchPh} placeholder={m.searchPh} value={q} onChange={e => setQ(e.target.value)} />
-              {sugs.length > 0 && (
-                <ul className="sugs">
-                  {sugs.map((s, i) => (
-                    <li key={i}><button type="button" onClick={async () => {
-                      setSugs([]); setQ(s.text);
-                      const r = await s.select().catch(() => null);
-                      if (r) { setPos({ lat: r.lat, lng: r.lng }); if (!pointOnly) setGeo(r); setChoices({}); setNoAddress(false); }
-                    }}><strong>{s.text}</strong>{s.secondary && <small className="muted"> {s.secondary}</small>}</button></li>
-                  ))}
-                </ul>
-              )}
-              {searchOff && q.trim().length >= 3 && <small className="muted">{m.searchUnavailable}</small>}
-            </div>
             <small className="muted">{m.tapHint}</small>
-            <MapView maps={maps} center={pos ?? undefined} zoom={pos ? 17 : 13} height={260} testId="picker-map"
+            <MapView maps={maps} center={pos ?? undefined} zoom={pos ? 17 : 13} height={mapH} testId="picker-map" compactTypes
               markers={pos ? [{ id: 'pick', lat: pos.lat, lng: pos.lng, kind: 'pick' }] : []}
               onMapClick={(lat, lng) => void readAt(lat, lng)} onMarkerDrag={(_, lat, lng) => void readAt(lat, lng)} />
-            <button className="btn secondary" onClick={locate} disabled={locating} data-testid="picker-gps">📍 {locating ? m.locatingMe : m.myLocation}</button>
-            {gpsErr && <p className="error" role="alert">{gpsErr === 'denied' ? m.meDenied : m.check.gpsOff}</p>}
             {pos && <small className="ok-text" data-testid="picker-pos">{pointOnly ? `✓ ${ls.n9.pointChosen}` : ls.position(pos.lat.toFixed(5), pos.lng.toFixed(5))}</small>}
             {pointOnly && <small className="muted" data-testid="point-only-note">{ls.n9.pointOnlyNote}</small>}
           </>
@@ -223,4 +183,22 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
       </div>
     </div>
   );
+}
+
+/** The popup's map height: most of the screen between the top margin and the bottom advert, leaving room for the title,
+ *  the hint, the chosen-point line and the two buttons. Follows screen rotation and advert height changes. */
+function usePopupMapHeight(): number {
+  const calc = () => {
+    if (typeof window === 'undefined') return 420;
+    const ad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ad-h')) || 0;
+    return Math.max(260, Math.round(window.innerHeight - ad - 250));
+  };
+  const [h, setH] = useState(calc);
+  useEffect(() => {
+    const on = () => setH(calc());
+    window.addEventListener('resize', on);
+    const t = setInterval(on, 1000); // the advert height arrives after the banner loads
+    return () => { window.removeEventListener('resize', on); clearInterval(t); };
+  }, []);
+  return h;
 }

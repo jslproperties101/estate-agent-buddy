@@ -8,7 +8,7 @@
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 
 const cfg = JSON.parse(readFileSync('capacitor.config.json', 'utf8'));
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -106,6 +106,63 @@ edit('android/app/build.gradle', s => {
     }`);
   }
   return s;
+});
+
+// 5. Change 015: the phone's own navigation area (gesture bar or back / home / recent buttons) is solid black on every
+//    screen, and the app's content (the web page and the AdMob banner inside it) ends directly above it. Android 15+
+//    draws apps edge to edge, under the navigation area; here the content view is padded by the system bars instead, so
+//    the advert can never sit over the gesture controls and the area under it shows the black window. Nothing else in
+//    the generated activity changes.
+if (existsSync(styles)) edit(styles, s => (s.includes('android:navigationBarColor') ? s
+  : s.replace(/(<style name="AppTheme.NoActionBar"[^>]*>)/, '$1\n        <item name="android:navigationBarColor">@android:color/black</item>')));
+const javaRoot = `${A}/java`;
+const findMain = dir => {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) { const f = findMain(p); if (f) return f; } else if (e.name === 'MainActivity.java') return p;
+  }
+  return null;
+};
+const mainActivity = existsSync(javaRoot) ? findMain(javaRoot) : null;
+if (!mainActivity) throw new Error('MainActivity.java not found: run "npx cap add android" first.');
+edit(mainActivity, s => {
+  if (s.includes('Change 015')) return s;
+  if (!/public class MainActivity extends BridgeActivity\s*\{\s*\}/.test(s)) throw new Error(`${mainActivity} is not the plain Capacitor template; not changing it.`);
+  const pkgLine = /^package [^;]+;/m.exec(s)?.[0];
+  if (!pkgLine) throw new Error(`No package line in ${mainActivity}`);
+  return `${pkgLine}
+
+import android.graphics.Color;
+import android.os.Build;
+import android.os.Bundle;
+import android.view.View;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Change 015: solid black system navigation area; app content (web page and AdMob banner) directly above it.
+        getWindow().getDecorView().setBackgroundColor(Color.BLACK);
+        getWindow().setNavigationBarColor(Color.BLACK);
+        if (Build.VERSION.SDK_INT >= 29) getWindow().setNavigationBarContrastEnforced(false);
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(false);
+        View content = findViewById(android.R.id.content);
+        if (content != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                return WindowInsetsCompat.CONSUMED;
+            });
+            ViewCompat.requestApplyInsets(content);
+        }
+    }
+}
+`;
 });
 
 console.log(`Android project configured: ${APP_NAME} (${APP_ID}${QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);

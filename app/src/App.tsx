@@ -82,6 +82,12 @@ import { auditStrings } from './audit/strings';
 import { ExportManagementScreen, AuditExportScreen } from './exports/ExportsUI';
 import { exportStrings } from './exports/strings';
 
+/** Change 015: the page content is the one scrolling region (main.content); a new screen starts at its top. */
+function scrollTop() {
+  try { document.querySelector('main.content')?.scrollTo(0, 0); } catch { /* old browser */ }
+  window.scrollTo(0, 0);
+}
+
 // Change 010: a Team Workspace invitation link the app was opened with is kept until the person deals with it.
 if (typeof window !== 'undefined') captureInviteFromUrl();
 
@@ -239,14 +245,14 @@ function Shell() {
   const go: Go = useCallback((next, opts) => {
     if (!opts?.replace) { stack.current.push(screen); window.history.pushState({ eab: stack.current.length }, ''); }
     setScreen(next);
-    window.scrollTo(0, 0);
+    scrollTop();
   }, [screen]);
   const back = useCallback(() => {
     if (stack.current.length) window.history.back(); else setScreen({ name: 'home' });
   }, []);
   // The Android back button and the browser's Back both arrive here.
   useEffect(() => {
-    const onPop = () => { const prev = stack.current.pop(); setScreen(prev ?? { name: 'home' }); window.scrollTo(0, 0); };
+    const onPop = () => { const prev = stack.current.pop(); setScreen(prev ?? { name: 'home' }); scrollTop(); };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);

@@ -35,6 +35,8 @@ import { readDetails, ChangeKey } from './commands';
 import { BUILTIN_PREFIXES, checkRef, defaultPrefix, makeRef, nextNumber, checkPrefix, numberChoices } from '../domain/refs';
 import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '../domain/places';
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
+import { c15Strings } from '../ui/c015Strings';
+import { makeMainPhoto, removePhoto } from './change015';
 import { FieldHelp } from '../ui/FieldHelp';
 import { ContactBox, ContactValue, aliasValue } from '../ui/ContactBox';
 import type { PickedContact } from '../lib/phonebook';
@@ -54,7 +56,7 @@ const SECTION_KEYS: Record<string, string[]> = {
   basics: ['type', 'purpose'],
   tenure: ['askingPrice', 'negotiable', 'commissionPct', 'commissionFlat', 'monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat', 'securityDepositMonths', 'utilityDepositMonths',
     'tenure', 'leaseExpiryYear', 'titleType', 'landUse', 'restriction'],
-  location: ['country', 'state', 'city', 'township', 'unitNo', 'street', 'mapsLink', 'lat'],
+  location: ['country', 'state', 'city', 'township', 'neighborhood', 'street', 'unitNo', 'mapsLink', 'lat'],
   details: ['landSqft', 'builtUpSqft', 'frontageFt', 'depthFt', 'bedrooms', 'bathrooms', 'floors', 'parking', 'lotType', 'furnishing', 'extraComments', 'maintenanceFee'],
   specs: ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'approvals', 'currentUse', 'roadAccess', 'specs'],
   availability: ['availability', 'availableFrom', 'condition', 'features'],
@@ -104,8 +106,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [refNoText, setRefNoText] = useState(String(d.refNo ?? ''));
   const refNoInit = useRef(refNoText);
   const [busy, setBusy] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [posErr, setPosErr] = useState(false);
   const [words, setWords] = useState('');
   const [wordsMsg, setWordsMsg] = useState('');
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -134,6 +134,15 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const toggle = (sid: string) => setOpen(o => { const n = new Set(o); if (n.has(sid)) n.delete(sid); else n.add(sid); return n; });
   const addedFiles = useRef<string[]>([]);
   const removedFiles = useRef<string[]>([]);
+  const c15 = c15Strings[lang];
+  /** Change 015: the photo whose small menu is open (one at a time); any tap elsewhere closes it. */
+  const [photoMenu, setPhotoMenu] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photoMenu) return;
+    const close = () => setPhotoMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [photoMenu]);
   // Draft autosave: what is typed here survives closing the app; it is not a saved record until Save is pressed.
   const draft = useDraft<Listing>({
     collection: 'properties', existing: initial, value: d, apply: setD, extra: refNoText, variant: prefill,
@@ -278,16 +287,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     setBusy(false);
   }
 
-  function locate() {
-    setPosErr(false);
-    if (!('geolocation' in navigator)) { setPosErr(true); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      p => { setLocating(false); setD(prev => ({ ...prev, lat: p.coords.latitude, lng: p.coords.longitude, geoAccuracy: Math.round(p.coords.accuracy), geoSource: 'gps' })); },
-      () => { setLocating(false); setPosErr(true); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 },
-    );
-  }
   /** Add Location (Change 009): only the chosen map point is saved. The typed address is never read back or changed. */
   function applyLocation(r: LocationResult) {
     setD(prev => ({ ...prev, lat: r.lat, lng: r.lng, placeId: undefined, geoSource: 'google', geoAccuracy: undefined }));
@@ -615,15 +614,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Opt({ k: 'state', listKey: 'state', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? MY_STATES : [] })}
         {Opt({ k: 'city', listKey: 'city', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? citiesFor(d.state) : [] })}
         {Opt({ k: 'township', listKey: 'township', builtIns: (d.country ?? DEFAULT_COUNTRY) === 'Malaysia' ? townshipsFor(d.city) : [] })}
+        {/* Change 015: Country → State → City → Township → Neighborhood → Street → Unit Number or Lot Number. */}
+        {Text({ k: 'neighborhood' })}
         {Text({ k: 'street' })}
         {Text({ k: 'unitNo' })}
         <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
         <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
-        <div className="two">
-          <button className="btn secondary" onClick={locate} disabled={locating}>{locating ? s.locating : s.useMyLocation}</button>
-          <button className="btn secondary" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
-        </div>
-        {posErr && <p className="error" role="alert">{s.posError}</p>}
+        {/* Change 015: no "Use my current location" here; Remove Position works as before. */}
+        <button className="btn secondary" data-testid="remove-position" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
         <label className="ff">
           <span>{s.l.mapsLink}</span>
           <input data-field="mapsLink" type="url" inputMode="url" autoComplete="off" placeholder={s.n9.mapsLinkPh} value={mapsLinkText} onChange={e => setMapsLink(e.target.value)} />
@@ -647,14 +645,25 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
                 <StoredImage fileId={p.fileId} url={p.url} />
                 <button type="button" className="pg-handle" aria-label={s.n9.dragLabel(i + 1)} title={s.n9.dragHint} data-testid="photo-drag" {...dragProps(i)}>⠿</button>
                 {i === 0 && <span className="pg-main" data-testid="photo-main">{s.mainPhoto}</span>}
-                <div className="pg-moves">
-                  <button type="button" className="btn small secondary" disabled={busy || i === 0} aria-label={s.n9.moveEarlier(i + 1)} onClick={() => reorder(i, i - 1)}>◀</button>
-                  <button type="button" className="btn small secondary" disabled={busy || i === d.photos.length - 1} aria-label={s.n9.moveLater(i + 1)} onClick={() => reorder(i, i + 1)}>▶</button>
+                {/* Change 015: one small menu per photo, with exactly Make as Main Photo and Remove (no arrows, no Remove button). */}
+                <div className="pg-menu-wrap">
+                  <button type="button" className="pg-menu-btn" aria-haspopup="menu" aria-expanded={photoMenu === p.id} disabled={busy}
+                    aria-label={c15.photo.menu(i + 1)} data-testid="photo-menu" onClick={e => { e.stopPropagation(); setPhotoMenu(m => (m === p.id ? null : p.id)); }}>⋮</button>
+                  {photoMenu === p.id && (
+                    <div className="pg-menu" role="menu" data-testid="photo-menu-list" onClick={e => e.stopPropagation()}>
+                      <button type="button" role="menuitem" data-testid="photo-make-main" disabled={i === 0} onClick={() => {
+                        setPhotoMenu(null);
+                        setD(prev => ({ ...prev, ...makeMainPhoto(prev.photos, p.id) }));
+                      }}>{c15.photo.makeMain}</button>
+                      <button type="button" role="menuitem" className="danger-text" data-testid="photo-remove" onClick={() => {
+                        setPhotoMenu(null);
+                        // Same as before: the file is only removed from the phone when the property is saved.
+                        if (p.fileId) removedFiles.current.push(p.fileId);
+                        setD(prev => { const r = removePhoto(prev.photos, p.id); return { ...prev, photos: r.photos, mainPhotoId: r.mainPhotoId }; });
+                      }}>{c15.photo.remove}</button>
+                    </div>
+                  )}
                 </div>
-                <button className="btn small secondary danger-text" disabled={busy} onClick={() => {
-                  if (p.fileId) removedFiles.current.push(p.fileId);
-                  setD(prev => { const photos = prev.photos.filter(x => x.id !== p.id); return { ...prev, photos, mainPhotoId: photos[0]?.id }; });
-                }}>{s.remove}</button>
               </div>
             ))}
           </div>

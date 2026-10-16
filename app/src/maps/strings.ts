@@ -49,7 +49,7 @@ const en = {
   },
   mapType: 'Map type', types: { roadmap: 'Map', satellite: 'Satellite', hybrid: 'Hybrid' } as Record<string, string>, recentre: 'My location: show where I am and follow',
   myPosition: 'Show my position', locatingMe: 'Finding your position…', meDenied: 'Location permission was refused. Allow location for this app in the phone settings.',
-  field: { country: 'Country', state: 'State', city: 'City / town', township: 'Township', street: 'Jalan / street' } as Record<string, string>,
+  field: { country: 'Country', state: 'State', city: 'City', township: 'Township', street: 'Street' } as Record<string, string>,
 };
 export type MapStrings = typeof en;
 
@@ -100,7 +100,7 @@ const bm: MapStrings = {
   },
   mapType: 'Jenis peta', types: { roadmap: 'Peta', satellite: 'Satelit', hybrid: 'Hibrid' }, recentre: 'Lokasi saya: tunjuk di mana saya dan ikut',
   myPosition: 'Tunjuk kedudukan saya', locatingMe: 'Mencari kedudukan anda…', meDenied: 'Kebenaran lokasi ditolak. Benarkan lokasi untuk aplikasi ini dalam tetapan telefon.',
-  field: { country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Taman / kawasan', street: 'Jalan' },
+  field: { country: 'Negara', state: 'Negeri', city: 'Bandar', township: 'Kawasan', street: 'Jalan' },
 };
 
 const zh: MapStrings = {
@@ -150,7 +150,7 @@ const zh: MapStrings = {
   },
   mapType: '地图类型', types: { roadmap: '地图', satellite: '卫星', hybrid: '混合' }, recentre: '我的位置：显示并跟随我的位置',
   myPosition: '显示我的位置', locatingMe: '正在获取您的位置…', meDenied: '位置权限被拒绝。请在手机设置中允许本应用使用位置。',
-  field: { country: '国家', state: '州属', city: '城市 / 镇', township: '花园 / 区', street: '街道' },
+  field: { country: '国家', state: '州属', city: '城市', township: '区', street: '街道' },
 };
 
 export const mapStrings: Record<Lang, MapStrings> = titled3({ en, bm, zh });

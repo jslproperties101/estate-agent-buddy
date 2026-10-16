@@ -16,9 +16,9 @@ import { listingStrings, ListingStrings, typeLabel } from './strings';
 import {
   Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, STATUSES, CATEGORIES,
   rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, rentCommissionRm, forRent, forSale, fieldsFor,
-  missingDetails, CONFIDENTIAL_DOCS, DOC_CATEGORIES, hasPosition, phoneDigits, usablePhone, Doc, orderedPhotos, unitLot, restrictionValue,
+  CONFIDENTIAL_DOCS, DOC_CATEGORIES, hasPosition, phoneDigits, usablePhone, Doc, orderedPhotos, unitLot, restrictionValue,
 } from './model';
-import { shownState, toCheck, VerifyState } from './verify';
+import { shownState, VerifyState } from './verify';
 import { Change } from './commands';
 import { adStrings } from '../adverts/strings';
 import { photoStrings } from '../photos/strings';
@@ -42,6 +42,9 @@ import { useToast } from '../ui/toast';
 import { fmtDateTime } from '../lib/dates';
 import { c11Strings } from '../ui/c011Strings';
 import { FeedAd, withFeedAds } from '../adverts/AdBar';
+import { c15Strings } from '../ui/c015Strings';
+import { IconGear } from '../icons';
+import { transactionLabels, specLines, checkAndMissing } from './change015';
 
 export type Layout = 'grid' | 'large';
 
@@ -74,19 +77,8 @@ function availabilityText(l: Listing, s: ListingStrings, lang: Lang): string | u
   return s.availability[l.availability];
 }
 
-function Facts({ l, s }: { l: Listing; s: ListingStrings }) {
-  const items: [string, string][] = [];
-  if (l.landSqft !== undefined) items.push(['landSqft', `${l.landSqft >= 43560 ? `${(l.landSqft / 43560).toFixed(1)} acres` : sqft(l.landSqft)} ${s.land}`]);
-  if (l.builtUpSqft !== undefined) items.push(['builtUpSqft', `${sqft(l.builtUpSqft)} ${s.builtUp}`]);
-  if (l.bedrooms !== undefined) items.push(['bedrooms', `${l.bedrooms} ${s.beds}`]);
-  if (l.bathrooms !== undefined) items.push(['bathrooms', `${l.bathrooms} ${s.baths}`]);
-  if (l.parking !== undefined) items.push(['parking', `${l.parking} ${s.parking}`]);
-  if (!items.length) return null;
-  return <div className="lc-facts">{items.map(([k, x]) => <span key={k}><VVal l={l} k={k}>{x}</VVal></span>)}</div>;
-}
-
 /** Tenure together with the restriction, then storeys and lot type (Change 009). Each value in its check colour. */
-function TenureLine({ l, s }: { l: Listing; s: ListingStrings }) {
+function TenureLine({ l, s, noStoreys }: { l: Listing; s: ListingStrings; noStoreys?: boolean }) {
   // Written with spans only, so it can sit inside the card's tap area (a button).
   const yrs = yearsRemaining(l);
   const r = restrictionValue(l.restriction);
@@ -94,8 +86,9 @@ function TenureLine({ l, s }: { l: Listing; s: ListingStrings }) {
   if (l.tenure) parts.push(<VVal key="tenure" l={l} k="tenure">{s.tenure[l.tenure] + (yrs !== undefined ? ` · ${s.yearsLeft(yrs)}` : '')}</VVal>);
   if (r) parts.push(<VVal key="restriction" l={l} k="restriction">{s.restrictions[r] ?? r}</VVal>);
   const more: JSX.Element[] = [];
-  if (l.floors !== undefined) more.push(<VVal key="floors" l={l} k="floors">{`${l.floors} ${s.l.floors}`}</VVal>);
-  if (l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType]}</span>);
+  // Change 015: on Subsale List cards storeys and lot type are in the specification lines instead.
+  if (!noStoreys && l.floors !== undefined) more.push(<VVal key="floors" l={l} k="floors">{`${l.floors} ${s.l.floors}`}</VVal>);
+  if (!noStoreys && l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType]}</span>);
   if (!parts.length && !more.length) return null;
   return (
     <span className="lc-tenure" data-testid="card-tenure">
@@ -148,22 +141,12 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const openIt = (l: Listing) => go({ name: 'listingDetail', id: l.id });
   const c11 = c11Strings[lang];
   const toast = useToast();
-  const [deleting, setDeleting] = useState<Listing | null>(null);
-  // Change 011: the card's red Delete is the same recoverable archive as Delete on the detail page (Change 010): the record,
-  // its ID and reference, photos, documents, notes and links all stay, and Restore brings the same record back. Someone
-  // a property is shared with as View and Edit asks its owner instead; anyone else is told they may not.
-  const askDelete = (l: Listing) => {
+  // Change 015: the card has no Delete or Open buttons any more. The card itself opens the property; the gold gear opens
+  // its form. Delete stays on the property page (the same recoverable archive, Change 010); Restore stays below.
+  const editIt = (l: Listing) => {
     const now = store.getState();
-    if (can(now, 'archive', 'properties', l.id) || can(now, 'requestDelete', 'properties', l.id)) setDeleting(l); else toast(ts.notAllowed, 'error');
+    if (can(now, 'edit', 'properties', l.id) && !now.properties.find(x => x.id === l.id)?.archived) go({ name: 'listingForm', id: l.id }); else toast(ts.notAllowed, 'error');
   };
-  function archiveFromCard(l: Listing) {
-    const now = store.getState();
-    const cur = now.properties.find(x => x.id === l.id);
-    if (!cur) return;
-    if (can(now, 'archive', 'properties', cur.id)) { store.upsert('properties', { ...cur, archived: { at: Date.now(), by: myId(now) } }); toast(c11.card.archived); return; }
-    if (can(now, 'requestDelete', 'properties', cur.id)) { void requestDelete(store, config(now.settings), 'properties', cur.id).then(() => toast(ts.requested), e => toast(ts.err[teamErrorOf(e).code] ?? ts.err.other, 'error')); return; }
-    toast(ts.notAllowed, 'error');
-  }
   function restore(l: Listing) {
     const now = store.getState();
     const cur = now.properties.find(x => x.id === l.id);
@@ -252,40 +235,12 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
       <div className="small muted" data-testid="listing-count">{s.results(shown.length, listings.length)}</div>
       {listings.length === 0 ? <p className="muted empty" data-testid="listing-empty">{s.empty}</p> : shown.length === 0 && <p className="muted">{s.none}</p>}
 
-      {layout === 'grid' ? (
-        <ul className="lc-grid" data-layout="grid">
-          {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
-            <li key={x.item.id} data-testid="listing-card">
-              <GridCardButton l={x.item} s={s} onOpen={() => openIt(x.item)} />
-              <CardActions l={x.item} lang={lang} onOpen={() => openIt(x.item)} onDelete={() => askDelete(x.item)} />
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="lc-list" data-layout="large">
-          {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (() => { const l = x.item; return (
-            <li key={l.id} className="lc-card tappable" data-testid="listing-card" onClick={() => openIt(l)}>
-              <CardPhoto l={l} s={s} className="lc-photo" />
-              <div className="lc-body">
-                <div className="lc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</div>
-                {typeOnly(l, s) && <div className="lc-type">{typeOnly(l, s)}</div>}
-                <strong className="lc-price"><PriceLine l={l} s={s} /></strong>
-                <Facts l={l} s={s} />
-                {availabilityText(l, s, lang) && <div className="lc-meta">{availabilityText(l, s, lang)}</div>}
-                <TenureLine l={l} s={s} />
-                {l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
-                <div className="between lc-foot">
-                  <span className="lc-owner">{ownerName(l) ? `${s.owner}: ${ownerName(l)}` : ''}</span>
-                  <CreatorTag state={state} collection="properties" id={l.id} />
-                </div>
-                <CardActions l={l} lang={lang} onOpen={() => openIt(l)} onDelete={() => askDelete(l)} />
-              </div>
-            </li>
-          ); })())}
-        </ul>
-      )}
-      {deleting && <Confirm lang={lang} title={ts.archiveQ} body={`${cardTitle(deleting) || s.untitled} — ${ts.archiveBody}`} okLabel={c11.card.del}
-        onCancel={() => setDeleting(null)} onOk={() => { archiveFromCard(deleting); setDeleting(null); }} />}
+      <ul className={layout === 'grid' ? 'lc-grid sc-list' : 'lc-list sc-list'} data-layout={layout}>
+        {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
+          <SubsaleCard key={x.item.id} l={x.item} lang={lang} large={layout === 'large'} owner={ownerName(x.item)}
+            onOpen={() => openIt(x.item)} onEdit={() => editIt(x.item)} />
+        ))}
+      </ul>
 
       {archivedList.length > 0 && (
         <details className="card stack-sm archived-section" data-testid="archived-section">
@@ -344,7 +299,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const owner = vendor?.name ?? l.ownerName;
   const phone = vendor?.phone ?? l.ownerPhone;
   const whatsapp = vendor?.whatsapp ?? l.ownerWhatsapp;
-  const missing = missingDetails(l);
+  const { check: unsure, missing } = checkAndMissing(l);
   const edit = (section: FormSection) => (canEdit && !l.archived ? () => go({ name: 'listingForm', id: l.id, section }) : undefined);
   const guarded = (action: Parameters<typeof can>[1], f: () => void) => () => { if (can(store.getState(), action, 'properties', l.id)) f(); else toast(ts.notAllowed, 'error'); };
   const vs = (k: string) => shownState(l, k);
@@ -352,7 +307,6 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   const row = (k: string, v?: string | number) => (v === undefined || v === '' ? null : (
     <div key={k} className="dl-row" data-row={k}><dt>{s.l[k] ?? k}</dt><dd><VVal l={l} k={k}>{v}</VVal>{vs(k) && <> <VerifyChip state={vs(k)} s={s} /></>}</dd></div>
   ));
-  const unsure = toCheck(l);
   const callable = usablePhone(phone);
   const numRow = (k: keyof Listing, fmt: (n: number) => string = String) => (l[k] === undefined ? null : row(k, fmt(l[k] as number)));
   const depositRm = l.monthlyRent !== undefined ? l.monthlyRent * ((l.securityDepositMonths ?? 0) + (l.utilityDepositMonths ?? 0)) : undefined;
@@ -437,8 +391,21 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         onCancel={() => setAskRequest(false)} onOk={() => { setAskRequest(false); void requestDelete(store, config(store.getState().settings), 'properties', l.id).then(() => toast(ts.requested), e => toast(ts.err[teamErrorOf(e).code] ?? ts.err.other, 'error')); }} />}
 
       <SectionCard title={s.sec.missing} className={missing.length ? 'missing' : ''} testId="missing" onEdit={edit(missing.includes('lat') && missing.length === 1 ? 'location' : 'basics')} editLabel={EL}>
-        {unsure.length > 0 && <p className="small" data-testid="verify-summary"><strong>⚠ {s.verify.summary(unsure.length)}:</strong> {unsure.map(k => s.l[k] ?? k).join(', ')}</p>}
-        {missing.length ? <div className="lc-facts">{missing.map(k => <span key={k}>{s.l[k] ?? k}</span>)}</div> : <small className="ok-text">{s.missingNone}</small>}
+        {/* Change 015: every field to check and every field not filled on its own row, never one long sentence. The same
+            lists as the card's two counts (an empty field is "not filled" only); the Change 009 states are unchanged. */}
+        {unsure.length > 0 && (
+          <div className="stack-sm" data-testid="verify-summary" data-n={unsure.length}>
+            <strong className="small">⚠ {c15Strings[lang].details.toCheckTitle(unsure.length)}</strong>
+            <ul className="field-rows">{unsure.map(k => <li key={k} data-testid="to-check-row" data-key={k}><span>{s.l[k] ?? k}</span><VerifyChip state={vs(k)} s={s} /></li>)}</ul>
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div className="stack-sm" data-testid="not-filled" data-n={missing.length}>
+            <strong className="small">{c15Strings[lang].details.notFilledTitle(missing.length)}</strong>
+            <ul className="field-rows">{missing.map(k => <li key={k} data-testid="not-filled-row" data-key={k}><span>{s.l[k] ?? k}</span></li>)}</ul>
+          </div>
+        )}
+        {!missing.length && <small className="ok-text">{s.missingNone}</small>}
       </SectionCard>
 
       <SectionCard title={s.sec.basics} onEdit={edit('basics')} editLabel={EL} testId="sec-basics">
@@ -474,8 +441,9 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
 
       <SectionCard title={s.sec.location} onEdit={edit('location')} editLabel={EL} testId="sec-location-view">
         <dl className="dl">
+          {/* Change 015: Country → State → City → Township → Neighborhood → Street → Unit Number or Lot Number. */}
           {row('country', l.country && (s.countries[l.country] ?? l.country))}{row('state', l.state)}{row('city', l.city)}{row('township', l.township)}
-          {row('unitNo', unitLot(l))}{row('street', l.street)}
+          {row('neighborhood', l.neighborhood)}{row('street', l.street)}{row('unitNo', unitLot(l))}
           {hasPosition(l) && <div className="dl-row" data-row="lat"><dt>{s.l.lat}</dt><dd className="ok-text" data-testid="location-saved">✓ {s.n9.locationSaved}{l.geoSource ? ` (${s.geoSource[l.geoSource]})` : ''}</dd></div>}
           {l.mapsLink && <div className="dl-row" data-row="mapsLink"><dt>{s.l.mapsLink}</dt><dd><a href={l.mapsLink} target="_blank" rel="noreferrer" data-testid="maps-link" className="break">{l.mapsLink}</a></dd></div>}
         </dl>
@@ -615,14 +583,62 @@ export function GridCardButton({ l, s, onOpen, extra }: { l: Listing; s: Listing
   );
 }
 
-/** Change 011: the card's two actions, side by side and the same size: a red Delete (a recoverable archive) and Open. */
-function CardActions({ l, lang, onOpen, onDelete }: { l: Listing; lang: Lang; onOpen: () => void; onDelete: () => void }) {
-  const t = c11Strings[lang].card;
-  const label = cardTitle(l) || listingStrings[lang].untitled;
+/** Change 015: one Subsale List card (Grid and Large). The whole card opens the property (one stretched button under the
+ *  content); the small gold gear at the far right of the title row is a separate button that opens the form, so a tap on
+ *  it never opens the card. Under the gear: FOR SALE and / or FOR RENT from the property's own purpose. On the photo:
+ *  the status (green AVAILABLE) at the top right, no purpose badge. Then the price, the specification lines in the agreed
+ *  order, tenure and restriction, the two counts, and "Click to open" at the bottom centre (plain text, not a button). */
+function SubsaleCard({ l, lang, large, owner, onOpen, onEdit }: { l: Listing; lang: Lang; large: boolean; owner?: string; onOpen: () => void; onEdit: () => void }) {
+  const { state } = useApp();
+  const s = listingStrings[lang];
+  const t = c15Strings[lang].card;
+  const label = cardTitle(l) || s.untitled;
+  const p = mainPhoto(l)!;
+  const tx = transactionLabels(l);
+  const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] : undefined });
+  const { check, missing } = checkAndMissing(l);
+  const avail = availabilityText(l, s, lang);
   return (
-    <div className="card-actions" onClick={e => e.stopPropagation()}>
-      <button type="button" className="card-del" data-testid="card-delete" aria-label={`${t.del}: ${label}`} onClick={onDelete}>{t.del}</button>
-      <button type="button" className="open-gold" data-testid="card-open" aria-label={`${t.open}: ${label}`} onClick={onOpen}>{t.open}</button>
-    </div>
+    <li className={`sc ${large ? 'sc-large' : 'sc-grid'}`} data-testid="listing-card" data-id={l.id}>
+      {/* A tap anywhere on the card opens it; the full-size button under the content gives keyboards and screen readers
+          the same action (its click reaches the card's handler). */}
+      <article className="sc-card" onClick={onOpen}>
+        <button type="button" className="sc-open" data-testid="card-open-area" aria-label={t.openOf(label)} />
+        <span className={`sc-photo ${large ? 'wide' : ''}`}>
+          <StoredImage fileId={p.fileId} url={p.url} />
+          {l.status && <span className={`sc-status st-${l.status}`} data-testid="card-status" data-status={l.status}>{s.status[l.status]}</span>}
+          {(p.sample || l.sample) && <span className="lc-sample">{p.sample ? s.samplePic : s.sample}</span>}
+        </span>
+        <div className="sc-body">
+          <div className="sc-head">
+            <div className="sc-side">
+              <button type="button" className="sc-gear" data-testid="card-edit" aria-label={t.editOf(label)} title={t.edit}
+                onClick={e => { e.stopPropagation(); onEdit(); }}><IconGear size={18} /></button>
+              {tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}
+            </div>
+            <div className="sc-title" data-testid="card-address">{label}</div>
+          </div>
+          <strong className="sc-price"><PriceLine l={l} s={s} short={!large} /></strong>
+          {lines.map(ln => (
+            <span key={ln.key} className="sc-spec" data-testid="card-spec" data-spec={ln.key}>
+              {ln.parts.map((x, i) => <span key={x.k}>{i > 0 && ', '}<VVal l={l} k={x.k}>{x.text}</VVal></span>)}
+            </span>
+          ))}
+          {l.parking !== undefined && <span className="sc-spec" data-testid="card-spec" data-spec="parking"><VVal l={l} k="parking">{t.parking(l.parking)}</VVal></span>}
+          {avail && <span className="lc-meta">{avail}</span>}
+          <TenureLine l={l} s={s} noStoreys />
+          {(check.length > 0 || missing.length > 0) && (
+            <span className="sc-counts" data-testid="card-counts">
+              {check.length > 0 && <span className="sc-count sc-check" data-testid="card-to-check" data-n={check.length}>{t.toCheck(check.length)}</span>}
+              {missing.length > 0 && <span className="sc-count sc-missing" data-testid="card-not-filled" data-n={missing.length}>{t.notFilled(missing.length)}</span>}
+            </span>
+          )}
+          {large && l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
+          {large && owner && <span className="lc-owner">{`${s.owner}: ${owner}`}</span>}
+          <CreatorTag state={state} collection="properties" id={l.id} />
+          <span className="sc-hint" data-testid="card-click-to-open" aria-hidden="true">{t.clickToOpen}</span>
+        </div>
+      </article>
+    </li>
   );
 }

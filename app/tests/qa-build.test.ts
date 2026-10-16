@@ -65,6 +65,10 @@ function project(): string {
   writeFileSync(join(main, 'res/values/styles.xml'), '<resources><style name="AppTheme.NoActionBar" parent="x"></style></resources>');
   writeFileSync(join(d, 'android/app/build.gradle'), 'android {\n    namespace "com.jslproperties.estateagentbuddy"\n    defaultConfig {\n        applicationId "com.jslproperties.estateagentbuddy"\n        versionCode 1\n        versionName "1.0"\n    }\n}\n');
   mkdirSync(join(d, 'android-config'), { recursive: true });
+  // The activity exactly as `npx cap add android` generates it (Change 015 adds the system-bar handling to it).
+  const pkg = join(main, 'java/com/jslproperties/estateagentbuddy');
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(join(pkg, 'MainActivity.java'), 'package com.jslproperties.estateagentbuddy;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {}\n');
   return d;
 }
 const setup = (dir: string, qa: boolean) => spawnSync(process.execPath, [resolve('scripts/android-setup.mjs')], { cwd: dir, env: { ...process.env, GITHUB_RUN_NUMBER: '7', EAB_QA: qa ? '1' : '' }, encoding: 'utf8' });
@@ -101,6 +105,19 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
     assert.match(m, /<meta-data android:name="com\.google\.android\.gms\.ads\.APPLICATION_ID" android:value="ca-app-pub-5995234129917229~3821658996" \/>/);
     assert.match(m, /WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/);
   }
+  // Change 015: black system navigation area and content above the system bars, in both; the package line is kept.
+  for (const dir of [qa, prod]) {
+    const act = readFileSync(join(dir, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8');
+    assert.match(act, /^package com\.jslproperties\.estateagentbuddy;/);
+    assert.match(act, /setNavigationBarColor\(Color\.BLACK\)/);
+    assert.match(act, /setOnApplyWindowInsetsListener/);
+    const st = readFileSync(join(dir, 'android/app/src/main/res/values/styles.xml'), 'utf8');
+    assert.match(st, /android:navigationBarColor">@android:color\/black/);
+  }
+  // Running it again changes nothing (CI may run it twice).
+  const before = readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8');
+  assert.equal(setup(qa, true).status, 0);
+  assert.equal(readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8'), before);
 });
 
 test('QA4 nativeVersionOf still reads the native version from the QA version name', async () => {
