@@ -10,6 +10,9 @@ DB="$ROOT -d $DBN"; P="psql -d $DBN -q -tA"
 $DB >/dev/null 2>&1 <<'SQL'
 do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+-- Like Supabase: pgcrypto lives in the "extensions" schema, NOT public (functions must find it via search_path).
+create schema if not exists extensions; create extension if not exists pgcrypto schema extensions;
+grant usage on schema extensions to anon, authenticated;
 create schema auth; create table auth.users (id uuid primary key, email text);
 create function auth.uid() returns uuid language sql stable as $f$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $f$;
 create function auth.jwt() returns jsonb language sql stable as $f$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $f$;

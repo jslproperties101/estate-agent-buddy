@@ -274,7 +274,7 @@ end $$;
 -- Sends an invitation (to a Google email, or a link anyone signed in may accept when p_email is null). Creates my
 -- Team Workspace if I have none. Answers the link token ONCE; only its hash is stored.
 create or replace function public.eab_team_invite(p_email text default null) returns jsonb
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$   -- pgcrypto (gen_random_bytes, digest) lives in "extensions" on Supabase
 declare uid uuid := auth.uid(); me text := lower(coalesce(auth.jwt() ->> 'email', '')); em text := nullif(lower(btrim(coalesce(p_email, ''))), '');
         nm text := nullif(coalesce(auth.jwt() -> 'user_metadata' ->> 'full_name', auth.jwt() -> 'user_metadata' ->> 'name'), '');
         tm uuid; tok text; inv uuid; n int;
@@ -316,7 +316,7 @@ end $$;
 
 -- Finds a waiting invitation for me by link token or id (an expired one is marked so and refused).
 create or replace function public.eab_find_invite(p_token text, p_invite uuid) returns public.eab_team_invites
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$   -- pgcrypto (digest) lives in "extensions" on Supabase
 declare inv public.eab_team_invites; em text := lower(coalesce(auth.jwt() ->> 'email', ''));
 begin
   if p_token is not null then
