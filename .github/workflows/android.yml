@@ -90,6 +90,9 @@ jobs:
       - name: Change 006 Layer 4 - dump, encrypt, restore into a NEW database with each key holder (local PostgreSQL, synthetic data)
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
         run: bash supabase/tests/platform-backup-test.sh
+      - name: Changes 19 and 20 - usage log and Developer Dashboard, developer-only access (local PostgreSQL)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/change019-test.sh
       - name: Existing roles and row-level security again, with the Change 010 proposal on top
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres, EAB_WITH_CHANGE010: '1' }
         run: bash supabase/tests/rls-test.sh
