@@ -8,11 +8,12 @@ import { useApp } from '../data/useStore';
 import { shareOrDownload } from '../lib/pdfRender';
 import { config } from '../config';
 import { startDriveConnect } from '../data/auth';
-import { downloadBackup, driveUsable, ensureFolder, listBackups, runDriveBackup, DriveFile } from './drive';
+import { downloadBackup, driveNowOutcome, driveUsable, ensureFolder, listBackups, runDriveBackup, DriveFile } from './drive';
 import { DriveClient } from './driveApi';
 import { createRestorePoint, drFolders, listPoints, loadRestorePoint, PointInfo } from './restorePoints';
 import { forgetTree } from './driveTree';
 import { fmtDateTime } from '../lib/dates';
+import { BusyLine } from '../ui/BusyLine';
 import { backupStrings } from './strings';
 import { createBackup, inspectBackup, noteBackupMade, planRestore, restoreBackup, Inspection, RestoreMode, RestorePlan } from './backup';
 
@@ -31,6 +32,8 @@ export function BackupCard({ lang }: { lang: Lang }) {
   const [plan, setPlan] = useState<RestorePlan | null>(null);
   const [driveBusy, setDriveBusy] = useState(false);
   const [driveMsg, setDriveMsg] = useState<{ text: string; bad?: boolean } | null>(null);
+  const [driveProgress, setDriveProgress] = useState<number | null>(null);   // Change 17b: 0 to 100 while a Drive run is going
+  const [driveWarn, setDriveWarn] = useState<string | null>(null);     // Change 17: the folder update failed or was partial
   const [driveFiles, setDriveFiles] = useState<DriveFile[] | null>(null);
   const [points, setPoints] = useState<PointInfo[] | null>(null);
   const [fromPoint, setFromPoint] = useState<PointInfo | null>(null);
@@ -43,18 +46,22 @@ export function BackupCard({ lang }: { lang: Lang }) {
     try { await startDriveConnect(config(state.settings)); } catch { setDriveMsg({ text: t.driveFail.network, bad: true }); }
   };
   const driveNow = async () => {
-    setDriveBusy(true); setDriveMsg(null);
-    const r = await runDriveBackup(store, fetch, Date.now(), { force: true });
+    setDriveBusy(true); setDriveMsg(null); setDriveWarn(null);
+    const r = await runDriveBackup(store, fetch, Date.now(), { force: true, onProgress: setDriveProgress });
     if (r.point) setDriveMsg({ text: t.driveOk(r.point.kept, r.point.name) });
     else setDriveMsg({ text: t.driveFail[r.pointError ?? r.error ?? 'server'] ?? t.driveFail.server, bad: true });
-    setDriveBusy(false);
+    // a good restore point must not hide a failed or partial update of the readable folders
+    const o = driveNowOutcome(r);
+    if (o.folders === 'failed') setDriveWarn(t.foldersFailed(t.driveFail[o.foldersError ?? 'server'] ?? t.driveFail.server));
+    else if (o.folders === 'partial') setDriveWarn(t.foldersPartial(o.waiting, o.failed));
+    setDriveBusy(false); setDriveProgress(null);
   };
   const rebuild = async () => {
-    setDriveBusy(true); setDriveMsg(null);
+    setDriveBusy(true); setDriveMsg(null); setDriveWarn(null);
     await forgetTree(store);
-    const r = await runDriveBackup(store, fetch, Date.now(), { force: false });
+    const r = await runDriveBackup(store, fetch, Date.now(), { force: false, onProgress: setDriveProgress });
     setDriveMsg(r.tree ? { text: t.rebuildDone } : { text: t.driveFail[r.treeError ?? r.error ?? 'server'] ?? t.driveFail.server, bad: true });
-    setDriveBusy(false);
+    setDriveBusy(false); setDriveProgress(null);
   };
   const showPoints = async () => {
     setDriveBusy(true); setDriveMsg(null);
@@ -134,6 +141,7 @@ export function BackupCard({ lang }: { lang: Lang }) {
       <small className="muted">{t.hint}</small>
       <small className="muted" data-testid="backup-last">{state.meta.lastBackupAt ? t.last(fmtDateTime(state.meta.lastBackupAt, lang)) : t.never}</small>
       <button className="btn primary" data-testid="backup-make" disabled={!!busy} onClick={make}>{busy === 'making' ? t.making : t.make}</button>
+      {busy && <BusyLine text={busy === 'making' ? t.making : busy === 'reading' ? t.reading : t.restoring} testId="backup-busy" />}
       <div className="card-title">{t.restoreTitle}</div>
       <small className="muted">{t.restoreHint}</small>
       <label className="btn secondary" aria-disabled={!!busy}>
@@ -183,6 +191,8 @@ export function BackupCard({ lang }: { lang: Lang }) {
         {driveFiles && driveFiles.map(f => (
           <div className="row" key={f.id} data-testid="drive-file"><small>{f.name}</small><button className="btn small ghost" disabled={driveBusy} onClick={() => void useDriveFile(f)}>{t.driveRestore}</button></div>
         ))}
+        {driveBusy && <BusyLine text={driveProgress !== null ? t.driveWorking : t.driveBusy} percent={driveProgress ?? undefined} note={driveProgress !== null ? t.driveBackground : undefined} testId="drive-busy" />}
+        {driveWarn && <small role="alert" className="warn-text" data-testid="drive-warn">{driveWarn}</small>}
         {driveMsg && <small role={driveMsg.bad ? 'alert' : 'status'} className={driveMsg.bad ? 'warn-text' : 'ok-text'} data-testid="drive-msg">{driveMsg.text}</small>}
       </>}
     </div>

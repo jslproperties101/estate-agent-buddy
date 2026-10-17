@@ -19,7 +19,7 @@ export class FakeTeamCloud {
   seq = 0;
   team: { id: string; createdBy: string; members: string[]; ended?: boolean } | null = null;
   teamsEver = 0;
-  invites: { id: string; teamId: string; by: string; email: string | null; token: string; status: string; expiresAt: number }[] = [];
+  invites: { id: string; teamId: string; by: string; email: string | null; token: string; status: string; expiresAt: number; answeredBy?: string; answeredAt?: number }[] = [];
   shares = new Map<string, Level>();           // `${teamId}|${ws}|${collection}|${id}` (recipient = the other member)
   shareAll = new Map<string, Level>();         // `${teamId}|${ownerId}|${scope}`
   deleteRequests: { id: string; teamId: string; ws: string; collection: string; recordId: string; ownerId: string; requesterId: string; status: string }[] = [];
@@ -148,6 +148,8 @@ export class FakeTeamCloud {
           members: t ? t.members.map(id => { const x = this.byId(id)!; return { user_id: id, email: x.email, name: x.name ?? null, joined_at: '2026-10-15T00:00:00Z' }; }) : [],
           invites_sent: this.invites.filter(i => t && i.teamId === t.id && i.status === 'pending' && i.expiresAt > Date.now()).map(i => ({ id: i.id, email: i.email, created_at: '', expires_at: new Date(i.expiresAt).toISOString() })),
           invites_for_me: this.invites.filter(i => i.status === 'pending' && i.expiresAt > Date.now() && i.email === me.email).map(i => ({ id: i.id, from_email: this.byId(i.by)!.email, from_name: this.byId(i.by)!.name ?? null, created_at: '', expires_at: new Date(i.expiresAt).toISOString() })),
+          invites_answered: this.invites.filter(i => i.by === me.id && (i.status === 'accepted' || i.status === 'declined') && i.answeredAt && i.answeredAt > Date.now() - 7 * 86_400_000)
+            .map(i => { const who = this.byId(i.answeredBy ?? ''); return { id: i.id, status: i.status, email: who?.email ?? i.email, name: i.status === 'accepted' ? who?.name ?? null : null, answered_at: new Date(i.answeredAt!).toISOString() }; }),
           shares_given: t ? [...this.shares].filter(([k]) => k.startsWith(`${t.id}|${me.ws}|`)).map(([k, level]) => { const [, ws, collection, record_id] = k.split('|'); return { workspace_id: ws, collection, record_id, level }; }) : [],
           share_all_given: t ? [...this.shareAll].filter(([k]) => k.startsWith(`${t.id}|${me.id}|`)).map(([k, level]) => ({ scope: k.split('|')[2], level })) : [],
           share_all_received: t && partner ? [...this.shareAll].filter(([k]) => k.startsWith(`${t.id}|${partner}|`)).map(([k, level]) => ({ scope: k.split('|')[2], level, owner_id: partner })) : [],
@@ -181,12 +183,12 @@ export class FakeTeamCloud {
         if (inv.status !== 'pending') return this.err(400, `invitation is no longer valid (${inv.status})`);
         if (inv.by === me.id) return this.err(403, 'cannot accept your own invitation');
         if (inv.email && inv.email !== me.email) return this.err(403, 'invitation is for another Google account');
-        if (fn === 'eab_team_decline') { inv.status = 'declined'; return this.json(null); }
+        if (fn === 'eab_team_decline') { inv.status = 'declined'; inv.answeredBy = me.id; inv.answeredAt = Date.now(); return this.json(null); }
         if (me.disabled) return this.err(403, 'account disabled');
         if (!this.team || this.team.id !== inv.teamId || this.team.ended) return this.err(400, 'invitation is no longer valid (team ended)');
         if (this.team.members.length >= 2) return this.err(403, 'team is full');
         this.team.members.push(me.id);
-        inv.status = 'accepted';
+        inv.status = 'accepted'; inv.answeredBy = me.id; inv.answeredAt = Date.now();
         this.logAudit(me, 'membership', { detail: { event: 'joined', email: me.email } });
         return this.json(this.team.id);
       }

@@ -15,6 +15,7 @@ import { Go } from '../nav';
 import { profileStrings } from './strings';
 import { OptionSelect } from '../ui/OptionSelect';
 import { StoredImage } from '../ui/common';
+import { IconGear } from '../icons';
 import { useToast } from '../ui/toast';
 import { DEFAULT_SHARE, shareText, shareFiles, whatsappLink, anyChosen, missingProfile, REQUIRED_PROFILE, RequiredProfileField } from '../domain/namecard';
 import { Profile, ShareChoice, COLLECTIONS, CollectionName } from '../data/types';
@@ -66,7 +67,7 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
         </div>
       )}
       <button className="btn secondary" onClick={() => go({ name: 'profileEdit' })}>{t.edit}</button>
-      <button className="btn secondary" onClick={() => go({ name: 'settings' })}>⚙ {t.settings}</button>
+      <button className="btn secondary" data-testid="open-settings" onClick={() => go({ name: 'settings' })}><span className="row-gap"><IconGear /> {t.settings}</span></button>
     </section>
   );
 }

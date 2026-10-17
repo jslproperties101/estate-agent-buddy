@@ -9,6 +9,7 @@ import { configured, fresh, syncNow, SyncError, supabaseCall, supabaseHeaders, R
 import { startGoogleSignIn, signOutRemote, canSignInHere } from '../data/auth';
 import { fmtDateTime } from '../lib/dates';
 import { Confirm } from '../ui/common';
+import { BusyLine } from '../ui/BusyLine';
 import { authStrings } from './strings';
 import { useGoogleReturn } from './LoginScreen';
 
@@ -54,6 +55,7 @@ export function AccountCard({ lang }: { lang: Lang }) {
             : <small className="warn-text">{a.fileMode}</small>}
         </>
       )}
+      {busy && <BusyLine text={a.sync.running} testId="account-busy" />}
       {msg && <p className="small" role="status" data-testid="account-msg">{msg}</p>}
       {ask && s && <Confirm lang={lang} title={a.signOutQ} body={a.signOutBody} okLabel={a.signOut} danger={false} onCancel={() => setAsk(false)}
         onOk={() => { setAsk(false); void signOutRemote(cfg, s); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? s.workspaceId }); }} />}

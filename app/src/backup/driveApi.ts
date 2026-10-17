@@ -31,8 +31,8 @@ export async function call(fetchFn: FetchFn, token: string, url: string, init: R
 /** Text inside a Drive query string. */
 export const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-export interface DriveItem { id: string; name: string; mimeType?: string; parents?: string[]; version?: string; size?: string; createdTime?: string; modifiedTime?: string; trashed?: boolean }
-const ITEM_FIELDS = 'id,name,mimeType,parents,version,size,createdTime,modifiedTime,trashed';
+export interface DriveItem { id: string; name: string; mimeType?: string; parents?: string[]; version?: string; md5Checksum?: string; size?: string; createdTime?: string; modifiedTime?: string; trashed?: boolean }
+const ITEM_FIELDS = 'id,name,mimeType,parents,version,md5Checksum,size,createdTime,modifiedTime,trashed';
 
 const enc = new TextEncoder();
 

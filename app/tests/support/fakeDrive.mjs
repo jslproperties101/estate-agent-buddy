@@ -5,6 +5,7 @@
 // Supported: files.list (q with name / mimeType / 'x' in parents / trashed), files.get (metadata, alt=media),
 // files.create (folder JSON, multipart upload), files.update (metadata PATCH incl. addParents/removeParents/trashed,
 // multipart media PATCH), files.copy. Every content change raises `version`, like Drive.
+import { createHash } from 'node:crypto';
 const FOLDER = 'application/vnd.google-apps.folder';
 
 export function createFakeDrive(opts = {}) {
@@ -17,7 +18,7 @@ export function createFakeDrive(opts = {}) {
     files.set(id, { id, name, parents: [...parents], mimeType, data, version: 1, trashed: false, createdTime: new Date(clock += 1000).toISOString() });
     return files.get(id);
   };
-  const meta = f => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, version: String(f.version), size: f.mimeType === FOLDER ? undefined : String(f.data.length), createdTime: f.createdTime, modifiedTime: f.createdTime, trashed: f.trashed });
+  const meta = f => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, version: String(f.version), md5Checksum: f.mimeType === FOLDER || opts.noMd5 ? undefined : createHash('md5').update(f.data).digest('hex'), size: f.mimeType === FOLDER ? undefined : String(f.data.length), createdTime: f.createdTime, modifiedTime: f.createdTime, trashed: f.trashed });
   const json = (o, status = 200) => ({ status, headers: { 'content-type': 'application/json' }, body: new TextEncoder().encode(JSON.stringify(o)) });
   const text = (s, status) => ({ status, headers: { 'content-type': 'text/plain' }, body: new TextEncoder().encode(s) });
 
@@ -126,5 +127,7 @@ export function createFakeDrive(opts = {}) {
   const fileAt = path => live().find(x => pathOf(x) === path);
   /** A person editing a file in Drive by hand. */
   const editByHand = (path, newText) => { const f = fileAt(path); f.data = new TextEncoder().encode(newText); f.version++; };
-  return { files, calls, state, handle, fetchFn, add, byName, pathOf, paths, textAt, fileAt, editByHand, FOLDER };
+  /** Google raising `version` with no change of content (sharing, a move, its own processing): the file is NOT edited. */
+  const touch = path => { const f = fileAt(path); f.version++; };
+  return { files, calls, state, handle, fetchFn, add, byName, pathOf, paths, textAt, fileAt, editByHand, touch, FOLDER };
 }

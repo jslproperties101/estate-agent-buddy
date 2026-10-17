@@ -10,6 +10,7 @@ import { config } from '../config';
 import { configured } from '../data/sync';
 import { Confirm } from '../ui/common';
 import { useToast } from '../ui/toast';
+import { BusyLine } from '../ui/BusyLine';
 import { IconGear } from '../icons';
 import { fmtDateTime } from '../lib/dates';
 import { recordTitle } from '../sync/SyncUI';
@@ -128,6 +129,7 @@ export function TeamScreen({ lang, go }: { lang: Lang; go: Go }) {
     <section className="stack" data-testid="team-screen">
       <div className="card stack-sm">
         <p className="small">{t.intro}</p>
+        {busy && <BusyLine text={t.working} testId="team-busy" />}
         {unavailable && <p className="warn-text small" role="status" data-testid="team-unavailable">{t.unavailable}</p>}
         <button className="btn secondary small fit" disabled={busy} onClick={() => void run(() => refreshTeam(store, cfg))}>{t.refresh}</button>
       </div>

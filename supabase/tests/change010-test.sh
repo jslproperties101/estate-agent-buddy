@@ -35,6 +35,8 @@ check() { if [[ "$3" == *"$2"* ]]; then pass=$((pass+1)); echo "PASS $1"; else f
 check_none() { if [[ -z "$2" ]]; then pass=$((pass+1)); echo "PASS $1"; else fail=$((fail+1)); echo "FAIL $1 :: expected nothing, got [$2]"; fi; }
 check_ok() { if [[ "$2" != *ERROR* ]]; then pass=$((pass+1)); echo "PASS $1"; else fail=$((fail+1)); echo "FAIL $1 :: expected no error, got [$2]"; fi; }
 OUT=$($DB -f supabase/proposed/20261016000000_change010_team_sharing_audit.sql 2>&1); check_none "proposal applies cleanly" "$(echo "$OUT" | grep -i error)"
+OUT=$($DB -f supabase/proposed/20261018100000_change013_invitation_answers.sql 2>&1); check_none "Change 13 invitation-answers update applies cleanly" "$(echo "$OUT" | grep -i error)"
+OUT=$($DB -f supabase/proposed/20261018100000_change013_invitation_answers.sql 2>&1); check_none "Change 13 update can be run twice" "$(echo "$OUT" | grep -i error)"
 
 A=aaaaaaaa-0000-0000-0000-000000000001; B=bbbbbbbb-0000-0000-0000-000000000002; C=cccccccc-0000-0000-0000-000000000003; D=dddddddd-0000-0000-0000-000000000004
 declare -A EM=([$A]=a@x.com [$B]=b@x.com [$C]=c@x.com [$D]=d@x.com)
@@ -81,12 +83,21 @@ check "expired invitation is not listed for B"          "[]" "$(as $B "select ea
 INV=$(as $A "select eab_team_invite('b@x.com')"); TOK=$(echo "$INV" | sed 's/.*"token": "\([0-9a-f]*\)".*/\1/')
 check "sender may issue another after expiry"           '"token"' "$INV"
 check_ok "B declines"                                   "$(as $B "select eab_team_decline(null, (select id from eab_team_invites where status='pending'))")"
+check "Change 13: A is told B declined"                 '"declined"' "$(as $A "select eab_team_status()->'invites_answered'")"
+check "Change 13: B is not told about own answer"       "[]" "$(as $B "select eab_team_status()->'invites_answered'")"
+check "Change 13: C sees no answers"                    "[]" "$(as $C "select eab_team_status()->'invites_answered'")"
 check "declined invitation cannot be accepted"          "no longer valid (declined)" "$(as $B "select eab_team_accept('$TOK')")"
 INV=$(as $A "select eab_team_invite(null)"); TOK=$(echo "$INV" | sed 's/.*"token": "\([0-9a-f]*\)".*/\1/')
 check "invitation by link (no email)"                   '"token"' "$INV"
 check "wrong link token refused"                        "not found" "$(as $B "select eab_team_accept('deadbeef')")"
 TEAM=$(as $B "select eab_team_accept('$TOK')")
 check "B accepts with the link and joins A's team"      "-" "$TEAM"
+check "Change 13: A is told B accepted, with B's name" "Badrul Agent" "$(as $A "select eab_team_status()->'invites_answered'")"
+q "update eab_team_invites set responded_at = now() - interval '8 days' where status in ('accepted','declined')" >/dev/null
+check "Change 13: answers older than 7 days are not listed" "[]" "$(as $A "select eab_team_status()->'invites_answered'")"
+OUT=$($DB -f supabase/proposed/20261018100000_change013_rollback.sql 2>&1); check_none "Change 13 rollback applies cleanly" "$(echo "$OUT" | grep -i error)"
+check "Change 13 rollback: status works, answers key gone" "f" "$(as $A "select (eab_team_status() ? 'invites_answered')::text")"
+OUT=$($DB -f supabase/proposed/20261018100000_change013_invitation_answers.sql 2>&1); check_none "Change 13 re-applies after its rollback" "$(echo "$OUT" | grep -i error)"
 check "team has exactly two members"                    "2" "$(as $A "select jsonb_array_length(eab_team_status()->'members')")"
 check "team is full: no third invitation"               "team is full" "$(as $A "select eab_team_invite('c@x.com')")"
 check "B cannot invite a third person either"           "team is full" "$(as $B "select eab_team_invite('c@x.com')")"

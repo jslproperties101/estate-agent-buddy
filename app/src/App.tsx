@@ -81,6 +81,9 @@ import { STALE_MS } from './backup/BackupUI';
 import { leadReviewStrings } from './data/leadReviewStrings';
 import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
+import { InvitePopup } from './team/InvitePopup';
+import { inviteAlertCount, markAnswersSeen, openInvites, unseenAnswers } from './team/invitations';
+import { personLabel } from './team/access';
 import { TeamScreen, ManageSharingScreen, WorkspaceSwitch, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
 import { teamStrings } from './team/strings';
 import { AuditSearchScreen } from './audit/AuditUI';
@@ -303,10 +306,11 @@ function Shell() {
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
-  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue;
+  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue + inviteAlertCount(state);
 
   return (
     <ToastContext.Provider value={showToast}>
+      <InvitePopup lang={lang} suppress={screen.name === 'team'} />
       <div className="shell">
         <header className={screen.name === 'home' ? 'topbar home' : 'topbar'}>
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
@@ -607,7 +611,7 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
   const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
   const follow = followUpDue(state.contacts, now, followDays);
-  const systemEmpty = follow.length === 0 && soon.length === 0 && recent.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale;
+  const systemEmpty = follow.length === 0 && soon.length === 0 && recent.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale && inviteAlertCount(state) === 0;
   const n = t.newsPage;
   return (
     <section className="stack" data-testid="notifications">
@@ -642,6 +646,18 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
             ))}
           </div>
         )}
+        {openInvites(state).map(i => (
+          <button key={i.id} className="link-row" data-testid="notif-invite" onClick={() => go({ name: 'team' })}>
+            <strong>{teamStrings[lang].invNotifFrom(personLabel(i.fromName, i.fromEmail))}</strong>
+            <small className="muted">{teamStrings[lang].invNotifHint}</small>
+          </button>
+        ))}
+        {unseenAnswers(state).map(a => (
+          <div key={a.id} className="link-row" data-testid="notif-invite-answer">
+            <strong>{(a.status === 'accepted' ? teamStrings[lang].invAnsAccepted : teamStrings[lang].invAnsDeclined)(personLabel(a.name, a.email))}</strong>
+            <button className="btn small secondary" data-testid="notif-invite-answer-ok" onClick={() => markAnswersSeen(store, [a.id])}>{teamStrings[lang].invGotIt}</button>
+          </div>
+        ))}
         {driveStale && (
           <button className="link-row" data-testid="notif-drive" onClick={() => go({ name: 'settings' })}>
             <strong>{backupStrings[lang].driveTitle}</strong>

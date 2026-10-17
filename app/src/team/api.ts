@@ -4,7 +4,7 @@
 // the Team Workspace screen; nothing pretends to work).
 import type { Store } from '../data/store';
 import { fresh, supabaseCall, supabaseHeaders, SyncConfig, SyncError, configured } from '../data/sync';
-import type { CollectionName, DeleteRequest, ShareLevel, ShareScope, TeamInvite, TeamMember, TeamState } from '../data/types';
+import type { CollectionName, DeleteRequest, ShareLevel, ShareScope, TeamAnswer, TeamInvite, TeamMember, TeamState } from '../data/types';
 import { usage } from '../usage/logger';
 
 type FetchFn = typeof fetch;
@@ -66,6 +66,7 @@ interface StatusJson {
   members: { user_id: string; email: string; name: string | null; joined_at: string }[];
   invites_sent: { id: string; email: string | null; created_at: string; expires_at: string }[];
   invites_for_me: { id: string; from_email: string; from_name: string | null; created_at: string; expires_at: string }[];
+  invites_answered?: { id: string; status: 'accepted' | 'declined'; email: string | null; name: string | null; answered_at: string }[];
   shares_given: { workspace_id: string; collection: CollectionName; record_id: string; level: ShareLevel }[];
   share_all_given: { scope: ShareScope; level: ShareLevel }[];
   share_all_received: { scope: ShareScope; level: ShareLevel; owner_id: string }[];
@@ -77,6 +78,7 @@ export function teamFromStatus(j: StatusJson, at = Date.now()): TeamState {
     members: (j.members ?? []).map((m): TeamMember => ({ userId: m.user_id, email: m.email, name: m.name ?? undefined, joinedAt: m.joined_at })),
     invitesSent: (j.invites_sent ?? []).map((i): TeamInvite => ({ id: i.id, email: i.email, createdAt: i.created_at, expiresAt: i.expires_at })),
     invitesForMe: (j.invites_for_me ?? []).map((i): TeamInvite => ({ id: i.id, fromEmail: i.from_email, fromName: i.from_name, createdAt: i.created_at, expiresAt: i.expires_at })),
+    invitesAnswered: (j.invites_answered ?? []).map((a): TeamAnswer => ({ id: a.id, status: a.status, email: a.email, name: a.name, answeredAt: a.answered_at })),
     sharesGiven: (j.shares_given ?? []).map(s => ({ workspaceId: s.workspace_id, collection: s.collection, recordId: s.record_id, level: s.level })),
     shareAllGiven: (j.share_all_given ?? []).map(a => ({ scope: a.scope, level: a.level })),
     shareAllReceived: (j.share_all_received ?? []).map(a => ({ scope: a.scope, level: a.level, ownerId: a.owner_id })),

@@ -10,7 +10,7 @@ import { DriveClient, mytStamp } from '../src/backup/driveApi';
 import { createRestorePoint, drFolders, listPoints, loadRestorePoint, KEEP_POINTS, STALE_INCOMPLETE_MS } from '../src/backup/restorePoints';
 import { exportTree, forgetTree, RECOVERY_KEEP_MS } from '../src/backup/driveTree';
 import { buildTree } from '../src/backup/tree';
-import { runDriveBackup } from '../src/backup/drive';
+import { driveNowOutcome, percentOf, runDriveBackup } from '../src/backup/drive';
 import { createBackup, inspectBackup, planRestore, restoreBackup } from '../src/backup/backup';
 import { fileRefs, cloudFileRefs } from '../src/data/fileRefs';
 import { sha256Hex } from '../src/data/hash';
@@ -312,6 +312,53 @@ test('T6 a file edited by hand in Drive is kept in Recovery as "edited outside t
   assert.match(d.textAt(`${ROOT}/Agent Profile/Profile.txt`)!, /Agent One/);
 });
 
+test('T6b Change 18: Google raising a file\'s version number with no change of content is NOT an edit by hand', async () => {
+  const { s } = await agentPhone();
+  const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
+  await exportTree(s, c, T0);
+  // Drive bumps the version of many files for its own reasons (sharing, processing, a move): nothing was edited
+  for (const p of d.paths().filter(x => !x.includes('/Recovery/'))) d.touch(p);
+  const run = await exportTree(s, c, T0 + 60_000);
+  assert.deepEqual(run.editedOutside, [], 'no false "changed by hand" warning');
+  assert.equal(run.toRecovery, 0, 'nothing was copied to Recovery');
+  assert.equal(run.status, 'complete');
+  assert.ok(!/Edited outside the app/.test(d.textAt(`${ROOT}/Export Status.txt`)!));
+  assert.ok(!d.paths().some(p => /edited outside the app/.test(p)));
+  // a REAL edit after those version bumps is still found
+  d.editByHand(`${ROOT}/To-Do/Call owner about price.txt`, 'my own notes');
+  const r2 = await exportTree(s, c, T0 + 120_000);
+  assert.deepEqual(r2.editedOutside, ['To-Do/Call owner about price.txt']);
+});
+
+test('T6c Change 18: an index saved before this change (no checksum) raises no false warning, then real edits are found', async () => {
+  const { s } = await agentPhone();
+  const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
+  await exportTree(s, c, T0);
+  // make the saved index look like the old one: no checksums, and every Drive version number moved on
+  const idx = (await s.listLocal('drivetree:')).find(x => x.key === 'drivetree:index')!.value as { files: Record<string, { md5?: string; version?: string }> };
+  for (const f of Object.values(idx.files)) { delete f.md5; f.version = '1'; }
+  await s.putLocalNow('drivetree:index', idx);
+  for (const p of d.paths().filter(x => !x.includes('/Recovery/'))) d.touch(p);
+  const run = await exportTree(s, c, T0 + 60_000);
+  assert.deepEqual(run.editedOutside, [], 'an old index does not warn');
+  assert.equal(run.toRecovery, 0);
+  const after = (await s.listLocal('drivetree:')).find(x => x.key === 'drivetree:index')!.value as { files: Record<string, { md5?: string }> };
+  assert.ok(Object.values(after.files).every(f => !!f.md5), 'the checksum is now stored for every file');
+  d.editByHand(`${ROOT}/To-Do/Call owner about price.txt`, 'my own notes');
+  const r2 = await exportTree(s, c, T0 + 120_000);
+  assert.deepEqual(r2.editedOutside, ['To-Do/Call owner about price.txt'], 'a real edit is found from now on');
+});
+
+test('T6d Change 18: when Drive gives no checksum at all, nothing is reported as edited by hand', async () => {
+  const { s } = await agentPhone();
+  const d = createFakeDrive({ noMd5: true }); const c = new DriveClient(d.fetchFn, 'TOK');
+  await exportTree(s, c, T0);
+  for (const p of d.paths().filter(x => !x.includes('/Recovery/'))) d.touch(p);
+  const run = await exportTree(s, c, T0 + 60_000);
+  assert.deepEqual(run.editedOutside, []);
+  assert.equal(run.status, 'complete');
+});
+
 test('T7 changes not yet confirmed by the cloud wait: the earlier Drive copy stays and the status says partial', async () => {
   const { s } = await agentPhone();
   const d = createFakeDrive(); const c = new DriveClient(d.fetchFn, 'TOK');
@@ -446,4 +493,56 @@ test('FX2 confidential documents: never offered to the shared team bucket; in th
   const fresh2 = await Store.open(new MemoryBackend());
   await restoreBackup(fresh2, pv.inspection, 'missing', T0 + 2);
   assert.equal(await (await fresh2.getFile(title))!.text(), '%PDF-geran-CONFIDENTIAL', 'and from the restore point');
+});
+
+test('DN1 Change 17: "Back up now" says so when the folder update failed or was only partial, and stays quiet when it is complete', async () => {
+  // complete
+  const a = await agentPhone();
+  const d1 = createFakeDrive();
+  const ok = await runDriveBackup(a.s, d1.fetchFn, T0, { force: true });
+  assert.deepEqual(driveNowOutcome(ok), { folders: 'ok', waiting: 0, failed: 0 });
+  // the restore point works but the folder update fails (Drive full during it): must be reported as failed
+  const b = await agentPhone();
+  const d2 = createFakeDrive();
+  await runDriveBackup(b.s, d2.fetchFn, T0, { force: true });
+  d2.state.fail = (method: string, u: URL) => (method === 'PATCH' && u.pathname.startsWith('/upload') ? { status: 403, headers: {}, body: new TextEncoder().encode('storageQuotaExceeded') } : null);
+  b.s.upsert('properties', { ...b.s.getState().properties[0], askingPrice: 1 });
+  await confirmSync(b.s);
+  const bad = await runDriveBackup(b.s, d2.fetchFn, T0 + 60_000, { force: true });
+  assert.ok(bad.point, 'the restore point itself was made');
+  assert.deepEqual(driveNowOutcome(bad), { folders: 'failed', foldersError: 'quota', waiting: 0, failed: 0 });
+  // partial: a change not yet confirmed by the cloud waits
+  const c = await agentPhone();
+  const d3 = createFakeDrive();
+  await runDriveBackup(c.s, d3.fetchFn, T0, { force: true });
+  c.s.upsert('tasks', { id: 't9', created: 30, updated: 30, title: 'Offline task', priority: 'low', done: false, kind: 'task', reminders: [] } as Task);
+  await c.s.flush();
+  const part = await runDriveBackup(c.s, d3.fetchFn, T0 + 60_000, { force: true });
+  assert.ok(part.point);
+  const o = driveNowOutcome(part);
+  assert.equal(o.folders, 'partial');
+  assert.ok(o.waiting >= 1);
+  // folders not asked for
+  assert.equal(driveNowOutcome({ ok: true }).folders, 'skipped');
+});
+
+test('PG1 Change 17b: the backup percentage starts at 0, never goes backwards, passes the halfway mark between the restore point and the folders, and ends at 100', async () => {
+  const { s } = await agentPhone();
+  const d = createFakeDrive();
+  const seen: number[] = [];
+  await runDriveBackup(s, d.fetchFn, T0, { force: true, onProgress: p => seen.push(p) });
+  assert.equal(seen[0], 0); assert.equal(seen[seen.length - 1], 100);
+  for (let i = 1; i < seen.length; i++) assert.ok(seen[i] >= seen[i - 1], `not backwards at ${i}: ${seen[i - 1]} -> ${seen[i]}`);
+  assert.ok(seen.some(p => p > 0 && p < 50), 'moves during the restore point');
+  assert.ok(seen.some(p => p > 50 && p < 100), 'moves during the folder update');
+  assert.ok(seen.every(p => p >= 0 && p <= 100));
+  // folders only (no restore point due again): the bar uses the whole width
+  const later: number[] = [];
+  await runDriveBackup(s, d.fetchFn, T0 + 1200_000, { onProgress: p => later.push(p) });
+  assert.ok(later.some(p => p > 0 && p < 100) || later.length >= 2);
+  assert.equal(later[later.length - 1], 100);
+  // a progress display that throws never breaks the backup
+  const r = await runDriveBackup(s, d.fetchFn, T0 + 2400_000, { force: true, onProgress: () => { throw new Error('display broke'); } });
+  assert.ok(r.ok && r.point && r.tree, 'a progress display that throws never breaks the backup');
+  assert.equal(percentOf(0, 50, 1, 2), 25); assert.equal(percentOf(50, 100, 4, 4), 100); assert.equal(percentOf(0, 100, 0, 0), 100);
 });

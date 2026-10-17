@@ -828,6 +828,11 @@ label.btn { position: relative; cursor: pointer; }
 @keyframes eab-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 .busy-line { display: flex; align-items: center; gap: 10px; }
+.busy-block { flex-direction: column; align-items: stretch; gap: 6px; }
+.busy-row { display: flex; align-items: center; gap: 10px; }
+.busy-bar { height: 6px; border-radius: 3px; background: var(--line-2); overflow: hidden; }
+.busy-bar > span { display: block; height: 100%; background: var(--gold); transition: width .25s ease; }
+@media (prefers-reduced-motion: reduce) { .busy-bar > span { transition: none; } }
 /* Opportunities → Co-broke Opportunities card (owner, 15 Oct). */
 .link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--ink); min-height: 88px; border: 1px solid var(--gold-lo); cursor: pointer; }
 .link-card strong { color: var(--gold-hi); font-size: 18px; }

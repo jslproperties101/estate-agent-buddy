@@ -121,15 +121,20 @@ export interface DriveRunResult {
  *  The two fail independently: a failed folder update never undoes a good restore point, and the other way round.
  *  Outcomes are recorded on the phone (meta.driveLast / driveLastOkAt for restore points, meta.driveTree for folders).
  *  Since this version the app no longer uploads backup .zip files to Drive; older ones stay listed and restorable. */
-export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now = Date.now(), opts: { force?: boolean; tree?: boolean } = {}): Promise<DriveRunResult> {
+export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now = Date.now(), opts: { force?: boolean; tree?: boolean; /** 0 to 100, for the progress shown on the Backup screen */ onProgress?: (percent: number) => void } = {}): Promise<DriveRunResult> {
   const d = store.getState().meta.drive;
   if (!driveUsable(d, now)) return { ok: false, error: 'notConnected' };
   const client = new DriveClient(fetchFn, d!.token);
   const out: DriveRunResult = { ok: true };
   const failure = (e: unknown): DriveFailure => (e instanceof DriveError ? e.code : 'server');
-  if (opts.force || backupDue(store.getState().meta.driveLastOkAt, now)) {
+  const willPoint = !!opts.force || backupDue(store.getState().meta.driveLastOkAt, now);
+  const willTree = opts.tree !== false;
+  const show = (pct: number) => { try { opts.onProgress?.(pct); } catch { /* the progress display must never break a backup */ } };
+  const part = (lo: number, hi: number) => (done: number, total: number) => show(percentOf(lo, hi, done, total));
+  show(0);
+  if (willPoint) {
     try {
-      out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now);
+      out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now, part(0, willTree ? 50 : 100));
       store.setSingleton('meta', { driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: out.point.kept, fileName: out.point.name } });
       usage.sync('drive.restore_point', true);
     } catch (e) {
@@ -139,9 +144,9 @@ export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now
       if (out.pointError === 'auth') return out;
     }
   }
-  if (opts.tree !== false) {
+  if (willTree) {
     try {
-      out.tree = await exportTree(store, client, now);
+      out.tree = await exportTree(store, client, now, part(willPoint ? 50 : 0, 100));
       usage.sync('drive.folders', out.tree.failed.length === 0);
       store.setSingleton('meta', { driveTree: { at: now, ok: true, status: out.tree.status, waiting: out.tree.waiting.length, failed: out.tree.failed.length, editedOutside: out.tree.editedOutside.length } });
     } catch (e) {
@@ -150,5 +155,20 @@ export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now
       store.setSingleton('meta', { driveTree: { at: now, ok: false, error: out.treeError }, ...(out.treeError === 'auth' ? { drive: undefined } : {}) });
     }
   }
+  show(100);
   return out;
+}
+
+/** Where a step of a stage lands on the 0 to 100 bar of the whole run. */
+export const percentOf = (lo: number, hi: number, done: number, total: number) => Math.max(0, Math.min(100, Math.round(lo + (hi - lo) * (total > 0 ? done / total : 1))));
+
+/** Change 17: what "Back up now" must tell the person. A good restore point must never hide a folder update that failed
+ *  or was only partly done. `folders`: ok = complete; partial = something waits or was not written; failed = could not
+ *  run; skipped = not asked for. */
+export interface DriveNowOutcome { folders: 'ok' | 'partial' | 'failed' | 'skipped'; foldersError?: DriveFailure; waiting: number; failed: number }
+export function driveNowOutcome(r: DriveRunResult): DriveNowOutcome {
+  if (r.treeError) return { folders: 'failed', foldersError: r.treeError, waiting: 0, failed: 0 };
+  if (!r.tree) return { folders: 'skipped', waiting: 0, failed: 0 };
+  const partial = r.tree.status !== 'complete' || r.tree.failed.length > 0 || r.tree.waiting.length > 0;
+  return { folders: partial ? 'partial' : 'ok', waiting: r.tree.waiting.length, failed: r.tree.failed.length };
 }

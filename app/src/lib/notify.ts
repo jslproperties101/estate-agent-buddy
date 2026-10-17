@@ -55,3 +55,14 @@ export function idFor(key: string): number {
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
   return Math.abs(h) % 2_000_000_000;
 }
+
+/** Change 13: one notification on the phone right now, without touching the reminders already scheduled (scheduleNative
+ *  replaces them all). Android app: a notification one second from now, so it appears in the status bar. Browser: shown
+ *  while the app is open when the person allowed it. Returns false when only the in-app alert can be shown. */
+export async function notifyNow(id: number, title: string, body: string): Promise<boolean> {
+  const n = native();
+  if (n) {
+    try { await n.schedule({ notifications: [{ id, title, body, schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true } }] }); return true; } catch { return false; }
+  }
+  return showNow(title, body);
+}

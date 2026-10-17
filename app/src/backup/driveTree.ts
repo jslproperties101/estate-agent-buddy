@@ -8,7 +8,8 @@
 //  - A deleted item: moved (not deleted) into the Recovery/ folder at its parent level, named
 //    "… deleted <name>". A whole property, contact or To-Do goes as one folder or file.
 //  - A renamed or moved record (new township, new owner name…): the same Drive files are moved, so links keep working.
-//  - Edited outside the app: when Drive's version of a file differs from the one the app wrote, the person's version is
+//  - Edited outside the app: when the content checksum (md5) of a file in Drive differs from the one the app wrote (Change 18:
+//    not Drive's version number, which also changes without an edit), the person's version is
 //    copied to Recovery/ as "… edited outside the app <name>" and listed in Export Status.txt; the app's version is
 //    written back. Nothing is ever imported from Drive by itself.
 //  - A file the person put in the bin: written again ("recreated").
@@ -32,7 +33,7 @@ export const RECOVERY_KEEP_MS = 90 * 24 * 3600_000;
 const INDEX_KEY = 'drivetree:index';
 const SYSTEM = ['README.txt', 'Export Status.txt', 'Index.csv'];
 
-interface FileRec { id: string; path: string[]; name: string; hash: string; version?: string; sha256: string; group: string; groupRoot?: string[]; bytes: number }
+interface FileRec { id: string; path: string[]; name: string; hash: string; version?: string; md5?: string; sha256: string; group: string; groupRoot?: string[]; bytes: number }
 interface TreeIndex { rootId?: string; folders: Record<string, string>; files: Record<string, FileRec>; system: Record<string, string> }
 
 export interface TreeRun {
@@ -70,7 +71,7 @@ Included: your confidential documents too (title deeds, owner correspondence, ag
 Drive. Not included on purpose: records other agents share with you, sample data, and any keys, tokens or passwords.
 `;
 
-export async function exportTree(store: Store, d: DriveClient, now = Date.now()): Promise<TreeRun> {
+export async function exportTree(store: Store, d: DriveClient, now = Date.now(), onProgress?: (done: number, total: number) => void): Promise<TreeRun> {
   const st = store.getState();
   const waiting = waitingKeys(st);
   const plan = buildTree(st, { waiting });
@@ -83,7 +84,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
   if (idx.rootId !== rootId) { idx.rootId = rootId; idx.folders = {}; idx.files = {}; idx.system = {}; }
   // what Drive holds now (only the app's own items are visible with drive.file)
   const live = new Map<string, DriveItem>();
-  for (const it of await d.list('trashed=false', 'id,name,mimeType,parents,version,size')) live.set(it.id, it);
+  for (const it of await d.list('trashed=false', 'id,name,mimeType,parents,version,md5Checksum,size')) live.set(it.id, it);
   for (const [k, id] of Object.entries(idx.folders)) if (!live.has(id)) delete idx.folders[k];
 
   const folder = async (path: string[]): Promise<string> => {
@@ -103,11 +104,15 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
     return b ? new Uint8Array(await b.arrayBuffer()) : undefined;
   };
 
+  // Change 17b: progress for the person (one step per planned file, then four tidy-up steps)
+  const stepsTotal = plan.length + 4; let step = 0;
+  const tick = () => { try { onProgress?.(Math.min(++step, stepsTotal), stepsTotal); } catch { /* progress is only a display */ } };
   const planned = new Map(plan.map(e => [e.key, e]));
   const save = async () => { await store.putLocalNow(INDEX_KEY, idx); };
 
   // 1. write what is new or changed
   for (const e of plan) {
+    tick();
     const prev = idx.files[e.key];
     if (e.waiting) { run.waiting.push(`${pk(e.path)}/${e.name}`); continue; }   // the previous Drive copy stays as it is
     try {
@@ -115,7 +120,11 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
       const parent = await folder(e.path);
       if (prev && there) {
         // edited outside the app: keep the person's version in Recovery, then write the app's
-        if (prev.version && there.version && there.version !== prev.version) {
+        // Change 18: Google raises `version` for many reasons that are not an edit of the content (sharing, a move, its own
+        // processing). So the CONTENT checksum decides. An index written before this change has no checksum: it is filled
+        // in now, without a warning, and from the next run on the checksum is compared.
+        if (prev.md5 === undefined && there.md5Checksum) { prev.md5 = there.md5Checksum; prev.version = there.version ?? prev.version; }
+        if (prev.md5 && there.md5Checksum && there.md5Checksum !== prev.md5) {
           const rec = await recoveryOf(prev.path);
           await d.copy(prev.id, rec, `${stamp} edited outside the app ${prev.name}`);
           run.editedOutside.push(`${pk(prev.path)}/${prev.name}`); run.toRecovery++;
@@ -124,7 +133,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
         if (pk(prev.path) !== pk(e.path) || prev.name !== e.name) {             // renamed or moved: same Drive file
           const moved = await d.move(prev.id, parent, parentsOf(prev.id), e.name);
           live.set(prev.id, { ...there, ...moved, parents: [parent] });
-          prev.path = e.path; prev.name = e.name; prev.version = moved.version ?? prev.version; run.moved++;
+          prev.path = e.path; prev.name = e.name; prev.version = moved.version ?? prev.version; prev.md5 = moved.md5Checksum ?? prev.md5; run.moved++;
         }
         if (prev.hash === e.hash) { run.unchanged++; continue; }
         const data = await bytesOf(e);
@@ -134,7 +143,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
           await d.copy(prev.id, rec, `${stamp} edited ${prev.name}`); run.toRecovery++;
         }
         const it = await d.update(prev.id, e.mime, data);
-        Object.assign(prev, { hash: e.hash, version: it.version, sha256: await sha256Hex(data.slice().buffer as ArrayBuffer), bytes: data.length, group: e.group, groupRoot: e.groupRoot });
+        Object.assign(prev, { hash: e.hash, version: it.version, md5: it.md5Checksum, sha256: await sha256Hex(data.slice().buffer as ArrayBuffer), bytes: data.length, group: e.group, groupRoot: e.groupRoot });
         live.set(prev.id, { ...there, ...it });
         run.written++;
       } else {
@@ -155,12 +164,12 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
             await d.copy(same.id, rec, `${stamp} replaced ${e.name}`); run.toRecovery++;
             it = await d.update(same.id, e.mime, data); run.written++;
           } else run.unchanged++;
-          idx.files[e.key] = { id: same.id, path: e.path, name: e.name, hash: e.hash, version: it.version ?? same.version, sha256: sha, group: e.group, groupRoot: e.groupRoot, bytes: data.length };
+          idx.files[e.key] = { id: same.id, path: e.path, name: e.name, hash: e.hash, version: it.version ?? same.version, md5: it.md5Checksum ?? same.md5Checksum, sha256: sha, group: e.group, groupRoot: e.groupRoot, bytes: data.length };
           continue;
         }
         const it = await d.create(parent, e.name, e.mime, data);
         if (prev) run.recreated++;
-        idx.files[e.key] = { id: it.id, path: e.path, name: e.name, hash: e.hash, version: it.version, sha256: sha, group: e.group, groupRoot: e.groupRoot, bytes: data.length };
+        idx.files[e.key] = { id: it.id, path: e.path, name: e.name, hash: e.hash, version: it.version, md5: it.md5Checksum, sha256: sha, group: e.group, groupRoot: e.groupRoot, bytes: data.length };
         live.set(it.id, { ...it, parents: [parent] });
         run.written++;
       }
@@ -199,6 +208,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
     }
   }
 
+  tick();
   // 3. empty folders the app made and no longer uses go to the bin (Recovery folders and their parents stay)
   const usedPaths = new Set<string>();
   for (const f of Object.values(idx.files)) for (let i = 1; i <= f.path.length; i++) usedPaths.add(pk(f.path.slice(0, i)));
@@ -213,6 +223,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
     } catch { /* next time */ }
   }
 
+  tick();
   // 4. Recovery copies older than 90 days go to the Drive bin
   for (const it of live.values()) {
     const t = stampTime(it.name);
@@ -222,6 +233,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
     try { await d.trash(it.id); run.binned++; } catch { /* next time */ }
   }
 
+  tick();
   // 5. README, Index.csv and Export Status.txt, written last
   run.status = run.waiting.length || run.failed.length ? 'partial' : 'complete';
   const indexRows = await Promise.all(Object.entries(idx.files).sort(([a], [b]) => (a < b ? -1 : 1)).map(async ([k, f]) => [k, f.group, `${pk(f.path)}/${f.name}`, f.sha256, f.bytes]));
@@ -251,6 +263,7 @@ export async function exportTree(store: Store, d: DriveClient, now = Date.now())
     }
   } catch (err) { await save(); throw err; }
   await save();
+  tick();
   run.ok = true;
   return run;
 }

@@ -3752,8 +3752,9 @@ test('U91 backup file: made from Settings, a bad file is refused, and a restore 
 });
 
 /** Routes Google Drive calls of a browser context to the in-memory stand-in (tests/support/fakeDrive.mjs). */
-async function routeDrive(ctx, drive) {
+async function routeDrive(ctx, drive, delayMs = 0) {
   await ctx.route('https://www.googleapis.com/**', async route => {
+    if (delayMs) await new Promise(r => setTimeout(r, delayMs));
     const req = route.request(); const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
     const buf = req.postDataBuffer();
@@ -3818,6 +3819,52 @@ test('U92 Google Drive (stand-in Drive, browser only): restore point and readabl
   assert.match(await page.getByTestId('drive-msg').innerText(), /Google did not accept the access/i);
   await page.getByTestId('drive-connect').waitFor();
   assert.match(await page.getByTestId('drive-state').innerText(), /Drive is not connected on this phone/i);
+  await ctx.close();
+});
+
+test('U92c Change 17 / 17b (stand-in Drive): Back up now shows a spinner with a percentage and the "keeps going" note, and a failed folder update is reported next to the good restore point', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const drive = createFakeDrive();
+  await routeDrive(ctx, drive, 60);
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => {
+      const tx = r.result.transaction('records', 'readwrite'); const st = tx.objectStore('records'); const g = st.get('s:meta');
+      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, dirty: [], tombstones: [], syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1' }, drive: { token: 'TOK', expiresAt: Date.now() + 3600000, connectedAt: Date.now() } }, 's:meta');
+        st.put({ id: 'dk1', created: 1, updated: 1, name: 'Drive Test Buyer', roles: ['buyer'], leadStatus: 'hot' }, 'c:contacts:dk1'); };
+      tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await waitStored(page, 'records', "all.some(v => v && v.driveLastOkAt && v.driveTree && v.driveTree.ok)");
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
+  // spinner, percentage and the note while it runs
+  await page.getByTestId('drive-now').click();
+  await page.getByTestId('drive-busy').waitFor();
+  assert.match(await page.getByTestId('drive-busy').innerText(), /Sending to Drive… \d+%/);
+  assert.match(await page.getByTestId('drive-busy-note').innerText(), /You can leave this screen/);
+  assert.ok(await page.getByTestId('drive-busy').locator('.spinner').count() === 1, 'spinner shown');
+  assert.equal(await page.getByTestId('drive-busy-bar').getAttribute('role'), 'progressbar');
+  await shot(page, '92c-drive-progress', false);
+  await page.locator('[data-testid="drive-msg"]').filter({ hasText: /Restore point made on Google Drive and checked/i }).waitFor();
+  assert.equal(await page.getByTestId('drive-busy').count(), 0, 'the spinner is gone when it is done');
+  assert.equal(await page.getByTestId('drive-warn').count(), 0, 'complete folder update: no warning');
+  // a change on the phone, and Drive refuses to rewrite files (full): the restore point is made but the folders are not updated
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('estate-agent-buddy');
+    r.onsuccess = () => { const tx = r.result.transaction('records', 'readwrite'); tx.objectStore('records').put({ id: 'dk1', created: 1, updated: 5, name: 'Drive Test Buyer Changed', roles: ['buyer'], leadStatus: 'hot' }, 'c:contacts:dk1'); tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error); };
+  }));
+  await page.reload(); await page.waitForSelector('nav.grid');
+  await waitStored(page, 'records', "all.some(v => v && v.name === 'Drive Test Buyer Changed')");
+  drive.state.fail = (method, u) => (method === 'PATCH' && u.pathname.startsWith('/upload') ? { status: 403, headers: {}, body: new TextEncoder().encode('storageQuotaExceeded') } : null);
+  await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
+  await page.getByTestId('drive-now').click();
+  await page.getByTestId('drive-warn').waitFor();
+  assert.match(await page.getByTestId('drive-warn').innerText(), /restore point is safe, but the readable Drive folders could NOT be updated/i);
+  assert.match(await page.getByTestId('drive-msg').innerText(), /Restore point made on Google Drive and checked/i, 'the good restore point is still reported');
+  await shot(page, '92d-drive-folder-warning', false);
   await ctx.close();
 });
 

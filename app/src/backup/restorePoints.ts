@@ -124,14 +124,18 @@ async function readManifest(d: DriveClient, manifestId: string): Promise<PointMa
 export interface PointRun { name: string; records: number; files: number; uploadedObjects: number; kept: number; binnedPoints: number; binnedObjects: number }
 
 /** Makes one verified restore point, then applies retention. Throws DriveError on failure (nothing half-marked as done). */
-export async function createRestorePoint(store: Store, d: DriveClient, reason: PointReason, now = Date.now()): Promise<PointRun> {
+export async function createRestorePoint(store: Store, d: DriveClient, reason: PointReason, now = Date.now(), onProgress?: (done: number, total: number) => void): Promise<PointRun> {
   const pkg = await collectPackage(store, now);
+  // Change 17b: progress for the person (one step per file, then records.json, manifest.json, the summary and the tidy-up)
+  const total = pkg.manifest.files.length + 4; let step = 0;
+  const tick = () => { try { onProgress?.(Math.min(++step, total), total); } catch { /* progress is only a display */ } };
   const f = await drFolders(d);
   // 1. objects, once each
   const have = new Map((await d.children(f.objects)).map(o => [o.name, o]));
   const objects = new Map<string, number>();
   let uploadedObjects = 0;
   for (const file of pkg.manifest.files) {
+    tick();
     const data = pkg.blobs.get(file.id)!;
     const sha = file.sha256 ?? await shaOf(data);
     objects.set(sha, data.length);
@@ -151,6 +155,7 @@ export async function createRestorePoint(store: Store, d: DriveClient, reason: P
   const recSha = await shaOf(recBytes);
   const rec = await d.create(folder, 'records.json', 'application/json', recBytes);
   if (await shaOf(await d.download(rec.id)) !== recSha) throw new DriveError('notVerified', 'records.json');
+  tick();
   // 3. manifest.json last, read back and checked
   const counts: Record<string, number> = {};
   for (const c of COLLECTIONS) counts[c] = (pkg.manifest.records[c] ?? []).length;
@@ -166,8 +171,11 @@ export async function createRestorePoint(store: Store, d: DriveClient, reason: P
   const mBytes = enc.encode(JSON.stringify(manifest, null, 1));
   const mf = await d.create(folder, 'manifest.json', 'application/json', mBytes);
   if (await shaOf(await d.download(mf.id)) !== await shaOf(mBytes)) throw new DriveError('notVerified', 'manifest.json');
+  tick();
   await d.create(folder, 'Restore Point.txt', 'text/plain', enc.encode(summaryText(manifest)));
+  tick();
   const pruned = await prunePoints(store, d, f, now, name);
+  tick();
   return { name, records: pkg.records, files: pkg.manifest.files.length, uploadedObjects, ...pruned };
 }
 

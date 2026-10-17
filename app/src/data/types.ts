@@ -342,6 +342,9 @@ export interface Meta {
   recErrors?: Record<string, string>;
   /** Change 010: my Team Workspace as the cloud last described it (eab_team_status). Absent = no Team Workspace known. */
   team?: TeamState;
+  /** Change 13: which invitation alerts the phone has already announced (so each is announced once), and which
+   *  "accepted / declined" notes I have read. Ids only. */
+  inviteAlerts?: { notified: string[]; seenAnswers: string[] };
   /** Change 010: records another agent shares with me right now ("collection:id" → owner and my access). Everything
    *  NOT listed here is my own record. Kept up to date by every sync; an entry disappears the moment access ends. */
   shared?: Record<string, SharedInfo>;
@@ -356,6 +359,8 @@ export type ShareScope = 'properties' | 'buyers' | 'vendors' | 'tasks' | 'appoin
 export const SHARE_SCOPES: ShareScope[] = ['properties', 'buyers', 'vendors', 'tasks', 'appointments'];
 export interface TeamMember { userId: string; email: string; name?: string; joinedAt?: string }
 export interface TeamInvite { id: string; email?: string | null; fromEmail?: string; fromName?: string | null; createdAt: string; expiresAt: string }
+/** Change 13: an invitation I sent that the other agent answered (told to me by the cloud for 7 days). */
+export interface TeamAnswer { id: string; status: 'accepted' | 'declined'; email?: string | null; name?: string | null; answeredAt: string }
 export interface DeleteRequest { id: string; workspaceId: string; collection: CollectionName; recordId: string; ownerId: string; requesterId: string; createdAt: string }
 export interface TeamState {
   /** Absent when I am in no Team Workspace (invitations for me may still be listed). */
@@ -366,6 +371,8 @@ export interface TeamState {
   members: TeamMember[];
   invitesSent: TeamInvite[];
   invitesForMe: TeamInvite[];
+  /** Change 13: invitations I sent that were accepted or declined in the last 7 days. */
+  invitesAnswered?: TeamAnswer[];
   sharesGiven: { workspaceId: string; collection: CollectionName; recordId: string; level: ShareLevel }[];
   shareAllGiven: { scope: ShareScope; level: ShareLevel }[];
   shareAllReceived: { scope: ShareScope; level: ShareLevel; ownerId: string }[];
