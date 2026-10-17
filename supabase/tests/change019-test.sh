@@ -80,10 +80,12 @@ check "user cannot delete events"                "permission denied" "$(as $B "d
 check "user cannot make themself developer"      "permission denied" "$(as $B "insert into eab_developers (user_id) values ('$B')")"
 check "user cannot read the developer list"      "permission denied" "$(as $B "select count(*) from eab_developers")"
 check "user cannot run the clean-up"             "permission denied" "$(as $B "select eab_usage_cleanup()")"
+check "user cannot run the totals refresh"       "permission denied" "$(as $B "select eab_usage_rollup()")"
+check "user cannot read the daily totals"        "permission denied" "$(as $B "select count(*) from eab_usage_daily")"
 check "non-developer: is_developer false"        "f"                 "$(as $B "select eab_is_developer()")"
 for fn in "eab_dev_overview(now()-interval '1 day', now()+interval '1 day')" "eab_dev_users(now()-interval '1 day', now()+interval '1 day')" \
           "eab_dev_breakdown(now()-interval '1 day', now()+interval '1 day')" "eab_dev_events(now()-interval '1 day', now()+interval '1 day')" \
-          "eab_dev_daily(now()-interval '1 day', now()+interval '1 day')"; do
+          "eab_dev_daily(current_date-1, current_date+1)" "eab_dev_history(current_date-1, current_date+1)"; do
   check "non-developer refused: ${fn%%(*}"       "not allowed"       "$(as $B "select * from $fn")"
   check "anonymous refused: ${fn%%(*}"           "denied"            "$(anon "select * from $fn")"
 done
@@ -105,20 +107,31 @@ check "breakdown by user, API and screen"        "b@x.com|geocoding.reverse|loca
 check "breakdown screen filter"                  "1"                 "$(as $A "select count(*) from eab_dev_breakdown($R, null, 'google', 'property-map')")"
 check "events list newest first, with e-mail"    "b@x.com"           "$(as $A "select email from eab_dev_events($R, '$B', 'google') limit 1")"
 check "events list limit capped at 1000"         "10"                "$(as $A "select count(*) from eab_dev_events($R, null, null, null, null, null, 5000)")"
-check "daily chart row"                          "|1|1|3.0|4|1|1"    "$(as $A "select '|'||active_users||'|'||sessions||'|'||active_minutes||'|'||google_calls||'|'||ai_calls||'|'||errors from eab_dev_daily($R)")"
+check "daily chart row"                          "|1|1|3.0|4|1|1"    "$(as $A "select '|'||active_users||'|'||sessions||'|'||active_minutes||'|'||google_calls||'|'||ai_calls||'|'||errors from eab_dev_daily(current_date-1, current_date+1)")"
 check "developer still cannot read the table"    "permission denied" "$(as $A "select count(*) from eab_usage_events")"
 
-echo "--- 90-day clean-up"
-q "insert into eab_usage_events (user_id, at, kind, name) values ('$B', now() - interval '91 days', 'screen', 'old'), ('$B', now() - interval '89 days', 'screen', 'recent')" >/dev/null
-check "clean-up deletes only events over 90 days" "1"                "$(q "select eab_usage_cleanup()")"
-check "recent event kept"                        "1"                 "$(q "select count(*) from eab_usage_events where name='recent'")"
-check "deleting a user deletes their events"     "0"                 "$(q "delete from auth.users where id='$C'"; q "select count(*) from eab_usage_events where user_id='$C'")"
+echo "--- 1 year of events, daily totals forever"
+check "history: B's Google calls by API and screen" "b@x.com|google|geocoding.reverse|location-picker|2" "$(as $A "select email||'|'||kind||'|'||name||'|'||screen||'|'||calls from eab_dev_history(current_date-1, current_date+1, '$B', 'google', 'geocoding.reverse')")"
+q "insert into eab_usage_events (user_id, at, received_at, kind, name, screen, ok) values
+   ('$B', now() - interval '400 days', now() - interval '400 days', 'google', 'geocoding.reverse', 'location-picker', true),
+   ('$B', now() - interval '400 days', now() - interval '400 days', 'google', 'geocoding.reverse', 'location-picker', false),
+   ('$B', now() - interval '200 days', now() - interval '200 days', 'screen', 'home', null, null)" >/dev/null
+q "update eab_usage_rollup_state set last_run = null" >/dev/null   # as if the totals had never been refreshed
+check "clean-up deletes only events over 1 year"  "2"                "$(q "select eab_usage_cleanup()")"
+check "200-day-old event kept"                   "1"                 "$(q "select count(*) from eab_usage_events where name='home' and at < now() - interval '199 days'")"
+check "deleted events stay in the daily totals"  "2|1"               "$(q "select calls||'|'||failures from eab_usage_daily where user_id='$B' and day <= current_date - 398")"
+check "history over 2 years includes them"       "b@x.com|4|1|"      "$(as $A "select email||'|'||calls||'|'||failures||'|' from eab_dev_history(current_date-800, current_date+1, '$B', 'google', 'geocoding.reverse')")"
+check "daily chart reaches beyond 1 year"        "2"                 "$(as $A "select google_calls from eab_dev_daily(current_date-800, current_date-399)")"
+check "clean-up again changes nothing"           "0|2"               "$(q "select eab_usage_cleanup()||'|'||(select calls from eab_usage_daily where user_id='$B' and day <= current_date - 398)")"
+as $B "select eab_log_usage('[{\"kind\":\"ai\",\"name\":\"voice.transcribe\",\"at\":\"$(date -u -d '20 days ago' +%Y-%m-%dT12:00:00Z)\"}]'::jsonb)" >/dev/null
+check "late event from an offline phone is counted" "1"              "$(as $A "select ai_calls from eab_dev_daily(current_date-21, current_date-19) where ai_calls > 0")"
+check "deleting a user deletes events and totals" "0|0"              "$(q "delete from auth.users where id='$B'"; q "select (select count(*) from eab_usage_events where user_id='$B')||'|'||(select count(*) from eab_usage_daily where user_id='$B')")"
 
 echo "--- rollback"
 RECS=$(q "select count(*) from eab_records")
 OUT=$($DB -f supabase/proposed/20261018000000_change019_020_rollback.sql 2>&1); check_none "rollback applies" "$(echo "$OUT" | grep -i error)"
-check_none "rollback removed the usage table" "$(q "select to_regclass('public.eab_usage_events')")"
-check_none "rollback removed the functions"   "$(q "select proname from pg_proc where proname like 'eab_dev_%' or proname in ('eab_log_usage','eab_is_developer','eab_usage_cleanup')")"
+check_none "rollback removed the usage tables" "$(q "select concat(to_regclass('public.eab_usage_events'), to_regclass('public.eab_usage_daily'), to_regclass('public.eab_developers'))")"
+check_none "rollback removed the functions"   "$(q "select proname from pg_proc where proname like 'eab_dev_%' or proname in ('eab_log_usage','eab_is_developer','eab_usage_cleanup','eab_usage_rollup')")"
 check "records untouched by the rollback"        "$RECS"             "$(q "select count(*) from eab_records")"
 OUT=$($DB -f supabase/proposed/20261018000000_change019_020_usage_dashboard.sql 2>&1); check_none "re-applies after rollback" "$(echo "$OUT" | grep -i error)"
 

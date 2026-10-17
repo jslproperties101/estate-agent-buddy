@@ -23,7 +23,14 @@
 --   anonymous          nothing.
 --   developer          reads summaries and event lists through the eab_dev_* functions; each one checks
 --                      eab_developers first and refuses everyone else ("not allowed").
---   nobody (API)       can update or delete events. Events older than 90 days are deleted automatically.
+--   nobody (API)       can update or delete events.
+--
+-- How long it is kept (owner, 18 Oct 2026: "1 year + totals forever"):
+--   eab_usage_events  every single event, for 1 year (365 days); then deleted automatically.
+--   eab_usage_daily   one row per user, day (Malaysian time), kind, name and screen with the totals (calls, failures,
+--                     summed value). Kept forever. Refreshed from the events before any event is deleted, and again for
+--                     any day that later receives events sent from a phone that was offline.
+--   Deleting a user's account deletes both their events and their daily totals.
 --
 -- Limits against runaway cost or abuse: at most 200 events per call, at most 5,000 events per user per hour (more are
 -- dropped), phone times are kept within the last 30 days and 5 minutes into the future.
@@ -69,12 +76,35 @@ create index if not exists eab_usage_events_at on public.eab_usage_events (at);
 create index if not exists eab_usage_events_user_at on public.eab_usage_events (user_id, at desc);
 create index if not exists eab_usage_events_kind_at on public.eab_usage_events (kind, at);
 create index if not exists eab_usage_events_user_received on public.eab_usage_events (user_id, received_at);   -- hourly limit check
+create index if not exists eab_usage_events_received on public.eab_usage_events (received_at);                -- daily totals refresh
 
--- Both tables: row-level security on, no policies, no grants. Unreadable and unwritable through the API; reached only
+create table if not exists public.eab_usage_daily (
+  user_id      uuid not null references auth.users (id) on delete cascade,
+  day          date not null,                 -- Malaysian date
+  kind         text not null,
+  name         text not null,
+  screen       text not null default '',      -- '' when the event had no screen
+  calls        bigint not null,
+  failures     bigint not null,
+  total_value  double precision,
+  primary key (user_id, day, kind, name, screen)
+);
+create index if not exists eab_usage_daily_day on public.eab_usage_daily (day);
+
+-- When the daily totals were last refreshed (one row).
+create table if not exists public.eab_usage_rollup_state (
+  id        integer primary key default 1 check (id = 1),
+  last_run  timestamptz
+);
+
+-- All tables: row-level security on, no policies, no grants. Unreadable and unwritable through the API; reached only
 -- through the functions below.
 alter table public.eab_developers enable row level security;
 alter table public.eab_usage_events enable row level security;
-revoke all on public.eab_developers, public.eab_usage_events from public, anon, authenticated;
+alter table public.eab_usage_daily enable row level security;
+alter table public.eab_usage_rollup_state enable row level security;
+revoke all on public.eab_developers, public.eab_usage_events, public.eab_usage_daily, public.eab_usage_rollup_state
+  from public, anon, authenticated;
 
 -- ---------- helpers ----------
 create or replace function public.eab_is_developer() returns boolean
@@ -88,13 +118,43 @@ begin
   if not public.eab_is_developer() then raise exception 'not allowed' using errcode = '42501'; end if;
 end $$;
 
--- Deletes events older than 90 days (at most 50,000 per run, so a run is always short). Runs by itself now and then
--- from eab_log_usage, and every night when pg_cron is switched on (see the end of this file).
+-- Refreshes the daily totals for every day that received events since the last refresh (with a 10-minute overlap, so
+-- an event saved at the same moment is never missed; recounting a day twice gives the same result). A day is always
+-- recounted from all its events, so late events from an offline phone are included.
+create or replace function public.eab_usage_rollup() returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_since timestamptz;
+  v_now timestamptz := clock_timestamp();
+  v_days date[];
+begin
+  insert into public.eab_usage_rollup_state (id, last_run) values (1, null) on conflict (id) do nothing;
+  select last_run into v_since from public.eab_usage_rollup_state where id = 1 for update;
+  select coalesce(array_agg(distinct (at at time zone 'Asia/Kuala_Lumpur')::date), '{}') into v_days
+    from public.eab_usage_events
+    where v_since is null or received_at > v_since - interval '10 minutes';
+  if cardinality(v_days) > 0 then
+    delete from public.eab_usage_daily where day = any (v_days);
+    insert into public.eab_usage_daily (user_id, day, kind, name, screen, calls, failures, total_value)
+    select user_id, (at at time zone 'Asia/Kuala_Lumpur')::date, kind, name, coalesce(screen, ''),
+           sum(n), coalesce(sum(n) filter (where ok is false), 0), sum(value)
+    from public.eab_usage_events
+    where (at at time zone 'Asia/Kuala_Lumpur')::date = any (v_days)
+    group by 1, 2, 3, 4, 5;
+  end if;
+  update public.eab_usage_rollup_state set last_run = v_now where id = 1;
+  return cardinality(v_days);
+end $$;
+
+-- Refreshes the daily totals, then deletes events older than 1 year (at most 50,000 per run, so a run is always
+-- short). Their totals stay in eab_usage_daily forever. Runs by itself now and then from eab_log_usage, and every
+-- night when pg_cron is switched on (see the end of this file).
 create or replace function public.eab_usage_cleanup() returns integer
 language plpgsql security definer set search_path = public as $$
 declare k integer;
 begin
-  with old as (select id from public.eab_usage_events where at < now() - interval '90 days' order by at limit 50000)
+  perform public.eab_usage_rollup();
+  with old as (select id from public.eab_usage_events where at < now() - interval '365 days' order by at limit 50000)
   delete from public.eab_usage_events e using old where e.id = old.id;
   get diagnostics k = row_count;
   return k;
@@ -262,36 +322,60 @@ begin
   limit least(greatest(coalesce(p_limit, 200), 1), 1000);
 end $$;
 
--- Per-day numbers for charts, in Malaysian time unless another time zone is given.
-create or replace function public.eab_dev_daily(p_from timestamptz, p_to timestamptz, p_user uuid default null, p_tz text default 'Asia/Kuala_Lumpur')
+-- Per-day numbers for charts, from the daily totals (complete for ALL time, also beyond the 1-year event limit).
+-- p_from and p_to are Malaysian dates, both included. Refreshes the totals first, so today is up to date.
+create or replace function public.eab_dev_daily(p_from date, p_to date, p_user uuid default null)
 returns table (day date, active_users bigint, sessions bigint, active_minutes numeric, google_calls bigint, ai_calls bigint, errors bigint)
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql security definer set search_path = public as $$
 begin
   perform public.eab_dev_guard();
+  perform public.eab_usage_rollup();
   return query
-  select (e.at at time zone p_tz)::date d, count(distinct e.user_id),
-    coalesce(sum(e.n) filter (where e.kind = 'session' and e.name = 'session.start'), 0)::bigint,
-    round(coalesce(sum(e.value) filter (where e.kind = 'session' and e.name = 'session.active'), 0)::numeric / 60000, 1),
-    coalesce(sum(e.n) filter (where e.kind = 'google'), 0)::bigint,
-    coalesce(sum(e.n) filter (where e.kind = 'ai'), 0)::bigint,
-    coalesce(sum(e.n) filter (where e.kind = 'error'), 0)::bigint
-  from public.eab_usage_events e
-  where e.at >= p_from and e.at < p_to and (p_user is null or e.user_id = p_user)
-  group by 1 order by 1;
+  select d.day, count(distinct d.user_id),
+    coalesce(sum(d.calls) filter (where d.kind = 'session' and d.name = 'session.start'), 0)::bigint,
+    round((coalesce(sum(d.total_value) filter (where d.kind = 'session' and d.name = 'session.active'), 0) / 60000.0)::numeric, 1),
+    coalesce(sum(d.calls) filter (where d.kind = 'google'), 0)::bigint,
+    coalesce(sum(d.calls) filter (where d.kind = 'ai'), 0)::bigint,
+    coalesce(sum(d.calls) filter (where d.kind = 'error'), 0)::bigint
+  from public.eab_usage_daily d
+  where d.day between p_from and p_to and (p_user is null or d.user_id = p_user)
+  group by d.day order by d.day;
+end $$;
+
+-- Long-term totals per user, kind, name and screen between two Malaysian dates (both included), from the daily
+-- totals: works for any period, including more than a year back.
+create or replace function public.eab_dev_history(p_from date, p_to date, p_user uuid default null, p_kind text default null,
+                                                  p_name text default null, p_screen text default null)
+returns table (user_id uuid, email text, kind text, name text, screen text, calls bigint, failures bigint, total_value double precision,
+               first_day date, last_day date, days_used bigint)
+language plpgsql security definer set search_path = public, auth as $$
+begin
+  perform public.eab_dev_guard();
+  perform public.eab_usage_rollup();
+  return query
+  select d.user_id, au.email::text, d.kind, d.name, nullif(d.screen, ''), sum(d.calls)::bigint, sum(d.failures)::bigint,
+         sum(d.total_value), min(d.day), max(d.day), count(distinct d.day)
+  from public.eab_usage_daily d join auth.users au on au.id = d.user_id
+  where d.day between p_from and p_to
+    and (p_user is null or d.user_id = p_user) and (p_kind is null or d.kind = p_kind)
+    and (p_name is null or d.name = p_name) and (p_screen is null or d.screen = p_screen)
+  group by d.user_id, au.email, d.kind, d.name, d.screen
+  order by 6 desc
+  limit 5000;
 end $$;
 
 -- ---------- who may call what ----------
-revoke all on function public.eab_is_developer(), public.eab_dev_guard(), public.eab_usage_cleanup(), public.eab_log_usage(jsonb),
+revoke all on function public.eab_is_developer(), public.eab_dev_guard(), public.eab_usage_rollup(), public.eab_usage_cleanup(), public.eab_log_usage(jsonb),
   public.eab_dev_overview(timestamptz, timestamptz), public.eab_dev_users(timestamptz, timestamptz, text, text),
   public.eab_dev_breakdown(timestamptz, timestamptz, uuid, text, text, text),
   public.eab_dev_events(timestamptz, timestamptz, uuid, text, text, text, text, integer),
-  public.eab_dev_daily(timestamptz, timestamptz, uuid, text) from public, anon, authenticated;
+  public.eab_dev_daily(date, date, uuid), public.eab_dev_history(date, date, uuid, text, text, text) from public, anon, authenticated;
 grant execute on function public.eab_is_developer(), public.eab_log_usage(jsonb),
   public.eab_dev_overview(timestamptz, timestamptz), public.eab_dev_users(timestamptz, timestamptz, text, text),
   public.eab_dev_breakdown(timestamptz, timestamptz, uuid, text, text, text),
   public.eab_dev_events(timestamptz, timestamptz, uuid, text, text, text, text, integer),
-  public.eab_dev_daily(timestamptz, timestamptz, uuid, text) to authenticated;
--- eab_dev_guard and eab_usage_cleanup are not callable through the API (used inside the functions above, and by pg_cron).
+  public.eab_dev_daily(date, date, uuid), public.eab_dev_history(date, date, uuid, text, text, text) to authenticated;
+-- eab_dev_guard, eab_usage_rollup and eab_usage_cleanup are not callable through the API (used inside the functions above, and by pg_cron).
 
 commit;
 
