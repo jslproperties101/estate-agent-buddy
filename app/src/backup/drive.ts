@@ -18,6 +18,7 @@ import type { Store } from '../data/store';
 import { DriveClient } from './driveApi';
 import { createRestorePoint, PointRun } from './restorePoints';
 import { exportTree, TreeRun } from './driveTree';
+import { usage } from '../usage/logger';
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const FOLDER_NAME = 'Estate Agent AI Buddy backups';
@@ -130,8 +131,10 @@ export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now
     try {
       out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now);
       store.setSingleton('meta', { driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: out.point.kept, fileName: out.point.name } });
+      usage.sync('drive.restore_point', true);
     } catch (e) {
       out.pointError = failure(e); out.ok = false; out.error = out.pointError;
+      usage.sync('drive.restore_point', false);
       store.setSingleton('meta', { driveLast: { at: now, ok: false, error: out.pointError }, ...(out.pointError === 'auth' ? { drive: undefined } : {}) });
       if (out.pointError === 'auth') return out;
     }
@@ -139,9 +142,11 @@ export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now
   if (opts.tree !== false) {
     try {
       out.tree = await exportTree(store, client, now);
+      usage.sync('drive.folders', out.tree.failed.length === 0);
       store.setSingleton('meta', { driveTree: { at: now, ok: true, status: out.tree.status, waiting: out.tree.waiting.length, failed: out.tree.failed.length, editedOutside: out.tree.editedOutside.length } });
     } catch (e) {
       out.treeError = failure(e); out.ok = false; out.error = out.error ?? out.treeError;
+      usage.sync('drive.folders', false);
       store.setSingleton('meta', { driveTree: { at: now, ok: false, error: out.treeError }, ...(out.treeError === 'auth' ? { drive: undefined } : {}) });
     }
   }

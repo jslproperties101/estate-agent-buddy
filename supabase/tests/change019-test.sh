@@ -135,5 +135,9 @@ check_none "rollback removed the functions"   "$(q "select proname from pg_proc 
 check "records untouched by the rollback"        "$RECS"             "$(q "select count(*) from eab_records")"
 OUT=$($DB -f supabase/proposed/20261018000000_change019_020_usage_dashboard.sql 2>&1); check_none "re-applies after rollback" "$(echo "$OUT" | grep -i error)"
 
+# last: adds an event, so it must not run before the counting checks above
+$DB -c "insert into public.eab_usage_events (user_id, kind, name, ok, at) values ('cccccccc-0000-0000-0000-000000000003','sync','sync.run',true, now());" >/dev/null
+check "last_sync counts the app's sync.run event"  "t"  "$(as $A "select (last_sync is not null)::text from eab_dev_users($R) where email='c@x.com'")"
+check "last_sync is empty for a failed-only sync"  "t"  "$(as $A "select (last_sync is null)::text from eab_dev_users($R) where email='b@x.com'")"
 echo "passed $pass, failed $fail"
 [ "$fail" -eq 0 ]

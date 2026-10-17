@@ -3,12 +3,14 @@
 // sign-in, any other failure is remembered as the last sync problem (the changes themselves stay on the phone).
 import type { Store } from './store';
 import { configured, syncNow, SyncConfig, SyncError, SyncResult } from './sync';
+import { usage } from '../usage/logger';
 
 export async function runSync(store: Store, cfg: SyncConfig, fetchFn: typeof fetch = fetch): Promise<{ ok: true; result: SyncResult } | { ok: false; code: string }> {
   if (!configured(cfg) || !store.getState().meta.syncSession) return { ok: false, code: 'not-signed-in' };
-  try { return { ok: true, result: await syncNow(store, cfg, fetchFn) }; }
+  try { const result = await syncNow(store, cfg, fetchFn); usage.sync('sync.run', true, result.pushed + result.pulled); return { ok: true, result }; }
   catch (e) {
     const code = e instanceof SyncError ? e.code : 'network';
+    usage.sync('sync.run', false);
     if (code === 'auth' || code === 'no-access') store.setSingleton('meta', { syncSession: undefined, syncError: code === 'auth' ? 'expired' : code });
     else store.setSingleton('meta', { syncError: code });
     return { ok: false, code };

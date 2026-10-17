@@ -263,7 +263,7 @@ begin
   select au.id, au.email::text, au.created_at, la.at, lv.app_version, lv.platform,
     (select x.device from public.eab_usage_events x where x.user_id = au.id and x.device is not null order by x.at desc limit 1),
     coalesce(per.s, 0), coalesce(per.am, 0), coalesce(per.g, 0), coalesce(per.gf, 0), coalesce(per.ai, 0), coalesce(per.er, 0), coalesce(per.sf, 0),
-    (select max(x.at) from public.eab_usage_events x where x.user_id = au.id and x.kind = 'sync' and x.name in ('sync.push', 'sync.pull') and x.ok),
+    (select max(x.at) from public.eab_usage_events x where x.user_id = au.id and x.kind = 'sync' and x.name like 'sync.%' and x.ok),
     (select max(x.at) from public.eab_usage_events x where x.user_id = au.id and x.kind = 'sync' and x.name like 'drive.%' and x.ok),
     (select x.value from public.eab_usage_events x where x.user_id = au.id and x.kind = 'metric' and x.name = 'storage.local_bytes' order by x.at desc limit 1),
     (select coalesce(jsonb_object_agg(rc.collection, rc.c), '{}'::jsonb) from (

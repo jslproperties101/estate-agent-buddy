@@ -62,6 +62,9 @@ export class Store {
   /** How many writes to the phone's storage have failed since the app opened. A screen that wants to say "Saved" waits
    *  for flush() and checks that this number did not go up, so a failed save is never reported as saved. */
   writeErrors = 0;
+  /** Change 19/20: told when this phone's person creates a new record or adds a file (names only: the usage log). */
+  onCreate?: (collection: string) => void;
+  onFileAdded?: () => void;
   /** True from a failed write until the next write succeeds (shown as "not saved" in the status line). */
   writeFailed = false;
   private cloudBusy = false;
@@ -147,6 +150,7 @@ export class Store {
     this.state = { ...this.state, [c]: updated };
     this.write(() => this.backend.put(recKey(c, next.id), next));
     if (i < 0) this.write(() => this.backend.removeLocal(`del:${key}`));
+    if (i < 0 && !keepTime && !next.sample) { try { this.onCreate?.(c); } catch { /* the usage log never disturbs a save */ } }
     // Change 010: the audit entry is written after the record itself, so a save is never held up by its history.
     if (!keepTime && !next.sample) this.recordAudit(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, source);
     if (!keepTime) this.markDirty(key);
@@ -455,6 +459,7 @@ export class Store {
   async putFile(blob: Blob): Promise<string> {
     const id = newId();
     await this.putFileAs(id, blob, 'local');
+    try { this.onFileAdded?.(); } catch { /* the usage log never disturbs a save */ }
     return id;
   }
   /** Keeps a file under a known id (a file taken down from the cloud keeps the id its record already points to). */

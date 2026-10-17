@@ -29,6 +29,7 @@ import { TeamEntryCard } from '../team/TeamEntry';
 import { DataSafetyCard } from '../sync/SyncUI';
 import { permission, requestPermission } from '../lib/notify';
 import { loadSampleInto } from '../data/sample';
+import { DevEntry } from '../usage/DevDashboard';
 
 export const REG_TYPES = ['REN', 'PEA', 'REA'] as const;
 
@@ -251,6 +252,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <small className="muted">{bugStrings[lang].settingsHint}</small>
         <button className="btn primary" data-testid="open-bug-report" onClick={() => go({ name: 'bugReport', from: 'settings' })}>{bugStrings[lang].open}</button>
       </div>
+      <DevEntry go={() => go({ name: 'devDashboard' })} />
       <BackupCard lang={lang} />
       <div className="card stack-sm" data-testid="followup-setting">
         <div className="card-title">{followStrings[lang].settingTitle}</div>

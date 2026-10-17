@@ -43,6 +43,8 @@ export type Screen =
   | { name: 'nameCard' }
   | { name: 'settings' }
   | { name: 'bugReport'; from?: string }
+  // Changes 19 and 20 (developer only)
+  | { name: 'devDashboard' }
   | { name: 'syncReview' }
   | { name: 'history'; collection: CollectionName; id: string }
   | { name: 'recentlyDeleted' }

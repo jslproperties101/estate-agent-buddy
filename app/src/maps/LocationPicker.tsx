@@ -11,6 +11,7 @@ import { mapStrings } from './strings';
 import { MapView, MapsNotice, useGoogleMaps } from './MapView';
 import { reverseGeocode, geocodeAddress, searchPlaces, GeocodeResult, Suggestion } from './google';
 import { c1017Strings } from '../ui/c1017Strings';
+import { usage } from '../usage/logger';
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
@@ -37,6 +38,8 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
   const c = strings[lang].c;
   const ls = listingStrings[lang];
   const { maps, status } = useGoogleMaps(lang);
+  // Change 19: Google calls made while this pop-up is open are noted as coming from "location-picker".
+  useEffect(() => { usage.setOverlay('location-picker'); return () => usage.setOverlay(''); }, []);
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(start ??
     (typeof current.lat === 'number' && typeof current.lng === 'number' ? { lat: current.lat, lng: current.lng } : null));
   const [geo, setGeo] = useState<GeocodeResult | null>(null);

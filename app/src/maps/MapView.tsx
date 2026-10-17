@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { loadMaps, Maps, MapsError, mapsAuthFailed, lastMapsError } from './google';
+import { usage } from '../usage/logger';
 import { useLivePosition, PositionState } from './position';
 import { mapStrings } from './strings';
 import type { Lang } from '../i18n';
@@ -105,6 +106,7 @@ export function MapView({ maps, markers, path, route, center, zoom = 15, fit, on
 
   useEffect(() => {
     if (!el.current || map.current) return;
+    usage.google('maps.map', true);   // each new map is one billed map load (Change 19)
     map.current = new maps.Map(el.current, {
       center: center ?? { lat: 2.8205, lng: 101.8036 }, zoom, mapTypeId: mapType, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false, gestureHandling: 'greedy',
       // Google's round camera control would sit under the ◎ My Location button; pinch / scroll zoom is unchanged.

@@ -4,6 +4,7 @@
 // no key. Gemini is not used for any map function.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { partsFromGoogle, AddressParts, GoogleComponent } from '../domain/places';
+import { usage } from '../usage/logger';
 
 export type Maps = any;
 
@@ -25,21 +26,28 @@ export function loadMaps(key: string, lang: 'en' | 'bm' | 'zh' = 'en'): Promise<
   loadedKey = key;
   sniff();
   loading = new Promise<Maps>((resolve, reject) => {
-    const timer = setTimeout(() => { loading = null; reject(new MapsError('timeout')); }, 20000);
+    const timer = setTimeout(() => { loading = null; usage.google('maps.load', false); reject(new MapsError('timeout')); }, 20000);
     // Google calls this when the key is wrong, restricted, or billing is not enabled.
-    w.gm_authFailure = () => { authFailed = true; loading = null; clearTimeout(timer); reject(new MapsError('auth')); window.dispatchEvent(new Event('eab-maps-auth-failure')); };
-    w.__eabMapsReady = () => { clearTimeout(timer); resolve(w.google.maps); };
+    w.gm_authFailure = () => { authFailed = true; loading = null; clearTimeout(timer); usage.google('maps.load', false); reject(new MapsError('auth')); window.dispatchEvent(new Event('eab-maps-auth-failure')); };
+    w.__eabMapsReady = () => { clearTimeout(timer); usage.google('maps.load', true); resolve(w.google.maps); };
     const s = document.createElement('script');
     const language = lang === 'bm' ? 'ms' : lang === 'zh' ? 'zh-CN' : 'en';
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&libraries=places,geometry&loading=async&callback=__eabMapsReady&language=${language}&region=MY`;
     s.async = true;
-    s.onerror = () => { loading = null; clearTimeout(timer); reject(new MapsError('load')); };
+    s.onerror = () => { loading = null; clearTimeout(timer); usage.google('maps.load', false); reject(new MapsError('load')); };
     document.head.appendChild(s);
   });
   return loading;
 }
 
 export const mapsAuthFailed = () => authFailed;
+
+/** Runs one Google call and notes it in the usage log (Change 19): which API, and whether Google answered. Nothing about
+ *  the request or the answer (address, position, search words) is noted. */
+async function counted(name: string, fn: () => Promise<any>): Promise<any> {
+  try { const r = await fn(); usage.google(name, true); return r; }
+  catch (e) { usage.google(name, (e as { code?: unknown })?.code === 'ZERO_RESULTS'); throw e; }
+}
 
 // Google reports why a key was refused only in the browser console ("Google Maps JavaScript API error:
 // RefererNotAllowedMapError"). The loader listens for those messages so the app can say exactly which Google Cloud
@@ -79,7 +87,7 @@ function fromGeocoder(r: any): GeocodeResult {
 /** Address of a map position (reverse geocoding). */
 export async function reverseGeocode(maps: Maps, lat: number, lng: number): Promise<GeocodeResult | null> {
   const g = new maps.Geocoder();
-  const res = await g.geocode({ location: { lat, lng } });
+  const res = await counted('geocoding.reverse', () => g.geocode({ location: { lat, lng } }));
   const first = res?.results?.[0];
   return first ? { ...fromGeocoder(first), lat, lng } : null;
 }
@@ -87,7 +95,7 @@ export async function reverseGeocode(maps: Maps, lat: number, lng: number): Prom
 /** Position of a typed address (forward geocoding), limited to Malaysia first. */
 export async function geocodeAddress(maps: Maps, address: string): Promise<GeocodeResult | null> {
   const g = new maps.Geocoder();
-  const res = await g.geocode({ address, region: 'MY' });
+  const res = await counted('geocoding.forward', () => g.geocode({ address, region: 'MY' }));
   const first = res?.results?.[0];
   return first ? fromGeocoder(first) : null;
 }
@@ -103,7 +111,7 @@ export async function searchPlaces(maps: Maps, input: string, near?: { lat: numb
   if (!AS?.fetchAutocompleteSuggestions) return [];
   const req: any = { input, includedRegionCodes: ['my'] };
   if (near) req.locationBias = { center: near, radius: 30000 };
-  const { suggestions } = await AS.fetchAutocompleteSuggestions(req);
+  const { suggestions } = await counted('places.autocomplete', () => AS.fetchAutocompleteSuggestions(req));
   return (suggestions ?? []).filter((s: any) => s.placePrediction).slice(0, 6).map((s: any) => {
     const p = s.placePrediction;
     return {
@@ -111,7 +119,7 @@ export async function searchPlaces(maps: Maps, input: string, near?: { lat: numb
       secondary: p.secondaryText?.text,
       select: async () => {
         const place = p.toPlace();
-        await place.fetchFields({ fields: ['addressComponents', 'location', 'formattedAddress', 'id'] });
+        await counted('places.details', () => place.fetchFields({ fields: ['addressComponents', 'location', 'formattedAddress', 'id'] }));
         const comps: GoogleComponent[] = (place.addressComponents ?? []).map((c: any) => ({ long_name: c.longText, short_name: c.shortText, types: c.types }));
         const loc = place.location;
         if (!loc) return null;
@@ -129,14 +137,14 @@ export async function routePreview(maps: Maps, from: { lat: number; lng: number 
   try {
     const { Route } = await maps.importLibrary('routes');
     if (Route?.computeRoutes) {
-      const { routes } = await Route.computeRoutes({ origin: from, destination: to, travelMode: 'DRIVING', fields: ['path', 'distanceMeters', 'durationMillis'] });
+      const { routes } = await counted('routes.compute', () => Route.computeRoutes({ origin: from, destination: to, travelMode: 'DRIVING', fields: ['path', 'distanceMeters', 'durationMillis'] }));
       const r = routes?.[0];
       if (r) return { path: (r.path ?? []).map((p: any) => ({ lat: typeof p.lat === 'function' ? p.lat() : p.lat, lng: typeof p.lng === 'function' ? p.lng() : p.lng })), distanceM: r.distanceMeters, durationS: r.durationMillis ? r.durationMillis / 1000 : undefined };
     }
   } catch { /* Routes API not enabled for this key: try the older Directions API */ }
   try {
     const svc = new maps.DirectionsService();
-    const res = await svc.route({ origin: from, destination: to, travelMode: maps.TravelMode?.DRIVING ?? 'DRIVING' });
+    const res = await counted('directions.route', () => svc.route({ origin: from, destination: to, travelMode: maps.TravelMode?.DRIVING ?? 'DRIVING' }));
     const route = res?.routes?.[0];
     if (!route) return null;
     const leg = route.legs?.[0];

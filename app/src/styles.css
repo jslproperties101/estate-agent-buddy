@@ -1103,3 +1103,13 @@ button.sync-banner { cursor: pointer; }
 .rec-status.plain { border: 0; background: none; padding: 0; }
 /* Change 7: Delete in the photo menu is red. */
 .pg-menu button.danger-text { color: var(--red); }
+/* Changes 19 and 20: Developer Dashboard (developer only). */
+.dev-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dev-stat { display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; overflow-wrap: anywhere; }
+.dev-stat strong { font-size: 20px; color: var(--gold-hi); }
+.dev-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+.dev-table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
+.dev-table th { text-align: left; color: var(--muted); font-weight: 700; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line-2); white-space: nowrap; }
+.dev-table td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.dev-bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid var(--line-2); }
+.dev-bar { flex: 1 1 0; min-width: 2px; background: var(--gold); border-radius: 2px 2px 0 0; }

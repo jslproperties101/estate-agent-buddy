@@ -5,6 +5,7 @@
 import type { Store } from '../data/store';
 import { fresh, supabaseCall, supabaseHeaders, SyncConfig, SyncError, configured } from '../data/sync';
 import type { CollectionName, DeleteRequest, ShareLevel, ShareScope, TeamInvite, TeamMember, TeamState } from '../data/types';
+import { usage } from '../usage/logger';
 
 type FetchFn = typeof fetch;
 
@@ -38,6 +39,12 @@ export function teamErrorOf(e: unknown): TeamError {
   return new TeamError('other', msg);
 }
 
+/** Change 19/20: which team and sharing actions are noted in the usage log (the action only, never who or what). */
+const FEATURE_OF: Record<string, string> = {
+  eab_team_invite: 'team.invite', eab_team_accept: 'team.accept', eab_team_decline: 'team.decline', eab_team_leave: 'team.leave',
+  eab_team_remove: 'team.remove', eab_share_set: 'share.set', eab_share_all_set: 'share.all', eab_request_delete: 'delete.request', eab_decide_delete: 'delete.decide',
+};
+
 /** Calls one database function as the signed-in person (refreshing the sign-in first when needed). */
 export async function rpc<T>(store: Store, cfg: SyncConfig, fn: string, body: Record<string, unknown> = {}, fetchFn: FetchFn = fetch): Promise<T> {
   if (!configured(cfg)) throw new TeamError('not-signed-in');
@@ -48,6 +55,7 @@ export async function rpc<T>(store: Store, cfg: SyncConfig, fn: string, body: Re
     if (s !== s0) store.setSingleton('meta', { syncSession: s });
     const r = await supabaseCall(fetchFn, `${cfg.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: supabaseHeaders(cfg, s.accessToken), body: JSON.stringify(body) });
     const text = await r.text();
+    if (FEATURE_OF[fn]) usage.feature(FEATURE_OF[fn]);
     return (text ? JSON.parse(text) : null) as T;
   } catch (e) { throw teamErrorOf(e); }
 }

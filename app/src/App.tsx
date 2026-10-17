@@ -62,7 +62,10 @@ import { c11Strings } from './ui/c011Strings';
 import { BuyerHistoryScreen } from './agenda/BuyerHistoryUI';
 import { BuyerMatchingScreen, BuyerMatchesScreen } from './contacts/BuyerMatchingUI';
 import { CreativeMediaScreen } from './marketing/CreativeMediaUI';
-import { nativeLook, hideSplash } from './native/native';
+import { nativeLook, hideSplash, platform } from './native/native';
+import { BUILD } from './native/updates';
+import { usage, detectDevice } from './usage/logger';
+import { DevDashboard } from './usage/DevDashboard';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
 import { config } from './config';
@@ -207,6 +210,17 @@ function Shell() {
   const [toast, setToast] = useState<{ text: string; kind: ToastKind } | null>(null);
   const [alerts, setAlerts] = useState<DueReminder[]>([]);
   useAutoSync();
+  // Changes 19 and 20: the usage log (what it records, and what it never does, is written at the top of usage/logger.ts).
+  const userId = state.meta.syncSession?.userId;
+  useEffect(() => {
+    const base = { appVersion: BUILD.version, platform: platform() };
+    usage.attach(store, base);
+    void detectDevice().then(device => usage.attach(store, { ...base, device }));
+    store.onCreate = c => usage.feature(`${c}.create`);
+    store.onFileAdded = () => usage.feature('file.add');
+    const stop = usage.start();
+    return () => { stop(); store.onCreate = undefined; store.onFileAdded = undefined; };
+  }, [store, userId]);
   // Old deleted records, their removed pictures and forgotten drafts are cleared after 30 days.
   useEffect(() => { void store.purgeOld(); }, [store]);
 
@@ -286,6 +300,7 @@ function Shell() {
     void scheduleNative([...list, ...ads]);
   }, [state.tasks, state.appointments, state.properties, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
   const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue;
@@ -391,6 +406,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'nameCard': return profileStrings[lang].sendTitle;
     case 'settings': return profileStrings[lang].setTitle;
     case 'bugReport': return bugStrings[lang].title;
+    case 'devDashboard': return 'Developer dashboard';
     case 'syncReview': return syncStrings[lang].review;
     case 'history': return syncStrings[lang].history;
     case 'recentlyDeleted': return syncStrings[lang].recent;
@@ -464,6 +480,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'nameCard': return <NameCardSend lang={lang} />;
     case 'settings': return <SettingsScreen lang={lang} go={go} />;
     case 'bugReport': return <BugReportScreen lang={lang} from={s.from ?? 'settings'} />;
+    case 'devDashboard': return <DevDashboard />;
     case 'syncReview': return <SyncReviewScreen lang={lang} go={go} />;
     case 'history': return <HistoryScreen key={`${s.collection}:${s.id}`} lang={lang} collection={s.collection} id={s.id} go={go} />;
     case 'recentlyDeleted': return <RecentlyDeletedScreen lang={lang} go={go} />;

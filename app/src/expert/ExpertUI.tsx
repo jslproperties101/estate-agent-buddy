@@ -14,6 +14,7 @@ import { whatsappLink } from '../domain/namecard';
 import { config } from '../config';
 import { fmtDateTime } from '../lib/dates';
 import { IconExpert } from '../icons';
+import { usage } from '../usage/logger';
 
 export function ExpertHome({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
@@ -96,7 +97,8 @@ export function ExpertThreadScreen({ lang, go, id }: { lang: Lang; go: Go; id: s
         history: t!.messages.slice(1).map(m => ({ from: m.from, text: m.text })),
       }, headers);
       add({ from: 'ai', text, via: 'ai' });
-    } catch { setErr(e.aiErr); }
+      usage.ai('expert.ask', true);
+    } catch { usage.ai('expert.ask', false); setErr(e.aiErr); }
     setBusy(false);
   }
 
