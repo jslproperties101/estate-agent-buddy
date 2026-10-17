@@ -11,18 +11,23 @@ import { onAppUrlOpen, onBrowserClosed, isNative, AUTH_CALLBACK } from '../nativ
 import { authStrings } from './strings';
 import { IconLogo } from '../icons';
 import { ConnectionRecovery } from './ConnectionRecovery';
+import { isReturnLink, closedTabMeansCancelled } from './returnState';
 
 type Phase = 'idle' | 'opening' | 'waiting' | 'exchanging';
 
 /** The return from Google, for both the web address and the Android app link. Used by the sign-in screen and by
  *  Settings (signing in again later). */
-export function useGoogleReturn(onDone: (error: string | null) => void): void {
+export function useGoogleReturn(onDone: (error: string | null) => void, onStart?: () => void): void {
   const { state, store } = useApp();
   const cfg = config(state.settings);
   const done = useRef(onDone);
   done.current = onDone;
+  const started = useRef(onStart);
+  started.current = onStart;
   useEffect(() => {
     const finish = async (url: string) => {
+      // Told BEFORE the exchange begins: handleCallback closes the Google tab, which must not look like a cancel.
+      if (isReturnLink(url)) started.current?.();
       const r = await handleCallback(cfg, url);
       if (r.kind === 'none') return;
       cleanWebAddress();
@@ -51,13 +56,13 @@ export function LoginScreen({ lang }: { lang: Lang }) {
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
-  useGoogleReturn(e => { setPhase('idle'); setErr(e); });
+  useGoogleReturn(e => { setPhase('idle'); setErr(e); }, () => { phaseRef.current = 'exchanging'; setPhase('exchanging'); });
 
   // Android: the person closed the Google tab without finishing.
   useEffect(() => {
     let l: { remove: () => unknown } | null = null;
     void onBrowserClosed(() => {
-      setTimeout(() => { if (phaseRef.current === 'waiting') { setPhase('idle'); setErr('cancelled'); } }, 1500);
+      setTimeout(() => { if (closedTabMeansCancelled(phaseRef.current)) { setPhase('idle'); setErr('cancelled'); } }, 1500);
     }).then(x => { l = x; });
     return () => { void l?.remove(); };
   }, []);
