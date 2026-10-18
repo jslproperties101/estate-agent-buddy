@@ -554,7 +554,7 @@ test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Gray Dropped, Green Boo
   await loadSample(page);
   await tile(page, 'Buyer List');
   const colours = await page.locator('[role="radiogroup"] .lead-dot').evaluateAll(d => d.map(x => getComputedStyle(x).backgroundColor));
-  assert.deepEqual(colours, ['rgb(59, 130, 246)', 'rgb(234, 179, 8)', 'rgb(239, 68, 68)', 'rgb(156, 163, 175)', 'rgb(34, 197, 94)']);
+  assert.deepEqual(colours, ['rgb(239, 68, 68)', 'rgb(234, 179, 8)', 'rgb(59, 130, 246)', 'rgb(34, 197, 94)', 'rgb(156, 163, 175)']);
   const hot = page.locator('[data-testid="contact-row"][data-lead="hot"]').first();
   assert.equal(await hot.evaluate(el => getComputedStyle(el).borderLeftColor), 'rgb(239, 68, 68)');
   await page.getByRole('radio', { name: /Warm/i }).click();
@@ -1599,7 +1599,7 @@ test('U35 vendors have their own status (Pending Property Info, Pending Follow-u
   assert.equal(await page.getByTestId('vendor-status-picker').locator('[aria-checked="true"]').getAttribute('data-vstat'), 'pending_info');
   await home(page); await tile(page, 'Buyer List');
   const bs = await page.getByTestId('status-filter').locator('[data-status]').evaluateAll(b => b.map(x => x.textContent.replace(/\d+$/, '').trim()));
-  assert.deepEqual(bs, ['Cold', 'Warm', 'Hot', 'Dropped', 'Booked / Bought']);
+  assert.deepEqual(bs, ['Hot', 'Warm', 'Cold', 'Booked / Bought', 'Dropped']);
   assert.ok(!bs.includes('Inactive'), 'Inactive is not a buyer filter any more');
   await shot(page, '35-buyers', false);
   await page.context().close();
