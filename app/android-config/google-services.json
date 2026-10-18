@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "165746523480",
+    "project_id": "estate-agent-ai-buddy-a7ac7",
+    "storage_bucket": "estate-agent-ai-buddy-a7ac7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:165746523480:android:074bee93b858f6545f392d",
+        "android_client_info": {
+          "package_name": "com.jslproperties.estateagentbuddy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRvj035D65IKKWo1tdmoEoLYbxMbKE0ko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:165746523480:android:889afedff11ab1f05f392d",
+        "android_client_info": {
+          "package_name": "com.jslproperties.estateagentbuddy.qa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRvj035D65IKKWo1tdmoEoLYbxMbKE0ko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
