@@ -832,7 +832,7 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
     ['profile', async () => { await page.getByTestId('top-profile').click(); }],
     ['expert', async () => { await page.locator('nav.grid > button').nth(10).click(); }],
     ['market', async () => { await page.locator('nav.grid > button').nth(11).click(); }],
-    ['project', async () => { await page.locator('nav.grid > button').nth(12).click(); }],
+    ['project', async () => { await page.locator('nav.grid > button').nth(0).click(); }],   // Change 43: Project is card 1
     ['voice', async () => { await page.locator('nav.grid > button').nth(14).click(); }],
     ['banners', async () => { await page.locator('nav.grid > button').nth(6).click(); await page.getByTestId('card-banners').click(); }],
   ];
@@ -852,9 +852,9 @@ test('U20 three languages: every main screen fits — no clipped, overlapping or
   // every tile label is translated
   await home(page);
   await pickLang(page, { hasText: 'BM' });
-  assert.match(await page.locator('nav.grid').innerText(), /Kewangan Ejen[\s\S]*Kalkulator Hartanah[\s\S]*Arahan Suara/i);
+  assert.match(await page.locator('nav.grid').innerText(), /Kewangan Ejen[\s\S]*Kalkulator Hartanah[\s\S]*Arahan Dibantu AI/i);
   await pickLang(page, { hasText: '中文' });
-  assert.match(await page.locator('nav.grid').innerText(), /代理财务[\s\S]*房产计算器[\s\S]*语音指令/i);
+  assert.match(await page.locator('nav.grid').innerText(), /代理财务[\s\S]*房产计算器[\s\S]*AI 辅助指令/i);
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-Hans');
   await page.context().close();
 });
@@ -1590,7 +1590,7 @@ test('U39b JoyChange002 Change 42: the start-up screen lasts the full five secon
   const seen = [];
   const end = Date.now() + 6500;
   while (Date.now() < end && await page.getByTestId('startup-logo').count()) {
-    const m = await page.getByTestId('startup-msg').innerText().catch(() => '');
+    const m = await page.getByTestId('startup-msg').innerText({ timeout: 300 }).catch(() => '');
     if (m && seen[seen.length - 1] !== m) seen.push(m);
     await page.waitForTimeout(100);
   }
@@ -4443,7 +4443,7 @@ test('U102 Change 012: property choosers show photo rows (placeholder without a 
   // one language button with a list
   assert.equal(await page.locator('header .lang > button').count(), 1);
   await pickLang(page, '[aria-label="Bahasa Malaysia"]');
-  assert.match(await page.locator('nav.grid').innerText(), /Senarai Subsale[\s\S]*Arahan Suara/);
+  assert.match(await page.locator('nav.grid').innerText(), /Senarai Subsale[\s\S]*Arahan Dibantu AI/);
   await pickLang(page, { hasText: 'EN' });
   await page.context().close();
 });
@@ -4825,6 +4825,15 @@ test('U121 owner 17 Oct 2026: Add Location search moves the pin; the card locati
     const noLoc = page.getByTestId('listing-card').filter({ hasText: 'Tiada Lokasi' });
     // Title Case on the card, including after the "/"; the record keeps what was typed.
     assert.equal(await noLoc.getByTestId('card-address').innerText(), 'Jalan Tiada Lokasi 1/2A');
+    if (layout === 'grid') {
+      // Change 28: the Grid card has no pencil and no counts; the location button still shows its bubble and never opens the card.
+      assert.equal(await noLoc.getByTestId('card-edit').count(), 0, 'grid: no edit button');
+      await noLoc.getByTestId('card-location').click();
+      assert.equal(await noLoc.getByTestId('card-location-bubble').innerText(), 'Location Not Set');
+      assert.equal(await page.getByTestId('listing-details').count(), 0, 'the card did not open');
+      await noLoc.getByTestId('card-location-bubble').waitFor({ state: 'detached', timeout: 2500 });
+      continue;
+    }
     // The location button: right side of the counts row, two lines tall, aligned under the pencil.
     const pin = noLoc.getByTestId('card-location'); const pen = noLoc.getByTestId('card-edit');
     const [pb, eb, cb] = [await pin.boundingBox(), await pen.boundingBox(), await noLoc.getByTestId('card-counts').boundingBox()];
@@ -4860,6 +4869,46 @@ test('U121 owner 17 Oct 2026: Add Location search moves the pin; the card locati
   await shot(page, '121-share-location', false);
   await menu.getByTestId('location-menu-close').click(); await menu.waitFor({ state: 'detached' });
   assert.equal(await page.getByTestId('listing-details').count(), 0, 'closing the menu does not open the card');
+  await page.context().close();
+});
+
+test('U122 JoyChange002 Change 32: Large Cards swipe through photos with tappable arrows (never opening the card); Grid cards do not; "Click to enlarge" on the property photo; the viewer arrows and "Slide to next" sit under the photo', async () => {
+  const page = await phone();
+  const png = n => ({ name: `${n}.png`, mimeType: 'image/png', buffer: Buffer.from(PNG_1X1, 'base64') });
+  await propertyWithPhotos(page, [png('a'), png('b'), png('c')]);
+  await home(page); await tile(page, 'Property List');
+  const card = page.getByTestId('listing-card').filter({ hasText: 'Photo house' });
+  // Large Cards (the default): two arrows on the picture; a tap moves the photo and does not open the card.
+  assert.equal(await card.getByTestId('card-photo-prev').count(), 1);
+  assert.equal(await card.getByTestId('card-photo-next').count(), 1);
+  const photoIdx = () => card.getByTestId('card-photo').getAttribute('data-index');
+  const before = await photoIdx();
+  await card.getByTestId('card-photo-next').click();
+  assert.notEqual(await photoIdx(), before, 'the picture changed');
+  assert.equal(await page.getByTestId('listing-details').count(), 0, 'the arrow did not open the card');
+  // Grid cards: unchanged, no arrows.
+  await page.getByRole('group', { name: /Layout/i }).getByRole('button').nth(0).click();
+  assert.equal(await page.getByTestId('listing-card').filter({ hasText: 'Photo house' }).getByTestId('card-photo-next').count(), 0, 'no arrows on Grid cards');
+  await page.getByRole('group', { name: /Layout/i }).getByRole('button').nth(1).click();
+  // Property page: "Click to enlarge" at the bottom centre of the photo.
+  await page.getByTestId('listing-card').filter({ hasText: 'Photo house' }).locator('.sc-card').click();
+  await page.getByTestId('listing-details').waitFor();
+  const en = page.getByTestId('detail-enlarge'); const ph = page.getByTestId('detail-photo');
+  assert.equal(await en.innerText(), 'Click to enlarge');
+  const [eb, pb] = [await en.boundingBox(), await ph.boundingBox()];
+  assert.ok(Math.abs((eb.x + eb.width / 2) - (pb.x + pb.width / 2)) <= 4, 'centred');
+  assert.ok(eb.y + eb.height <= pb.y + pb.height + 1 && eb.y > pb.y + pb.height / 2, 'at the bottom, on the photo');
+  await ph.click();
+  const photo = await page.getByTestId('photo-viewer-photo').boundingBox();
+  const hint = page.getByTestId('viewer-hint');
+  assert.equal(await hint.innerText(), 'Slide to next');
+  const [hb, nb, bb] = [await hint.boundingBox(), await page.getByTestId('photo-viewer-next').boundingBox(), await page.getByTestId('photo-viewer-prev').boundingBox()];
+  assert.ok(hb.y >= photo.y + photo.height - 1, 'the hint is below the photo, not on it');
+  assert.ok(nb.y >= photo.y + photo.height - 1 && bb.y >= photo.y + photo.height - 1, 'the arrows are below the photo');
+  assert.ok(nb.y - (photo.y + photo.height) <= 60, 'and just below it, not far down the screen');
+  await shot(page, '122-viewer', false);
+  await page.getByTestId('photo-viewer-next').click();
+  assert.equal(await page.getByTestId('photo-viewer-count').innerText(), '2 / 3');
   await page.context().close();
 });
 

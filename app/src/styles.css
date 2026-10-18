@@ -903,7 +903,7 @@ label.btn { position: relative; cursor: pointer; }
 /* Change 29: the language list is a centred pop-up (it was a drop-down under the button). */
 .lang-menu { max-width: 320px; gap: 6px; }
 .lang-menu h2 { font-size: 17px; margin-bottom: 2px; }
-.lang-text { font-size: 13px; font-weight: 800; letter-spacing: .2px; }
+.lang-text { font-size: 14px; font-weight: 800; letter-spacing: .2px; }
 .lang-menu button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 16px; font-weight: 600; text-align: left; }
 .lang-menu button[aria-checked="true"] { background: var(--gold-grad); color: var(--on-gold); }
 .lang-short { min-width: 36px; font-weight: 800; }

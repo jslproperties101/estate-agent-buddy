@@ -204,19 +204,14 @@ test('C4 the recipient (Change 16: one list): the shared card shows who created 
   await b.page.getByTestId('listing').waitFor();
   const card = b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' });
   await card.waitFor();
+  await b.page.getByRole('button', { name: 'Large Cards' }).click();   // Change 28: only Large Cards carry the creator line; Grid cards are just picture, address, type, price
   assert.equal(await card.getByTestId('card-creator').innerText(), 'Aina');
   const mine = b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' });
   assert.equal(await mine.getByTestId('card-creator').innerText(), 'You', 'own and shared in the same list');
   assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 2' }).count(), 0, 'not shared');
-  // Grid (narrow cards): Click to Open at the left; the name at the right, moved under it when there is no room, never cut
-  const open = await card.getByTestId('card-click-to-open').boundingBox();
-  let who = await card.getByTestId('card-creator').boundingBox();
-  const box = await card.locator('.sc-card').boundingBox();
-  assert.ok(open.x < who.x && box.x + box.width - (who.x + who.width) <= 16, 'grid: creator at the right');
-  assert.equal(await card.getByTestId('card-creator').evaluate(e => e.scrollWidth <= e.clientWidth + 1), true, 'grid: the name is not cut');
-  await shot(b.page, 'c010-05-team-view-card');
+  // Change 28: Large Cards is the default view and the small Grid card has no footer (no creator, no Click to Open).
+  let who;
   // Large cards: on the same line
-  await b.page.getByRole('button', { name: 'Large Cards' }).click();
   const open2 = await card.getByTestId('card-click-to-open').boundingBox();
   who = await card.getByTestId('card-creator').boundingBox();
   assert.ok(open2.x < who.x && Math.abs((open2.y + open2.height / 2) - (who.y + who.height / 2)) <= 6, 'large: one line, Click to Open left, creator right');
