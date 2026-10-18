@@ -1398,6 +1398,65 @@ test('U32 voice: End recording shows the recognised words; nothing recognised gi
   }
 });
 
+test('U124 JoyChange002 Batch D: AI Assisted Command is minimal (48); speech waits in the box, corrected (49); the review area shows the matching property and contact, photo first (50)', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(FAKE_SPEECH('create a new terrace house at jalan tahap 1 freehold non bumi putra owner Victor Vendor 013 222 3333'));
+  const page = await ctx.newPage();
+  await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
+  // A vendor and a property to be found.
+  await tile(page, 'Vendor List'); await page.getByRole('button', { name: 'New vendor' }).click();
+  await page.locator('[data-field="name"]').fill('Victor Vendor'); await page.locator('[data-field="phone"]').fill('013-222 3333');
+  await page.getByTestId('save-contact').click(); await waitStored(page, 'records', `all.some(v => v && v.name === 'Victor Vendor')`);
+  await home(page);
+  await c15Property(page, { street: 'Jalan Tahap 1', purpose: 'sale' });
+  await home(page); await tile(page, 'Voice Command');
+  // 48: the box, the send arrow, the voice button and How to use; nothing else.
+  const scr = page.getByTestId('voice-command');
+  assert.equal(await scr.locator('textarea').count(), 1);
+  for (const id of ['cmd-send', 'voice-start', 'cmd-howto']) assert.equal(await scr.getByTestId(id).count(), 1, id);
+  assert.equal(await scr.locator('.notice, .chip-row, details.examples').count(), 0, 'no intro, language chips or example list');
+  assert.equal(await page.getByTestId('cmd-howto-list').count(), 0, 'How to use starts closed');
+  const tb = await scr.locator('textarea').boundingBox(); const mic = await page.getByTestId('voice-start').boundingBox();
+  assert.ok(mic.y > tb.y + tb.height - 2, 'the voice button is below the typing box');
+  await page.getByTestId('cmd-howto').click();
+  assert.ok(await page.getByTestId('cmd-howto-group').count() >= 5, 'examples grouped by task');
+  await page.getByTestId('cmd-example').first().click();
+  await page.waitForFunction(() => /^Create a new terrace house/.test(document.querySelector('[data-testid="voice-command"] textarea')?.value ?? ''));
+  assert.match(await scr.locator('textarea').inputValue(), /^Create a new terrace house/, 'an example goes into the box');
+  assert.equal(await page.getByTestId('proposal').count(), 0, 'and waits there until send');
+  await page.getByTestId('cmd-howto').click();
+  assert.equal(await page.getByTestId('cmd-howto-list').count(), 0, 'tapping again hides it');
+  await scr.locator('textarea').fill('');
+  // 48 + 49: listening shows no text; what was heard is corrected and waits in the box.
+  await page.getByTestId('voice-start').click();
+  await page.getByRole('button', { name: 'Use the speech service' }).click();
+  const stop = page.getByTestId('voice-stop');
+  assert.equal((await stop.innerText()).trim(), '', 'no words on the button while listening');
+  await stop.click(); await page.getByTestId('voice-start').waitFor();
+  assert.equal(await scr.locator('textarea').inputValue(), 'create a new terrace house at Jalan Tahap 1 freehold Non Bumiputera owner Victor Vendor 013 222 3333');
+  assert.equal(await page.getByTestId('proposal').count(), 0, 'nothing happens until send');
+  // 50: the review area: the property and the contact, best match first, photo rows.
+  await page.getByTestId('cmd-send').click();
+  await page.getByTestId('proposal').waitFor();
+  const mp = page.getByTestId('match-property');
+  assert.match(await mp.getByTestId('mp-addr').first().innerText(), /Jalan Tahap 1/i, 'the matching property is chosen');
+  assert.match(await page.getByTestId('match-contact').innerText(), /Victor Vendor[\s\S]*Best match/i);
+  await page.getByTestId('match-property-current').click();
+  const first = page.getByTestId('match-property-list').locator('.pp-opt').first();
+  assert.match(await first.innerText(), /Create a new property listing/, '"Create new" is offered first');
+  const opt = page.getByTestId('mp-option').first();
+  const [th, ad] = [await opt.locator('.pp-thumb').boundingBox(), await opt.getByTestId('mp-addr').boundingBox()];
+  assert.ok(th.x < ad.x, 'photo first, then the address');
+  await page.getByTestId('mp-new').click();
+  assert.match(await page.getByTestId('proposal').innerText(), /Open in the form/i);
+  await page.getByTestId('match-property-current').click(); await page.getByTestId('mp-option').first().click();
+  await page.getByRole('button', { name: 'Open this property with these details' }).click();
+  await page.getByTestId('listing-form').waitFor();
+  assert.match(await page.locator('header h1').innerText(), /Edit property/i, 'the existing property opens in its form (nothing saved yet)');
+  assert.ok(await page.getByTestId('review-banner').count(), 'the words to check are marked in the form');
+  await ctx.close();
+});
+
 test('U33 phone book: Send Name Card picker fills editable name and number; refusals and missing support are explained, never silent', async () => {
   const page = await phone();
   // Complete the required profile so the name card is active.
@@ -2953,6 +3012,7 @@ test('U76 Voice diagnostics: unsupported recognition, blocked microphone and an 
     page.on('pageerror', e => consoleErrors.push(String(e)));
     await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
     await tile(page, 'Voice Command');
+    if (!(await page.getByTestId('cmd-howto-list').count())) await page.getByTestId('cmd-howto').click();   // Change 48: inside How to use
     await page.getByTestId('open-voice-diag').click();
     await page.getByTestId('voice-diag-checks').waitFor();
     await fn(page);
@@ -3094,6 +3154,7 @@ test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet a
     assert.match(await page.getByTestId('buyer-pdf').innerText(), expect.buyerText);
     await home(page);
     await page.locator('nav.grid > button[data-key="voice"]').click();
+    if (!(await page.getByTestId('cmd-howto-list').count())) await page.getByTestId('cmd-howto').click();   // Change 48: inside How to use
     assert.match(await page.getByTestId('open-voice-diag').innerText(), new RegExp(expect.diag, 'i'));
     await page.getByTestId('open-voice-diag').click();
     assert.match(await page.getByTestId('voice-diag').innerText(), expect.diagText);

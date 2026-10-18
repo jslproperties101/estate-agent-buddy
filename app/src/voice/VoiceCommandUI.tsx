@@ -1,7 +1,12 @@
-// Button 12 — Voice Command: the central place to capture information by voice (replacing the removed
-// Smart Capture). Property details, to-dos, appointments and contacts are understood on the phone and always
-// opened in their form for the agent to check before saving.
+// Button 12 — AI Assisted Command (was Voice Command): the central place to capture information by voice or typing.
+// Property details, to-dos, appointments and contacts are understood on the phone and always opened in their form for
+// the agent to check before saving.
+// JoyChange002 Change 48: minimal by default: the typing box, the voice button below it and "How to use and examples".
+// Change 50: the review area always shows which property (and contact) the words are about, best match first.
 import { useState } from 'react';
+import { c048Strings } from './c048Strings';
+import { rankProperties, preselect, Ranked } from './match';
+import { PropertyMatchPicker, NEW } from './MatchPickers';
 import { can } from '../team/access';
 import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -84,7 +89,7 @@ export const voiceCommandStrings = titled3( {
 });
 
 type Panel =
-  | { kind: 'target'; result: Targeted; text: string }
+  | { kind: 'target'; result: Targeted; text: string; changes: Change[]; ranked: Ranked<Listing>[] }
   | { kind: 'buyers'; query: BuyerQuery; matches: BuyerMatch[] };
 
 export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
@@ -94,6 +99,10 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
   const [panel, setPanel] = useState<Panel | null>(null);
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
   const [done, setDone] = useState('');
+  const k = c048Strings[lang];
+  const [howTo, setHowTo] = useState(false);
+  const [fill, setFill] = useState<{ text: string; n: number } | undefined>(undefined);
+  const [sel, setSel] = useState(NEW);
   const places = [...(state.options.township ?? []), ...(state.options.city ?? [])].map(o => o.value);
 
   /** Buyer search and price / rent / status changes by name; then to-do, calendar and contact commands. Returns true when handled. */
@@ -105,10 +114,17 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
       setPanel({ kind: 'buyers', query: bq.query, matches: findBuyers(bq.query, state.contacts, state.inquiries, state.appointments, state.properties) });
       return true;
     }
-    const tu = parseTargetedUpdate(text, state.properties.filter(p => !p.archived && can(state, 'edit', 'properties', p.id)), places);
+    const editable = state.properties.filter(p => !p.archived && can(state, 'edit', 'properties', p.id));
+    const tu = parseTargetedUpdate(text, editable, places);
     if (tu) {
-      setTicked(tu.kind === 'update' ? Object.fromEntries(tu.changes.map(c => [c.key, true])) : {});
-      setPanel({ kind: 'target', result: tu, text });
+      // Change 50: every editable property, ranked by what was said; the parser's own matches rank first.
+      const hints = tu.kind === 'update' || tu.kind === 'same' ? [tu.property.id] : tu.kind === 'choose' ? tu.options.map(o => o.id) : [];
+      const ranked = rankProperties(text, editable, state.contacts, { inquiries: state.inquiries, appointments: state.appointments }, hints);
+      const changes = tu.kind === 'same' ? tu.changes ?? [] : tu.changes;
+      const first = tu.kind === 'update' || tu.kind === 'same' ? tu.property : tu.kind === 'choose' ? ranked.find(r => hints.includes(r.item.id))?.item : preselect(ranked);
+      setSel(first?.id ?? NEW);
+      setTicked(Object.fromEntries(changes.map(c => [c.key, true])));
+      setPanel({ kind: 'target', result: tu, text, changes, ranked });
       return true;
     }
     setPanel(null);
@@ -139,12 +155,6 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
   const s = listingStrings[lang];
   const propLabel = (l: Listing) => [l.ref, cardTitle(l)].filter(Boolean).join(' · ');
 
-  /** The agent picked one of several matching properties. */
-  function choose(l: Listing, changes: Change[]) {
-    const real = changes.filter(c => currentValue(l, c.key) !== c.value);
-    setTicked(Object.fromEntries(real.map(c => [c.key, true])));
-    setPanel({ kind: 'target', result: real.length ? { kind: 'update', property: l, changes: real } : { kind: 'same', property: l }, text: '' });
-  }
   function apply(l: Listing, changes: Change[]) {
     const sel = changes.filter(c => ticked[c.key]);
     if (!sel.length) return;
@@ -155,57 +165,56 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
   }
 
   return (
-    <section className="stack" data-testid="voice-command">
-      <p className="notice">{t.intro}</p>
-      <small className="muted" data-testid="voice-cmd-lang-note">{m.note}</small>
-      <PropertyVoice lang={lang} mode="central" otherCommand={agenda}
-        onCreate={changes => go({ name: 'listingForm', prefill: prefillFrom(changes) })}
+    <section className="stack cmd-screen" data-testid="voice-command">
+      <PropertyVoice lang={lang} mode="central" otherCommand={agenda} minimal fill={fill}
+        onCreate={(changes, target) => {
+          // Change 50: a chosen saved contact becomes the vendor (instead of the typed owner name and phone).
+          const use = target?.contactId ? changes.filter(c => c.key !== 'ownerName' && c.key !== 'ownerPhone') : changes;
+          const prefill = { ...prefillFrom(use), ...(target?.contactId ? { vendorId: target.contactId } : {}) };
+          go({ name: 'listingForm', id: target?.propertyId, prefill });
+        }}
         onFind={c => { go({ name: 'listing', filters: { type: c.type, typeWord: c.typeWord, location: c.area, purpose: c.purpose } }); return 0; }} />
 
       {done && <p className="voice-msg" role="status" data-testid="voice-done">{done}</p>}
 
-      {panel?.kind === 'target' && (
-        <div className="proposal stack-sm" data-testid="target-panel">
-          {panel.result.kind === 'update' && (() => {
-            const r = panel.result;
-            return (
-              <>
-                <strong>{m.target}</strong>
-                <small className="muted" data-testid="target-property">{propLabel(r.property)}</small>
-                <ul className="prop-list">
-                  {r.changes.map(c => (
-                    <li key={c.key} className={ticked[c.key] ? 'on' : ''}>
-                      <label className="prop-row">
-                        <input type="checkbox" checked={!!ticked[c.key]} onChange={e => setTicked(v => ({ ...v, [c.key]: e.target.checked }))} aria-label={changeLabel(s, c.key)} data-testid={`target-${c.key}`} />
-                        <span className="prop-main">
-                          <span className="prop-label">{changeLabel(s, c.key)}</span>
-                          <span className="prop-before">{m.now}: {showValue(s, c.key, currentValue(r.property, c.key), lang)}</span>
-                          <span className="prop-after">{m.next}: {showValue(s, c.key, c.value, lang)}</span>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-                <div className="two">
-                  <button className="btn secondary" onClick={() => setPanel(null)} data-testid="target-cancel">{m.cancel}</button>
-                  <button className="btn primary" disabled={!r.changes.some(c => ticked[c.key])} onClick={() => apply(r.property, r.changes)} data-testid="target-apply">{m.apply}</button>
-                </div>
-              </>
-            );
-          })()}
-          {panel.result.kind === 'same' && <p data-testid="target-same">{propLabel(panel.result.property)}: {m.same}</p>}
-          {panel.result.kind === 'none' && <p className="warn-text" role="status" data-testid="target-none">{panel.result.reason === 'notFound' ? m.notFound : m.noTarget}</p>}
-          {panel.result.kind === 'choose' && (() => {
-            const r = panel.result;
-            return (
-              <>
-                <p role="status" data-testid="target-choose">{m.choose}</p>
-                {r.options.map(l => <button key={l.id} className="pick-item" onClick={() => choose(l, r.changes)} data-testid="target-option">{propLabel(l)}</button>)}
-              </>
-            );
-          })()}
-        </div>
-      )}
+      {panel?.kind === 'target' && (() => {
+        // Change 50: the property is chosen in a picture dropdown (best match first, "Create a new property listing" too).
+        const chosen = panel.ranked.find(r => r.item.id === sel)?.item;
+        const real = chosen ? panel.changes.filter(c => currentValue(chosen, c.key) !== c.value) : panel.changes;
+        return (
+          <div className="proposal stack-sm" data-testid="target-panel">
+            <strong>{m.target}</strong>
+            <PropertyMatchPicker lang={lang} ranked={panel.ranked} value={sel} onChange={v => { setSel(v); setTicked(Object.fromEntries(panel.changes.map(c => [c.key, true]))); }} />
+            {chosen && <small className="muted" data-testid="target-property">{propLabel(chosen)}</small>}
+            {chosen && !real.length && <p data-testid="target-same">{propLabel(chosen)}: {m.same}</p>}
+            {!chosen && panel.result.kind === 'none' && <p className="warn-text" role="status" data-testid="target-none">{panel.result.reason === 'notFound' ? m.notFound : m.noTarget}</p>}
+            {panel.result.kind === 'choose' && chosen && <p role="status" className="muted" data-testid="target-choose">{m.choose}</p>}
+            {real.length > 0 && (
+              <ul className="prop-list">
+                {real.map(c => (
+                  <li key={c.key} className={ticked[c.key] ? 'on' : ''}>
+                    <label className="prop-row">
+                      <input type="checkbox" checked={!!ticked[c.key]} onChange={e => setTicked(v => ({ ...v, [c.key]: e.target.checked }))} aria-label={changeLabel(s, c.key)} data-testid={`target-${c.key}`} />
+                      <span className="prop-main">
+                        <span className="prop-label">{changeLabel(s, c.key)}</span>
+                        {chosen && <span className="prop-before">{m.now}: {showValue(s, c.key, currentValue(chosen, c.key), lang)}</span>}
+                        <span className="prop-after">{m.next}: {showValue(s, c.key, c.value, lang)}</span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="two">
+              <button className="btn secondary" onClick={() => setPanel(null)} data-testid="target-cancel">{m.cancel}</button>
+              {chosen
+                ? <button className="btn primary" disabled={!real.some(c => ticked[c.key])} onClick={() => apply(chosen, real)} data-testid="target-apply">{m.apply}</button>
+                : <button className="btn primary" disabled={!panel.changes.some(c => ticked[c.key])} data-testid="target-new"
+                    onClick={() => go({ name: 'listingForm', prefill: prefillFrom(panel.changes.filter(c => ticked[c.key])) })}>{k.toForm}</button>}
+            </div>
+          </div>
+        );
+      })()}
 
       {panel?.kind === 'buyers' && (
         <div className="proposal stack-sm" data-testid="buyers-panel">
@@ -226,11 +235,24 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
         </div>
       )}
 
-      <div className="card stack-sm">
-        <div className="card-title">{t.can}</div>
-        {t.examples.map(x => <small key={x}>• “{x}”</small>)}
-      </div>
-      <button className="btn secondary" onClick={() => go({ name: 'voiceDiag' })} data-testid="open-voice-diag">🩺 {m.diag}</button>
+      {/* Change 48: "How to use and examples" opens on this screen, below the button, and pushes the rest down. */}
+      <button type="button" className="btn secondary howto-btn" aria-expanded={howTo} data-testid="cmd-howto" onClick={() => setHowTo(x => !x)}>{howTo ? k.hideHowTo : k.howTo}</button>
+      {howTo && (
+        <div className="card stack-sm howto" data-testid="cmd-howto-list">
+          <p className="small">{k.howIntro}</p>
+          <small className="muted">{k.tapToUse}</small>
+          {k.groups.map(g => (
+            <div key={g.title} className="stack-xs howto-group" data-testid="cmd-howto-group">
+              <strong>{g.title}</strong>
+              {g.examples.map(x => (
+                <button key={x} type="button" className="example" data-testid="cmd-example" onClick={() => setFill(f => ({ text: x, n: (f?.n ?? 0) + 1 }))}>“{x}”</button>
+              ))}
+            </div>
+          ))}
+          <small className="muted" data-testid="voice-cmd-lang-note">{k.note}</small>
+          <button className="btn small secondary" onClick={() => go({ name: 'voiceDiag' })} data-testid="open-voice-diag">🩺 {k.diag}</button>
+        </div>
+      )}
     </section>
   );
 }

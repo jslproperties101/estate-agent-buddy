@@ -2,13 +2,21 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { strings, Lang } from '../i18n';
 import { VOICE_LANGS, VoiceError, listen, Listening, speechSupported } from '../voice/recognizer';
+import { c048Strings } from '../voice/c048Strings';
+import { IconMic } from '../icons';
+import type { ReactNode } from 'react';
 
 // The notice about the speech service is shown once each time the app is opened.
 let acceptedThisSession = false;
 
 /** Memoised: typing elsewhere in a big form (which redraws the form) does not redraw the speech box. */
-export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label, rows = 3, testId }: {
+export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label, rows = 3, testId, compact, action, transform }: {
   lang: Lang; value: string; onChange: (text: string) => void; label: string; rows?: number; testId?: string;
+  /** JoyChange002 Change 48: just the typing box (with `action` beside it, e.g. a send arrow) and a round voice button
+   *  below it. The speech language follows the app language; while listening the button pulses red with no text. */
+  compact?: boolean; action?: ReactNode;
+  /** Change 49: applied to what the phone heard before it goes into the box (property-word corrections). */
+  transform?: (heard: string) => string;
 }) {
   const v = strings[lang].voice;
   const [voiceLang, setVoiceLang] = useState(lang === 'bm' ? 'ms-MY' : lang === 'zh' ? 'zh-CN' : 'en-MY');
@@ -31,7 +39,7 @@ export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label,
     setProcessing(false);
     live.current = listen(voiceLang, {
       interim: x => setInterim(x),
-      final: x => onChange((textRef.current ? textRef.current + ' ' : '') + x),
+      final: x => onChange((textRef.current ? textRef.current + ' ' : '') + (transform ? transform(x) : x)),
       error: code => { if (code !== 'aborted') setError(code); },
       end: () => { setListening(false); setProcessing(false); setInterim(''); live.current = null; },
     });
@@ -42,6 +50,38 @@ export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label,
     live.current?.stop();
   }
 
+  const notice = asking && (
+    <div className="ask" role="dialog" aria-labelledby="sp-t">
+      <strong id="sp-t">{v.noticeTitle}</strong>
+      <p>{v.notice}</p>
+      <small className="sens">{v.safety}</small>
+      <div className="two">
+        <button type="button" className="btn secondary" onClick={() => setAsking(false)}>{v.noticeNo}</button>
+        <button type="button" className="btn primary" onClick={() => { acceptedThisSession = true; setAsking(false); start(true); }}>{v.noticeOk}</button>
+      </div>
+    </div>
+  );
+  if (compact) {
+    const k = c048Strings[lang];
+    return (
+      <div className="stack-sm speech compact" data-testid={testId}>
+        <div className="cmd-input">
+          <textarea aria-label={label} rows={rows} value={value + (interim ? (value ? ' ' : '') + interim : '')} onChange={e => { onChange(e.target.value); setInterim(''); }} />
+          {action}
+        </div>
+        {notice}
+        {!asking && (
+          <button type="button" className={`mic-round ${listening ? 'on' : ''} ${processing ? 'busy' : ''}`} disabled={processing} aria-busy={processing || undefined}
+            aria-label={processing ? k.working : listening ? k.listening : k.speak} title={processing ? k.working : listening ? k.listening : k.speak}
+            data-testid={processing ? 'voice-processing' : listening ? 'voice-stop' : 'voice-start'} onClick={() => (listening ? stop() : start())}>
+            {processing ? <span className="spinner" aria-hidden="true" /> : <IconMic size={30} />}
+          </button>
+        )}
+        {typeof navigator !== 'undefined' && navigator.onLine === false && <small className="warn-text">{v.offline}</small>}
+        {error && <p className="error" role="alert" data-testid="voice-error">{v.errors[error]}</p>}
+      </div>
+    );
+  }
   return (
     <div className="stack-sm speech" data-testid={testId}>
       <div className="chip-row" role="group" aria-label={strings[lang].langSwitch}>
@@ -50,17 +90,7 @@ export const SpeechBox = memo(function SpeechBox({ lang, value, onChange, label,
         ))}
       </div>
       {voiceLang === 'zh-CN' && <small className="muted">{v.zhNote}</small>}
-      {asking && (
-        <div className="ask" role="dialog" aria-labelledby="sp-t">
-          <strong id="sp-t">{v.noticeTitle}</strong>
-          <p>{v.notice}</p>
-          <small className="sens">{v.safety}</small>
-          <div className="two">
-            <button type="button" className="btn secondary" onClick={() => setAsking(false)}>{v.noticeNo}</button>
-            <button type="button" className="btn primary" onClick={() => { acceptedThisSession = true; setAsking(false); start(true); }}>{v.noticeOk}</button>
-          </div>
-        </div>
-      )}
+      {notice}
       {!asking && (processing
         ? <button type="button" className="mic busy" disabled aria-busy="true" data-testid="voice-processing"><span className="spinner" aria-hidden="true" /> {v.processing}</button>
         : listening

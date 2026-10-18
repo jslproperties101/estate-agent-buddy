@@ -1,13 +1,19 @@
 // Voice / text for properties: speech → editable text → proposed details → review → save.
 // This is how property information is captured. Understanding runs on the phone with simple rules (commands.ts);
 // nothing is saved until the agent ticks and confirms each value.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Lang } from '../i18n';
 import { listingStrings, ListingStrings, typeLabel } from './strings';
 import { parseCommand, Change, ChangeKey, Command, currentValue } from './commands';
 import { Listing, rm, landText, sqft } from './model';
 import { SpeechBox } from '../ui/SpeechBox';
 import { useApp } from '../data/useStore';
+import { correctTerms, vocabularyFrom } from '../voice/correct';
+import { rankProperties, rankContacts, preselect, Ranked } from '../voice/match';
+import { PropertyMatchPicker, ContactMatchPicker, NEW } from '../voice/MatchPickers';
+import { c048Strings } from '../voice/c048Strings';
+import { VENDOR_ROLES, BUYER_ROLES, type Contact } from '../data/types';
+import { can } from '../team/access';
 import { monthText } from '../lib/dates';
 
 export type VoiceMode = 'list' | 'record' | 'central';
@@ -54,9 +60,14 @@ export function showValue(s: ListingStrings, k: ChangeKey, v: unknown, lang: Lan
 /** Details an agent usually states for a new property; the ones not said are listed, so nothing looks invented. */
 const CREATE_EXPECTED: ChangeKey[] = ['type', 'township', 'street', 'landSqft', 'builtUpSqft', 'askingPrice', 'tenure'];
 
-export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, otherCommand }: {
+export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, otherCommand, minimal, fill }: {
   lang: Lang; mode: VoiceMode; listing?: Listing;
-  onCreate?: (changes: Change[]) => void;
+  /** Change 50: `target` is the existing property and / or saved contact the agent chose in the review area. */
+  onCreate?: (changes: Change[], target?: { propertyId?: string; contactId?: string }) => void;
+  /** Change 48: the minimal AI Assisted Command layout (typing box, send arrow, voice button; nothing else). */
+  minimal?: boolean;
+  /** Change 48: an example tapped in "How to use" is put in the box (it waits there until send). */
+  fill?: { text: string; n: number };
   onFind?: (c: Extract<Command, { kind: 'find' }>) => number;
   onApply?: (changes: Change[]) => void;
   /** Central Voice Command: a chance to handle a to-do, calendar or contact command first. */
@@ -72,6 +83,24 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
   const [noteText, setNoteText] = useState('');
   const [keepWords, setKeepWords] = useState(false);
   const places = [...(state.options.township ?? []), ...(state.options.city ?? [])].map(o => o.value);
+  // Change 49: the agent's own saved places, so local names heard slightly wrong are corrected.
+  const vocab = vocabularyFrom(state.options, state.properties);
+  const fix = (heard: string) => correctTerms(heard, vocab);
+  // Change 50: which existing property / saved contact a "create" command may really be about.
+  const [ranked, setRanked] = useState<{ props: Ranked<Listing>[]; contacts: Ranked<Contact>[] | null }>({ props: [], contacts: null });
+  const [propSel, setPropSel] = useState(NEW);
+  const [contactSel, setContactSel] = useState(NEW);
+  const k = c048Strings[lang];
+  const people = state.contacts.filter(c => c.roles.some(r => VENDOR_ROLES.includes(r) || BUYER_ROLES.includes(r)));
+  function findTargets(cmdText: string, r: Command) {
+    if (mode !== 'central' || r.kind !== 'create') return;
+    const props = rankProperties(cmdText, state.properties.filter(p => !p.archived && can(state, 'edit', 'properties', p.id)), state.contacts, { inquiries: state.inquiries, appointments: state.appointments });
+    const named = r.changes.some(c => c.key === 'ownerName' || c.key === 'ownerPhone');
+    const cs = rankContacts(cmdText, people);
+    setRanked({ props, contacts: named || cs.length ? cs : null });
+    setPropSel(preselect(props)?.id ?? NEW);
+    setContactSel(preselect(cs)?.id ?? NEW);
+  }
 
   function interpret(cmdText = text) {
     setMessage(''); setResult(null);
@@ -87,20 +116,31 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
     if (r.kind === 'ask' && r.topic === 'note') setNoteText(r.prefix ?? '');
     if ((r.kind === 'create' || r.kind === 'update') && !r.changes.length) { setMessage(v.unknown); return; }
     if (r.kind === 'create' || r.kind === 'update') setPicked(Object.fromEntries(r.changes.map(c => [c.key, true])));
+    findTargets(cmdText, r);
     setResult(r);
   }
 
   const chosen = (r: Command) => (r.kind === 'create' || r.kind === 'update' ? r.changes.filter(c => picked[c.key]) : []);
 
+  const onText = (x: string) => { setText(x); setResult(null); setMessage(''); };
+  useEffect(() => { if (fill) onText(fill.text); }, [fill?.n]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="card stack-sm voice-cmd" data-testid="voice-cmd">
-      <div className="card-title">🎙 {v.title}</div>
-      <small className="muted">{mode === 'record' ? v.recordHint : v.listHint}</small>
-      <small className="engine-note">{v.engine}</small>
-      <SpeechBox lang={lang} value={text} onChange={x => { setText(x); setResult(null); setMessage(''); }} label={v.textLabel} />
-      <button className="btn primary" disabled={!text.trim()} onClick={() => interpret()}>{v.interpret}</button>
+    <div className={minimal ? 'stack-sm voice-cmd minimal' : 'card stack-sm voice-cmd'} data-testid="voice-cmd">
+      {minimal ? (
+        // Change 48: the box, a send arrow beside it, the voice button below. What was heard waits in the box until send.
+        <SpeechBox lang={lang} value={text} onChange={onText} label={v.textLabel} compact transform={fix} testId="cmd-speech"
+          action={<button type="button" className="send-btn" aria-label={k.send} title={k.send} disabled={!text.trim()} data-testid="cmd-send" onClick={() => interpret()}>
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>} />
+      ) : <>
+        <div className="card-title">🎙 {v.title}</div>
+        <small className="muted">{mode === 'record' ? v.recordHint : v.listHint}</small>
+        <small className="engine-note">{v.engine}</small>
+        <SpeechBox lang={lang} value={text} onChange={onText} label={v.textLabel} transform={fix} />
+        <button className="btn primary" disabled={!text.trim()} onClick={() => interpret()}>{v.interpret}</button>
+      </>}
 
-      <details className="examples">
+      {!minimal && <details className="examples">
         <summary>{v.examples}</summary>
         <div className="stack-sm">
           {SAMPLE_COMMANDS[mode].map(c => (
@@ -109,7 +149,7 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
             </button>
           ))}
         </div>
-      </details>
+      </details>}
 
       {message && <p className="voice-msg" role="status" data-testid="voice-msg">{message}</p>}
 
@@ -141,6 +181,12 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
               </li>
             ))}
           </ul>
+          {result.kind === 'create' && mode === 'central' && (
+            <div className="stack-sm match-pickers">
+              <PropertyMatchPicker lang={lang} ranked={ranked.props} value={propSel} onChange={setPropSel} />
+              {ranked.contacts && <ContactMatchPicker lang={lang} ranked={ranked.contacts} all={people} value={contactSel} onChange={setContactSel} />}
+            </div>
+          )}
           {result.kind === 'create' && (() => {
             const said = new Set(result.changes.map(c => c.key));
             const missing = CREATE_EXPECTED.filter(k => !said.has(k) && !(k === 'township' && said.has('city'))).map(k => changeLabel(s, k));
@@ -155,9 +201,10 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
             <button className="btn primary" disabled={!chosen(result).length}
               onClick={() => {
                 const sel = chosen(result);
-                if (result.kind === 'create') onCreate?.(keepWords ? [...sel, { key: 'notes', value: text.trim() }] : sel);
+                if (result.kind === 'create') onCreate?.(keepWords ? [...sel, { key: 'notes', value: text.trim() }] : sel,
+                  mode === 'central' ? { propertyId: propSel === NEW ? undefined : propSel, contactId: contactSel === NEW ? undefined : contactSel } : undefined);
                 else { onApply?.(sel); setResult(null); setText(''); setMessage(v.applied(sel.length)); }
-              }}>{result.kind === 'create' ? v.toForm : v.apply}</button>
+              }}>{result.kind === 'create' ? (mode === 'central' && propSel !== NEW ? k.openExisting : v.toForm) : v.apply}</button>
           </div>
         </div>
       )}

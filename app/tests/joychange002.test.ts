@@ -114,3 +114,51 @@ test('J36-2 delete removes the entry and everything under it, and clears that pa
   const merged = optionsAfterRename(OPTS, 'city@Malaysia/Negeri Sembilan', 'Seremban', 'Nilai');
   assert.deepEqual(merged['city@Malaysia/Negeri Sembilan'].map(o => o.value), ['Nilai'], 'renaming onto an existing name keeps one');
 });
+
+// ---------- Batch D: Changes 49 and 50 ----------
+import { correctTerms, vocabularyFrom, distance } from '../src/voice/correct';
+import { rankProperties, rankContacts, preselect, phonesIn, samePhone } from '../src/voice/match';
+import type { Contact } from '../src/data/types';
+
+test('J49-1 near-misses of property words and the agent’s own places are fixed; other words are left alone', () => {
+  const V = ['Kota Seriemas', 'Jalan Seriemas 1', 'Bandar Enstek', 'Salak Tinggi'];
+  assert.equal(correctTerms('create a new terrace house in kota seri emas jalan seri mas 1 freehold non bumi putra', V),
+    'create a new terrace house in Kota Seriemas Jalan Seriemas 1 freehold Non Bumiputera');
+  assert.equal(correctTerms('the s p a is signed, pending loan', V), 'the SPA is signed, pending loan', 'ordinary words keep their case');
+  assert.equal(correctTerms('semi d factory in salak tinggy lease hold', V), 'Semi-D factory in Salak Tinggi leasehold');
+  assert.equal(correctTerms('call Thomas at 3pm tomorrow', V), 'call Thomas at 3pm tomorrow', 'not close to a known word: unchanged');
+  assert.equal(correctTerms('RM580,000, four bedrooms', V), 'RM580,000, four bedrooms', 'numbers and punctuation untouched');
+  assert.equal(correctTerms('', V), '');
+  assert.equal(distance('seriemas', 'serimas'), 1);
+  const vocab = vocabularyFrom({ 'township@Malaysia/Negeri Sembilan/Nilai': [{ value: 'Kota Seriemas' }], type: [{ value: 'Warehouse hub' }] }, [{ street: 'Jalan Aina 1' }]);
+  assert.deepEqual(vocab, ['Kota Seriemas', 'Jalan Aina 1'], 'address entries and property addresses, not other lists');
+});
+
+const C = (x: Partial<Contact>): Contact => ({ id: x.id ?? 'c', created: 1, updated: 1, name: 'X', roles: ['buyer'], ...x } as Contact);
+test('J50-1 the property is found by ID, address, or a linked vendor or buyer; best first', () => {
+  const props = [
+    L({ id: 'a', ref: 'P1001', street: 'Jalan Seriemas 1', township: 'Kota Seriemas', city: 'Nilai', vendorId: 'v1', updated: 3 }),
+    L({ id: 'b', ref: 'P1002', street: 'Jalan Aina 2', township: 'Bandar Enstek', city: 'Nilai', ownerName: 'Encik Ahmad', ownerPhone: '013-222 3333', updated: 2 }),
+    L({ id: 'c', ref: 'P1003', street: 'Jalan Logistik 5', city: 'Salak Tinggi', updated: 1 }),
+  ];
+  const contacts = [C({ id: 'v1', name: 'Victor Tan', phone: '012-345 6789', roles: ['vendor'] }), C({ id: 'k', name: 'Buyer Kamal', phone: '019-111 2222' })];
+  const links = { inquiries: [{ id: 'i', created: 1, updated: 1, contactId: 'k', propertyId: 'c' }] as never[] };
+  const top = (text: string) => rankProperties(text, props, contacts, links)[0].item.id;
+  assert.equal(top('change the status of P1003 to sold'), 'c', 'by ID');
+  assert.equal(top('the house at jalan seriemas 1 kota seriemas'), 'a', 'by address');
+  assert.equal(top('the property of Victor Tan'), 'a', 'by the linked vendor’s name');
+  assert.equal(top('owner 013 222 3333'), 'b', 'by the owner’s phone');
+  assert.equal(top('the one Buyer Kamal asked about'), 'c', 'by a linked buyer');
+  assert.equal(rankProperties('x', props, contacts).length, 3, 'every property stays choosable');
+  assert.equal(preselect(rankProperties('a new bungalow somewhere', props, contacts)), undefined, 'no clear match: Create new');
+  assert.equal(preselect(rankProperties('P1002', props, contacts))?.id, 'b');
+});
+
+test('J50-2 contacts by name or phone, best first; phone numbers match in any format', () => {
+  assert.deepEqual(phonesIn('call 012-345 6789 or +60 13 222 3333 about RM580,000'), ['0123456789', '60132223333']);
+  assert.ok(samePhone('60123456789', '012-345 6789'));
+  const cs = [C({ id: 'a', name: 'Lim Wei', phone: '012 888 7777' }), C({ id: 'b', name: 'Lim Ah Kow' }), C({ id: 'c', name: 'Siti' })];
+  assert.deepEqual(rankContacts('add buyer Lim Wei 012 888 7777', cs).map(r => r.item.id), ['a', 'b']);
+  assert.deepEqual(rankContacts('call 0128887777', cs).map(r => r.item.id), ['a']);
+  assert.deepEqual(rankContacts('nobody', cs), []);
+});

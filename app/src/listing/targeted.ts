@@ -9,7 +9,7 @@ export type Targeted =
   /** Several properties fit what was said; the agent picks one (or says the reference). */
   | { kind: 'choose'; options: Listing[]; changes: Change[] }
   /** Nothing to change: the property already has these values. */
-  | { kind: 'same'; property: Listing }
+  | { kind: 'same'; property: Listing; changes?: Change[] }
   | { kind: 'none'; reason: 'noTarget' | 'notFound'; changes: Change[] };
 
 const norm = (r?: string) => (r ?? '').replace(/[\s-]+/g, '').toUpperCase();
@@ -68,5 +68,5 @@ export function parseTargetedUpdate(text: string, props: Listing[], places: stri
   if (candidates.length > 1) return { kind: 'choose', options: candidates.slice(0, 8), changes };
   const property = candidates[0];
   const real = changes.filter(c => currentValue(property, c.key) !== c.value);
-  return real.length ? { kind: 'update', property, changes: real } : { kind: 'same', property };
+  return real.length ? { kind: 'update', property, changes: real } : { kind: 'same', property, changes };
 }

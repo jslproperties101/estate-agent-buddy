@@ -103,7 +103,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   // Change 010: reference numbers belong to each agent's own workspace; records shared by the other agent never count.
   const ownProps = useMemo(() => state.properties.filter(p => !isForeign(state, 'properties', p.id)), [state]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [d, setD] = useState<Listing>(() => {
-    if (initial) return forEditing(initial);
+    // JoyChange002 Change 50: a voice command can open an existing property with the details that were said, marked "from
+    // your words" for checking; nothing is saved until Save.
+    if (initial) { const e = forEditing(initial); return prefill ? { ...e, ...prefill, id: e.id, filledFrom: { ...(e.filledFrom ?? {}), ...(prefill.filledFrom ?? {}) } } : e; }
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
     const no = nextNumber(ownProps);
     return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
