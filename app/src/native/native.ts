@@ -11,11 +11,16 @@ export const isNative = (): boolean => { try { return Capacitor.isNativePlatform
 export const platform = (): 'android' | 'ios' | 'web' => { try { return Capacitor.getPlatform() as 'android' | 'ios' | 'web'; } catch { return 'web'; } };
 
 /** Android package / iOS bundle id, also the URL scheme Google sign-in returns to. */
-declare const __EAB_BUILD__: { qa?: boolean } | undefined;
+declare const __EAB_BUILD__: { qa?: boolean; website?: boolean } | undefined;
 /** The isolated QA build (EAB_QA=1 at build time): separate package name and sign-in return link, never updates itself. */
 export const IS_QA = typeof __EAB_BUILD__ !== 'undefined' && !!__EAB_BUILD__?.qa;
 export const APP_ID = IS_QA ? 'com.jslproperties.estateagentbuddy.qa' : 'com.jslproperties.estateagentbuddy';
 export const AUTH_CALLBACK = `${APP_ID}://auth-callback`;
+/** JoyChange002 Change 47: the laptop website (EAB_WEBSITE=1 at build time), opened in Chrome, Edge or Safari. Laid out for
+ *  a wide screen, with no adverts and without the phone-only parts (live GPS journeys, the phone book). Never true inside
+ *  the installed app. */
+const WEBSITE_BUILD = typeof __EAB_BUILD__ !== 'undefined' && !!__EAB_BUILD__?.website;
+export const isWebsite = (): boolean => WEBSITE_BUILD && !isNative();
 
 const cache = new Map<string, any>();
 /** A native plugin, or undefined in the browser. */

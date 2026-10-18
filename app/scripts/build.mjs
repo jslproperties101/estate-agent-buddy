@@ -35,9 +35,11 @@ if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-p
 // (so it can never download the production bundle). See docs/QA.md. Normal builds do not set it.
 // Not a secret, so it is read even with --no-env (the screen tests build a QA copy).
 const qa = process.env.EAB_QA === '1';
+// EAB_WEBSITE=1 makes the laptop website (JoyChange002 Change 47): wide layout, no adverts, no phone-only parts. Not a secret.
+const website = process.env.EAB_WEBSITE === '1';
 // releaseLabel (package.json) is a display-only milestone name ("2.0.010" = the integrated Changes 001-010). It is never
 // compared: installs and updates use the commit (sha), the semantic version and nativeVersion only.
-const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}) };
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}), ...(website ? { website: true } : {}) };
 
 // EAB_OUTDIR: another output folder (the screen tests build a QA copy beside dist/). Default dist/.
 const OUT = process.env.EAB_OUTDIR || 'dist';
@@ -60,5 +62,8 @@ await build({
 });
 
 copyFileSync('index.html', `${OUT}/index.html`);
+// The website's web server (InfinityFree, Apache): every address opens the app, HTTPS only, and index.html is never kept
+// in a browser cache, so a new upload is seen on the next visit.
+if (website) copyFileSync('web/.htaccess', `${OUT}/.htaccess`);
 const set = Object.entries(config).filter(([, v]) => v).map(([k]) => k);
 console.log(`Build finished: dist/ (configured: ${set.length ? set.join(', ') : 'none — set keys in Settings on the phone'}; Capacitor: ${capacitorPlugin.real() ? 'real' : 'browser stand-in'})`);

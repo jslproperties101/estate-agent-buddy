@@ -7,6 +7,7 @@ import { ReactNode, useState } from 'react';
 import { Lang } from '../i18n';
 import { PickedContact, pickPhoneContacts, phonebookProblem, PhonebookProblem } from '../lib/phonebook';
 import { titled3 } from '../lib/titleCase';
+import { isWebsite } from '../native/native';
 
 const T = titled3( {
   en: {
@@ -71,6 +72,7 @@ export function PhonebookButton({ lang, onPicked, compact, testId = 'pick-contac
   lang: Lang; onPicked: (c: PickedContact) => void; compact?: boolean; testId?: string; className?: string;
 }) {
   const { t, busy, msg, pick } = usePhonebook(lang, onPicked);
+  if (isWebsite()) return null;   // JoyChange002 Change 47: a laptop has no phone book; the details are typed
   return (
     <>
       {compact

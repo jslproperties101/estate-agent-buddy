@@ -32,6 +32,7 @@ import { IconGps, IconCobroke } from '../icons';
 import { BannerDot } from './BannersUI';
 import { activeBanners } from '../domain/banners';
 import type { Journey } from '../data/types';
+import { isWebsite } from '../native/native';
 
 export function GpsHome({ lang, go }: { lang: Lang; go: Go }) {
   const g = gpsStrings[lang];
@@ -119,13 +120,16 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
     return () => { tracker.onPoint = null; };
   }, [maps, tracker]);
 
-  const recording = j && (j.status === 'recording' || j.status === 'paused');
+  const web = isWebsite();
+  const recording = !web && j && (j.status === 'recording' || j.status === 'paused');
   const here = tracker.fix ?? (j?.points.length ? { ...j.points[j.points.length - 1] } : null);
   const previous = state.journeys.filter(x => x.status === 'saved').sort((a, b) => b.startedAt - a.startedAt);
   const withPos = state.properties.filter(p => !p.archived).filter(hasPosition);
 
   return (
     <section className="stack" data-testid="house-shopping">
+      {/* JoyChange002 Change 47: a laptop cannot record a drive; it shows the journeys recorded on the phone. */}
+      {web ? <p className="notice" data-testid="gps-phone-only">{g.phoneOnly}</p> : <>
       <p className="notice">{g.screenOn} {g.safety}</p>
       <div className="card stack-sm tracker-card">
         <div className="between">
@@ -154,6 +158,7 @@ export function HouseShopping({ lang, go }: { lang: Lang; go: Go }) {
         )}
         {recording && <button className="btn primary" disabled={!here && !maps} onClick={() => setMarking(true)} data-testid="mark-here">📍 {g.markHere}</button>}
       </div>
+      </>}
 
       {!recording && <IdleMap lang={lang} go={go} maps={maps} status={status} />}
 

@@ -3,6 +3,7 @@
 #  database Supabase migrations: roles and row-level security tested on PostgreSQL
 #  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
 #           with the Maps key secret set, also loads the real Google map in a browser and attaches a screenshot
+#  website  QA branches: the laptop website (test Supabase) uploaded by FTP to estateagentaibuddy.page.gd
 #  web      the same bundle as a website on GitHub Pages, plus updates/latest.json + the bundle zip that installed
 #           apps download by themselves (needs Pages source = GitHub Actions)
 #
@@ -13,6 +14,9 @@
 #   EAB_EXPERT_API_URL        optional Ask Expert AI function URL
 #   EAB_QA_SUPABASE_URL       the separate TEST Supabase project's URL, for the QA APK only (optional)
 #   EAB_QA_SUPABASE_ANON_KEY  that test project's anon (public) key, for the QA APK only (optional)
+#   EAB_WEB_FTP_HOST          laptop website (JoyChange002 Change 47): InfinityFree FTP host, e.g. ftpupload.net
+#   EAB_WEB_FTP_USER          InfinityFree FTP username (if0_...)
+#   EAB_WEB_FTP_PASSWORD      InfinityFree FTP password (the hosting account password)
 name: Build
 
 on:
@@ -227,6 +231,55 @@ jobs:
           [ -f maps-check.txt ] && FILES="$FILES maps-check.txt"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" $FILES --prerelease --target "$GITHUB_SHA" --title "Estate Agent Buddy ${TAG}" --notes-file notes.md
+
+  website:
+    # JoyChange002 Change 47: the laptop website (wide layout, no adverts, no phone-only parts), built against the TEST
+    # Supabase project and uploaded by FTP to InfinityFree (estateagentaibuddy.page.gd). QA branches only, after the
+    # tests pass; skipped (with a note) until the three FTP secrets exist. The live Supabase project is never built in.
+    needs: test
+    if: contains(github.ref_name, 'qa') || startsWith(github.ref_name, '2.')
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app } }
+    env:
+      EAB_WEBSITE: '1'
+      EAB_SUPABASE_URL: ${{ secrets.EAB_QA_SUPABASE_URL }}
+      EAB_SUPABASE_ANON_KEY: ${{ secrets.EAB_QA_SUPABASE_ANON_KEY }}
+      EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
+      EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
+      FTP_HOST: ${{ secrets.EAB_WEB_FTP_HOST }}
+      FTP_USER: ${{ secrets.EAB_WEB_FTP_USER }}
+      FTP_PASSWORD: ${{ secrets.EAB_WEB_FTP_PASSWORD }}
+      FTP_DIR: ${{ vars.EAB_WEB_FTP_DIR || 'htdocs' }}
+      SITE_URL: ${{ vars.EAB_WEB_URL || 'https://estateagentaibuddy.page.gd/' }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - name: Install (without the Android packages)
+        run: npm install --omit=optional --no-audit --no-fund
+      - name: Build the website
+        run: |
+          [ -n "$EAB_SUPABASE_URL" ] || echo "::warning::EAB_QA_SUPABASE_URL is not set: the website will ask for the connection on its sign-in screen."
+          npm run build
+          rm -f dist/*.map
+          test -f dist/.htaccess
+          ls -la dist
+      - name: Upload to the website (FTP over TLS)
+        run: |
+          if [ -z "$FTP_HOST" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASSWORD" ]; then
+            echo "::warning::Website not uploaded: add the secrets EAB_WEB_FTP_HOST, EAB_WEB_FTP_USER and EAB_WEB_FTP_PASSWORD (InfinityFree → Accounts → FTP Details)."
+            exit 0
+          fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp >/dev/null
+          up() {
+            lftp -u "$FTP_USER","$FTP_PASSWORD" "$FTP_HOST" -e "set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate $1; set net:max-retries 3; set net:timeout 30; mirror -R --verbose=1 --no-perms --exclude-glob *.map dist $FTP_DIR; bye"
+          }
+          # Encrypted always. InfinityFree's FTP server has been known not to send its full certificate chain; if checking
+          # the certificate fails, the upload is retried still encrypted but without that check, and this says so.
+          up true || { echo "::warning::FTP certificate could not be verified; uploaded over TLS without certificate verification."; up false; }
+          echo "Website: $SITE_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "Built from ${GITHUB_SHA::7} against the TEST Supabase project." >> "$GITHUB_STEP_SUMMARY"
 
   web:
     # The web version and the update package for installed apps: exactly the bundle built (and tested) for the APK.

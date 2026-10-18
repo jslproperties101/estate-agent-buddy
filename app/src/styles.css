@@ -1263,3 +1263,35 @@ button.sync-banner { cursor: pointer; }
 .bk-reserved { background: #1E2A3A; color: var(--blue); }
 .bk-cancelled { background: #2A2A30; color: var(--muted); text-decoration: line-through; }
 .booking-row.bk-cancelled { opacity: .7; }
+
+/* ---------- JoyChange002 Change 47: the laptop website (html.website, set only by the EAB_WEBSITE build) ----------
+   The phone app is untouched. On a wide screen the app uses up to 1320px; screens with lists of cards or a map use the
+   full width, everything else (forms, details, settings, chats) stays a comfortable reading column in the middle. */
+html.website button, html.website [role="button"], html.website .tile, html.website a { cursor: pointer; }
+html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-allowed; }
+@media (min-width: 1000px) {
+  html.website .shell { max-width: 1320px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  html.website .content { padding: 24px 32px 48px; }
+  html.website .content > * { width: 100%; max-width: 920px; margin-left: auto; margin-right: auto; }
+  html.website .content:is([data-screen="home"], [data-screen="listing"], [data-screen="calendar"], [data-screen="propertyMap"],
+    [data-screen="houseShopping"], [data-screen="journey"], [data-screen="devDashboard"], [data-screen="trackSales"]) > * { max-width: none; }
+
+  /* Home: five tiles a row (15 tiles = three rows). */
+  html.website .home .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+  html.website .tile { min-height: 140px; font-size: 16px; padding: 14px 8px; justify-content: center; }
+  html.website .tile:hover { filter: brightness(1.12); }
+
+  /* Subsale List: Large Cards side by side, Grid cards six a row. */
+  html.website .lc-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; align-items: start; }
+  html.website .lc-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  /* The open property: a wide photo instead of a tall one, so the details start higher up. */
+  html.website .content[data-screen="listingDetail"] .lc-photo.tall { aspect-ratio: 16 / 9; }
+
+  /* Pop-ups and full sheets: a little wider than on a phone, still centred. */
+  html.website .sheet { max-width: 860px; }
+  html.website .save-bar.floating { width: min(calc(100% - 16px), 920px); }
+  html.website .toast { max-width: 720px; }
+}
+@media (min-width: 1500px) {
+  html.website .lc-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}

@@ -393,7 +393,7 @@ function Shell() {
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
         <UpdateBanner lang={lang} />
 
-        <main className="content">
+        <main className="content" data-screen={screen.name}>
           <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
         </main>
 

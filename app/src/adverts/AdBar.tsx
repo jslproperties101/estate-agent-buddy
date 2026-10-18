@@ -13,6 +13,7 @@ import { memo, useEffect, useState, useSyncExternalStore } from 'react';
 import type { Lang } from '../i18n';
 import { c11Strings } from '../ui/c011Strings';
 import { BANNER_H, nativeAdsAvailable, setBannerVisible, startBanner, testAdsOnly } from './admob';
+import { isWebsite } from '../native/native';
 
 // ---------- full-screen views ----------
 let immersiveCount = 0;
@@ -38,7 +39,11 @@ function setReserved(px: number) {
 // ---------- the fixed bottom area ----------
 /** `cover`: drawn on the start-up screen (Change 42). It shows the same banner but never touches the page's reserved height
  *  (--ad-h), which belongs to the app shell's own BottomAd, so removing the cover cannot reset it. */
-export const BottomAd = memo(function BottomAd({ lang, cover }: { lang: Lang; cover?: boolean }) {
+export const BottomAd = memo(function BottomAd(props: { lang: Lang; cover?: boolean }) {
+  // JoyChange002 Change 47: no adverts on the laptop website (nothing is drawn and no space is kept free for one).
+  return isWebsite() ? null : <BottomAdBar {...props} />;
+});
+const BottomAdBar = memo(function BottomAdBar({ lang, cover }: { lang: Lang; cover?: boolean }) {
   const t = c11Strings[lang].ad;
   const hidden = useSyncExternalStore(subscribe, isImmersive);
   const [native, setNative] = useState<'starting' | 'on' | 'off'>(() => (nativeAdsAvailable() ? 'starting' : 'off'));
@@ -85,9 +90,10 @@ export function FeedAd({ lang, n }: { lang: Lang; n: number }) {
 export const FEED_AD_EVERY = 3;
 export function withFeedAds<T>(shown: T[]): ({ kind: 'item'; item: T; index: number } | { kind: 'ad'; n: number })[] {
   const out: ({ kind: 'item'; item: T; index: number } | { kind: 'ad'; n: number })[] = [];
+  const ads = !isWebsite();   // JoyChange002 Change 47: no in-feed adverts on the laptop website
   shown.forEach((item, index) => {
     out.push({ kind: 'item', item, index });
-    if ((index + 1) % FEED_AD_EVERY === 0) out.push({ kind: 'ad', n: (index + 1) / FEED_AD_EVERY });
+    if (ads && (index + 1) % FEED_AD_EVERY === 0) out.push({ kind: 'ad', n: (index + 1) / FEED_AD_EVERY });
   });
   return out;
 }

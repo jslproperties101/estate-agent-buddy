@@ -22,6 +22,7 @@ import { TaskRow } from '../agenda/AgendaUI';
 import { completeTask, sortTasks } from '../domain/workflow';
 import { cardTitle, normalisePhone, phoneDigits, usablePhone } from '../listing/model';
 import { fmtDate } from '../lib/dates';
+import { isWebsite } from '../native/native';
 import { pickPhoneContacts, phonebookSupported, phonebookProblem, PickedContact } from '../lib/phonebook';
 import { useToast } from '../ui/toast';
 import { PhoneInput } from '../ui/PhonebookButton';
@@ -124,7 +125,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
   return (
     <section className="stack" data-testid={`contacts-${role}`}>
       <button className="btn primary" onClick={() => go({ name: 'contactForm', role })}>{role === 'vendor' ? s.addVendor : s.addBuyer}</button>
-      <button className="btn secondary" onClick={() => void importPhone()} aria-disabled={!phonebookSupported()}>{s.importPhone}</button>
+      {!isWebsite() && <button className="btn secondary" onClick={() => void importPhone()} aria-disabled={!phonebookSupported()}>{s.importPhone}</button>}
       <input aria-label={s.search} placeholder={s.search} value={q} onChange={e => setQ(e.target.value)} />
       <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <div className="chip-row" role="radiogroup" aria-label={role === 'vendor' ? t.vendorStatusLabel : t.leadLabel} data-testid="status-filter">

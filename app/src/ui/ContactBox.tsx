@@ -9,6 +9,7 @@
 import { useMemo } from 'react';
 import { Lang } from '../i18n';
 import { usePhonebook } from './PhonebookButton';
+import { isWebsite } from '../native/native';
 import type { PickedContact } from '../lib/phonebook';
 import type { Contact } from '../data/types';
 import { normalisePhone } from '../listing/model';
@@ -40,6 +41,7 @@ export function ContactBox({ lang, idPrefix, labels, value, onChange, onPicked, 
   pickLabel: string; suggestLabel: string; useLabel: string; phonePh?: string; whatsappPh?: string;
 }) {
   const { busy, msg, pick } = usePhonebook(lang, onPicked);
+  const book = !isWebsite();   // JoyChange002 Change 47: no phone book on the laptop website
   const f = fields ?? { name: `${idPrefix}.name`, phone: `${idPrefix}.phone`, whatsapp: `${idPrefix}.whatsapp` };
   const q = { name: (value.name ?? '').trim().toLowerCase(), phone: digits(value.phone), wa: (value.whatsapp ?? '').replace(/^@/, '').toLowerCase() };
   const suggestions = useMemo(() => {
@@ -60,7 +62,7 @@ export function ContactBox({ lang, idPrefix, labels, value, onChange, onPicked, 
         <label htmlFor={`${idPrefix}-name`}>{labels.name}</label>
         <div className="combo">
           <input id={`${idPrefix}-name`} data-field={f.name} autoComplete="off" value={value.name ?? ''} onChange={e => onChange({ name: e.target.value || undefined })} />
-          <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={pickLabel} title={pickLabel} aria-busy={busy} data-testid={`${idPrefix}-pick`}><PhonebookIcon /></button>
+          {book && <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={pickLabel} title={pickLabel} aria-busy={busy} data-testid={`${idPrefix}-pick`}><PhonebookIcon /></button>}
         </div>
         {msg && <p className={msg.error ? 'error pb-msg' : 'muted small pb-msg'} role={msg.error ? 'alert' : 'status'} data-testid={`${idPrefix}-pick-msg`}>{msg.text}</p>}
       </div>
@@ -74,7 +76,7 @@ export function ContactBox({ lang, idPrefix, labels, value, onChange, onPicked, 
               value={(value.phone ?? '').replace(/^\+/, '')} onChange={e => onChange({ phone: phoneTyped(e.target.value) })}
               onBlur={() => onChange({ phone: normalisePhone(value.phone) })} />
           </div>
-          <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={pickLabel} title={pickLabel} aria-busy={busy} data-testid={`${idPrefix}-pick-phone`}><PhonebookIcon /></button>
+          {book && <button type="button" className="combo-btn" onClick={() => void pick()} aria-label={pickLabel} title={pickLabel} aria-busy={busy} data-testid={`${idPrefix}-pick-phone`}><PhonebookIcon /></button>}
         </div>
       </div>
       <div className="ff">
