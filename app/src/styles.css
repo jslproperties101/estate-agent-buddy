@@ -255,6 +255,11 @@ label.btn { position: relative; cursor: pointer; }
 .tile:active { transform: translateY(1px); }
 .tile.voice-tile { background: var(--gold-grad); color: var(--on-gold); border-color: #B8902B; }
 .tile.voice-tile .tile-icon { color: var(--on-gold); border-color: rgba(17,17,17,.4); background: rgba(255,255,255,.25); }
+/* Change 43: the robot sits directly on the gold, no badge behind it. */
+.tile.robot-tile .tile-icon { width: 56px; height: 56px; border: 0; background: none; border-radius: 0; }
+.tile.robot-tile .tile-icon .robot-img { display: block; width: 56px; height: 56px; object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.profile-email { font-size: 15px; font-weight: 700; color: var(--gold-hi); text-align: center; overflow-wrap: anywhere; padding: 2px 4px; }
+.logout-btn { margin-top: 6px; }
 .today-card { display: flex; flex-direction: column; gap: 8px; }
 /* Cards that are not built yet: still gold-edged, visibly marked "Coming Soon". */
 .tile.soon .tile-icon { opacity: .75; }
@@ -277,9 +282,10 @@ label.btn { position: relative; cursor: pointer; }
   border: 1px solid transparent; background: linear-gradient(#111013, #111013) padding-box, var(--gold-edge) border-box; }
 
 /* Dialogs, sheets, toast */
-.scrim, .sheet-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex; align-items: flex-end; justify-content: center; padding: 12px 12px calc(12px + var(--ad-h, 0px)); z-index: 20; }
-.dialog { background: var(--card); border: 1px solid var(--line-2); border-radius: 20px; padding: 18px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
-.sheet { background: var(--bg); border: 1px solid var(--gold-lo); border-radius: 20px; padding: 14px; width: 100%; max-width: 720px; max-height: calc(100vh - 24px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+/* Change 26: every pop-up card sits in the vertical middle of the area ABOVE the ad banner (the bottom padding is the ad). */
+.scrim, .sheet-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .7); display: flex; align-items: center; justify-content: center; padding: 12px 12px calc(12px + var(--ad-h, 0px)); z-index: 20; }
+.dialog { max-height: 100%; overflow-y: auto; background: var(--card); border: 1px solid var(--line-2); border-radius: 20px; padding: 18px; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 10px; }
+.sheet { background: var(--bg); border: 1px solid var(--gold-lo); border-radius: 20px; padding: 14px; width: 100%; max-width: 720px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .sheet-actions { position: sticky; bottom: 0; background: var(--bg); padding-top: 6px; }
 .toast { position: fixed; left: 12px; right: 12px; bottom: calc(16px + var(--ad-h, 0px) + env(safe-area-inset-bottom, 0px)); max-width: 696px; margin: 0 auto; background: #1E1B15; color: var(--ink); border: 1px solid var(--gold-lo); border-radius: 14px; padding: 8px 8px 8px 14px; display: flex; align-items: center; gap: 8px; z-index: 30; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
 .toast span { flex: 1; font-size: 15px; }
@@ -625,15 +631,22 @@ label.btn { position: relative; cursor: pointer; }
 .intro-msg.slow, .intro-msg.failed { color: var(--ink); }
 .intro-stage { perspective: 700px; }
 .intro .logo-img { display: block; border-radius: 22%; filter: drop-shadow(0 0 24px rgba(212,175,55,.35));
-  animation: intro-spin .8s cubic-bezier(.2,.7,.25,1) both; will-change: transform; }
+  animation: intro-spin 1s linear 5 both; will-change: transform; }
+/* Change 42: the logo turns once a second around its vertical axis, five turns for the five seconds. */
 @keyframes intro-spin {
-  0% { transform: scale(.35) rotateY(-540deg); opacity: 0; }
-  35% { opacity: 1; }
-  100% { transform: scale(1) rotateY(0deg); opacity: 1; }
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
 }
+/* A purely visual progress bar that fills evenly over the five seconds. */
+.intro-bar { width: min(260px, 70vw); height: 8px; border-radius: 4px; background: var(--card-2); border: 1px solid var(--line-2); overflow: hidden; }
+.intro-bar span { display: block; height: 100%; width: 100%; transform-origin: left center; background: var(--gold-grad); animation: intro-fill 5s linear both; }
+@keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.intro-ad { position: absolute; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0px); }
+.intro-msg { min-height: 2.6em; }
 @keyframes intro-out { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) {
   .intro .logo-img { animation: intro-fade .3s ease-out both; }
+  .intro-bar span { animation: intro-fill 5s linear both; }
 }
 @keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
 
@@ -645,8 +658,14 @@ label.btn { position: relative; cursor: pointer; }
 .topbar.home .top-btn { width: 44px; min-width: 44px; }
 .top-badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
   font-size: 14px; font-weight: 800; line-height: 22px; text-align: center; }
-.topbar.home .wordmark span { font-size: 14px; }
-.topbar.home .wordmark em { font-size: 18px; white-space: nowrap; }
+/* Change 44: on the main page the logo and wording fill the bar from top to bottom. The bar keeps its height (the logo is as
+   66px tall with -10px margins, so it counts as 46px in the row and uses the 10px padding above and below); the
+   wording grows with the screen width as far as the space left of the three buttons allows. */
+.topbar.home h1.brand { gap: 6px; }
+.topbar.home h1.brand img.logo-img { width: 66px; height: 66px; margin: -10px 0; }
+.topbar.home .wordmark { justify-content: center; }
+.topbar.home .wordmark span { font-size: clamp(13px, 4.5vw, 20px); white-space: nowrap; }
+.topbar.home .wordmark em { font-size: clamp(18px, 6.4vw, 30px); white-space: nowrap; }
 .topbar .lang button { min-width: 34px; padding: 0 4px; }
 
 /* Contacts hub: Buyers and Vendors */
@@ -881,8 +900,10 @@ label.btn { position: relative; cursor: pointer; }
 .lang { position: relative; flex: none; display: block; border: 0; background: none; padding: 0; border-radius: 0; }
 .lang-btn { position: relative; }
 .lang-cur { display: none; position: absolute; right: -4px; bottom: -4px; min-width: 22px; height: 18px; padding: 0 3px; border-radius: 9px; background: var(--gold-grad); color: var(--on-gold); font-size: 11px; font-weight: 800; line-height: 18px; text-align: center; }
-.lang-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 25; min-width: 190px; display: flex; flex-direction: column; padding: 4px;
-  background: var(--card); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: 0 10px 28px rgba(0,0,0,.6); }
+/* Change 29: the language list is a centred pop-up (it was a drop-down under the button). */
+.lang-menu { max-width: 320px; gap: 6px; }
+.lang-menu h2 { font-size: 17px; margin-bottom: 2px; }
+.lang-text { font-size: 13px; font-weight: 800; letter-spacing: .2px; }
 .lang-menu button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 16px; font-weight: 600; text-align: left; }
 .lang-menu button[aria-checked="true"] { background: var(--gold-grad); color: var(--on-gold); }
 .lang-short { min-width: 36px; font-weight: 800; }
@@ -1061,6 +1082,11 @@ html { background: #000; }
 .sc-locrow .sc-counts { grid-column: 1; grid-row: 2; }
 .sc-pin { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 .sc-pin.unset { opacity: .55; }
+/* Change 28: the small Grid card's last row is the price at the left and the location button at the right. */
+.sc-body-grid .sc-locrow { grid-template-rows: auto; align-items: center; }
+.sc-body-grid .sc-locrow .sc-price { grid-column: 1; grid-row: 1; }
+.sc-body-grid .sc-pin { grid-row: 1; }
+.sc-body-grid .sc-type { color: var(--muted); }
 .sc-bubble { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 3; white-space: nowrap; font-size: 12px; font-weight: 700; line-height: 1.2;
   padding: 5px 9px; border-radius: 10px; background: var(--card-2, #222); color: var(--ink); border: 1px solid var(--gold-lo, #8a7228); box-shadow: 0 4px 14px rgba(0,0,0,.45); pointer-events: none; }
 .sc-large .sc-counts, .sc-large .sc-loc-blank { font-size: 14px; }
@@ -1103,17 +1129,43 @@ button.sync-banner { cursor: pointer; }
 .photo-list .pg-menu-btn::before { content: '⋮'; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px;
   background: rgba(8,8,10,.85); border: 1px solid var(--line-2); color: var(--gold-hi); font-size: 15px; font-weight: 800; }
 .lc-photo[role="button"] { cursor: zoom-in; }
+/* Change 32: "Click to enlarge" on the property page photo, bottom centre; taps go through to the photo. */
+.lc-enlarge { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 24px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none; font-size: 13px; font-weight: 700; line-height: 1.3; color: var(--gold-hi); background: rgba(8,8,10,.72); border: 1px solid rgba(246,227,161,.35);
+  border-radius: 999px; padding: 3px 12px; }
+/* Change 32: Large Cards swipe through the property's photos; small arrows (44 px touch area) and dots on the picture. */
+.sc-photo.wide.swipe { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.sc-photo.wide.swipe img { pointer-events: none; -webkit-user-drag: none; }
+.sc-arrow { position: absolute; top: 50%; z-index: 2; width: 30px; height: 30px; margin: -15px 0 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; border: 1px solid rgba(246,227,161,.45); background: rgba(8,8,10,.62); color: var(--gold-hi); font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; }
+.sc-arrow::before { content: ''; position: absolute; inset: -7px; } /* a 44 × 44 touch area around the small circle */
+.sc-arrow.prev { left: 8px; }
+.sc-arrow.next { right: 8px; }
+.sc-arrow:focus-visible { outline: 3px solid var(--gold-hi); outline-offset: 2px; }
+.sc-dots { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); z-index: 1; display: flex; gap: 5px; padding: 3px 6px; border-radius: 999px;
+  background: rgba(8,8,10,.5); pointer-events: none; }
+.sc-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.45); }
+.sc-dots i.on { background: var(--gold-hi); }
 /* Change 7: full-screen photo viewer */
 .pv { position: fixed; inset: 0; z-index: 60; background: #000; display: flex; flex-direction: column; touch-action: none; user-select: none; }
 .pv-top { display: flex; align-items: center; justify-content: space-between; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; color: #fff; }
 .pv-count { font-weight: 700; }
 .pv-btn { min-width: 48px; min-height: 48px; border-radius: 24px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.5); color: #fff; font-size: 24px; line-height: 1; }
 .pv-btn:disabled { opacity: .3; }
-.pv-stage { flex: 1; overflow: hidden; display: flex; align-items: center; justify-content: center; touch-action: none; }
-.pv-img { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center center; will-change: transform; }
-.pv-img img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
-.pv-nav { position: absolute; left: 0; right: 0; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: space-between; padding: 0 16px; pointer-events: none; }
-.pv-nav .pv-btn { pointer-events: auto; }
+/* Change 32: the photo is as tall as it needs (never taller than the room left for it) and the arrows with "Slide to next"
+   sit directly under it. The whole area still takes swipes and pinches; the room shrinks on a short screen and the top
+   bar and arrows stay visible. */
+.pv { --pv-room: calc(100vh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+@supports (height: 100dvh) { .pv { --pv-room: calc(100dvh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); } }
+.pv-stage { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; justify-content: center; touch-action: none;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+.pv-img { flex: 0 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center center; will-change: transform; }
+.pv-img img { display: block; width: 100%; height: auto; max-height: max(120px, var(--pv-room)); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.pv-img .img-wait { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: max(120px, var(--pv-room)); }
+.pv-nav { position: relative; z-index: 1; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px 0; }
+.pv-nav .pv-btn { flex: none; color: var(--gold-hi); border-color: rgba(246,227,161,.45); }
+.pv-hint { min-width: 0; text-align: center; font-size: 14px; font-weight: 600; line-height: 1.25; color: #F2EEE3; background: rgba(255,255,255,.08);
+  border-radius: 999px; padding: 4px 12px; }
 /* Change 12: Track My Sales */
 .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .kpi { border: 1px solid var(--line-2); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px; background: var(--card-2); min-width: 0; }

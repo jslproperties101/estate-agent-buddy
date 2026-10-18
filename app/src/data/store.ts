@@ -16,7 +16,7 @@ export function emptyState(): AppState {
     properties: [], contacts: [], inquiries: [], appointments: [], tasks: [], journeys: [],
     deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [], calculations: [],
     profile: {},
-    settings: { lang: 'en', layout: 'grid' },
+    settings: { lang: 'en', layout: 'large' }, // Change 28: Large Cards on a first install; afterwards the last choice is kept
     options: {},
     meta: { fired: [], dirty: [], tombstones: [] },
   };

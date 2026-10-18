@@ -24,6 +24,7 @@ declare module 'react' {
   export function memo<P>(c: (props: P) => any): (props: P) => any;
 }
 declare module 'react/jsx-runtime' { export const jsx: any; export const jsxs: any; export const Fragment: any; }
+declare module 'react-dom' { export function createPortal(node: any, container: Element): any }
 declare module 'react-dom/client' { export function createRoot(el: Element): { render(node: any): void } }
 declare module '*.css';
 type EabFormEl = HTMLInputElement & HTMLTextAreaElement & HTMLSelectElement;

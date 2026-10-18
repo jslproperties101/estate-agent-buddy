@@ -14,7 +14,8 @@ import { useApp, useStore } from '../data/useStore';
 import { Go } from '../nav';
 import { profileStrings } from './strings';
 import { OptionSelect } from '../ui/OptionSelect';
-import { StoredImage } from '../ui/common';
+import { StoredImage, Confirm } from '../ui/common';
+import { signOutRemote } from '../data/auth';
 import { IconGear } from '../icons';
 import { useToast } from '../ui/toast';
 import { DEFAULT_SHARE, shareText, shareFiles, whatsappLink, anyChosen, missingProfile, REQUIRED_PROFILE, RequiredProfileField } from '../domain/namecard';
@@ -35,13 +36,17 @@ import { DevEntry } from '../usage/DevDashboard';
 export const REG_TYPES = ['REN', 'PEA', 'REA'] as const;
 
 export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
-  const { state } = useApp();
+  const { state, store } = useApp();
   const t = profileStrings[lang];
   const p = state.profile;
+  const session = state.meta.syncSession;
+  const [askLogout, setAskLogout] = useState(false);
   const has = !!(p.fullName || p.phone || p.agency);
   const missing = missingProfile(p);
   return (
     <section className="stack" data-testid="profile">
+      {/* Change 45: the signed-in email, a clean line at the very top with no label. */}
+      {session?.email && <div className="profile-email" data-testid="profile-email">{session.email}</div>}
       <div className="namecard">
         <div className="nc-photo"><StoredImage fileId={p.photoFileId} /></div>
         <div className="nc-body">
@@ -68,6 +73,10 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
       )}
       <button className="btn secondary" onClick={() => go({ name: 'profileEdit' })}>{t.edit}</button>
       <button className="btn secondary" data-testid="open-settings" onClick={() => go({ name: 'settings' })}><span className="row-gap"><IconGear /> {t.settings}</span></button>
+      {/* Change 29: a red Log out button at the bottom; it asks first. */}
+      {session && <button className="btn danger full logout-btn" data-testid="logout" onClick={() => setAskLogout(true)}>{t.logout}</button>}
+      {askLogout && session && <Confirm lang={lang} title={t.logoutQ} body={t.logoutBody} okLabel={t.logout} onCancel={() => setAskLogout(false)}
+        onOk={() => { setAskLogout(false); void signOutRemote(config(store.getState().settings), session); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? session.workspaceId }); }} />}
     </section>
   );
 }

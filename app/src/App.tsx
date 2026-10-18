@@ -1,6 +1,7 @@
 // Estate Agent AI Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
 import { openBackend } from './data/backend';
 import { Store, AccessError } from './data/store';
@@ -12,7 +13,7 @@ import { DealScreen, TrackSalesScreen } from './deals/DealUI';
 import { cc001Strings } from './ui/cc001Strings';
 import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
-import { beginStartup, startupLang, StartupPhase } from './startup/startup';
+import { beginStartup, startupLang, StartupPhase, SPLASH_MS, splashStep } from './startup/startup';
 import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
@@ -55,7 +56,7 @@ import { bugStrings } from './bugreport/strings';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconMic, IconLogo, IconMoney, IconCalc, IconCard, IconProject, IconMarket, IconCreative, IconMatch, IconGlobe,
+  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMarket, IconCreative, IconMatch,
 } from './icons';
 import { BottomAd } from './adverts/AdBar';
 import { c11Strings } from './ui/c011Strings';
@@ -105,9 +106,13 @@ if (typeof window !== 'undefined') captureInviteFromUrl();
  *  owner's answers of 16 Oct 2026: 4 Creative Media (where the property list was), 10 Buyer Matching (Agent Profile moved to
  *  the top bar, beside the language button), 12 Market Intelligence, 14 Subsale List (the property list, bottom centre).
  *  No card carries a Coming Soon label any more; Project and Market Intelligence still open honest "not built yet" screens. */
+/** Change 43: the three bottom-row tiles carry the full gold fill. */
+const GOLD_TILES = new Set(['agenda', 'property', 'voice']);
 export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] = [
   // ClaudeChanges001 change 12: Calendar and To-do in one tile (it asks which), and Track My Sales in the Calendar's place.
-  { key: 'agenda', icon: () => <IconAgenda />, target: { name: 'calendar' } },
+  // JoyChange002 Change 43: Project moves to the top-left; Calendar & To-Do takes its old place, bottom-left of the gold row
+  // (Calendar & To-Do | Subsale | AI Assisted Command). Nothing else moves.
+  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' } }, // the real Project screen is Batch E
   { key: 'sales', icon: () => <IconSales />, target: { name: 'trackSales' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
   { key: 'creative', icon: () => <IconCreative />, target: { name: 'creativeMedia' } },
@@ -119,9 +124,9 @@ export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] =
   { key: 'matching', icon: () => <IconMatch />, target: { name: 'buyerMatching' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
   { key: 'market', icon: () => <IconMarket />, target: { name: 'comingSoon', key: 'market' } },
-  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' } },
+  { key: 'agenda', icon: () => <IconAgenda />, target: { name: 'calendar' } },
   { key: 'property', icon: () => <IconHome />, target: { name: 'listing' } },
-  { key: 'voice', icon: () => <IconMic />, target: { name: 'voice' } },
+  { key: 'voice', icon: () => <IconRobot size={56} />, target: { name: 'voice' } },
 ];
 
 /** Startup is driven by readiness, not by a timer: the dashboard appears the moment the phone's storage is open, however
@@ -132,6 +137,10 @@ export default function App() {
   const [phase, setPhase] = useState<StartupPhase>('opening');
   const [attempt, setAttempt] = useState(0);
   const [gone, setGone] = useState(false);
+  // Change 42: the start-up screen stays for the full SPLASH_MS every time, even when the storage opens sooner.
+  // (Automated browser tests, which report navigator.webdriver, skip the wait unless the address has ?splash=full; a phone never does.)
+  const [minDone, setMinDone] = useState(() => typeof navigator !== 'undefined' && (navigator as { webdriver?: boolean }).webdriver === true && !/splash=full/.test(typeof location === 'undefined' ? '' : location.search));
+  useEffect(() => { if (minDone) return; const x = setTimeout(() => setMinDone(true), SPLASH_MS); return () => clearTimeout(x); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const lang = startupLang(typeof navigator === 'undefined' ? undefined : navigator.languages);
   useEffect(() => beginStartup(() => openBackend().then(Store.open), (p, value) => {
     setPhase(p);
@@ -141,11 +150,11 @@ export default function App() {
   useEffect(() => { void hideSplash(); }, []);
   useEffect(() => { if (store) void nativeLook(); }, [store]);
   // After the short fade-out the cover is removed from the page altogether.
-  useEffect(() => { if (phase !== 'ready') return; const x = setTimeout(() => setGone(true), FADE_MS); return () => clearTimeout(x); }, [phase]);
+  useEffect(() => { if (phase !== 'ready' || !minDone) return; const x = setTimeout(() => setGone(true), FADE_MS); return () => clearTimeout(x); }, [phase, minDone]);
   return (
     <>
       {store && <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>}
-      {!gone && <StartupLogo phase={phase} lang={store?.getState().settings.lang ?? lang} onRetry={() => setAttempt(n => n + 1)} />}
+      {!gone && <StartupLogo phase={phase} done={minDone} lang={store?.getState().settings.lang ?? lang} onRetry={() => setAttempt(n => n + 1)} />}
     </>
   );
 }
@@ -155,14 +164,25 @@ export const FADE_MS = 120;
 
 /** Startup cover: the logo and one truthful line about what is happening. The spin is decoration only. People who ask
  *  the phone for reduced motion get a short fade instead of the spin. */
-function StartupLogo({ phase, lang, onRetry }: { phase: StartupPhase; lang: Lang; onRetry: () => void }) {
+function StartupLogo({ phase, done, lang, onRetry }: { phase: StartupPhase; done: boolean; lang: Lang; onRetry: () => void }) {
   const s = startupStrings[lang];
-  const text = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : s.opening;
+  // Change 42: six visual lines, one every SPLASH_STEP_MS. A real problem (slow or failed storage) still replaces them.
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t0 = Date.now();
+    const x = setInterval(() => setStep(splashStep(Date.now() - t0)), 100);
+    return () => clearInterval(x);
+  }, []);
+  const text = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : s.steps[step] ?? s.opening;
+  const leaving = phase === 'ready' && done;
   return (
-    <div className={`intro${phase === 'ready' ? ' leaving' : ''}`} data-testid="startup-logo" data-phase={phase}>
+    <div className={`intro${leaving ? ' leaving' : ''}`} data-testid="startup-logo" data-phase={phase} data-step={step}>
       <div className="intro-stage" aria-hidden="true"><IconLogo size={168} big splash /></div>
-      {phase !== 'ready' && <p className={`intro-msg ${phase}`} role={phase === 'failed' ? 'alert' : 'status'} data-testid="startup-msg">{text}</p>}
+      <div className="intro-bar" aria-hidden="true" data-testid="startup-bar"><span /></div>
+      {!leaving && <p className={`intro-msg ${phase}`} role={phase === 'failed' ? 'alert' : 'status'} data-testid="startup-msg">{text}</p>}
       {(phase === 'slow' || phase === 'failed') && <button className="btn secondary" data-testid="startup-retry" onClick={onRetry}>{s.retry}</button>}
+      {/* The same bottom advert as every other screen, from the first moment. */}
+      <div className="intro-ad"><BottomAd lang={lang} cover /></div>
     </div>
   );
 }
@@ -318,19 +338,21 @@ function Shell() {
           {/* ClaudeChanges001 change 2: no "Saved on This Phone" line under the title; a problem shows as a banner on the main page. */}
           <div className="title-col">
             {screen.name === 'home'
-              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={46} /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
+              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
               : <h1>{title}</h1>}
           </div>
           {screen.name === 'home' && <>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
               <IconBell />{notifCount > 0 && <span className="top-badge" aria-hidden="true">{notifCount > 9 ? '9+' : notifCount}</span>}
             </button>
-            {/* Owner, 16 Oct 2026: Agent Profile left the cards and sits here, beside the language button. */}
-            <button className="icon-btn top-btn" onClick={() => go({ name: 'profile' })} aria-label={c11Strings[lang].top.profile} title={c11Strings[lang].top.profile} data-testid="top-profile">
-              <IconCard />
-            </button>
           </>}
+          {/* Change 29: bell, language, profile (language and profile swapped). The profile icon is a plain user. */}
           <LangMenu lang={lang} onPick={l => store.setSingleton('settings', { lang: l })} />
+          {screen.name === 'home' && (
+            <button className="icon-btn top-btn" onClick={() => go({ name: 'profile' })} aria-label={c11Strings[lang].top.profile} title={c11Strings[lang].top.profile} data-testid="top-profile">
+              <IconUser />
+            </button>
+          )}
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
         <UpdateBanner lang={lang} />
@@ -534,7 +556,7 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
-          <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
+          <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
             aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
             {tile.key === 'opportunities' && teamBadgeCount(state) > 0 && <span className="tile-badge" data-testid="opportunities-badge" aria-label={teamStrings[lang].newInvites(teamBadgeCount(state))}>{teamBadgeCount(state)}</span>}
@@ -557,27 +579,29 @@ function LangMenu({ lang, onPick }: { lang: Lang; onPick: (l: Lang) => void }) {
   const label = c11Strings[lang].top.language;
   useEffect(() => {
     if (!open) return;
-    const close = (e: Event) => { if (!(e.target as Element)?.closest?.('.lang')) setOpen(false); };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('pointerdown', close); document.addEventListener('keydown', esc);
-    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('keydown', esc); };
   }, [open]);
   const cur = LANGS.find(l => l.code === lang) ?? LANGS[0];
   return (
     <div className="lang">
       <button type="button" className="icon-btn top-btn lang-btn" aria-haspopup="menu" aria-expanded={open} aria-label={`${label}: ${cur.label}`} title={label} data-testid="lang-btn" onClick={() => setOpen(o => !o)}>
-        <IconGlobe />
+        <span className="lang-text">{cur.short}</span>
       </button>
-      {open && (
-        <div className="lang-menu" role="menu" aria-label={label} data-testid="lang-menu">
-          {LANGS.map(l => (
-            <button key={l.code} type="button" role="menuitemradio" aria-checked={lang === l.code} aria-pressed={lang === l.code} aria-label={l.label} data-lang={l.code}
-              onClick={() => { setOpen(false); onPick(l.code); }}>
-              <span className="lang-short">{l.short}</span> <span>{l.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Change 29: the list of languages is a centred pop-up (Change 26), not a drop-down under the button. */}
+      {open && createPortal(
+        <div className="scrim" role="presentation" data-testid="lang-scrim" onPointerDown={(e: EabEvent<Element>) => { if (e.target === e.currentTarget) setOpen(false); }}>
+          <div className="dialog lang-menu" role="menu" aria-label={label} data-testid="lang-menu">
+            <h2>{label}</h2>
+            {LANGS.map(l => (
+              <button key={l.code} type="button" role="menuitemradio" aria-checked={lang === l.code} aria-pressed={lang === l.code} aria-label={l.label} data-lang={l.code}
+                onClick={() => { setOpen(false); onPick(l.code); }}>
+                <span className="lang-short">{l.short}</span> <span>{l.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>, document.body)}
     </div>
   );
 }

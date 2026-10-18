@@ -192,8 +192,8 @@ test('CC2 change 2: the banner counts down to the next automatic try (every 60 s
   assert.ok(app.includes('<SyncBanner'), 'the banner is on the main page');
 });
 
-test('CC12d the dashboard: card 1 Calendar & To-Do, card 2 Track My Sales, in every language', () => {
-  assert.deepEqual(TILES.slice(0, 2).map(t => t.key), ['agenda', 'sales']);
+test('CC12d the dashboard: Calendar & To-Do (bottom left since JoyChange002 Change 43), card 2 Track My Sales, in every language', () => {
+  assert.deepEqual([TILES[12], TILES[1]].map(t => t.key), ['agenda', 'sales']);
   assert.deepEqual(TILES[1].target, { name: 'trackSales' });
   assert.equal(TILES.length, 15);
   assert.equal(strings.en.tiles.agenda, 'Calendar & To\u2011Do', 'a non-breaking hyphen, so the card never splits To-Do');

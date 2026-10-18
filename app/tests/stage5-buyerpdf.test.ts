@@ -70,7 +70,7 @@ test('BP5 each important fact keeps its check-status label; anything but Confirm
   const by = (k: string) => rows.find(r => r.k.startsWith(k))!;
   // Owner, 17 Oct 2026: Asking Price has no check status, so it carries no mark (an old mark on the record is not shown).
   assert.deepEqual([by('Asking Price').tag, by('Asking Price').warn], [undefined, undefined]);
-  assert.deepEqual([by('Land Area').tag, by('Land Area').warn], ['Owner Stated', true]);
+  assert.deepEqual([by('Land Size').tag, by('Land Size').warn], ['Owner Stated', true]);
   assert.deepEqual([by('Built-Up').tag, by('Built-Up').warn], ['Need to Check', true]);
   assert.deepEqual([by('Tenure').tag, by('Tenure').warn], ['Unknown', true]);
   assert.deepEqual([by('Lease Expiry').tag, by('Lease Expiry').warn], ['Need to Check', true], 'Change 009: not marked counts as Need to Check, never confirmed');

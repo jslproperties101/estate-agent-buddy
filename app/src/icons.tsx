@@ -3,6 +3,8 @@ import logo256 from './brand/logo-256.webp';
 import logo512 from './brand/logo-512.webp';
 import splash256 from './brand/splash-256.webp';
 import splash512 from './brand/splash-512.webp';
+import robot96 from './brand/robot-96.webp';
+import robot192 from './brand/robot-192.webp';
 type P = { size?: number };
 const svg = (d: string) => ({ size = 22 }: P) => (
   <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -21,6 +23,8 @@ export const IconGps = svg('M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 12a2
 export const IconExpert = svg('M12 3a7 7 0 00-4 12.7V19h8v-3.3A7 7 0 0012 3zM9 22h6');
 export const IconMoney = svg('M3 7h18v10H3zM12 15a3 3 0 100-6 3 3 0 000 6zM6 10v4M18 10v4');
 export const IconCalc = svg('M6 3h12v18H6zM9 7h6M9 11h1M12 11h1M15 11h0M9 14h1M12 14h1M9 17h1M12 17h1M15 14v3');
+/** Change 29: the plain user (profile) icon for the top bar: a head and shoulders inside a circle. */
+export const IconUser = svg('M12 21a9 9 0 100-18 9 9 0 000 18zM12 13a3 3 0 100-6 3 3 0 000 6zM6.2 18.2a6.5 6.5 0 0111.6 0');
 export const IconCard = svg('M3 6h18v12H3zM8 13a2 2 0 100-4 2 2 0 000 4zM5 16a3 3 0 016 0M14 10h4M14 13h4');
 /** Subsale: a house with a resale arrow. */
 export const IconSubsale = svg('M3 11l8-6 8 6M5 10v9h8M17 14h5M19.5 11.5L22 14l-2.5 2.5M22 19h-5');
@@ -44,6 +48,11 @@ export const IconPencil = svg('M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4zM14.5 5.5
 export const IconPin = svg('M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z');
 /** Change 015: the X that closes a popup. */
 export const IconClose = svg('M6 6l12 12M18 6L6 18');
+/** Change 43: the robot mascot from the logo (no house or buildings), used for AI Assisted Command. Cut from the owner's logo
+ *  artwork supplied by the owner on 18 Oct 2026 (assets/brand/robot-source.png, transparent background). */
+export const IconRobot = ({ size = 40 }: P) => (
+  <img className="robot-img" src={size > 48 ? robot192 : robot96} srcSet={`${robot96} 96w, ${robot192} 192w`} sizes={`${size}px`} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} />
+);
 export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3M8 21h8');
 /** Estate Agent AI Buddy logo in the app: header, sign-in and first-start choice. Change 002a (owner, Oct 2026): the owner-supplied
  *  black-and-gold artwork (assets/brand/logo-002a-source.jpg) replaces the earlier red-bordered logo here only; the phone's

@@ -6,7 +6,7 @@ import { MemoryBackend, Backend } from '../src/data/backend';
 import { Store } from '../src/data/store';
 import { syncNow } from '../src/data/sync';
 import { saveStateOf, saveStateFromStore } from '../src/data/savestate';
-import { beginStartup, startupLang, StartupPhase, SLOW_MS } from '../src/startup/startup';
+import { beginStartup, startupLang, StartupPhase, SLOW_MS, SPLASH_MS, SPLASH_STEPS, splashStep } from '../src/startup/startup';
 import { startupStrings } from '../src/startup/strings';
 import { TOAST_OK_MS, TOAST_ERROR_MS } from '../src/ui/toast';
 import { convertInactive, inactiveContacts, reviewContacts } from '../src/data/leadReview';
@@ -61,8 +61,10 @@ test('P5 startup: a cancelled startup reports nothing more; the limit is about f
   assert.deepEqual(phases, ['opening']);
   assert.equal(SLOW_MS, 5000);
   for (const l of ['en', 'bm', 'zh'] as const) {
-    const all = Object.values(startupStrings[l]).join(' ').toLowerCase();
-    assert.ok(!/encrypt|secur|ai update|enkripsi|keselamatan|加密|安全/.test(all), `${l}: no claim about encryption, security or AI updates`);
+    // JoyChange002 Change 42: the six visual `steps` are the owner's decorative lines; the three real messages still promise nothing untrue.
+    const { opening, slow, failed, retry } = startupStrings[l];
+    const all = [opening, slow, failed, retry].join(' ').toLowerCase();
+    assert.ok(!/encrypt|secur|ai update|enkripsi|keselamatan|加密|安全/.test(all), `${l}: no claim about encryption, security or AI updates in the real messages`);
   }
   assert.equal(startupLang(['ms-MY']), 'bm');
   assert.equal(startupLang(['zh-Hans-MY']), 'zh');
@@ -71,6 +73,18 @@ test('P5 startup: a cancelled startup reports nothing more; the limit is about f
 });
 
 // ---------- A. save and sync status ----------
+test('P5b Change 42: the start-up screen lasts five seconds with six lines spread evenly, in every language', () => {
+  assert.equal(SPLASH_MS, 5000);
+  assert.equal(SPLASH_STEPS, 6);
+  assert.deepEqual([0, 800, 833, 1700, 2500, 3300, 4166, 4999, 9000].map(splashStep), [0, 0, 0, 2, 3, 3, 4, 5, 5]);
+  assert.equal(splashStep(-5), 0);
+  for (const l of ['en', 'bm', 'zh'] as const) {
+    assert.equal(startupStrings[l].steps.length, 6, `${l}: six lines`);
+    assert.ok(startupStrings[l].steps.every(x => x.trim().length > 0));
+  }
+  assert.deepEqual(startupStrings.en.steps, ['Initializing app', 'Analyzing', 'Checking encrypted data checksum', 'Checksum verified', 'Security checks', 'Security check pass']);
+});
+
 test('P6 success messages stay two seconds; errors stay longer', () => {
   assert.equal(TOAST_OK_MS, 2000);
   assert.ok(TOAST_ERROR_MS > TOAST_OK_MS);

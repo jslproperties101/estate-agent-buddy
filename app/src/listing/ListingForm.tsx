@@ -716,7 +716,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </Sec>
 
 
-      <Sec id="details" title={s.sec.details} testId="sec-details" {...secProps('details')}>
+      <Sec id="details" title={s.formSec.details} testId="sec-details" {...secProps('details')}>
         {pair(show('landSqft') && Text({ k: 'landSqft', numeric: true }), show('builtUpSqft') && Text({ k: 'builtUpSqft', numeric: true }))}
         {pair(show('frontageFt') && Text({ k: 'frontageFt', numeric: true }), show('depthFt') && Text({ k: 'depthFt', numeric: true }))}
         {/* Change 014: Lot Type directly under Frontage and Depth, each with its own check status. */}
@@ -764,7 +764,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </Sec>
 
       {(show('ceilingFt') || show('specs') || show('zoning') || show('currentUse') || show('roadAccess')) && (
-        <Sec id="specs" title={show('ceilingFt') || (show('specs') && !show('roadAccess')) ? s.sec.building : s.sec.land} testId="sec-specs" {...secProps('specs')}>
+        <Sec id="specs" title={show('ceilingFt') || (show('specs') && !show('roadAccess')) ? s.sec.building : s.formSec.land} testId="sec-specs" {...secProps('specs')}>
           {pair(show('ceilingFt') && Text({ k: 'ceilingFt', numeric: true }), show('powerKva') && Text({ k: 'powerKva', numeric: true }))}
           {show('loadingBays') && Text({ k: 'loadingBays', numeric: true })}
           {show('zoning') && Text({ k: 'zoning' })}
@@ -776,7 +776,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       )}
 
 
-      <Sec id="banner" title={s.sec.banner} testId="sec-banner-form" {...secProps('banner')}>
+      <Sec id="banner" title={s.formSec.banner} testId="sec-banner-form" {...secProps('banner')}>
         {Select({ k: 'bannerStatus', options: BANNER_STATUSES, labels: s.banner })}
         {d.bannerStatus === 'yes' && (
           <div className="stack-sm" data-testid="banner-location">

@@ -9,6 +9,15 @@ export type StartupPhase = 'opening' | 'slow' | 'failed' | 'ready';
  *  waiting after that: the storage may still finish, and the person can press "Try again". */
 export const SLOW_MS = 5000;
 
+/** JoyChange002 Change 42: the start-up screen is always shown for this long, every time the app opens (no skipping). It is
+ *  visual only: the app itself is ready as soon as the storage opens, and the screen simply stays until the time is up. */
+export const SPLASH_MS = 5000;
+/** The six start-up lines are spread evenly over SPLASH_MS (about 0.83 s each). */
+export const SPLASH_STEPS = 6;
+export const SPLASH_STEP_MS = SPLASH_MS / SPLASH_STEPS;
+/** Which of the six lines (0-5) is showing after `elapsedMs` of the start-up screen. */
+export const splashStep = (elapsedMs: number) => Math.max(0, Math.min(SPLASH_STEPS - 1, Math.floor(elapsedMs / SPLASH_STEP_MS)));
+
 /** Runs `open` once. `on` is told 'opening' first, 'slow' if it takes longer than slowMs, and finally 'ready' (with the
  *  result) or 'failed'. There is no minimum time: if `open` finishes at once, 'ready' follows at once.
  *  Returns a function that stops all further reports (used when the screen goes away or the person retries). */

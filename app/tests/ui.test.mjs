@@ -135,6 +135,8 @@ async function waitStored(page, storeName, expr, timeout = 10000) {
 async function tile(page, name) {
   // Change 011: the property list is the "Subsale List" card (14); Agent Profile is the top-bar button (owner, 16 Oct 2026).
   if (name === 'Property List') name = 'Subsale List';
+  // JoyChange002 Change 43: the Voice Command card is now "AI Assisted Command" (same card, key "voice").
+  if (name === 'Voice Command') { await page.locator('nav.grid > button[data-key="voice"]').click(); return; }
   if (['Agent Profile', 'Profil Ejen', '经纪人资料'].includes(name)) { await page.getByTestId('top-profile').click(); return; }
   if (name === 'Buyer List' || name === 'Vendor List') {
     await page.locator('nav.grid > button', { hasText: 'Contacts' }).first().click();
@@ -199,7 +201,7 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — Creative Media 4, Buyer Matching 10, Subsale List 14, Voice Command 15; no Coming Soon labels; Agent Profile and Notifications at the top', async () => {
+test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — Creative Media 4, Buyer Matching 10, Subsale List 14, AI Assisted Command 15; no Coming Soon labels; Agent Profile and Notifications at the top', async () => {
   const page = await phone();
   assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent AI Buddy');
   assert.equal(await page.title(), 'Estate Agent AI Buddy');
@@ -207,9 +209,10 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   // Change 011 + owner's answers of 16 Oct 2026: Creative Media takes card 4, the property list becomes "Subsale List" at
   // card 14 (bottom centre), Agent Profile moves to the top bar, Buyer Matching uses the freed card 10 (Change 013).
   // ClaudeChanges001 change 12: card 1 is Calendar & To-Do (asks which), card 2 is Track My Sales.
-  assert.deepEqual(names, ['Calendar & To\u2011Do', 'Track My Sales', 'Opportunities', 'Creative Media', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
+  // JoyChange002 Change 43: Project is card 1; Calendar & To-Do, Subsale List and AI Assisted Command are the gold bottom row.
+  assert.deepEqual(names, ['Project', 'Track My Sales', 'Opportunities', 'Creative Media', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
     'Agent Financial', 'Property Calculator', 'Buyer Matching', 'Ask Expert', 'Market Intelligence',
-    'Project', 'Subsale List', 'Voice Command']);
+    'Calendar & To\u2011Do', 'Subsale List', 'AI Assisted Command']);
   assert.equal(await page.locator('nav.grid > button[data-key="property"]').getAttribute('data-tile'), '14', 'Subsale List is card 14');
   assert.equal(await page.locator('nav.grid > button[data-key="creative"]').getAttribute('data-tile'), '4', 'Creative Media is card 4');
   assert.equal(await page.locator('nav.grid').getByText(/Coming Soon|Soon/i).count(), 0, 'no Coming Soon label on any card');
@@ -229,7 +232,7 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   await page.getByTestId('top-profile').click();
   await page.getByRole('button', { name: /Settings/i }).waitFor();
   await home(page);
-  assert.equal(names.indexOf('Voice Command') + 1, 15, 'Voice Command is card 15');
+  assert.equal(names.indexOf('AI Assisted Command') + 1, 15, 'AI Assisted Command is card 15');
   for (const gone of ['Buyer List', 'Vendor List', 'News', 'Settings', 'Co-broke']) assert.ok(!names.includes(gone), `no ${gone} card`);
   await tile(page, 'Creative Media');
   await page.getByTestId('creative-media').waitFor();
@@ -237,7 +240,8 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   await tile(page, 'Buyer Matching');
   await page.getByTestId('buyer-matching').waitFor();
   await home(page);
-  assert.equal(await page.locator('nav.grid > button.voice-tile').getAttribute('data-tile'), '15', 'the bright-gold Voice Command card is number 15');
+  assert.equal(await page.locator('nav.grid > button.voice-tile[data-key="voice"]').getAttribute('data-tile'), '15', 'the bright-gold AI Assisted Command card is number 15');
+  assert.equal(await page.locator('nav.grid > button.gold-tile').count(), 3, 'the bottom row of three is gold');
   // Top bar: Notifications only. Change 003 (owner): the top-middle "Soon" item (Co-broke) is removed; nothing else moves.
   assert.equal(await page.getByTestId('top-cobroke').count(), 0, 'no Soon item in the top bar');
   assert.equal(await page.locator('.top-soon').count(), 0);
@@ -289,7 +293,7 @@ test('U2 Smart Capture is removed everywhere; voice is the capture path', async 
   await page.context().close();
 });
 
-test('U3 Property List: Grid first and default, Large cards second, references hidden on cards, choice remembered', async () => {
+test('U3 Property List: Grid first, Large Cards the default on a first install (Change 28), references hidden on cards, choice remembered', async () => {
   const page = await phone();
   await tile(page, 'Property List');
   assert.ok(await page.getByTestId('listing-empty').isVisible(), 'starts empty: no invented records');
@@ -298,7 +302,9 @@ test('U3 Property List: Grid first and default, Large cards second, references h
   await tile(page, 'Property List');
   const seg = page.locator('.lc-tools .seg button');
   assert.deepEqual(await seg.evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Grid', 'Large Cards']);
-  assert.equal(await seg.first().getAttribute('aria-pressed'), 'true', 'Grid is the default');
+  assert.equal(await seg.nth(1).getAttribute('aria-pressed'), 'true', 'Large Cards is the default on a first install (Change 28)');
+  assert.equal(await page.locator('ul[data-layout="large"]').count(), 1);
+  await seg.first().click();
   assert.equal(await page.locator('ul[data-layout="grid"] > li[data-testid="listing-card"]').count(), 10);
   // Change 011: a medium advert card after every third property shown (3, 6, 9): 10 properties → 3 adverts, in their own rows.
   assert.equal(await page.locator('ul[data-layout="grid"] > li > [data-testid="feed-ad"]').count(), 3);
@@ -314,9 +320,11 @@ test('U3 Property List: Grid first and default, Large cards second, references h
   assert.equal(await page.locator('ul[data-layout="large"] > li > [data-testid="feed-ad"]').count(), 3);
   assert.ok(!/P10\d\d/.test(await page.locator('ul[data-layout="large"]').innerText()), 'no reference numbers on large cards');
   await shot(page, '02b-list-large');
+  await seg.first().click();
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List');
-  assert.equal(await page.locator('ul[data-layout="large"]').count(), 1, 'layout choice kept after reopening');
+  assert.equal(await page.locator('ul[data-layout="grid"]').count(), 1, 'the last layout chosen is kept after reopening');
+  await page.locator('.lc-tools .seg button').nth(1).click();
   await page.getByTestId('listing-card').first().locator('.sc-card').click();
   assert.match(await page.getByTestId('ref-row').innerText(), /P10\d\d/i, 'the detail page shows the reference');
   await page.context().close();
@@ -1360,7 +1368,7 @@ test('U32 voice: End recording shows the recognised words; nothing recognised gi
     await ctx.addInitScript(FAKE_SPEECH(words));
     const page = await ctx.newPage();
     await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
-    assert.match(await page.locator('nav.grid > button.voice-tile').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/i, 'gold Voice Command card');
+    assert.match(await page.locator('nav.grid > button[data-key="voice"]').evaluate(b => getComputedStyle(b).backgroundImage), /gradient/i, 'gold Voice Command card');
     await tile(page, 'Voice Command');
     await page.getByTestId('voice-start').first().click();
     await page.getByRole('button', { name: 'Use the speech service' }).click();
@@ -1570,6 +1578,29 @@ test('U39 startup: readiness-driven, not a timer: the app opens as soon as the p
   await ctx.close();
 });
 
+test('U39b JoyChange002 Change 42: the start-up screen lasts the full five seconds, spins the logo, fills a bar, shows six lines in order and carries the bottom advert', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
+  const page = await ctx.newPage();
+  const t0 = Date.now();
+  await page.goto(`${base}?splash=full`);
+  await page.getByTestId('startup-logo').waitFor({ state: 'attached', timeout: 2000 });
+  assert.equal(await page.getByTestId('startup-bar').count(), 1, 'a progress bar');
+  assert.equal(await page.locator('.intro [data-testid="bottom-ad"]').count(), 1, 'the bottom advert is on the start-up screen');
+  assert.match(await page.locator('.intro .logo-img').evaluate(i => getComputedStyle(i).animationName), /intro-spin/);
+  const seen = [];
+  const end = Date.now() + 6500;
+  while (Date.now() < end && await page.getByTestId('startup-logo').count()) {
+    const m = await page.getByTestId('startup-msg').innerText().catch(() => '');
+    if (m && seen[seen.length - 1] !== m) seen.push(m);
+    await page.waitForTimeout(100);
+  }
+  await page.getByTestId('startup-logo').waitFor({ state: 'detached', timeout: 3000 });
+  const took = Date.now() - t0;
+  assert.ok(took >= 4800 && took < 7000, `about five seconds (${took} ms)`);
+  assert.deepEqual(seen, ['Initializing app', 'Analyzing', 'Checking encrypted data checksum', 'Checksum verified', 'Security checks', 'Security check pass']);
+  await ctx.close();
+});
+
 test('U40 startup: slow storage says so after about five seconds, and Try again recovers (never an indefinite silent splash)', async () => {
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
   await ctx.addInitScript(() => {
@@ -1581,13 +1612,13 @@ test('U40 startup: slow storage says so after about five seconds, and Try again 
   const t0 = Date.now();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Opening your data on this phone/i);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Initializing app/i);   // Change 42: the first of the six start-up lines
   assert.equal(await page.getByTestId('startup-logo').getAttribute('data-phase'), 'opening');
   await page.locator('[data-testid="startup-logo"][data-phase="slow"]').waitFor({ timeout: 8000 });
   const took = Date.now() - t0;
   assert.ok(took >= 4500 && took < 7500, `the notice comes at about five seconds (${took} ms)`);
   assert.match(await page.getByTestId('startup-msg').innerText(), /taking longer than usual\. Your saved data has not been changed/i);
-  assert.ok(!/encrypt|secur|AI update/i.test(await page.getByTestId('startup-logo').innerText()), 'no untrue claims');
+  assert.ok(!/encrypt|secur|AI update/i.test(await page.getByTestId('startup-msg').innerText()), 'the slow notice itself makes no claims about checks');
   await page.evaluate(() => { window.__hang = false; });
   await page.getByTestId('startup-retry').click();
   await page.waitForSelector('nav.grid');
@@ -1620,7 +1651,7 @@ test('U42 startup message follows the phone language (Bahasa Malaysia)', async (
   const page = await ctx.newPage();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Membuka data anda dalam telefon ini/i);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Memulakan aplikasi/i);
   await ctx.close();
 });
 
@@ -3046,7 +3077,7 @@ test('U78 Bahasa Malaysia and Chinese: the calculator, buyer PDF, update sheet a
     await page.getByTestId('open-buyer-pdf').click();
     assert.match(await page.getByTestId('buyer-pdf').innerText(), expect.buyerText);
     await home(page);
-    await page.locator('nav.grid > button.voice-tile').click();
+    await page.locator('nav.grid > button[data-key="voice"]').click();
     assert.match(await page.getByTestId('open-voice-diag').innerText(), new RegExp(expect.diag, 'i'));
     await page.getByTestId('open-voice-diag').click();
     assert.match(await page.getByTestId('voice-diag').innerText(), expect.diagText);
@@ -4540,6 +4571,16 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
     assert.equal(await cards.count(), 3, layout);
     assert.equal(await page.getByTestId('card-delete').count(), 0, `${layout}: no Delete on cards`);
     assert.equal(await page.getByTestId('card-open').count(), 0, `${layout}: no Open button on cards`);
+    if (layout === 'grid') {
+      // Change 28: the small Grid card has no edit button and no footer; it keeps the location button.
+      for (let i = 0; i < 3; i++) {
+        const c = cards.nth(i);
+        assert.equal(await c.getByTestId('card-edit').count(), 0, `grid ${i}: no edit button`);
+        assert.equal(await c.getByTestId('card-location').count(), 1, `grid ${i}: location button`);
+        assert.equal(await c.getByTestId('card-type').count(), 1, `grid ${i}: property type`);
+      }
+      continue;
+    }
     for (let i = 0; i < 3; i++) {
       const c = cards.nth(i);
       const card = await c.locator('.sc-card').boundingBox();
@@ -4597,7 +4638,7 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
     assert.deepEqual(spec[0][1].map(t => t.toLowerCase()), ['terrace house', '2.5 storeys', 'corner']);
     assert.deepEqual(spec[0][1].slice(1), ['2.5 Storeys', 'Corner'], 'Title Case');
     assert.deepEqual(spec[1][1], ['4 Bedrooms', ', 3 Bathrooms']);
-    assert.deepEqual(spec[2][1], ['Land 1,650 sq ft', 'Built-Up 2,200 sq ft']);
+    assert.deepEqual(spec[2][1], ['Land size 1,650 sq ft', 'Built-Up 2,200 sq ft']);
     assert.ok(!(await both.locator('[data-spec="type"]').innerText()).includes(','), 'no commas on the type line');
     assert.ok(!(await both.locator('[data-spec="area"]').innerText()).includes(','.repeat(1) + ' Built'), 'no comma between land and built-up');
     const [tl, te, rl, al] = [await both.locator('[data-spec="type"]').boundingBox(), await both.getByTestId('card-tenure').boundingBox(), await both.locator('[data-spec="rooms"]').boundingBox(), await both.locator('[data-spec="area"]').boundingBox()];

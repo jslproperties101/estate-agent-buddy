@@ -78,17 +78,19 @@ export function PriceLine({ l, s, short }: { l: Listing; s: ListingStrings; shor
 
 
 /** Tenure together with the restriction, then storeys and lot type (Change 009). Each value in its check colour. */
-function TenureLine({ l, s, noStoreys }: { l: Listing; s: ListingStrings; noStoreys?: boolean }) {
+function TenureLine({ l, s, noStoreys, detail }: { l: Listing; s: ListingStrings; noStoreys?: boolean; detail?: boolean }) {
   // Written with spans only, so it can sit inside the card's tap area (a button).
   const yrs = yearsRemaining(l);
   const r = restrictionValue(l.restriction);
   const parts: JSX.Element[] = [];
-  if (l.tenure) parts.push(<VVal key="tenure" l={l} k="tenure">{s.tenure[l.tenure] + (yrs !== undefined ? ` · ${s.yearsLeft(yrs)}` : '')}</VVal>);
+  // Change 34: on the open property card the Tenure box already says it, so this line keeps only the restriction.
+  if (l.tenure && !detail) parts.push(<VVal key="tenure" l={l} k="tenure">{s.tenure[l.tenure] + (yrs !== undefined ? ` · ${s.yearsLeft(yrs)}` : '')}</VVal>);
   if (r) parts.push(<VVal key="restriction" l={l} k="restriction">{s.restrictions[r] ?? r}</VVal>);
   const more: JSX.Element[] = [];
   // Change 015: on Subsale List cards storeys and lot type are in the specification lines instead.
   if (!noStoreys && l.floors !== undefined) more.push(<VVal key="floors" l={l} k="floors">{`${l.floors} ${s.l.floors}`}</VVal>);
-  if (!noStoreys && l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType] ?? l.lotType}</span>);
+  // Change 33: on the open property card the lot type sits beside the property type instead.
+  if (!noStoreys && !detail && l.lotType) more.push(<span key="lotType">{s.lotType[l.lotType] ?? l.lotType}</span>);
   if (!parts.length && !more.length) return null;
   return (
     <span className="lc-tenure" data-testid="card-tenure">
@@ -132,7 +134,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const inWorkspace = byCreator(state, 'properties', visible(state, 'properties', state.properties), by);
   const listings = inWorkspace.filter(l => !l.archived);
   const archivedList = inWorkspace.filter(l => l.archived).sort((a, b) => (b.archived?.at ?? 0) - (a.archived?.at ?? 0));
-  const layout: Layout = state.settings.layout === 'large' ? 'large' : 'grid';
+  const layout: Layout = state.settings.layout === 'grid' ? 'grid' : 'large';   // Change 28: Large Cards unless Grid was chosen
   const setLayout = (x: Layout) => store.setSingleton('settings', { layout: x });
   const [f, setF] = useState<Filters>(initial ?? {});
   const [open, setOpen] = useState(false);
@@ -352,26 +354,29 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
           <StoredImage fileId={shownPhoto.fileId} url={shownPhoto.url} />
           <span className="lc-shade" /><span className="lc-badges"><Badges l={l} s={s} /></span>
           {shownPhoto.sample && <span className="lc-sample">{s.samplePic}</span>}
+          {/* Change 32: the hint is written on the photo itself, bottom centre; the tap still opens the viewer. */}
+          {photos.length > 0 && <span className="lc-enlarge" data-testid="detail-enlarge" aria-hidden="true">{cc001Strings[lang].photo.enlarge}</span>}
         </span>
         {photos.length > 1 && (
           <div className="thumbs">{photos.map(p => <button key={p.id} className={p.id === shownPhoto.id ? 'on' : ''} onClick={() => setPhotoId(p.id)} aria-label={p.name}><StoredImage fileId={p.fileId} url={p.url} /></button>)}</div>
         )}
         <div className="lc-body">
           <div className="lc-title big" data-testid="detail-address">{cardTitle(l) || s.untitled}</div>
-          {typeOnly(l, s) && <div className="lc-type">{typeOnly(l, s)}</div>}
+          {/* Change 33: property type and lot type, e.g. "Semi-D factory · Corner" (display only). */}
+          {(typeOnly(l, s) || l.lotType) && <div className="lc-type" data-testid="detail-type">{[typeOnly(l, s), l.lotType && (s.lotType[l.lotType] ?? l.lotType)].filter(Boolean).join(' · ')}</div>}
           <strong className="lc-price big"><PriceLine l={l} s={s} /></strong>
           {l.negotiable && forSale(l) && <span className="badge fit">{s.negotiable[l.negotiable]}</span>}
           <div className="key-facts">
             {[
               ['landSqft', l.landSqft !== undefined ? landText(l.landSqft) : undefined],
-              ['builtUpSqft', l.builtUpSqft !== undefined ? sqft(l.builtUpSqft) : undefined],
-              ['bedrooms', l.bedrooms], ['bathrooms', l.bathrooms], ['parking', l.parking],
+              ['builtUpSqft', l.builtUpSqft !== undefined ? sqft(l.builtUpSqft) : '–'],
               ['tenure', l.tenure && s.tenure[l.tenure] + (yrs !== undefined ? ` · ${s.yearsLeft(yrs)}` : '')],
+              ['bedrooms', l.bedrooms], ['bathrooms', l.bathrooms], ['parking', l.parking],
             ].filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => (
               <div key={k as string} className="kf"><span>{s.kf[k as string]}</span><strong data-testid={k === 'tenure' && yrs !== undefined ? 'years-left' : undefined}><VVal l={l} k={k as string}>{v as string}</VVal></strong></div>
             ))}
           </div>
-          <TenureLine l={l} s={s} />
+          <TenureLine l={l} s={s} detail />
         </div>
       </div>
 
@@ -471,12 +476,12 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
       </SectionCard>
 
       <SectionCard title={s.sec.details} onEdit={edit('details')} editLabel={EL} testId="sec-details-view">
-        {hasAny(l.landSqft, l.builtUpSqft, l.frontageFt, l.depthFt, l.bedrooms, l.bathrooms, l.floors, l.parking, l.lotType, l.furnishing, l.condition, l.maintenanceFee, l.extraComments) ? (
+        {hasAny(l.landSqft, l.builtUpSqft, l.frontageFt, l.depthFt, l.bedrooms, l.bathrooms, l.floors, l.parking, l.furnishing, l.condition, l.maintenanceFee, l.extraComments) ? (
           <dl className="dl">
             {numRow('landSqft', landText)}{numRow('builtUpSqft', sqft)}
             {l.frontageFt !== undefined || l.depthFt !== undefined ? row('frontageFt', `${l.frontageFt ?? '?'} ft × ${l.depthFt ?? '?'} ft`) : null}
             {numRow('bedrooms')}{numRow('bathrooms')}{numRow('floors')}{numRow('parking')}
-            {row('lotType', l.lotType && (s.lotType[l.lotType] ?? l.lotType))}{row('furnishing', l.furnishing && (s.furnishing[l.furnishing] ?? l.furnishing))}
+            {row('furnishing', l.furnishing && (s.furnishing[l.furnishing] ?? l.furnishing))}
             {row('condition', l.condition && (s.condition[l.condition] ?? l.condition))}
             {numRow('maintenanceFee', rm)}
           </dl>
@@ -597,7 +602,14 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
   const t = c15Strings[lang].card;
   const t17 = c1017Strings[lang];
   const label = cardTitle(l) || s.untitled;
-  const p = mainPhoto(l)!;
+  // Change 32: a Large Card's picture swipes through the property's photos (arrows too); a Grid card keeps the main photo.
+  const photos = large ? orderedPhotos(l) : [];
+  const [pi, setPi] = useState(0);
+  const at = photos.length ? Math.min(pi, photos.length - 1) : 0;
+  const p = photos[at] ?? mainPhoto(l)!;
+  const many = photos.length > 1;
+  const swipe = useCardSwipe(many, d => setPi(k => (Math.min(k, photos.length - 1) + d + photos.length) % photos.length));
+  const tp = cc001Strings[lang].photo;
   const tx = transactionLabels(l);
   const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] ?? l.lotType : undefined });
   const { check, missing } = checkAndMissing(l);
@@ -622,13 +634,35 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
           the same action (its click reaches the card's handler). */}
       <article className="sc-card" onClick={onOpen}>
         <button type="button" className="sc-open" data-testid="card-open-area" aria-label={t.openOf(label)} />
-        <span className={`sc-photo ${large ? 'wide' : ''}`}>
-          <StoredImage fileId={p.fileId} url={p.url} />
+        <span className={`sc-photo ${large ? 'wide' : ''} ${many ? 'swipe' : ''}`} data-testid="card-photo" data-index={at} {...(many ? swipe : {})}>
+          <StoredImage key={p.id} fileId={p.fileId} url={p.url} />
+          {many && <>
+            <button type="button" className="sc-arrow prev" data-testid="card-photo-prev" aria-label={tp.prev} title={tp.prev}
+              onClick={e => { e.stopPropagation(); setPi(k => (Math.min(k, photos.length - 1) - 1 + photos.length) % photos.length); }}>‹</button>
+            <button type="button" className="sc-arrow next" data-testid="card-photo-next" aria-label={tp.next} title={tp.next}
+              onClick={e => { e.stopPropagation(); setPi(k => (Math.min(k, photos.length - 1) + 1) % photos.length); }}>›</button>
+            <span className="sc-dots" data-testid="card-photo-dots" aria-hidden="true">{photos.map((x, k) => <i key={x.id} className={k === at ? 'on' : ''} />)}</span>
+          </>}
           {tx.length > 0 && <span className="sc-txs">{tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}</span>}
           {l.status && <span className={`sc-status st-${l.status}`} data-testid="card-status" data-status={l.status}>{s.status[l.status]}</span>}
           {(p.sample || l.sample) && <span className="lc-sample">{p.sample ? s.samplePic : s.sample}</span>}
         </span>
-        <div className="sc-body">
+        {/* Change 28: the small Grid card is just the picture (with its status and For Sale / For Rent labels), the address, the
+            property type, the price and the location button. No edit button: the agent opens the card and edits inside. */}
+        {!large && (
+          <div className="sc-body sc-body-grid">
+            <div className="sc-title" data-testid="card-address">{label}</div>
+            <span className="sc-spec sc-type" data-testid="card-type">{typeOnly(l, s) || '—'}</span>
+            <div className="sc-locrow" data-testid="card-location-row">
+              <strong className="sc-price"><PriceLine l={l} s={s} short /></strong>
+              <button type="button" className={`sc-gear sc-pin ${hasPosition(l) ? '' : 'unset'}`} data-testid="card-location" data-set={hasPosition(l) ? 'yes' : 'no'}
+                aria-label={t17.locationOf(label)} title={t17.locationOf(label)}
+                onClick={e => { e.stopPropagation(); onLocation(); }}><IconPin size={18} /></button>
+              {bubble && <span className="sc-bubble" role="status" data-testid="card-location-bubble">{t17.notSet}</span>}
+            </div>
+          </div>
+        )}
+        {large && <div className="sc-body">
           <div className="sc-head">
             <div className="sc-side">
               <button type="button" className="sc-gear" data-testid="card-edit" aria-label={t.editOf(label)} title={t.edit}
@@ -654,12 +688,53 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
           {large && l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
           {large && owner && <span className="lc-owner">{`${s.owner}: ${owner}`}</span>}
           <CardFoot lang={lang} collection="properties" id={l.id} />
-        </div>
+        </div>}
       </article>
       {menu && <LocationMenu lang={lang} l={l} go={go} onClose={() => setMenu(false)} />}
     </li>
   );
 }
+
+/** Change 32: sideways swipes on a Large Card's picture. Only a clearly horizontal drag counts (touch-action: pan-y leaves
+ *  up and down to the page, so the list still scrolls); a swipe changes the photo and the click that follows it is
+ *  swallowed so the card does not open. A plain tap still opens the card. */
+type SwipePtr = { pointerId: number; clientX: number; clientY: number; target: EventTarget | null };
+function useCardSwipe(on: boolean, step: (d: 1 | -1) => void) {
+  const g = useRef<{ id?: number; x: number; y: number; dx: number; side: boolean; eat: boolean }>({ x: 0, y: 0, dx: 0, side: false, eat: false });
+  const end = () => { g.current.id = undefined; };
+  return {
+    onPointerDown: (e: SwipePtr) => {
+      g.current.eat = false;
+      if (!on || (e.target as Element | null)?.closest?.('button')) { end(); return; }   // an arrow: its own click
+      g.current = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, side: false, eat: false };
+    },
+    onPointerMove: (e: SwipePtr) => {
+      const s0 = g.current;
+      if (s0.id !== e.pointerId) return;
+      const dx = e.clientX - s0.x; const dy = e.clientY - s0.y;
+      s0.dx = dx;
+      if (!s0.side && Math.abs(dx) > CARD_SWIPE_SLOP && Math.abs(dx) > Math.abs(dy) * 1.2) s0.side = true;
+      if (!s0.side && Math.abs(dy) > CARD_SWIPE_SLOP && Math.abs(dy) >= Math.abs(dx)) end();   // the page is scrolling
+    },
+    onPointerUp: (e: SwipePtr) => {
+      const s0 = g.current;
+      if (s0.id !== e.pointerId) return;
+      end();
+      const dx = e.clientX - s0.x;
+      if (s0.side || Math.abs(dx) > CARD_SWIPE_SLOP) {
+        s0.eat = true;   // a drag, not a tap: the card must not open
+        if (Math.abs(dx) >= CARD_SWIPE) step(dx < 0 ? 1 : -1);
+      }
+    },
+    onPointerCancel: end,
+    onClickCapture: (e: { target: EventTarget | null; stopPropagation(): void; preventDefault(): void }) => {
+      if ((e.target as Element | null)?.closest?.('button')) { g.current.eat = false; return; }
+      if (g.current.eat) { g.current.eat = false; e.stopPropagation(); e.preventDefault(); }
+    },
+  };
+}
+const CARD_SWIPE_SLOP = 10;
+const CARD_SWIPE = 40;
 
 /** How long the "Location Not Set" bubble stays (owner, 17 Oct 2026). */
 export const LOCATION_BUBBLE_MS = 1500;

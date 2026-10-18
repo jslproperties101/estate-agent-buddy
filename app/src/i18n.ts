@@ -21,7 +21,7 @@ const en = {
   tiles: {
     agenda: 'Calendar & To‑Do', sales: 'Track My Sales', todo: 'To-Do', calendar: 'Calendar', opportunities: 'Opportunities', property: 'Subsale List', creative: 'Creative Media', matching: 'Buyer Matching',
     vendor: 'Vendor List', buyer: 'Buyer List', gps: 'GPS Assistance', finance: 'Agent Financial',
-    calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'Voice Command',
+    calculator: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', voice: 'AI Assisted Command',
     subsale: 'Subsale', project: 'Project', cobroke: 'Co-broke',
     contacts: 'Contacts', news: 'News', activity: 'Inquiries & Viewings', settings: 'Settings', market: 'Market Intelligence',
   } as Record<string, string>,
@@ -161,7 +161,7 @@ const bm: Strings = {
   tiles: {
     agenda: 'Kalendar & Tugasan', sales: 'Jejak Jualan Saya', todo: 'Tugasan', calendar: 'Kalendar', opportunities: 'Peluang', property: 'Senarai Subsale', creative: 'Media Kreatif', matching: 'Padanan Pembeli',
     vendor: 'Senarai Penjual', buyer: 'Senarai Pembeli', gps: 'Bantuan GPS', finance: 'Kewangan Ejen',
-    calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Suara',
+    calculator: 'Kalkulator Hartanah', profile: 'Profil Ejen', expert: 'Tanya Pakar', voice: 'Arahan Dibantu AI',
     subsale: 'Subsale', project: 'Projek', cobroke: 'Co-broke',
     contacts: 'Kenalan', news: 'Berita', activity: 'Pertanyaan & Lawatan', settings: 'Tetapan', market: 'Risikan Pasaran',
   },
@@ -299,7 +299,7 @@ const zh: Strings = {
   tiles: {
     agenda: '日历与待办', sales: '我的成交追踪', todo: '待办事项', calendar: '日历', opportunities: '商机', property: '二手房列表', creative: '创意媒体', matching: '买家配对',
     vendor: '卖家列表', buyer: '买家列表', gps: 'GPS 助手', finance: '代理财务',
-    calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: '语音指令',
+    calculator: '房产计算器', profile: '经纪人资料', expert: '咨询专家', voice: 'AI 辅助指令',
     subsale: '二手房', project: '新项目', cobroke: '联合代理',
     contacts: '联系人', news: '新闻', activity: '询问与看房', settings: '设置', market: '市场情报',
   },

@@ -38,7 +38,7 @@ test('C15-2 specification order (owner, 17 Oct 2026): type, storeys, corner spac
   const t = text(l);
   assert.match(t[0], /^Terrace.*, 2\.5 Storeys, Corner$/);
   assert.equal(t[1], '4 Bedrooms, 3 Bathrooms');
-  assert.equal(t[2], 'Land 1,650 sq ft, Built-Up 2,200 sq ft');
+  assert.equal(t[2], 'Land size 1,650 sq ft, Built-Up 2,200 sq ft');
   assert.deepEqual(lines[2].parts.map(p => p.k), ['landSqft', 'builtUpSqft']);
   // Each part keeps its field key, so the Change 009 check colour stays on the value.
   assert.deepEqual(lines[0].parts.map(p => p.k), ['type', 'floors', 'lotType']);
@@ -47,7 +47,7 @@ test('C15-2 specification order (owner, 17 Oct 2026): type, storeys, corner spac
 test('C15-3 only real values are shown; empty lines are left out; acres from one acre up', () => {
   assert.deepEqual(text(L({})), []);
   assert.deepEqual(text(L({ bathrooms: 1 })), ['1 Bathroom']);
-  assert.deepEqual(text(L({ floors: 1, landSqft: 87120 })), ['1 Storey', 'Land 2.0 acres']);
+  assert.deepEqual(text(L({ floors: 1, landSqft: 87120 })), ['1 Storey', 'Land size 2.0 acres']);
   assert.deepEqual(text(L({ builtUpSqft: 900 })), ['Built-Up 900 sq ft'], 'built-up alone still has its line');
   const noType = specLines(L({ lotType: 'end' }), { ...en, lotType: 'End lot' });
   assert.deepEqual(noType.map(x => x.parts.map(p => p.text)), [['End lot']]);

@@ -36,7 +36,9 @@ function setReserved(px: number) {
 }
 
 // ---------- the fixed bottom area ----------
-export const BottomAd = memo(function BottomAd({ lang }: { lang: Lang }) {
+/** `cover`: drawn on the start-up screen (Change 42). It shows the same banner but never touches the page's reserved height
+ *  (--ad-h), which belongs to the app shell's own BottomAd, so removing the cover cannot reset it. */
+export const BottomAd = memo(function BottomAd({ lang, cover }: { lang: Lang; cover?: boolean }) {
   const t = c11Strings[lang].ad;
   const hidden = useSyncExternalStore(subscribe, isImmersive);
   const [native, setNative] = useState<'starting' | 'on' | 'off'>(() => (nativeAdsAvailable() ? 'starting' : 'off'));
@@ -49,8 +51,8 @@ export const BottomAd = memo(function BottomAd({ lang }: { lang: Lang }) {
     return () => { alive = false; };
   }, [native]);
   useEffect(() => { if (native === 'on') void setBannerVisible(!hidden); }, [hidden, native]);
-  useEffect(() => { setReserved(hidden ? 0 : height); }, [hidden, height]);
-  useEffect(() => () => setReserved(0), []);
+  useEffect(() => { if (!cover) setReserved(hidden ? 0 : height); }, [hidden, height, cover]);
+  useEffect(() => () => { if (!cover) setReserved(0); }, [cover]);
 
   if (hidden) return null;
   return (

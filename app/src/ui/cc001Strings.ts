@@ -45,6 +45,8 @@ const en = {
     setMain: 'Set as Main Photo', delete: 'Delete', deleteQ: 'Delete this photo?', deleteBody: 'The photo is removed from this property when you save.',
     viewer: 'Photo viewer', close: 'Close', counter: (i: number, n: number) => `${i} / ${n}`, prev: 'Previous photo', next: 'Next photo',
     open: (i: number) => `Open photo ${i} full screen`,
+    // Change 32: written on the property page photo and under the photo in the viewer (kept as typed, not Title Case)
+    enlarge: 'Click to enlarge', slide: 'Slide to next',
   },
   // Change 11: prompts when Booked / Sold / Rented is chosen
   deal: {
@@ -112,6 +114,7 @@ const bm: CC001 = {
     setMain: 'Jadikan Foto Utama', delete: 'Padam', deleteQ: 'Padam foto ini?', deleteBody: 'Foto dibuang daripada hartanah ini apabila anda simpan.',
     viewer: 'Pemapar foto', close: 'Tutup', counter: (i, n) => `${i} / ${n}`, prev: 'Foto sebelumnya', next: 'Foto seterusnya',
     open: i => `Buka foto ${i} skrin penuh`,
+    enlarge: 'Klik untuk besarkan', slide: 'Leret untuk seterusnya',
   },
   deal: {
     bookedQ: 'Isi butiran tempahan sekarang?', bookedBody: 'Hartanah disimpan dahulu, kemudian halaman tempahan dibuka.',
@@ -176,6 +179,7 @@ const zh: CC001 = {
     setMain: '设为主照片', delete: '删除', deleteQ: '删除这张照片？', deleteBody: '保存后，照片会从此房产中移除。',
     viewer: '照片查看器', close: '关闭', counter: (i, n) => `${i} / ${n}`, prev: '上一张', next: '下一张',
     open: i => `全屏打开第 ${i} 张照片`,
+    enlarge: '点击放大', slide: '滑动查看下一张',
   },
   deal: {
     bookedQ: '现在填写预订资料？', bookedBody: '先保存房产，然后打开预订页面。',
