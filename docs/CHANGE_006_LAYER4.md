@@ -24,6 +24,9 @@ Tests: `node --test ops/platform-backup/platform-backup.test.mjs` (P4-1…P4-10)
 `bash supabase/tests/platform-backup-test.sh` (local PostgreSQL: dump → encrypt → restore into a NEW database with each
 key → row counts and content fingerprints equal; tampered file refused). Both run in CI (database job).
 
+Restoring into a NEW project: `database.sql` holds tables, not extensions. JoyChange002 search indexes need `pg_trgm`, so right
+after the dump's `CREATE SCHEMA public;` line add `CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;` (the test does this).
+
 ## 2. Decisions only the owner can make (nothing is assumed)
 1. **Independent storage.** Must be a different company or at least a different account from Supabase and from the
    Google account that holds Drive, with **write-once retention (object lock)** so stolen job credentials cannot delete

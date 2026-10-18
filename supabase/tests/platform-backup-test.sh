@@ -80,7 +80,10 @@ for h in holder1 holder2; do
   node ops/platform-backup/restore-backup.mjs --file "$FILE" --identity "$WORK/keys/$h.private.json" --out "$WORK/restored-$h" >/dev/null 2>&1; check "$h's key opens the backup and every entry checks out" "0" "$?"
   $ROOT -c "create database $NEW;" >/dev/null
   psql -q -d $NEW -c "drop schema public cascade;" >/dev/null 2>&1   # the dump creates it, as on a brand-new project
+  psql -q -d $NEW -c "drop schema public cascade;" >/dev/null 2>&1   # the dump creates it, as on a brand-new project
   psql -d $NEW -q -c "do \$\$ begin create role anon nologin; exception when duplicate_object then null; end \$\$; do \$\$ begin create role authenticated nologin; exception when duplicate_object then null; end \$\$; do \$\$ begin create role service_role nologin; exception when duplicate_object then null; end \$\$;" >/dev/null 2>&1
+  # the dump holds tables, not extensions: right after it creates schema public, enable pg_trgm there (JoyChange002 trigram search indexes need it)
+  sed -i 's/^CREATE SCHEMA public;$/CREATE SCHEMA public;\nCREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;/' "$WORK/restored-$h/database.sql"
   psql -v ON_ERROR_STOP=1 -d $NEW -q -f "$WORK/restored-$h/database.sql" >/dev/null 2>"$WORK/load-$h.err"; RC=$?; [ $RC = 0 ] || head -3 "$WORK/load-$h.err"
   check "dump loads into a NEW database ($NEW)" "0" "$RC"
   check "row counts and content fingerprints match the source ($h)" "$SRCFP" "$(fingerprint $NEW)"
