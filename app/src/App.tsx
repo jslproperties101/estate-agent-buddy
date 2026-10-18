@@ -2,6 +2,8 @@
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ProjectList, ProjectDetail, ProjectForm } from './projects/ProjectUI';
+import { projectStrings } from './projects/strings';
 import { ScreenEntry, newEntryId, forgetEntry, saveScroll, savedScroll } from './ui/screenMemory';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
 import { openBackend } from './data/backend';
@@ -123,7 +125,7 @@ export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] =
   // ClaudeChanges001 change 12: Calendar and To-do in one tile (it asks which), and Track My Sales in the Calendar's place.
   // JoyChange002 Change 43: Project moves to the top-left; Calendar & To-Do takes its old place, bottom-left of the gold row
   // (Calendar & To-Do | Subsale | AI Assisted Command). Nothing else moves.
-  { key: 'project', icon: () => <IconProject />, target: { name: 'comingSoon', key: 'project' } }, // the real Project screen is Batch E
+  { key: 'project', icon: () => <IconProject />, target: { name: 'projects' } },   // JoyChange002: the Project feature
   { key: 'sales', icon: () => <IconSales />, target: { name: 'trackSales' } },
   { key: 'opportunities', icon: () => <IconTrend />, target: { name: 'opportunities' } },
   { key: 'creative', icon: () => <IconCreative />, target: { name: 'creativeMedia' } },
@@ -453,6 +455,9 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'propertyMap': return gs.map;
     case 'banners': return gs.banners;
     case 'finance': return financeStrings[lang].title;
+    case 'projects': return projectStrings[lang].title;
+    case 'projectDetail': return projectStrings[lang].title;
+    case 'projectForm': return s.id ? projectStrings[lang].editTitle : projectStrings[lang].newTitle;
     case 'dealForm': return s.id ? financeStrings[lang].editDeal : financeStrings[lang].newDeal;
     case 'expenseForm': return s.id ? financeStrings[lang].editExpense : financeStrings[lang].newExpense;
     case 'incomeForm': return s.id ? financeStrings[lang].editIncome : financeStrings[lang].newIncome;
@@ -529,6 +534,9 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'propertyMap': return <PropertyMap key={s.id ?? ''} lang={lang} go={go} id={s.id} />;
     case 'banners': return <BannerScreen key={s.propertyId ?? ''} lang={lang} go={go} propertyId={s.propertyId} />;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
+    case 'projects': return <ProjectList lang={lang} go={go} />;
+    case 'projectDetail': return <ProjectDetail lang={lang} id={s.id} go={go} />;
+    case 'projectForm': return <ProjectForm lang={lang} id={s.id} go={go} back={back} />;
     case 'dealForm': return <DealForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} />;
     case 'expenseForm': return <MoneyForm key={s.id ?? 'new-e'} lang={lang} back={back} id={s.id} kind="expense" />;
     case 'incomeForm': return <MoneyForm key={s.id ?? 'new-i'} lang={lang} back={back} id={s.id} kind="income" />;

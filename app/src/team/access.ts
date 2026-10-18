@@ -17,7 +17,7 @@ export type Action =
 /** Kinds of record that can be shared at all. The calculator and everything else stay private. */
 export const SHAREABLE: CollectionName[] = ['properties', 'contacts', 'tasks', 'appointments'];
 /** Kinds of record with a View History section (Change 010 D). */
-export const AUDITED: CollectionName[] = ['properties', 'contacts', 'tasks', 'appointments', 'calculations', 'inquiries', 'deals', 'banners'];
+export const AUDITED: CollectionName[] = ['properties', 'contacts', 'tasks', 'appointments', 'calculations', 'inquiries', 'deals', 'banners', 'projects'];
 
 const BUYER = ['buyer', 'tenant', 'investor'];
 const VENDOR = ['vendor', 'landlord'];

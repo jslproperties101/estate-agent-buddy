@@ -1,4 +1,5 @@
 // Record types for everything the app keeps. The property record (Listing) lives in listing/model.ts.
+import type { Project } from '../projects/model';
 // Every record has an id made on the device, so records created offline never collide when synced later.
 import type { Listing } from '../listing/model';
 import type { Lang } from '../i18n';
@@ -416,10 +417,12 @@ export interface Collections {
   expertThreads: ExpertThread;
   banners: Banner;
   calculations: Calculation;
+  /** JoyChange002: new developments (projects/model.ts). */
+  projects: Project;
 }
 export type CollectionName = keyof Collections;
 export const COLLECTIONS: CollectionName[] = [
-  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners', 'calculations',
+  'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners', 'calculations', 'projects',
 ];
 
 export interface Singletons { profile: Profile; settings: Settings; options: OptionLists; meta: Meta }

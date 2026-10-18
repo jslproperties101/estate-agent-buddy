@@ -1243,3 +1243,23 @@ button.sync-banner { cursor: pointer; }
 .match-pickers { padding-top: 4px; }
 .mp-best { color: var(--ok); font-weight: 700; }
 .mp-new-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--gold-hi); font-size: 22px; font-weight: 800; }
+
+/* ---------- JoyChange002: Projects ---------- */
+.project-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.project-card { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; color: var(--ink); cursor: pointer; }
+.pc-name, .pd-name { font-family: 'Noto Serif', Georgia, serif; font-size: 18px; overflow-wrap: anywhere; }
+.pd-name { font-size: 20px; margin: 0; }
+.pc-price { color: var(--gold-hi); font-weight: 800; }
+.pj-st { white-space: nowrap; }
+.pj-upcoming { background: #1E2A3A; color: var(--blue); }
+.pj-launched, .pj-selling { background: #1F8A4C; color: #fff; }
+.pj-sold_out { background: #5A1E18; color: #FFB4A8; }
+.pj-completed { background: #2A2A30; color: var(--muted); }
+.unit-type, .unit-edit { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.booking-row { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--card-2); color: var(--ink); }
+.bk-st { font-size: 14px; }
+.bk-booked, .bk-pending_loan { background: #3A2A12; color: var(--amber); }
+.bk-spa_signed { background: #1F8A4C; color: #fff; }
+.bk-reserved { background: #1E2A3A; color: var(--blue); }
+.bk-cancelled { background: #2A2A30; color: var(--muted); text-decoration: line-through; }
+.booking-row.bk-cancelled { opacity: .7; }

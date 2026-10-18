@@ -14,7 +14,7 @@ export const newId = () =>
 export function emptyState(): AppState {
   return {
     properties: [], contacts: [], inquiries: [], appointments: [], tasks: [], journeys: [],
-    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [], calculations: [],
+    deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [], calculations: [], projects: [],
     profile: {},
     settings: { lang: 'en', layout: 'large' }, // Change 28: Large Cards on a first install; afterwards the last choice is kept
     options: {},

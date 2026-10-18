@@ -29,6 +29,10 @@ export type Screen =
   | { name: 'propertyMap'; id?: string }
   | { name: 'banners'; propertyId?: string }
   | { name: 'finance' }
+  // JoyChange002: the Project feature (new developments)
+  | { name: 'projects' }
+  | { name: 'projectDetail'; id: string }
+  | { name: 'projectForm'; id?: string }
   | { name: 'dealForm'; id?: string; propertyId?: string }
   | { name: 'expenseForm'; id?: string }
   | { name: 'incomeForm'; id?: string }

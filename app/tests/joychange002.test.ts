@@ -162,3 +162,32 @@ test('J50-2 contacts by name or phone, best first; phone numbers match in any fo
   assert.deepEqual(rankContacts('call 0128887777', cs).map(r => r.item.id), ['a']);
   assert.deepEqual(rankContacts('nobody', cs), []);
 });
+
+// ---------- Batch E: the Project feature ----------
+import { priceRange, unitCounts, unitTaken, bookingCommission, type Project } from '../src/projects/model';
+import { projectStrings } from '../src/projects/strings';
+import { COLLECTIONS } from '../src/data/types';
+
+test('JP-1 project prices, unit counts, double booking and commission', () => {
+  const p = { id: 'p', created: 1, updated: 1, name: 'X', status: 'selling', commissionPct: 3,
+    unitTypes: [{ id: 'a', name: 'A', priceFrom: 480000, priceTo: 520000, units: 40 }, { id: 'b', name: 'B', priceFrom: 650000, units: 8 }, { id: 'c', name: 'C' }],
+    bookings: [{ id: '1', unitTypeId: 'a', unitNo: 'A-12', status: 'booked', price: 500000 }, { id: '2', unitTypeId: 'a', unitNo: 'A-13', status: 'cancelled' }, { id: '3', unitTypeId: 'b', unitNo: 'B-1', status: 'spa_signed' }],
+  } as Project;
+  assert.deepEqual(priceRange(p), { from: 480000, to: 650000 });
+  const c = unitCounts(p);
+  assert.deepEqual([c.total, c.booked, c.left], [48, 2, 46], 'a cancelled booking does not hold a unit');
+  assert.deepEqual(c.byType.a, { total: 40, booked: 1, left: 39 });
+  assert.deepEqual(c.byType.c, { total: undefined, booked: 0 }, 'units not given: nothing left is claimed');
+  assert.ok(unitTaken(p, ' a-12 '), 'unit numbers compare without case or spaces');
+  assert.ok(!unitTaken(p, 'A-13'), 'a cancelled unit can be booked again');
+  assert.ok(!unitTaken(p, 'A-12', '1'), 'the booking itself does not count');
+  assert.equal(bookingCommission(p, p.bookings[0]), 15000);
+  assert.equal(bookingCommission(p, p.bookings[1]), undefined);
+  assert.deepEqual(priceRange({ unitTypes: [] }), { from: undefined, to: undefined });
+  assert.ok(COLLECTIONS.includes('projects'), 'projects sync and back up like other records');
+  for (const lang of ['en', 'bm', 'zh'] as const) {
+    const s = projectStrings[lang];
+    assert.equal(Object.keys(s.status).length, 5); assert.equal(Object.keys(s.booking).length, 5);
+    assert.ok(s.title && s.add && s.b.taken && s.u.add, lang);
+  }
+});

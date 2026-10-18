@@ -28,6 +28,7 @@
 // each file's header and in Index.csv, never from a folder name. Two items that would get the same name in one folder:
 // the later one (by creation, then id) gets " [first 8 characters of its id]".
 import type { AppState, Appointment, CollectionName, Contact, Deal, ExpertThread, Expense, Income, Inquiry, Journey, Target, Task, Calculation, Banner } from '../data/types';
+import type { Project } from '../projects/model';
 import { BUYER_ROLES, VENDOR_ROLES } from '../data/types';
 import { Listing, orderedPhotos, unitLot } from '../listing/model';
 import { fieldLabel } from '../sync/SyncUI';
@@ -60,7 +61,7 @@ const photosN = (n: number) => `${n} photo${n === 1 ? '' : 's'}`;
 const DOC_FOLDER: Record<string, string> = { brochure: 'Brochures and Floor Plans', floorplan: 'Brochures and Floor Plans', other: 'Other', title: 'Property Title', correspondence: 'Owner Correspondence', transaction: 'Agreements' };
 const MOD = {
   props: 'Property Listing', todo: 'To-Do', cal: 'Calendar', contacts: 'Contacts', inq: 'Inquiries and Viewings', gps: 'GPS Assistance',
-  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings',
+  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings', projects: 'Projects',
 };
 /** Settings fields that are never written to Drive (keys and addresses). */
 const SECRET_SETTINGS = new Set(['mapsApiKey', 'supabaseUrl', 'supabaseAnonKey', 'expertApiUrl']);
@@ -228,6 +229,8 @@ export function buildTree(state: AppState, opts: TreeOptions = {}): TreeEntry[] 
   if (incomes.length) add({ key: 'finance:incomes', group: 'finance', path: [MOD.fin], name: 'Income.csv', mime: 'text/csv', text: csv(['id', 'date', 'source', 'amount_rm', 'note'], incomes.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map(e => [e.id, e.date, e.source, e.amount, e.note])), waiting: fin('incomes', incomes) });
   if (targets.length) add({ key: 'finance:targets', group: 'finance', path: [MOD.fin], name: 'Targets.txt', mime: 'text/plain', text: textDoc('Targets', undefined, undefined, targets.slice().sort((a, b) => (a.key < b.key ? -1 : 1)).map(t => [`${t.period === 'year' ? 'Year' : 'Month'} ${t.key}`, `RM ${t.amount}`] as [string, string])), waiting: fin('targets', targets) });
 
+  perRecord('projects', mine('projects', state.projects) as Project[], [MOD.projects], p => p.name || 'Project', 'Project',
+    p => `Unit types:\n${p.unitTypes.map(u => `- ${u.name}${u.priceFrom !== undefined ? ` RM ${u.priceFrom}` : ''}${u.priceTo !== undefined ? ` to RM ${u.priceTo}` : ''}${u.units !== undefined ? `, ${u.units} units` : ''}`).join('\n')}\nBookings:\n${p.bookings.map(b => `- ${b.unitNo} ${b.status}${b.buyerName ? ` ${b.buyerName}` : ''}${b.bookedOn ? ` ${b.bookedOn}` : ''}`).join('\n')}\n`);
   perRecord('calculations', mine('calculations', state.calculations) as Calculation[], [MOD.calc], c => `${c.title || c.kind} ${mytIso(c.created).slice(0, 10)}`, 'Saved Calculation');
   perRecord('expertThreads', mine('expertThreads', state.expertThreads) as ExpertThread[], [MOD.expert], t => `${t.expert} - ${t.question.slice(0, 50)}`, 'Ask Expert', t => `Messages:\n${t.messages.map(m => `- ${mytIso(m.at)} ${m.from}: ${indent(m.text)}`).join('\n')}\n`);
 

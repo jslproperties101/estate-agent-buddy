@@ -992,10 +992,11 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await page.context().close();
 });
 
-test('U25 Project and Market Intelligence still say they are not built yet (no Coming Soon label on their cards since Change 011)', async () => {
+test('U25 Market Intelligence still says it is not built yet; Project is built (JoyChange002) and opens its list', async () => {
   const page = await phone();
   await tile(page, 'Project');
-  assert.match(await page.getByTestId('soon-project').innerText(), /not built yet/i);
+  await page.getByTestId('projects').waitFor();
+  assert.match(await page.getByTestId('projects-empty').innerText(), /No projects yet/i);
   await home(page);
   await tile(page, 'Market Intelligence');
   assert.match(await page.getByTestId('soon-market').innerText(), /Nothing here is live/i);
@@ -1455,6 +1456,72 @@ test('U124 JoyChange002 Batch D: AI Assisted Command is minimal (48); speech wai
   assert.match(await page.locator('header h1').innerText(), /Edit property/i, 'the existing property opens in its form (nothing saved yet)');
   assert.ok(await page.getByTestId('review-banner').count(), 'the words to check are marked in the form');
   await ctx.close();
+});
+
+test('U125 JoyChange002 Project: add a development with two unit types and prices; book units (a unit cannot be booked twice); counts, price range and commission show; edit and delete', async () => {
+  const page = await phone();
+  await loadSample(page);
+  await tile(page, 'Project');
+  await page.getByTestId('project-add').click();
+  await page.getByTestId('project-save').click();
+  assert.match(await page.getByTestId('project-name-error').innerText(), /project name/i, 'a name is needed');
+  await page.locator('[data-field="projectName"]').fill('Taman Seri Baiduri Fasa 2');
+  await page.locator('[data-field="developer"]').fill('Baiduri Land Sdn Bhd');
+  await page.locator('[data-field="city"]').fill('Nilai');
+  await page.locator('[data-field="projectStatus"]').selectOption('selling');
+  await page.locator('[data-field="commissionPct"]').fill('3');
+  for (const [name, from, to, units] of [['Type A (22 x 75)', '480000', '520000', '40'], ['Type B corner', '650000', '', '8']]) {
+    await page.getByTestId('unit-add').click();
+    const u = page.getByTestId('unit-edit').last();
+    await u.locator('[data-field="unitName"]').fill(name);
+    await u.locator('[data-field="unitLayout"]').selectOption('Terrace house');
+    await u.locator('[data-field="unitPriceFrom"]').fill(from);
+    if (to) await u.locator('[data-field="unitPriceTo"]').fill(to);
+    await u.locator('[data-field="unitCount"]').fill(units);
+  }
+  await page.getByTestId('project-save').click();
+  await page.getByTestId('project-detail').waitFor();
+  await waitStored(page, 'records', `all.some(v => v && v.name === 'Taman Seri Baiduri Fasa 2' && v.unitTypes && v.unitTypes.length === 2)`);
+  assert.match(await page.getByTestId('project-detail').innerText(), /RM 480,000 – RM 650,000[\s\S]*0 of 48 units booked · 48 left/i);
+  // Book a unit with a saved buyer, then try the same unit again.
+  const book = async (unitNo, type, price) => {
+    await page.getByTestId('booking-add').click();
+    const ed = page.getByTestId('booking-editor');
+    await ed.locator('[data-field="unitTypeId"]').selectOption({ label: type });
+    await ed.locator('[data-field="unitNo"]').fill(unitNo);
+    await ed.locator('[data-field="bookingStatus"]').selectOption('pending_loan');
+    if (price) await ed.locator('[data-field="bookingPrice"]').fill(price);
+    await ed.getByTestId('booking-save').click();
+  };
+  await book('A-12', 'Type A (22 x 75)', '500000');
+  await page.getByTestId('booking-editor').waitFor({ state: 'detached' });
+  assert.match(await page.getByTestId('booking-row').innerText(), /A-12 · Type A[\s\S]*Booked - Pending Loan[\s\S]*Your commission: RM 15,000/i);
+  await book('a-12', 'Type A (22 x 75)');
+  assert.match(await page.getByTestId('booking-error').innerText(), /already booked/i, 'the same unit cannot be booked twice');
+  await page.getByTestId('booking-editor').getByRole('button', { name: 'Cancel' }).click();
+  assert.match(await page.getByTestId('project-detail').innerText(), /1 of 48 units booked · 47 left/);
+  assert.match(await page.getByTestId('unit-type').first().innerText(), /1 of 40 units booked · 39 left/);
+  // Cancelling the booking frees the unit.
+  await page.getByTestId('booking-row').click();
+  await page.getByTestId('booking-editor').locator('[data-field="bookingStatus"]').selectOption('cancelled');
+  await page.getByTestId('booking-save').click();
+  assert.match(await page.getByTestId('project-detail').innerText(), /0 of 48 units booked/);
+  // The list shows it; edit keeps the bookings; delete asks first.
+  await home(page); await tile(page, 'Project');
+  const card = page.getByTestId('project-card').first();
+  assert.match(await card.innerText(), /Taman Seri Baiduri Fasa 2[\s\S]*Selling[\s\S]*Baiduri Land Sdn Bhd · Nilai[\s\S]*RM 480,000 – RM 650,000/i);
+  await card.click(); await page.getByTestId('project-edit').click();
+  await page.locator('[data-field="developer"]').fill('Baiduri Land Berhad');
+  await page.getByTestId('project-save').click(); await page.getByTestId('project-detail').waitFor();
+  assert.equal(await page.getByTestId('booking-row').count(), 1, 'bookings kept after editing the project');
+  assert.deepEqual(await layoutProblems(page), [], 'the project page fits the phone');
+  for (const lang of [{ hasText: 'BM' }, { hasText: '中文' }]) { await pickLang(page, lang); assert.deepEqual(await layoutProblems(page), [], 'and fits in BM and Chinese'); }
+  await pickLang(page, { hasText: 'EN' });
+  await page.getByTestId('project-delete').click();
+  await page.locator('.scrim .dialog').getByRole('button', { name: 'Delete project' }).click();
+  await page.getByTestId('projects').waitFor();
+  assert.equal(await page.getByTestId('project-card').count(), 0);
+  await page.context().close();
 });
 
 test('U33 phone book: Send Name Card picker fills editable name and number; refusals and missing support are explained, never silent', async () => {
