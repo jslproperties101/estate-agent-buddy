@@ -12,7 +12,7 @@
 // properties, explains what would go with it (listing/optionEdit.ts) and offers Edit / Rename instead. A field whose
 // value is already saved is locked: it opens only with its pencil, and its X asks before emptying it. A value chosen in
 // this visit stays open and its X empties it at once.
-import { ReactNode, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { strings, Lang } from '../i18n';
 import { ChoiceDialog, Confirm } from './common';
@@ -24,11 +24,10 @@ import { countBelow, propertiesUsing, optionsAfterDelete, optionsAfterRename, re
 
 export interface Choice { value: string; label?: string }
 
-export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, help, savedValue }: {
+export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, savedValue }: {
   lang: Lang; label: string; listKey: string; builtIns: Choice[]; value?: string; onChange: (v: string | undefined) => void;
   allowEmpty?: boolean; emptyLabel?: string; testId?: string; hint?: string;
   /** A Field Help "?" shown after the label. */
-  help?: ReactNode;
   /** Applied to a typed value before it is checked and saved (for example upper case for prefixes). */
   normalise?: (v: string) => string;
   /** Returns an error message for a typed value that cannot be used. */
@@ -113,7 +112,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
 
   return (
     <div className="ff opt" data-testid={testId}>
-      <span><span id={`${id}-l`}>{label}</span>{help}</span>
+      <span><span id={`${id}-l`}>{label}</span></span>
       <div className={`opt-field ${locked ? 'locked' : ''}`}>
         <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} aria-disabled={locked || undefined}
           data-locked={locked ? 'yes' : undefined} onClick={() => { if (!locked) setOpen(o => !o); }}>

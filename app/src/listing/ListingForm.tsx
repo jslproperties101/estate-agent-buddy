@@ -2,7 +2,6 @@
 // then the remaining property information, 5 Documents at the end. Every section can be opened and closed (closed at
 // first, owner 13 Oct 2026); a floating Save works from anywhere. Opening it with a section (from the Edit button of
 // a detail card) opens and scrolls to that section. Every input has data-field so voice can fill it for review.
-// Fields that may not be obvious have a "?" (ui/FieldHelp).
 // ClaudeChanges001 (owner, 17 Oct 2026): section 1 is "Basic Info and Availability" (ID, Availability, Property Type, Sale
 // or Rent, Arrangement); Status is merged into Availability and the Availability and Condition / Listing Arrangement and
 // Status sections are gone (Condition moved to Property Details, Special Features deleted). Choosing Booked, Sold or
@@ -39,7 +38,6 @@ import { COUNTRIES, DEFAULT_COUNTRY, MY_STATES, citiesFor, townshipsFor } from '
 import { LocationPicker, LocationResult } from '../maps/LocationPicker';
 import { c15Strings } from '../ui/c015Strings';
 import { makeMainPhoto, removePhoto } from './change015';
-import { FieldHelp } from '../ui/FieldHelp';
 import { ContactBox, ContactValue, aliasValue } from '../ui/ContactBox';
 import type { PickedContact } from '../lib/phonebook';
 import type { Contact } from '../data/types';
@@ -209,7 +207,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   // Called as functions (not components) so inputs keep focus while typing.
   const Text = ({ k, numeric, area, hint, money }: { k: keyof Listing; numeric?: boolean; area?: boolean; hint?: string; money?: boolean }) => withVp(k as string, (
     <label className="ff" key={k}>
-      <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
+      <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
       {money ? <MoneyInput data-field={k as string} value={d[k] as number | undefined} onChange={n => set(k, n as never)} /> : area
         ? <textarea data-field={k} rows={3} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)} />
         : <input data-field={k} inputMode={numeric ? 'decimal' : undefined} placeholder={hint}
@@ -219,7 +217,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   ));
   const Select = ({ k, options, labels }: { k: keyof Listing; options: readonly string[]; labels?: Record<string, string> }) => withVp(k as string, (
     <label className="ff" key={k}>
-      <span className="between"><span>{s.l[k as string]}<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} /></span>{fromWords(k)}</span>
+      <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
       <select data-field={k} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)}>
         <option value="">{s.notSet}</option>
         {options.map(o => <option key={o} value={o}>{labels ? labels[o] : o}</option>)}
@@ -229,7 +227,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const Opt = ({ k, listKey, builtIns, labels, onPick }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void }) => withVp(k as string, (
     <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
       builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined} savedValue={initial?.[k] as string | undefined}
-      onChange={v => (onPick ? onPick(v) : set(k, v as never))} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
+      onChange={v => (onPick ? onPick(v) : set(k, v as never))} />
   ));
   /** Change 5: one level of the location chain. Its remembered options are the ones saved under the level above; choosing
    *  a different value clears every level below it. */
@@ -512,12 +510,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       {/* 1. Basic Info and Availability (ClaudeChanges001): ID, Availability, Property Type, Sale or Rent, Arrangement. */}
       <Sec id="basics" title={`1 · ${s.sec.basics}`} testId="sec-basics-form" {...secProps('basics')}>
         <div className="ref-row">
-          <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false} help={<FieldHelp lang={lang} topic="refPrefix" label={s.l.refPrefix} />}
+          <OptionSelect lang={lang} label={s.l.refPrefix} listKey="refPrefix" testId="ref-prefix" allowEmpty={false}
             builtIns={BUILTIN_PREFIXES.map(v => ({ value: v }))} value={d.refPrefix}
             normalise={v => v.trim().toUpperCase()} validate={v => (checkPrefix(v) ? s.refProblem.invalidPrefix : null)}
             onChange={v => { if (v) { setD(p => ({ ...p, refPrefix: v.toUpperCase() })); setRefErr(null); } }} />
           <div className="ff">
-            <span><label htmlFor="ref-no-input">{s.l.refNo}</label><FieldHelp lang={lang} topic="refNo" label={s.l.refNo} /></span>
+            <span><label htmlFor="ref-no-input">{s.l.refNo}</label></span>
             <div className="combo">
               <input id="ref-no-input" data-field="refNo" inputMode="numeric" aria-invalid={!!(refErr || refProblem)} value={refNoText}
                 onChange={e => { setRefNoText(e.target.value.replace(/\D/g, '')); setRefErr(null); }} />
@@ -553,7 +551,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         )}
         {/* Change 8 / 10: Availability, with Status merged into it, no check status. */}
         <label className="ff">
-          <span>{x1.avail.label}<FieldHelp lang={lang} topic="availability" label={x1.avail.label} /></span>
+          <span>{x1.avail.label}</span>
           <select data-field="availability" value={availChoice(d) ?? ''} onChange={e => {
             const v = (e.target.value || undefined) as AvailChoice | undefined;
             setD(prev => ({ ...prev, ...availPatch(v, prev.availableFrom), filledFrom: { ...(prev.filledFrom ?? {}), availability: 'typed', status: 'typed' } }));
@@ -575,7 +573,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Select({ k: 'purpose', options: PURPOSES, labels: s.purpose })}
         {/* Change 10: Co-broke or Direct; for Co-broke the other agent's name, agency and contact. */}
         <label className="ff">
-          <span>{s.l.arrangement}<FieldHelp lang={lang} topic="arrangement" label={s.l.arrangement} /></span>
+          <span>{s.l.arrangement}</span>
           <select data-field="arrangement" value={d.arrangement === 'cobroke' || d.arrangement === 'direct' ? d.arrangement : ''}
             onChange={e => set('arrangement', (e.target.value || undefined) as Listing['arrangement'])}>
             <option value="">{s.notSet}</option>
@@ -624,7 +622,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           </label>
           {(d.rentCommissionType ?? 'months') === 'months' ? withVp('rentCommissionMonths', (
             <div className="ff" key="rentCommissionMonths">
-              <label htmlFor="rent-months">{s.l.rentCommissionMonths}<FieldHelp lang={lang} topic="commissionPct" label={s.l.rentCommissionMonths} /></label>
+              <label htmlFor="rent-months">{s.l.rentCommissionMonths}</label>
               <select id="rent-months" data-field="rentCommissionMonths" value={monthsCustom ? 'custom' : d.rentCommissionMonths ?? ''}
                 onChange={e => {
                   if (e.target.value === 'custom') { setMonthsCustom(true); return; }
@@ -669,7 +667,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {Loc('neighborhood', [])}
         {Loc('street', [])}
         {Text({ k: 'unitNo' })}
-        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button><FieldHelp lang={lang} topic="location" label={s.sec.location} /></div>
+        <div className="between"><button className="btn primary gmap-btn grow" onClick={() => setPicker(true)} data-testid="gmap-add">📍 {s.n9.addLocation}</button></div>
         <p className={`small ${hasPosition(d) ? 'ok-text' : 'muted'}`} data-testid="pos-text">{hasPosition(d) ? `✓ ${s.n9.locationSaved}${d.geoSource ? ` (${s.geoSource[d.geoSource]})` : ''}` : s.n9.noLocation}</p>
         {/* Change 015: no "Use my current location" here; Remove Position works as before. */}
         <button className="btn secondary" data-testid="remove-position" onClick={() => setD(prev => ({ ...prev, lat: undefined, lng: undefined, geoSource: undefined, placeId: undefined, geoAccuracy: undefined }))} disabled={!hasPosition(d)}>{s.clearPosition}</button>
@@ -759,7 +757,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
 
       <Sec id="owner" title={s.sec.owner} testId="sec-owner" {...secProps('owner')}>
         {/* Change 9: the saved contacts in one searchable list (name or number). */}
-        <ContactPick lang={lang} label={s.l.vendorId} help={<FieldHelp lang={lang} topic="vendorId" label={s.l.vendorId} />} contacts={vendors}
+        <ContactPick lang={lang} label={s.l.vendorId} contacts={vendors}
           value={d.vendorId} noneLabel={x1.vendorNone} onChange={v => set('vendorId', v)} testId="vendor-pick" field="vendorId" />
         {linked ? <small className="muted">{s.vendorLinked}{linked.phone ? ` ${linked.phone}` : ''}{linked.whatsapp ? ` · ${linked.whatsapp}` : ''}</small> : <>
           <ContactBox lang={lang} idPrefix="owner" fields={{ name: 'ownerName', phone: 'ownerPhone', whatsapp: 'ownerWhatsapp' }} contacts={state.contacts.filter(x => x.roles.some(r => r === 'vendor' || r === 'landlord'))}

@@ -1,7 +1,7 @@
 // A saved-contact dropdown with a search box (ClaudeChanges001 change 9): the agent finds a person by name or by phone
 // number (digits anywhere in the number). Used for the property's Linked Vendor. The list opens inside the page, like
 // OptionSelect, so long names wrap instead of being cut.
-import { ReactNode, useId, useState } from 'react';
+import { useId, useState } from 'react';
 import type { Lang } from '../i18n';
 import { strings } from '../i18n';
 import type { Contact } from '../data/types';
@@ -18,8 +18,8 @@ export function searchContacts(list: Contact[], q: string): Contact[] {
   return list.filter(c => norm(c.name ?? '').includes(n) || (d.length >= 2 && digits(c.phone).includes(d)) || norm(c.whatsapp ?? '').includes(n));
 }
 
-export function ContactPick({ lang, label, help, contacts, value, onChange, noneLabel, testId, field }: {
-  lang: Lang; label: string; help?: ReactNode; contacts: Contact[]; value?: string; onChange: (id: string | undefined) => void;
+export function ContactPick({ lang, label, contacts, value, onChange, noneLabel, testId, field }: {
+  lang: Lang; label: string; contacts: Contact[]; value?: string; onChange: (id: string | undefined) => void;
   noneLabel: string; testId?: string; field?: string;
 }) {
   const c = strings[lang].c;
@@ -32,7 +32,7 @@ export function ContactPick({ lang, label, help, contacts, value, onChange, none
   const pick = (v?: string) => { onChange(v); setOpen(false); setQ(''); };
   return (
     <div className="ff opt" data-testid={testId} data-field={field} data-value={value ?? ''}>
-      <span><span id={`${id}-l`}>{label}</span>{help}</span>
+      <span><span id={`${id}-l`}>{label}</span></span>
       <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}>
         <span id={`${id}-v`} className={cur ? '' : 'muted'}>{cur ? cur.name : noneLabel}</span><span aria-hidden="true" className="opt-caret">▾</span>
       </button>

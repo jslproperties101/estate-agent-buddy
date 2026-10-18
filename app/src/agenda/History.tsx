@@ -33,13 +33,14 @@ export function InquiryHistory({ lang, go, propertyId, contactId, plain }: { lan
 
   const body = (
     <>
+      {/* Change 86 (JoyChange003): the gold add button is the first thing on the screen. */}
+      <button className="btn primary add-property" data-testid="inquiry-add" onClick={() => go({ name: 'inquiryForm', propertyId, contactId })}>{a.inq.add}</button>
       {!plain && <small className="muted">{a.inq.help}</small>}
       {list.length === 0 ? <Empty>{a.inq.none}</Empty> : (
         <ul className="act-list" data-testid="inquiry-list">
           {list.map(i => <InquiryItem key={i.id} lang={lang} i={i} go={go} showProperty={!propertyId} onConvert={() => convert(i)} />)}
         </ul>
       )}
-      <button className="btn secondary" onClick={() => go({ name: 'inquiryForm', propertyId, contactId })}>{a.inq.add}</button>
     </>
   );
   if (plain) return <div className="stack-sm" data-testid="inquiry-history">{body}</div>;
@@ -81,13 +82,13 @@ export function ViewingHistory({ lang, go, propertyId, contactId, plain }: { lan
     .sort((x, y) => ((x.start ?? '9999') < (y.start ?? '9999') ? 1 : -1));
   const body = (
     <>
+      <button className="btn primary add-property" data-testid="viewing-add" onClick={() => go({ name: 'apptForm', kind: 'viewing', propertyId, contactId })}>{a.view.add}</button>
       {!plain && <small className="muted">{a.view.flow}</small>}
       {list.length === 0 ? <Empty>{a.view.none}</Empty> : (
         <ul className="act-list" data-testid="viewing-list">
           {list.map(v => <ViewingItem key={v.id} lang={lang} v={v} go={go} showProperty={!propertyId} />)}
         </ul>
       )}
-      <button className="btn secondary" onClick={() => go({ name: 'apptForm', kind: 'viewing', propertyId, contactId })}>{a.view.add}</button>
     </>
   );
   if (plain) return <div className="stack-sm" data-testid="viewing-history">{body}</div>;

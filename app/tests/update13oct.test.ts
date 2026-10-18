@@ -9,7 +9,6 @@ import { FakeCloud, cfg } from './support/fakeCloud';
 import { sampleData, loadSampleInto, isSampleKey, isEmptyWorkspace } from '../src/data/sample';
 import { missingProfile, REQUIRED_PROFILE, shareText, DEFAULT_SHARE } from '../src/domain/namecard';
 import { fromNative } from '../src/lib/phonebook';
-import { HELP } from '../src/ui/help';
 import { VENDOR_STATUSES } from '../src/data/types';
 
 test('N1 name card: required details are full name, registration type and number, agency and a full phone number', () => {
@@ -67,9 +66,3 @@ test('N4 phone book: name and first number read from the Android plugin, whichev
   assert.equal(fromNative(undefined), null);
 });
 
-test('N5 field help: every topic has what / enter in all three languages', () => {
-  for (const [k, topic] of Object.entries(HELP)) for (const l of ['en', 'bm', 'zh'] as const) {
-    assert.ok(topic[l]?.what && topic[l]?.enter, `${k} ${l}`);
-  }
-  assert.ok(Object.keys(HELP).length >= 25);
-});

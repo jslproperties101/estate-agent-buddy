@@ -10,6 +10,7 @@
   --card-2: #1B1B1F;
   --line: #2E2A22;
   --line-2: #4A4231;
+  --box-line: #D8B95C;   /* Change 73/83/85/87 (JoyChange003): the light gold border of every grouped box and card */
   --ink: #F7F4EC;
   --muted: #BEB7A6;
   --gold: #D4AF37;
@@ -83,6 +84,9 @@ small, .small { font-size: 14px; }
 
 .content { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch;
   padding: 14px max(14px, env(safe-area-inset-right, 0px)) 16px max(14px, env(safe-area-inset-left, 0px)); min-width: 0; }
+/* Change 74 (JoyChange003): menu and list screens start their first content about 10% of the screen height below the title bar.
+   Forms, photo viewers, maps, the home screen and the AI command page keep their own spacing. */
+.content:is([data-screen="notifications"], [data-screen="contactsHome"], [data-screen="opportunities"], [data-screen="listing"], [data-screen="contacts"], [data-screen="activity"], [data-screen="todo"], [data-screen="calendar"], [data-screen="gps"], [data-screen="houseShopping"], [data-screen="banners"], [data-screen="finance"], [data-screen="projects"], [data-screen="adTracker"], [data-screen="adSummary"], [data-screen="profile"], [data-screen="settings"], [data-screen="recentlyDeleted"], [data-screen="history"], [data-screen="expert"], [data-screen="cobroke"], [data-screen="creativeMedia"], [data-screen="buyerHistory"], [data-screen="team"], [data-screen="manageSharing"], [data-screen="exports"], [data-screen="trackSales"]) { padding-top: calc(14px + 10dvh); }
 /* A page with the floating Save keeps room so its last field can scroll clear of the Save bar. */
 .content:has(.save-bar.floating) { padding-bottom: 110px; }
 .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -94,8 +98,8 @@ small, .small { font-size: 14px; }
 .two > *, .filter-grid > *, .fin-grid > * { min-width: 0; }
 .empty { padding: 4px 0; }
 
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; min-width: 0; }
-.sub-card { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; }
+.card { background: var(--card); border: 1px solid var(--box-line); border-radius: 16px; padding: 14px; min-width: 0; }
+.sub-card { background: var(--card-2); border: 1px solid var(--box-line); border-radius: 12px; padding: 10px; min-width: 0; }
 .card-title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-weight: 700; color: var(--gold-hi); }
 .badge { font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 12px; background: #2A2312; color: var(--gold-hi); border: 1px solid var(--line-2); }
 .badge.light { background: var(--gold-grad); color: var(--on-gold); border: 0; }
@@ -129,13 +133,16 @@ small, .small { font-size: 14px; }
 .btn.big { min-height: 60px; font-size: 18px; }
 .btn:disabled, .btn.disabled { background: #222226; color: #8F897C; border-color: #2A2A2E; box-shadow: none; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--gold-hi); font-weight: 700; text-align: left; min-height: 32px; }
-.link-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: transparent; border: 0; border-top: 1px solid var(--line); color: var(--gold-hi); font-weight: 700; min-height: 48px; padding: 8px 0; text-align: left; width: 100%; }
-.link-row:first-of-type { border-top: 0; }
+/* Change 87 (JoyChange003): every list entry is its own light gold bordered card with a gap between cards. */
+.link-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; background: var(--card-2); border: 1px solid var(--box-line); border-radius: 12px; color: var(--gold-hi); font-weight: 700; min-height: 48px; padding: 10px 12px; text-align: left; width: 100%; margin-top: 10px; }
+.link-row:first-of-type { margin-top: 0; }
 .link-row.on { color: var(--ink); }
 .link-row .between { width: 100%; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip-btn { min-height: 44px; padding: 4px 12px; border-radius: 22px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; text-align: left; }
 .chip-btn[aria-pressed="true"], .chip-btn.on, .chip-btn[aria-checked="true"] { background: var(--gold-grad); color: var(--on-gold); border-color: #B8902B; }
+.chip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.chip-grid .chip-btn { justify-content: center; text-align: center; padding: 4px 6px; gap: 4px; font-size: 14px; flex-wrap: wrap; min-width: 0; }
 .check { display: flex; gap: 10px; align-items: center; min-height: 44px; font-size: 15px; }
 
 /* Forms — one shared look for every control a person can type into or choose from.
@@ -179,7 +186,20 @@ select option:checked { background: #2A2312; color: var(--gold-hi); }
 .money-rm { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--gold-hi); font-weight: 700; font-size: 15px; pointer-events: none; }
 .money input { padding-left: 46px; font-variant-numeric: tabular-nums; }
 .row-wrap .money, .filter-grid .money { flex: 1 1 120px; }
-input[type="checkbox"] { width: 24px; height: 24px; accent-color: var(--gold); flex: none; }
+/* Change 80 (JoyChange003): every radio button and tick box is the same fixed 28px size, never squeezed by long text beside it. */
+input[type="checkbox"], input[type="radio"] { appearance: none; -webkit-appearance: none; width: 28px; height: 28px; min-width: 28px; min-height: 28px; max-width: 28px; flex: none; margin: 0;
+  display: inline-grid; place-content: center; vertical-align: middle; padding: 0; border: 2px solid var(--box-line); background: var(--card-2); cursor: pointer; }
+input[type="radio"] { border-radius: 50%; }
+input[type="checkbox"] { border-radius: 8px; }
+input[type="radio"]::before { content: ''; width: 14px; height: 14px; border-radius: 50%; background: var(--gold); transform: scale(0); transition: transform .12s ease-out; }
+input[type="radio"]:checked::before { transform: scale(1); }
+input[type="checkbox"]::before { content: ''; width: 8px; height: 15px; border: solid var(--on-gold); border-width: 0 3px 3px 0; transform: translate(0, -1px) rotate(45deg) scale(0); transition: transform .12s ease-out; }
+input[type="checkbox"]:checked { background: var(--gold-grad); border-color: #B8902B; }
+input[type="checkbox"]:checked::before { transform: translate(0, -1px) rotate(45deg) scale(1); }
+input[type="radio"]:checked { border-color: var(--gold); }
+input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: .5; cursor: not-allowed; }
+/* A radio or tick box beside a title and a longer description lines up with the first line of the title. */
+.check:has(> input[type="radio"]), .check:has(> input[type="checkbox"]) { align-items: flex-start; }
 input, select, textarea { max-width: 100%; min-width: 0; }
 /* Labels: brighter than helper text and placeholders, smaller and lighter than headings, never gold. */
 .ff, .filter-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 15px; font-weight: 600; color: var(--label-ink); min-width: 0; letter-spacing: .01em; }
@@ -286,7 +306,7 @@ label.btn { position: relative; cursor: pointer; }
 .coming-soon { border-color: var(--gold-lo); border-style: dashed; }
 
 .photo-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.photo-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; text-align: left; color: var(--ink); min-width: 0; }
+.photo-card { background: var(--card); border: 1px solid var(--box-line); border-radius: 14px; padding: 6px 6px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; text-align: left; color: var(--ink); min-width: 0; }
 .photo-card .photo { height: 72px; border-radius: 10px; margin-bottom: 4px; overflow: hidden; background: var(--card-2); display: block; }
 .photo-card .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-card strong { color: var(--gold-hi); overflow-wrap: anywhere; }
@@ -323,7 +343,7 @@ label.btn { position: relative; cursor: pointer; }
 .example { text-align: left; background: var(--card-2); border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; min-height: 48px; color: var(--ink); font-size: 15px; }
 .sample-badge { margin-right: 6px; }
 .voice-msg { background: var(--card-2); border-left: 4px solid var(--gold); border-radius: 8px; padding: 8px 10px; }
-.proposal { border: 1px solid var(--gold-lo); border-radius: 14px; padding: 12px; background: #15130D; }
+.proposal { border: 1px solid var(--box-line); border-radius: 14px; padding: 12px; background: #15130D; }
 .prop-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .prop-list li { border: 1px solid var(--line-2); border-radius: 10px; background: var(--card-2); }
 .prop-list li.on { border-color: var(--gold); }
@@ -393,8 +413,10 @@ label.btn { position: relative; cursor: pointer; }
 
 /* Property detail */
 .key-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
-.kf { background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: column; min-width: 0; }
+.kf { background: var(--card-2); border: 1px solid var(--box-line); border-radius: 10px; padding: 6px 8px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 4px; min-width: 0; }
+/* Change 84 (JoyChange003): a label and its value read side by side as "Label - Value". */
 .kf span { font-size: 14px; color: var(--muted); }
+.kf span::after { content: ' -'; }
 .kf strong { font-size: 15px; overflow-wrap: anywhere; }
 .rec-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .card.missing { border-color: #5A4520; }
@@ -416,7 +438,7 @@ label.btn { position: relative; cursor: pointer; }
 .ad-expired, .ad-paused { background: #3C3C42; }
 .ad-planned { background: #1D3550; color: #DDEBFA; }
 .doc-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.doc-sum div { background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; display: flex; justify-content: space-between; gap: 6px; font-size: 14px; min-width: 0; }
+.doc-sum div { background: var(--card-2); border: 1px solid var(--box-line); border-radius: 10px; padding: 6px 8px; display: flex; justify-content: space-between; gap: 6px; font-size: 14px; min-width: 0; }
 .doc-sum span { overflow-wrap: anywhere; min-width: 0; }
 .doc-sum strong { color: var(--gold-hi); }
 .doc-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 6px; overflow-wrap: anywhere; }
@@ -449,7 +471,7 @@ label.btn { position: relative; cursor: pointer; }
 .search-box { display: flex; flex-direction: column; gap: 4px; }
 .sugs { list-style: none; margin: 0; padding: 4px; border: 1px solid var(--field-focus); box-shadow: inset 0 0 0 1px rgba(212,175,55,.5); border-radius: 12px; background: var(--card-2); display: flex; flex-direction: column; gap: 2px; }
 .sugs button { width: 100%; text-align: left; background: transparent; border: 0; padding: 8px; min-height: 44px; color: var(--ink); border-radius: 8px; }
-.diff-card { border-color: var(--gold-lo); }
+.diff-card { border-color: var(--box-line); }
 .diff-row { display: flex; flex-wrap: wrap; gap: 6px; font-size: 15px; }
 
 /* Sign-in */
@@ -466,7 +488,7 @@ label.btn { position: relative; cursor: pointer; }
 
 /* Settings → Check Google Maps */
 .check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.check-list li { display: flex; gap: 10px; align-items: flex-start; background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.check-list li { display: flex; gap: 10px; align-items: flex-start; background: var(--card-2); border: 1px solid var(--box-line); border-radius: 10px; padding: 8px 10px; }
 .check-list li.ok { border-color: #23503A; }
 .check-list li.bad { border-color: #7A3A1A; }
 .check-mark { width: 24px; flex: none; font-weight: 800; text-align: center; }
@@ -476,7 +498,7 @@ label.btn { position: relative; cursor: pointer; }
 
 /* Inquiries, viewings, appointments */
 .act-list, .task-list, .contact-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.act-item { background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.act-item { background: var(--card-2); border: 1px solid var(--box-line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .act-item.st-cancelled { opacity: .75; }
 .appt-st { font-size: 14px; font-weight: 700; border-radius: 8px; padding: 1px 8px; background: #2A2A2E; }
 .appt-scheduled { background: #1D3550; color: #DDEBFA; }
@@ -489,7 +511,7 @@ label.btn { position: relative; cursor: pointer; }
 .tabs button { min-height: 44px; padding: 4px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--muted); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; }
 .tabs button.on { background: var(--gold-grad); color: var(--on-gold); border-color: #B8902B; }
 .tabs button.on .count { background: var(--on-gold); color: var(--gold-hi); }
-.task { display: flex; align-items: flex-start; gap: 10px; background: var(--card-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.task { display: flex; align-items: flex-start; gap: 10px; background: var(--card-2); border: 1px solid var(--box-line); border-radius: 12px; padding: 10px; }
 .task input { margin-top: 10px; }
 .task.overdue { border-color: #7A3A1A; }
 .task.done .task-main strong { text-decoration: line-through; color: var(--muted); }
@@ -516,7 +538,7 @@ label.btn { position: relative; cursor: pointer; }
 .cal-day.sel .dot-t { background: #111; }
 
 /* Contacts */
-.contact-row { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-left: 6px solid #3A3A3E; border-radius: 12px; padding: 4px 8px 4px 0; }
+.contact-row { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--box-line); border-left: 6px solid #3A3A3E; border-radius: 12px; padding: 4px 8px 4px 0; }
 .row-main { flex: 1; min-width: 0; text-align: left; background: transparent; border: 0; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; min-height: 56px; color: var(--ink); }
 .contact-name { font-size: 22px; margin: 0; overflow-wrap: anywhere; }
 
@@ -527,7 +549,7 @@ label.btn { position: relative; cursor: pointer; }
 .big-card small { font-size: 15px; color: var(--muted); }
 .big-card-icon { font-size: 40px; color: var(--gold-hi); line-height: 1; }
 .tracker-card .stats, .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.stats div { background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; min-width: 0; }
+.stats div { background: var(--card-2); border: 1px solid var(--box-line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; min-width: 0; }
 .stats span { font-size: 14px; color: var(--muted); }
 .stats strong { font-size: 20px; color: var(--gold-hi); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .rec-dot { width: 14px; height: 14px; border-radius: 7px; background: #EF4444; animation: pulse 1s infinite; }
@@ -561,11 +583,11 @@ label.btn { position: relative; cursor: pointer; }
 
 /* Agent Financial */
 .fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.fin-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fin-card { background: var(--card); border: 1px solid var(--box-line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .fin-card > span { font-size: 14px; color: var(--muted); font-weight: 600; }
 .fin-card strong { font-size: 20px; color: var(--gold-hi); overflow-wrap: anywhere; }
 .fin-card strong.neg { color: var(--red); }
-.fin-card.gold { background: linear-gradient(160deg, #2A2312, #131316); border-color: var(--gold-lo); }
+.fin-card.gold { background: linear-gradient(160deg, #2A2312, #131316); border-color: var(--box-line); }
 .bar { height: 8px; border-radius: 4px; background: #2A2A2E; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--gold-grad); }
 .bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; height: 120px; align-items: end; }
@@ -619,18 +641,6 @@ label.btn { position: relative; cursor: pointer; }
   .photo-card .photo { height: 110px; }
   .lc-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-
-/* Field Help "?" and its explanation */
-.help-q { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-height: 44px; margin: -10px 0 -10px -6px; padding: 0;
-  border: 0; background: transparent; color: var(--gold-hi); vertical-align: middle; flex: none; position: relative; font-size: 0; }
-.help-q::after { content: '?'; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
-  border: 1px solid var(--gold-lo); background: #1E1B15; font-size: 14px; font-weight: 800; line-height: 1; }
-.help-q[aria-expanded="true"]::after { background: var(--gold); color: var(--on-gold); }
-.help-pop { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 6px 0 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--gold-lo);
-  background: #17150F; color: var(--ink); font-size: 14px; font-weight: 400; line-height: 1.4; text-align: left; }
-.help-pop b { color: var(--gold-hi); font-weight: 700; }
-.help-what { font-weight: 600; }
-.help-close { align-self: flex-end; color: var(--muted); font-size: 13px; }
 
 /* Required profile fields and the name-card activation message */
 .req { color: var(--gold-hi); font-weight: 800; }
@@ -695,7 +705,7 @@ label.btn { position: relative; cursor: pointer; }
 .notif-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .notif-list .link-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 .sample-tag { background: #2A2312; color: var(--gold-hi); border-color: var(--gold-lo); }
-.sample-note { border-color: var(--gold-lo); }
+.sample-note { border-color: var(--box-line); }
 
 /* Property form: collapsible sections and the floating Save */
 .form-tools { align-items: center; }
@@ -878,7 +888,7 @@ label.btn { position: relative; cursor: pointer; }
 .busy-bar > span { display: block; height: 100%; background: var(--gold); transition: width .25s ease; }
 @media (prefers-reduced-motion: reduce) { .busy-bar > span { transition: none; } }
 /* Opportunities → Co-broke Opportunities card (owner, 15 Oct). */
-.link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--ink); min-height: 88px; border: 1px solid var(--gold-lo); cursor: pointer; }
+.link-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--ink); min-height: 88px; border: 1px solid var(--box-line); cursor: pointer; }
 .link-card strong { color: var(--gold-hi); font-size: 18px; }
 
 /* ---------- Change 010: Team Workspace, sharing, archive, audit history, exports ---------- */
@@ -912,7 +922,7 @@ label.btn { position: relative; cursor: pointer; }
 .progress > span { display: block; height: 100%; background: var(--gold-grad); }
 .export-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: start; border-top: 1px solid var(--line); padding-top: 8px; }
 .export-row .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
-.export-row input[type=checkbox] { width: 24px; height: 24px; margin-top: 4px; }
+.export-row input[type=checkbox] { margin-top: 4px; }
 
 /* ---------- Changes 011–014 ---------- */
 :root { --ad-h: 0px; }
@@ -1204,7 +1214,7 @@ button.sync-banner { cursor: pointer; }
 .pg-menu button.danger-text { color: var(--red); }
 /* Changes 19 and 20: Developer Dashboard (developer only). */
 .dev-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.dev-stat { display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; min-width: 0; overflow-wrap: anywhere; }
+.dev-stat { display: flex; flex-direction: column; gap: 2px; background: var(--card); border: 1px solid var(--box-line); border-radius: 12px; padding: 10px; min-width: 0; overflow-wrap: anywhere; }
 .dev-stat strong { font-size: 20px; color: var(--gold-hi); }
 .dev-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
 .dev-table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
@@ -1220,7 +1230,7 @@ button.sync-banner { cursor: pointer; }
 .tick-opts { display: flex; flex-wrap: wrap; gap: 6px; }
 .tick { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid var(--line-2); background: var(--card-2); font-size: 14px; cursor: pointer; }
 .tick.on { border-color: var(--gold); color: var(--gold-hi); }
-.tick input { width: 18px; height: 18px; accent-color: var(--gold); margin: 0; }
+.tick input { margin: 0; }
 .lc-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .archived-btn { margin-left: auto; min-height: 44px; }
 
@@ -1255,8 +1265,8 @@ button.sync-banner { cursor: pointer; }
 .pj-launched, .pj-selling { background: #1F8A4C; color: #fff; }
 .pj-sold_out { background: #5A1E18; color: #FFB4A8; }
 .pj-completed { background: #2A2A30; color: var(--muted); }
-.unit-type, .unit-edit { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
-.booking-row { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--card-2); color: var(--ink); }
+.unit-type, .unit-edit { border: 1px solid var(--box-line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.booking-row { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; text-align: left; border: 1px solid var(--box-line); border-radius: 12px; padding: 8px 10px; background: var(--card-2); color: var(--ink); }
 .bk-st { font-size: 14px; }
 .bk-booked, .bk-pending_loan { background: #3A2A12; color: var(--amber); }
 .bk-spa_signed { background: #1F8A4C; color: #fff; }
@@ -1298,6 +1308,6 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 
 /* JoyChange002 Change 46: the first-login country pick. */
 .country-choice { gap: 10px; max-height: 100%; }
-.country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 140px; max-height: 42vh; border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 140px; max-height: 42vh; border: 1px solid var(--box-line); border-radius: 12px; padding: 4px; }
 .country-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--ink); font-weight: 600; }
 .country-row.on { border-color: var(--gold-lo); background: #2A2312; color: var(--gold-hi); }

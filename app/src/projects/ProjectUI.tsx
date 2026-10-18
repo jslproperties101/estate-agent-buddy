@@ -42,7 +42,7 @@ export function ProjectList({ lang, go }: { lang: Lang; go: Go }) {
   }, [state.projects, q]);
   return (
     <section className="stack" data-testid="projects">
-      <button className="btn primary" data-testid="project-add" onClick={() => go({ name: 'projectForm' })}><span aria-hidden="true">＋</span> {t.add}</button>
+      <button className="btn primary add-property" data-testid="project-add" onClick={() => go({ name: 'projectForm' })}><span aria-hidden="true">＋</span> {t.add}</button>
       {state.projects.length > 0 && <input aria-label={t.search} placeholder={t.search} value={q} onChange={e => setQ(e.target.value)} data-testid="project-search" />}
       {state.projects.length === 0 && <p className="muted empty" data-testid="projects-empty">{t.empty}</p>}
       {state.projects.length > 0 && list.length === 0 && <p className="muted">{t.none}</p>}

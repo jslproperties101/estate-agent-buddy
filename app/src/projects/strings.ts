@@ -2,7 +2,7 @@
 import type { Lang } from '../i18n';
 
 const en = {
-  title: 'Projects', add: 'Add new project', newTitle: 'New project', editTitle: 'Edit project', empty: 'No projects yet. Add a new development to keep its unit types, prices and bookings together.',
+  title: 'Projects', add: 'Add New Project', newTitle: 'New project', editTitle: 'Edit project', empty: 'No projects yet. Add a new development to keep its unit types, prices and bookings together.',
   search: 'Search name, developer or place', none: 'No project matches.', open: 'Open',
   status: { upcoming: 'Upcoming', launched: 'Launched', selling: 'Selling', sold_out: 'Sold out', completed: 'Completed' } as Record<string, string>,
   booking: { reserved: 'Reserved', booked: 'Booked', pending_loan: 'Booked - Pending Loan', spa_signed: 'SPA Signed', cancelled: 'Cancelled' } as Record<string, string>,
@@ -28,7 +28,7 @@ const en = {
 export type ProjectStrings = typeof en;
 
 const bm: ProjectStrings = {
-  title: 'Projek', add: 'Tambah projek baharu', newTitle: 'Projek baharu', editTitle: 'Ubah projek', empty: 'Belum ada projek. Tambah pembangunan baharu untuk menyimpan jenis unit, harga dan tempahannya bersama.',
+  title: 'Projek', add: 'Tambah Projek Baharu', newTitle: 'Projek baharu', editTitle: 'Ubah projek', empty: 'Belum ada projek. Tambah pembangunan baharu untuk menyimpan jenis unit, harga dan tempahannya bersama.',
   search: 'Cari nama, pemaju atau tempat', none: 'Tiada projek sepadan.', open: 'Buka',
   status: { upcoming: 'Akan datang', launched: 'Dilancarkan', selling: 'Sedang dijual', sold_out: 'Habis dijual', completed: 'Siap' },
   booking: { reserved: 'Ditahan', booked: 'Ditempah', pending_loan: 'Ditempah - Menunggu Pinjaman', spa_signed: 'SPA Ditandatangani', cancelled: 'Dibatalkan' },
@@ -53,7 +53,7 @@ const bm: ProjectStrings = {
 };
 
 const zh: ProjectStrings = {
-  title: '新项目', add: '新增项目', newTitle: '新项目', editTitle: '编辑项目', empty: '还没有项目。新增一个发展项目，把单位类型、价格和预订集中记录。',
+  title: '新项目', add: '添加新项目', newTitle: '新项目', editTitle: '编辑项目', empty: '还没有项目。新增一个发展项目，把单位类型、价格和预订集中记录。',
   search: '搜索名称、发展商或地点', none: '没有符合的项目。', open: '打开',
   status: { upcoming: '即将推出', launched: '已推出', selling: '销售中', sold_out: '已售罄', completed: '已完工' },
   booking: { reserved: '已保留', booked: '已预订', pending_loan: '已预订 - 等待贷款', spa_signed: '已签买卖合约', cancelled: '已取消' },

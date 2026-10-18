@@ -4,7 +4,6 @@ import { useApp, useFileStatus, useFileUrl } from '../data/useStore';
 import { strings, Lang } from '../i18n';
 import { leadReviewStrings } from '../data/leadReviewStrings';
 import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
-import { FieldHelp } from './FieldHelp';
 import { REMINDER_CHOICES } from '../domain/workflow';
 import { cardTitle, normalisePhone } from '../listing/model';
 import { newId } from '../data/store';
@@ -55,7 +54,7 @@ export function VendorStatusPicker({ lang, value, onChange }: { lang: Lang; valu
   const t = strings[lang];
   return (
     <div className="ff" data-testid="vendor-status-picker">
-      <span>{t.vendorStatusLabel}<FieldHelp lang={lang} topic="vendorStatus" label={t.vendorStatusLabel} /></span>
+      <span>{t.vendorStatusLabel}</span>
       <div className="chip-row" role="radiogroup" aria-label={t.vendorStatusLabel}>
         {VENDOR_STATUSES.map(s => (
           <button key={s} type="button" role="radio" aria-checked={value === s} className={`chip-btn lead-chip ${value === s ? 'on' : ''}`} data-vstat={s}
@@ -72,7 +71,7 @@ export function LeadPicker({ lang, value, onChange }: { lang: Lang; value?: Lead
   const t = strings[lang];
   return (
     <div className="ff">
-      <span>{t.leadLabel}<FieldHelp lang={lang} topic="buyerStatus" label={t.leadLabel} /></span>
+      <span>{t.leadLabel}</span>
       <div className="chip-row" role="radiogroup" aria-label={t.leadLabel}>
         {LEAD_STATUSES.map(s => (
           <button key={s} type="button" role="radio" aria-checked={value === s} className={`chip-btn lead-chip ${value === s ? 'on' : ''}`}

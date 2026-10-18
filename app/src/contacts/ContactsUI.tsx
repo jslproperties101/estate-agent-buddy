@@ -8,9 +8,8 @@ import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
 import { contactStrings } from './strings';
 import { Go } from '../nav';
-import { BUYER_ROLES, CONTACT_ROLES, Contact, ContactRole, EXPERTS, ExpertKey, LEAD_COLOURS, LEAD_STATUSES, LeadStatus, VENDOR_ROLES, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
+import { BUYER_ROLES, CONTACT_ROLES, Contact, ContactRole, EXPERTS, ExpertKey, LEAD_COLOURS, LeadStatus, VENDOR_ROLES, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
 import { LeadDot, LeadPicker, VendorDot, VendorStatusPicker, SectionCard, Empty, Confirm } from '../ui/common';
-import { FieldHelp } from '../ui/FieldHelp';
 import { IconBuyer, IconVendor } from '../icons';
 import { OptionSelect } from '../ui/OptionSelect';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
@@ -103,7 +102,8 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
     .filter(c => lead === 'all' || statusOf(c) === lead)
     .filter(c => !q.trim() || [c.name, c.phone, c.whatsapp, c.company, c.email].some(v => (v ?? '').toLowerCase().includes(q.trim().toLowerCase()) || (q.replace(/\D/g, '').length > 3 && phoneDigits(v).includes(q.replace(/\D/g, '')))))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const statuses: (LeadStatus | VendorStatus)[] = role === 'vendor' ? VENDOR_STATUSES : LEAD_STATUSES;
+  // Change 70 (JoyChange003): buyers are listed hottest first so the six pills sit in two rows of three.
+  const statuses: (LeadStatus | VendorStatus)[] = role === 'vendor' ? VENDOR_STATUSES : (['hot', 'warm', 'cold', 'booked', 'dropped'] as LeadStatus[]);
   const colour = (x: LeadStatus | VendorStatus) => (role === 'vendor' ? VENDOR_COLOURS[x as VendorStatus] : LEAD_COLOURS[x as LeadStatus]);
   const label = (x: LeadStatus | VendorStatus) => (role === 'vendor' ? t.vendorStatus[x] : t.lead[x]);
 
@@ -124,11 +124,11 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
 
   return (
     <section className="stack" data-testid={`contacts-${role}`}>
-      <button className="btn primary" onClick={() => go({ name: 'contactForm', role })}>{role === 'vendor' ? s.addVendor : s.addBuyer}</button>
+      <button className="btn primary add-property" onClick={() => go({ name: 'contactForm', role })}>{role === 'vendor' ? s.addVendor : s.addBuyer}</button>
       {!isWebsite() && <button className="btn secondary" onClick={() => void importPhone()} aria-disabled={!phonebookSupported()}>{s.importPhone}</button>}
       <input aria-label={s.search} placeholder={s.search} value={q} onChange={e => setQ(e.target.value)} />
       <CreatorFilter lang={lang} value={by} onChange={setBy} />
-      <div className="chip-row" role="radiogroup" aria-label={role === 'vendor' ? t.vendorStatusLabel : t.leadLabel} data-testid="status-filter">
+      <div className="chip-row chip-grid" role="radiogroup" aria-label={role === 'vendor' ? t.vendorStatusLabel : t.leadLabel} data-testid="status-filter">
         <button type="button" role="radio" aria-checked={lead === 'all'} className={`chip-btn ${lead === 'all' ? 'on' : ''}`} onClick={() => setLead('all')}>{s.allLeads} <span className="count">{all.length}</span></button>
         {statuses.map(l => (
           <button key={l} type="button" role="radio" aria-checked={lead === l} className={`chip-btn ${lead === l ? 'on' : ''}`} onClick={() => setLead(l)} data-status={l}>
@@ -254,7 +254,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         {err && <p className="error" role="alert">{t.c.nameRequired}</p>}
         <PhoneInput lang={lang} id="contact-phone" dataField="phone" label={<label htmlFor="contact-phone">{s.f.phone}</label>} value={d.phone ?? ''}
           onChange={v => setD(x => ({ ...x, phone: v || undefined }))} onBlur={() => setD(x => ({ ...x, phone: normalisePhone(x.phone) }))} onPicked={picked} />
-        <label className="ff"><span>{s.whatsapp}<FieldHelp lang={lang} topic="whatsapp" label={s.whatsapp} /></span><input data-field="whatsapp" autoComplete="off" autoCapitalize="none" placeholder="@" value={d.whatsapp ?? ''} onChange={e => setD(x => ({ ...x, whatsapp: e.target.value || undefined }))} />
+        <label className="ff"><span>{s.whatsapp}</span><input data-field="whatsapp" autoComplete="off" autoCapitalize="none" placeholder="@" value={d.whatsapp ?? ''} onChange={e => setD(x => ({ ...x, whatsapp: e.target.value || undefined }))} />
           <small className="muted">{s.whatsappHint}</small></label>
         {dup && <p className="warn-text" role="status">{s.duplicate(dup.name)} <button className="link-btn" onClick={() => go({ name: 'contactDetail', id: dup.id })}>{s.openExisting}</button></p>}
         <label className="ff">{s.f.email}<input type="email" value={d.email ?? ''} onChange={e => setD(x => ({ ...x, email: e.target.value || undefined }))} /></label>

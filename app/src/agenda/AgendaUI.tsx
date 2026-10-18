@@ -232,7 +232,7 @@ export function TodoScreen({ lang, go }: { lang: Lang; go: Go }) {
   const order: TaskBucket[] = ['overdue', 'today', 'upcoming', 'someday', 'done'];
   return (
     <section className="stack" data-testid="todo">
-      <button className="btn primary" onClick={() => go({ name: 'taskForm' })}>{a.todo.add}</button>
+      <button className="btn primary add-property" data-testid="todo-add" onClick={() => go({ name: 'taskForm' })}>{a.todo.add}</button>
       <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <Tabs label={a.todo.title} value={tab} onChange={setTab} options={order.map(k => ({ value: k, label: a.todo.tabs[k], count: buckets[k].length }))} />
       {tab === 'done' && <small className="muted">{a.todo.history}</small>}

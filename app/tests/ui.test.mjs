@@ -527,7 +527,7 @@ test('U9 inquiries and viewings are separate; Convert to Viewing moves it as Pen
   assert.deepEqual(await page.getByTestId('bh-event').evaluateAll(e => e.map(x => x.getAttribute('data-kind'))), ['inquiry', 'viewing_completed']);
   // a direct viewing without an inquiry, for the same buyer again
   const sameBuyer = await page.getByTestId('bh-open-buyer').innerText();
-  await view.getByRole('button', { name: '+ Viewing' }).click();
+  await view.getByRole('button', { name: '+ Add New Viewing' }).click();
   await page.locator('[data-field="contactId"]').selectOption(await page.locator('[data-field="contactId"] option', { hasText: sameBuyer }).first().getAttribute('value'));
   await page.locator('[data-field="date"]').fill('2026-12-01');
   await page.locator('[data-field="time"]').fill('10:30');
@@ -566,7 +566,7 @@ test('U10 lead colours: Blue Cold, Yellow Warm, Red Hot, Gray Dropped, Green Boo
 test('U11 To-Do: due date, priority, reminders, completion kept as history; follow-ups become To-Dos', async () => {
   const page = await phone();
   await tile(page, 'To-Do');
-  await page.getByRole('button', { name: '+ New to-do' }).click();
+  await page.getByRole('button', { name: '+ Add New To-do' }).click();
   await page.locator('[data-field="title"]').fill('Prepare offer letter');
   await page.locator('[data-field="due"]').fill('2030-01-15');
   await page.locator('[data-field="priority"]').selectOption('urgent');
@@ -918,7 +918,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
     ['property form dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="purpose"]'],
     ['property form custom dropdown', async () => { await tile(page, 'Property List'); await newProperty(page); }, '.opt-btn'],
     ['property form money', async () => { await tile(page, 'Property List'); await newProperty(page); }, '[data-field="askingPrice"]'],
-    ['contact form', async () => { await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click(); }, '[data-field="name"]'],
+    ['contact form', async () => { await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click(); }, '[data-field="name"]'],
     ['calculator', async () => { await tile(page, 'Property Calculator'); }, '[data-field="price"]'],
     ['to-do form', async () => { await tile(page, 'To-Do'); await page.getByRole('button', { name: /New to-do|Add/i }).first().click(); }, '[data-field="title"]'],
     ['agent profile', async () => { await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/i }).first().click(); }, '[data-field="fullName"]'],
@@ -934,7 +934,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
     }
   }
   // Focus: gold border. Error: red border on the field that has the problem.
-  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').focus();
   await page.waitForTimeout(250); // let the colour transition finish
   assert.equal((await fieldLook('[data-field="name"]')).border, 'rgb(212, 175, 55)', 'focused field is gold');
@@ -1342,7 +1342,7 @@ test('U31 contacts: phonebook button fills name and phone (asks before replacing
     window.ContactsManager = function () {};
     Object.defineProperty(navigator, 'contacts', { configurable: true, value: { select: async () => [{ name: ['Puan Siti'], tel: ['012-345 6789'], email: [] }] } });
   });
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.getByTestId('pick-contact').click();
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Puan Siti');
   assert.equal(await page.locator('[data-field="phone"]').inputValue(), '+60 12-345 6789');
@@ -1358,7 +1358,7 @@ test('U31 contacts: phonebook button fills name and phone (asks before replacing
   await page.getByTestId('save-contact').click();
   assert.equal(await page.getByTestId('contact-whatsapp').innerText(), '@siti.property');
   // Alias only, no phone number: allowed, and never turned into a phone number.
-  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Alias Only');
   await page.locator('[data-field="whatsapp"]').fill('@aliasonly');
   await page.getByTestId('save-contact').click();
@@ -1406,7 +1406,7 @@ test('U124 JoyChange002 Batch D: AI Assisted Command is minimal (48); speech wai
   const page = await ctx.newPage();
   await page.goto(base); await page.waitForSelector('nav.grid'); await chooseStart(page, 'empty');
   // A vendor and a property to be found.
-  await tile(page, 'Vendor List'); await page.getByRole('button', { name: 'New vendor' }).click();
+  await tile(page, 'Vendor List'); await page.getByRole('button', { name: 'Add New Vendor' }).click();
   await page.locator('[data-field="name"]').fill('Victor Vendor'); await page.locator('[data-field="phone"]').fill('013-222 3333');
   await page.getByTestId('save-contact').click(); await waitStored(page, 'records', `all.some(v => v && v.name === 'Victor Vendor')`);
   await home(page);
@@ -1643,9 +1643,8 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   await page.locator('[data-sec="tenure"]').click();
   await page.locator('[data-field="askingPrice"]').fill('480000');
   await page.locator('[data-sec="notes"]').click();
-  // Field help
-  await page.locator('[data-help="tenure"]').click();
-  assert.match(await page.getByTestId('help-tenure').innerText(), /freehold[\s\S]*Enter:[\s\S]*Example:[\s\S]*Why it matters:/i);
+  // Change 52 (JoyChange003): the round "?" help buttons are gone everywhere.
+  assert.equal(await page.locator('[data-help]').count(), 0);
   // Save floats: visible at the bottom of the screen while the middle of the form is shown.
   await page.locator('#sec-notes').scrollIntoViewIfNeeded();
   const box = await page.getByTestId('save-floating').boundingBox();
@@ -1811,7 +1810,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   assert.equal(await page.getByTestId('save-status').count(), 0);
   assert.equal(await page.getByTestId('sync-banner').count(), 0);
   // Good save: the message shows, then goes in about two seconds.
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Timing Buyer');
   await page.getByTestId('save-contact').click();
   const toast = page.getByTestId('toast');
@@ -1824,7 +1823,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   assert.ok(shown >= 1500 && shown <= 2800, `the success message stays about two seconds (${shown} ms), not four`);
   // Failed save: the phone's storage refuses the write.
   await page.evaluate(() => { window.__failWrites = true; });
-  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Not Saved Buyer');
   await page.getByTestId('save-contact').click();
   await page.locator('[data-testid="toast"][data-kind="error"]').waitFor();
@@ -1842,7 +1841,7 @@ test('U43 save confirmation: "Saved on this phone." appears after the write and 
   assert.ok(Date.now() - e0 > 2500, 'an error is not as brief as a success');
   // Recovered.
   await page.evaluate(() => { window.__failWrites = false; });
-  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Saved Again');
   await page.getByTestId('save-contact').click();
   await page.locator('[data-testid="toast"][data-kind="ok"]').waitFor();
@@ -1867,7 +1866,7 @@ test('U44 Notifications: System Notifications and News / Announcements sections,
   await shot(page, '44-notifications', false);
   // A reminder coming up appears under System Notifications.
   await home(page); await tile(page, 'To-Do');
-  await page.getByRole('button', { name: '+ New to-do' }).click();
+  await page.getByRole('button', { name: '+ Add New To-do' }).click();
   await page.locator('[data-field="title"]').fill('Call the lawyer');
   const soon = new Date(Date.now() + 2 * 86_400_000); const ymd = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
   await page.locator('[data-field="due"]').fill(ymd);
@@ -2019,7 +2018,7 @@ const waitFor = async (cond, ms = 6000) => { const t = Date.now(); while (!cond(
 
 test('U50 draft autosave: closing the app during entry keeps the form; editing, discarding and saving behave', async () => {
   const page = await phone();
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Half Typed Buyer');
   await page.locator('[data-field="whatsapp"]').fill('@half');
   await page.getByTestId('draft-saved').waitFor();
@@ -2028,7 +2027,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Buyer List');
   assert.equal(await page.getByTestId('contact-row').count(), 0, 'a draft is not a record');
-  await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.getByTestId('draft-banner').waitFor();
   assert.match(await page.getByTestId('draft-banner').innerText(), /Draft from .* restored\. It is not saved yet/i);
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer');
@@ -2037,7 +2036,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await page.locator('[data-field="name"]').fill('Half Typed Buyer Two');
   await waitStored(page, 'local', "all.some(v => JSON.stringify(v).includes('Half Typed Buyer Two'))");
   await page.reload(); await page.waitForSelector('nav.grid');
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.getByTestId('draft-banner').waitFor();   // the draft is restored asynchronously: wait for it, not for time
   assert.equal(await page.locator('[data-field="name"]').inputValue(), 'Half Typed Buyer Two');
   // Discard: the form is empty again and the draft is gone for good.
@@ -2046,7 +2045,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   assert.equal(await page.getByTestId('draft-banner').count(), 0);
   await waitStored(page, 'local', "!all.some(v => JSON.stringify(v).includes('Half Typed Buyer'))");   // the draft is really gone from storage
   await page.reload(); await page.waitForSelector('nav.grid');
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   assert.equal(await page.getByTestId('draft-banner').count(), 0, 'nothing comes back after a discard');
   assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
   // A partly filled form that cannot be saved yet (no name) keeps what was typed.
@@ -2060,7 +2059,7 @@ test('U50 draft autosave: closing the app during entry keeps the form; editing, 
   await page.getByTestId('contact-detail').waitFor();
   await home(page); await tile(page, 'Buyer List');
   assert.equal(await page.getByTestId('contact-row').count(), 1, 'exactly one record');
-  await page.getByRole('button', { name: 'New buyer' }).click();
+  await page.getByRole('button', { name: 'Add New Buyer' }).click();
   assert.equal(await page.getByTestId('draft-banner').count(), 0, 'saving cleared the draft');
   assert.equal(await page.locator('[data-field="name"]').inputValue(), '');
   await page.context().close();
@@ -2119,7 +2118,7 @@ test('U52 the phone’s storage upgrades from the Phase 1 layout without losing 
 
 test('U53 record status chip, History with restore, and Recently deleted with restore', async () => {
   const page = await phone();
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Ahmad History');
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
@@ -2385,7 +2384,7 @@ test('U57 a Phase 1 phone with real records, no remembered team and NO last-sync
   });
   const p2 = await ctx2.newPage();
   await p2.goto(base); await p2.waitForSelector('nav.grid'); await chooseStart(p2, 'empty');       // first start: empty database
-  await tile(p2, 'Buyer List'); await p2.getByRole('button', { name: 'New buyer' }).click();
+  await tile(p2, 'Buyer List'); await p2.getByRole('button', { name: 'Add New Buyer' }).click();
   await p2.locator('[data-field="name"]').fill('Entered Offline'); await p2.getByTestId('save-contact').click(); await p2.getByTestId('contact-detail').waitFor();
   await waitStored(p2, 'records', "all.some(v => v && Array.isArray(v.dirty) && v.dirty.length > 0)");   // the unsent-changes list is written a moment after the record; the next step copies it
   await p2.evaluate(async SBURL => {
@@ -2654,7 +2653,7 @@ test('U65 Change 008/009 property cards: a single tap opens; no long press, Prev
 
 test('U66 phone book on the contact form and the property owner: icon beside the number; refused, cancelled and unsupported are each explained', async () => {
   const page = await phone();
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   const icon = page.getByTestId('pick-contact');
   assert.equal((await icon.getAttribute('aria-label')).toLowerCase(), 'choose from phone book');
   const [ib, fb] = await Promise.all([icon.boundingBox(), page.locator('[data-field="phone"]').boundingBox()]);
@@ -2703,7 +2702,7 @@ test('U66 phone book on the contact form and the property owner: icon beside the
 
 test('U67 phone numbers that are too short get no Call / WhatsApp link, with an explanation; a WhatsApp alias without a number is kept', async () => {
   const page = await phone();
-  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Short Number'); await page.locator('[data-field="phone"]').fill('12-34');
   await page.getByTestId('save-contact').click();
   await page.getByTestId('contact-detail').waitFor();
@@ -2711,7 +2710,7 @@ test('U67 phone numbers that are too short get no Call / WhatsApp link, with an 
   assert.match(await page.getByTestId('phone-invalid').innerText(), /looks incomplete/i);
   await home(page); await tile(page, 'Buyer List');
   assert.equal(await page.locator('.contact-row a[href^="tel:"]').count(), 0, 'no broken Call link in the list either');
-  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'New buyer' }).click();
+  await home(page); await tile(page, 'Buyer List'); await page.getByRole('button', { name: 'Add New Buyer' }).click();
   await page.locator('[data-field="name"]').fill('Good Number'); await page.locator('[data-field="phone"]').fill('0123456789'); await page.locator('[data-field="whatsapp"]').fill('@good.number');
   await page.getByTestId('save-contact').click(); await page.getByTestId('contact-detail').waitFor();
   assert.equal(await page.locator('a[href="tel:+60123456789"]').count(), 1);
@@ -4948,7 +4947,7 @@ test('U118 Change 015 Add Location popup (as changed 17 Oct 2026): larger but no
 test('U121 owner 17 Oct 2026: Add Location search moves the pin; the card location button: "Location Not Set" for 1.5 s, or Share Location / Open in Google Maps; share to a buyer or vendor on WhatsApp, or a new contact from the phone book', async () => {
   const page = await phone({ maps: true });
   // A buyer and a vendor to share with.
-  for (const [list, btn, name, tel] of [['Buyer List', 'New buyer', 'Bella Buyer', '012-345 6789'], ['Vendor List', 'New vendor', 'Victor Vendor', '013-222 3333']]) {
+  for (const [list, btn, name, tel] of [['Buyer List', 'Add New Buyer', 'Bella Buyer', '012-345 6789'], ['Vendor List', 'Add New Vendor', 'Victor Vendor', '013-222 3333']]) {
     await tile(page, list); await page.getByRole('button', { name: btn }).click();
     await page.locator('[data-field="name"]').fill(name);
     await page.locator('[data-field="phone"]').fill(tel);

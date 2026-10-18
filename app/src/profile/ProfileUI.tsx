@@ -24,7 +24,6 @@ import { Profile, ShareChoice, COLLECTIONS, CollectionName } from '../data/types
 import { normalisePhone, phoneDigits } from '../listing/model';
 import { compressImage } from '../lib/images';
 import { PhonebookButton } from '../ui/PhonebookButton';
-import { FieldHelp } from '../ui/FieldHelp';
 import { config, supabaseInputProblem } from '../config';
 import { authStrings } from '../auth/strings';
 import { AccountCard } from '../auth/AccountUI';
@@ -109,11 +108,11 @@ function ImageField({ lang, label, fileId, onChange, testId }: { lang: Lang; lab
 }
 
 /** Label of a required profile field: a gold * and, once missing, the word "required". */
-function Req({ lang, k, missing, help }: { lang: Lang; k: RequiredProfileField; missing: RequiredProfileField[]; help?: string }) {
+function Req({ lang, k, missing }: { lang: Lang; k: RequiredProfileField; missing: RequiredProfileField[] }) {
   const t = profileStrings[lang];
   return (
     <span className="between">
-      <span>{t.f[k]} <span className="req" aria-label={t.requiredMark}>*</span>{help && <FieldHelp lang={lang} topic={help} />}</span>
+      <span>{t.f[k]} <span className="req" aria-label={t.requiredMark}>*</span></span>
       {missing.includes(k) && <small className="req-flag">{t.requiredMark}</small>}
     </span>
   );
@@ -137,7 +136,7 @@ export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
         <small className="muted"><span className="req" aria-hidden="true">*</span> {t.required}</small>
         <label className="ff"><Req lang={lang} k="fullName" missing={missing} /><input data-field="fullName" aria-required="true" aria-invalid={tried && missing.includes('fullName')} value={p.fullName ?? ''} onChange={e => set('fullName', e.target.value)} /></label>
         <OptionSelect lang={lang} label={`${t.f.regType} *`} listKey="regType" builtIns={REG_TYPES.map(v => ({ value: v }))} value={p.regType} savedValue={state.profile.regType} onChange={v => set('regType', v)} testId="opt-regType" />
-        <label className="ff"><Req lang={lang} k="regNo" missing={missing} help="regNo" /><input data-field="regNo" aria-required="true" aria-invalid={tried && missing.includes('regNo')} value={p.regNo ?? ''} onChange={e => set('regNo', e.target.value)} /></label>
+        <label className="ff"><Req lang={lang} k="regNo" missing={missing} /><input data-field="regNo" aria-required="true" aria-invalid={tried && missing.includes('regNo')} value={p.regNo ?? ''} onChange={e => set('regNo', e.target.value)} /></label>
         <label className="ff"><Req lang={lang} k="agency" missing={missing} /><input data-field="agency" aria-required="true" aria-invalid={tried && missing.includes('agency')} value={p.agency ?? ''} onChange={e => set('agency', e.target.value)} /></label>
         <label className="ff"><Req lang={lang} k="phone" missing={missing} /><input data-field="phone" type="tel" inputMode="tel" aria-required="true" aria-invalid={tried && missing.includes('phone')} value={p.phone ?? ''} onChange={e => set('phone', e.target.value)} onBlur={() => setP(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
         {tried && missing.includes('phone') && p.phone && <small className="error">{t.phoneShort}</small>}
