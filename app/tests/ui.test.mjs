@@ -4562,7 +4562,7 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
       if (layout === 'large') assert.ok(Math.abs((hb.y + hb.height / 2) - (who.y + who.height / 2)) <= 6, `${layout} ${i}: same line`);
       else assert.ok(who.y + who.height / 2 >= hb.y, `${layout} ${i}: on or under the Click to Open line`);
       assert.equal(await c.getByTestId('card-creator').innerText(), 'You');
-      assert.ok(card.y + card.height - (hb.y + hb.height) <= 12, `${layout} ${i}: at the very bottom`);
+      assert.ok(card.y + card.height - Math.max(hb.y + hb.height, who.y + who.height) <= 12, `${layout} ${i}: the footer line(s) at the very bottom`);
       assert.equal(await c.locator('.lc-purpose').count(), 0, 'no old purpose badge');
       assert.equal(await c.locator('.sc-body [data-testid="card-tx"]').count(), 0, 'no FOR SALE / FOR RENT under the title');
     }
