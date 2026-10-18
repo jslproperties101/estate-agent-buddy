@@ -69,6 +69,13 @@ test('K1 first login: asked once, Malaysia selected, searchable; the choice is s
   await page.getByTestId('country-choice').waitFor();
   assert.equal(await page.locator('[data-country="Malaysia"]').getAttribute('aria-checked'), 'true', 'Malaysia is selected by default');
   assert.equal(await page.getByTestId('start-choice').count(), 0, 'the sample-data choice waits for the country');
+  // Change 88 (JoyChange003): the list is short and the Continue button is fully visible (not under the ad or off the screen).
+  const cont = await page.getByTestId('country-continue').boundingBox(); const vp = page.viewportSize();
+  assert.ok(cont && cont.y >= 0 && cont.y + cont.height <= vp.height, 'Continue is on the screen');
+  const lst = await page.getByTestId('country-list').boundingBox();
+  assert.ok(lst.height <= vp.height * 0.3, `the country list is short (${Math.round(lst.height)}px of ${vp.height}px)`);
+  const adTop = await page.evaluate(() => { const a = document.querySelector('[data-testid="bottom-ad"], .bottom-ad, .ad-slot'); return a ? a.getBoundingClientRect().top : null; });
+  if (adTop !== null) assert.ok(cont.y + cont.height <= adTop + 1, 'Continue sits above the ad');
   await page.screenshot({ path: `${SHOTS}k1-country.png` });
   await page.getByTestId('country-search').fill('singa');
   assert.equal(await page.locator('.country-row').count(), 1);

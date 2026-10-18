@@ -378,7 +378,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   await page.getByTestId('ref-prefix').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const list = page.getByTestId('ref-prefix').locator('.opt-list');
   assert.equal(await list.locator('.opt-x').count(), 0, 'built-in prefixes cannot be deleted');
-  await list.getByRole('button', { name: 'Others…' }).click();
+  await list.getByRole('button', { name: '+ Add New' }).click();
   await list.locator('.opt-new input').fill('kl');
   await list.getByRole('button', { name: 'Add' }).click();
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'ID: KL1011');
@@ -437,7 +437,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   assert.ok(idx.every((x, i) => x >= 0 && (i === 0 || x > idx[i - 1])), `location order ${JSON.stringify(idx)}`);
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
-  await town.getByRole('button', { name: 'Others…' }).click();
+  await town.getByRole('button', { name: '+ Add New' }).click();
   await town.locator('.opt-new input').fill('Taman Sri Pajam');
   await town.getByRole('button', { name: 'Add' }).click();
   await page.getByTestId('save-property').click();
@@ -452,7 +452,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await t2.getByRole('button', { name: 'Remove Taman Sri Pajam' }).click();
   await confirmOptDelete(page);
   assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/i }).count(), 0);
-  assert.ok(await t2.getByRole('button', { name: 'Others…' }).isVisible(), 'Others stays available');
+  assert.ok(await t2.getByRole('button', { name: '+ Add New' }).isVisible(), 'Others stays available');
   await page.context().close();
 });
 
@@ -462,7 +462,7 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
-  await town.getByRole('button', { name: 'Others…' }).click();
+  await town.getByRole('button', { name: '+ Add New' }).click();
   await town.locator('.opt-new input').fill('Taman Desa Nilai');
   await town.getByRole('button', { name: 'Add' }).click();
   await page.locator('[data-field="unitNo"]').fill('No. 5');
@@ -753,7 +753,7 @@ test('U17 Agent Profile (was Profile & Name Card): details, REN/PEA/REA/Others, 
   await page.locator('[data-field="fullName"]').fill('Lee Ah Kow');
   const reg = page.getByTestId('opt-regType');
   await reg.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
-  for (const x of ['REN', 'PEA', 'REA', 'Others…']) assert.equal(await reg.getByRole(x === 'Others…' ? 'button' : 'option', { name: x, exact: true }).count(), 1, x);
+  for (const x of ['REN', 'PEA', 'REA', '+ Add New']) assert.equal(await reg.getByRole(x === '+ Add New' ? 'button' : 'option', { name: x, exact: true }).count(), 1, x);
   await reg.getByRole('option', { name: 'REN', exact: true }).click();
   await page.locator('[data-field="regNo"]').fill('31234');
   await page.locator('[data-field="agency"]').fill('Agency Gold Sdn Bhd');
@@ -4867,10 +4867,10 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   assert.equal(await page.getByRole('button', { name: /Use my current location/i }).count(), 0, 'no Use my current location');
   const remove = page.getByTestId('remove-position');
   assert.equal(await remove.isDisabled(), true, 'Remove Position is there, disabled with no position');
-  // Owner, 17 Oct 2026: Neighborhood is a remembered dropdown (Others… adds, ✕ removes).
+  // Owner, 17 Oct 2026: Neighborhood is a remembered dropdown (+ Add New adds, ✕ removes).
   const nb = page.getByTestId('opt-neighborhood');
   await nb.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
-  await nb.getByRole('button', { name: 'Others…' }).click();
+  await nb.getByRole('button', { name: '+ Add New' }).click();
   await nb.locator('.opt-new input').fill('Taman Bukit');
   await nb.getByRole('button', { name: 'Add' }).click();
   await setStreet(page, 'Jalan Order 7');
@@ -4889,7 +4889,7 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   const vrows = await page.locator('[data-testid="sec-location-view"] .dl-row').evaluateAll(xs => xs.map(x => x.dataset.row));
   assert.deepEqual(vrows.filter(r => ['neighborhood', 'street', 'unitNo'].includes(r)), ['neighborhood', 'street', 'unitNo']);
   assert.match(await page.locator('[data-testid="sec-location-view"] [data-row="neighborhood"]').innerText(), /Neighborhood\s+Taman Bukit/);
-  // The next property is offered the remembered neighborhood, with ✕; removing it leaves Others… available.
+  // The next property is offered the remembered neighborhood, with ✕; removing it leaves + Add New available.
   await home(page); await tile(page, 'Property List'); await newProperty(page);
   const nb2 = page.getByTestId('opt-neighborhood');
   await nb2.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
@@ -4897,7 +4897,7 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   await nb2.getByRole('button', { name: 'Remove Taman Bukit' }).click();
   await confirmOptDelete(page);
   assert.equal(await nb2.getByRole('option', { name: /Taman Bukit/i }).count(), 0, 'removed with ✕');
-  assert.ok(await nb2.getByRole('button', { name: 'Others…' }).isVisible());
+  assert.ok(await nb2.getByRole('button', { name: '+ Add New' }).isVisible());
   await page.context().close();
 });
 
@@ -5077,18 +5077,23 @@ test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (
   assert.equal(await vs.evaluate(e => getComputedStyle(e).color), 'rgb(255, 138, 122)', 'red');
   await vs.selectOption('owner');
   assert.equal(await vs.evaluate(e => getComputedStyle(e).color), 'rgb(247, 162, 75)', 'orange');
-  // Change 36: the saved Street is locked; its pencil opens it.
+  // Change 51 (replaces the Change 36 lock): the saved Street opens with one tap, as a pop-up in the middle of the screen;
+  // the pencil and the X are only inside the list, pencil first, each on a remembered entry.
   const st = page.getByTestId('opt-street');
-  assert.equal(await st.locator('.opt-btn').getAttribute('data-locked'), 'yes');
-  await st.locator('.opt-btn').click({ force: true });
-  assert.equal(await st.locator('.opt-list').count(), 0, 'tapping a locked field does not open it');
-  const pen = await st.getByTestId('opt-street-edit').boundingBox(); const x = await st.getByTestId('opt-street-clear').boundingBox();
-  assert.ok(pen.x < x.x && Math.abs(pen.y - x.y) <= 2, 'pencil first, then X, side by side');
+  assert.equal(await st.locator('.opt-field .fx-btn').count(), 0, 'no pencil or X beside the closed field');
+  assert.equal(await st.locator('.opt-btn').getAttribute('data-locked'), null, 'not locked');
+  await st.locator('.opt-btn').click();
+  await st.getByTestId('opt-popup').waitFor();
+  const pop = await st.locator('.opt-pop').boundingBox(); const vp = page.viewportSize();
+  assert.ok(Math.abs((pop.x + pop.width / 2) - vp.width / 2) < 20, 'the pop-up is centred across the screen');
+  const pen = await st.locator('.opt-list .opt-edit').first().boundingBox(); const x = await st.locator('.opt-list .opt-x').first().boundingBox();
+  assert.ok(pen.x < x.x && Math.abs(pen.y - x.y) <= 2, 'inside the list: pencil first, then X, side by side');
   assert.ok(pen.width < 44 && pen.width >= 28, 'smaller than the old X, not tiny');
-  // X on the saved value asks first.
-  await st.getByTestId('opt-street-clear').click();
-  await page.locator('.scrim .dialog').getByRole('button', { name: 'Cancel' }).click();
-  assert.match(await st.locator('.opt-btn').innerText(), /Jalan Tahap 1/i, 'cancel keeps it');
+  assert.ok(await st.getByRole('option', { name: 'Not set', exact: true }).isVisible() || await st.getByRole('option', { name: /not set/i }).first().isVisible(), 'Not Set is in the list');
+  assert.ok(await st.getByRole('button', { name: '+ Add New' }).isVisible(), '+ Add New is the last entry');
+  await st.getByTestId('opt-popup-close').click();
+  assert.equal(await st.locator('.opt-pop').count(), 0, 'the close button shuts the pop-up');
+  assert.match(await st.locator('.opt-btn').innerText(), /Jalan Tahap 1/i, 'closing keeps the value');
   // The city above the street: X on its remembered entry explains what goes with it, and Edit renames instead.
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
   await home(page); await tile(page, 'Property List'); await newProperty(page);

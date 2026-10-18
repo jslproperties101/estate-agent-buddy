@@ -4,6 +4,9 @@
 // the pop-up's own content scrolls (the pop-up itself already sits in the area above the keyboard: on Android the page
 // shrinks above the keyboard, see scripts/android-setup.mjs).
 // Nothing happens without a keyboard on screen (a laptop browser, or a phone with a hardware keyboard).
+// JoyChange003 Changes 66 / 71: while the keyboard is open the page gets spare room under its last field (html.kb-open and
+// --kb-room, used by .content in styles.css), so even the last field can be scrolled up clear of the keyboard and nothing is
+// hidden. Long lists keep scrolling with the keyboard open (touch-action in styles.css).
 
 const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"]';
 /** The keyboard takes at least this many pixels when it is open. */
@@ -22,6 +25,18 @@ function scrollParent(el: Element): HTMLElement | null {
     if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
   }
   return document.scrollingElement as HTMLElement | null;
+}
+
+/** Spare scroll room under the last field while the keyboard is open: enough that the last field can be lined up near the top. */
+export const KEYBOARD_ROOM = 0.85;
+export function roomFor(visibleHeight: number): number { return Math.round(visibleHeight * KEYBOARD_ROOM); }
+
+function syncRoom() {
+  if (typeof document === 'undefined') return;
+  const open = keyboardOpen();
+  const root = document.documentElement;
+  root.classList.toggle('kb-open', open);
+  if (open) root.style.setProperty('--kb-room', `${roomFor(viewHeight())}px`); else root.style.removeProperty('--kb-room');
 }
 
 /** How far to scroll so the field's top lands `BUFFER` of the visible height below the top of the visible area. */
@@ -61,6 +76,7 @@ export function installKeyboardAlign() {
   };
   const measure = () => { if (!keyboardOpen() || viewHeight() > fullHeight) fullHeight = Math.max(fullHeight, viewHeight()); };
   window.addEventListener('orientationchange', () => { fullHeight = 0; setTimeout(() => { fullHeight = viewHeight(); }, 500); });
-  (window.visualViewport ?? window).addEventListener('resize', () => { measure(); later(); });
-  document.addEventListener('focusin', e => { if ((e.target as Element)?.matches?.(FIELD)) later(); });
+  (window.visualViewport ?? window).addEventListener('resize', () => { measure(); syncRoom(); later(); });
+  document.addEventListener('focusin', e => { if ((e.target as Element)?.matches?.(FIELD)) { syncRoom(); later(); } });
+  document.addEventListener('focusout', () => { setTimeout(syncRoom, 150); });
 }

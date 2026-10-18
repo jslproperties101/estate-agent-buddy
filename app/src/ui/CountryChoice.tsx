@@ -81,7 +81,7 @@ export function CountryChoice({ lang, onChoose }: { lang: Lang; onChoose: (count
   return (
     <div className="sheet-scrim start-scrim" role="presentation">
       <div className="sheet country-choice" role="dialog" aria-modal="true" aria-labelledby="cc-t" data-testid="country-choice">
-        <span className="start-logo"><IconLogo size={72} big /></span>
+        <span className="start-logo"><IconLogo size={56} big /></span>
         <h2 id="cc-t">{t.title}</h2>
         <p className="muted">{t.body}</p>
         <input type="search" aria-label={t.search} placeholder={t.search} value={q} onChange={e => setQ(e.target.value)} data-testid="country-search" autoComplete="off" />

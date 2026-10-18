@@ -89,6 +89,9 @@ small, .small { font-size: 14px; }
 .content:is([data-screen="notifications"], [data-screen="contactsHome"], [data-screen="opportunities"], [data-screen="listing"], [data-screen="contacts"], [data-screen="activity"], [data-screen="todo"], [data-screen="calendar"], [data-screen="gps"], [data-screen="houseShopping"], [data-screen="banners"], [data-screen="finance"], [data-screen="projects"], [data-screen="adTracker"], [data-screen="adSummary"], [data-screen="profile"], [data-screen="settings"], [data-screen="recentlyDeleted"], [data-screen="history"], [data-screen="expert"], [data-screen="cobroke"], [data-screen="creativeMedia"], [data-screen="buyerHistory"], [data-screen="team"], [data-screen="manageSharing"], [data-screen="exports"], [data-screen="trackSales"]) { padding-top: calc(14px + 10dvh); }
 /* A page with the floating Save keeps room so its last field can scroll clear of the Save bar. */
 .content:has(.save-bar.floating) { padding-bottom: 110px; }
+/* Changes 66 / 71 (JoyChange003): with the keyboard open the page has spare room under its last field, and lists keep scrolling. */
+html.kb-open .content, html.kb-open .content:has(.save-bar.floating) { padding-bottom: calc(var(--kb-room, 0px) + 110px); }
+.content, .opt-list, .dialog { touch-action: pan-y; }
 .stack { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .stack-sm { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .between { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -233,7 +236,10 @@ label.btn { position: relative; cursor: pointer; }
    with a full 44 px touch area around it. */
 .opt-field { position: relative; display: flex; align-items: stretch; gap: 6px; }
 .opt-field .opt-btn { flex: 1 1 auto; min-width: 0; }
-.opt-field.locked .opt-btn { opacity: .85; cursor: default; border-style: dashed; }
+.opt-pop { gap: 6px; padding: 12px; max-height: 100%; }
+.opt-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.opt-pop .opt-list { border: 0; box-shadow: none; background: transparent; padding: 0; overflow-y: auto; min-height: 0; max-height: min(60dvh, 440px); }
+.opt-btn[aria-expanded="true"] { border-radius: 10px; }
 .fx-btns { display: flex; align-items: center; gap: 6px; flex: none; }
 .fx-btn { position: relative; width: 32px; height: 32px; min-width: 32px; min-height: 32px; padding: 0; flex: none; align-self: center; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 8px; border: 1px solid var(--line-2); background: #1E1B15; cursor: pointer; }
@@ -723,7 +729,7 @@ label.btn { position: relative; cursor: pointer; }
 
 /* New-user start choice */
 .start-scrim { z-index: 60; align-items: flex-start; padding-top: max(16px, 6vh); }
-.start-scrim .sheet { max-height: calc(100vh - max(16px, 6vh) - 12px); }
+.start-scrim .sheet { max-height: calc(100dvh - max(16px, 6dvh) - 24px - var(--ad-h, 0px)); }
 .start-choice { align-items: stretch; text-align: center; gap: 12px; }
 .start-logo { display: flex; justify-content: center; }
 .choice-card { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 16px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); }
@@ -1307,7 +1313,9 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 }
 
 /* JoyChange002 Change 46: the first-login country pick. */
-.country-choice { gap: 10px; max-height: 100%; }
-.country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 140px; max-height: 42vh; border: 1px solid var(--box-line); border-radius: 12px; padding: 4px; }
+/* Change 88 (JoyChange003): a shorter country list, and the Continue button always visible above the ad (it stays at the bottom of the card). */
+.country-choice { gap: 8px; }
+.country-choice > .btn.primary { position: sticky; bottom: 0; flex: none; }
+.country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 96px; max-height: min(26dvh, 220px); flex: 0 1 auto; border: 1px solid var(--box-line); border-radius: 12px; padding: 4px; }
 .country-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--ink); font-weight: 600; }
 .country-row.on { border-color: var(--gold-lo); background: #2A2312; color: var(--gold-hi); }

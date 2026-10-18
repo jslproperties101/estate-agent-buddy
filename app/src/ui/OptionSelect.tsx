@@ -2,16 +2,18 @@
 //  - Choosing Others lets the agent type a new value; it is saved to the remembered list and chosen.
 //  - Custom values show first (most recently used on top) and can be removed with ✕.
 //  - Built-in values cannot be removed. Others is always available.
-// The list opens inside the page (not a floating pop-up), so long words in any language wrap instead of being cut.
+// JoyChange003 Change 82: the list opens as a pop-up card in the middle of the screen (the same card every dialog uses), so
+// long words in any language wrap instead of being cut. Change 51: tapping the field opens the list at once; the pencil and the X
+// live only inside the list (on remembered entries); "Not Set" in the list empties the field; the last entry is "+ Add New".
 // Change 009: a longer list opens with a search box: typing filters the list at once (letters anywhere in the value), and
 // a value that is not in the list can be added straight from the search ("Add …"), then it is remembered with an ✕.
 // ClaudeChanges001 (owner, 17 Oct 2026): every list has the search box (change 9), and a remembered value shows only its
 // ✕, without "Saved by you" (change 6).
 // JoyChange002 Change 36: every remembered entry has a pencil (rename in place) and an X (delete), the pencil first, each in
 // its own small bordered square. Deleting asks first; an address entry with entries saved under it, or used by saved
-// properties, explains what would go with it (listing/optionEdit.ts) and offers Edit / Rename instead. A field whose
-// value is already saved is locked: it opens only with its pencil, and its X asks before emptying it. A value chosen in
-// this visit stays open and its X empties it at once.
+// properties, explains what would go with it (listing/optionEdit.ts) and offers Edit / Rename instead.
+// Change 51 (JoyChange003) removed the field lock of Change 36: the field always opens with one tap, and a value chosen in
+// this visit is emptied with "Not Set" in the list.
 import { useId, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { strings, Lang } from '../i18n';
@@ -24,7 +26,7 @@ import { countBelow, propertiesUsing, optionsAfterDelete, optionsAfterRename, re
 
 export interface Choice { value: string; label?: string }
 
-export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, savedValue }: {
+export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate }: {
   lang: Lang; label: string; listKey: string; builtIns: Choice[]; value?: string; onChange: (v: string | undefined) => void;
   allowEmpty?: boolean; emptyLabel?: string; testId?: string; hint?: string;
   /** A Field Help "?" shown after the label. */
@@ -32,7 +34,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   normalise?: (v: string) => string;
   /** Returns an error message for a typed value that cannot be used. */
   validate?: (v: string) => string | null;
-  /** Change 36: the value as last saved; while the field still holds it, the field is locked until its pencil is tapped. */
+  /** Kept so existing callers still compile; Change 51 removed the lock, so it is ignored. */
   savedValue?: string;
 }) {
   const { state, store } = useApp();
@@ -44,12 +46,10 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   const [q, setQ] = useState('');
   const x36 = c036Strings[lang];
   const toast = useToast();
-  const [unlocked, setUnlocked] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [renameErr, setRenameErr] = useState<string | null>(null);
-  const [ask, setAsk] = useState<null | { kind: 'field' | 'simple' | 'below' | 'props'; value: string; n: number }>(null);
-  const locked = !!value && savedValue !== undefined && value === savedValue && !unlocked;
+  const [ask, setAsk] = useState<null | { kind: 'simple' | 'below' | 'props'; value: string; n: number }>(null);
   const customs = [...(state.options[listKey] ?? [])].sort((a, b) => b.used - a.used)
     .filter(o => !builtIns.some(b => b.value.toLowerCase() === o.value.toLowerCase()));
   const searchable = true;   // ClaudeChanges001 change 9: every list can be searched
@@ -60,6 +60,7 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   const exact = [...builtIns.map(b => b.value), ...customs.map(o => o.value)].some(x => norm(x) === norm(q.trim()));
   const labelOf = (v?: string) => (v === undefined || v === '' ? emptyLabel ?? c.notSet : builtIns.find(b => b.value === v)?.label ?? v);
 
+  function close() { setOpen(false); setTyping(null); setErr(null); setQ(''); setRenaming(null); setRenameErr(null); }
   function pick(v: string | undefined) {
     onChange(v);
     if (v && customs.some(o => o.value === v)) store.touchOption(listKey, v);
@@ -94,11 +95,6 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
     if (value === v) onChange(undefined);
     setAsk(null);
   }
-  function clearField() {
-    if (value !== undefined && value === savedValue) { setAsk({ kind: 'field', value, n: 0 }); return; }
-    onChange(undefined); setUnlocked(true);
-  }
-
   function addTyped(text = typing ?? '') {
     const v = (normalise ? normalise(text) : text).trim();
     if (!v) return;
@@ -113,22 +109,19 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   return (
     <div className="ff opt" data-testid={testId}>
       <span><span id={`${id}-l`}>{label}</span></span>
-      <div className={`opt-field ${locked ? 'locked' : ''}`}>
-        <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} aria-disabled={locked || undefined}
-          data-locked={locked ? 'yes' : undefined} onClick={() => { if (!locked) setOpen(o => !o); }}>
-          <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span>{!locked && <span aria-hidden="true" className="opt-caret">▾</span>}
+      <div className="opt-field">
+        <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}>
+          <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span><span aria-hidden="true" className="opt-caret">▾</span>
         </button>
-        {value && (
-          <span className="fx-btns">
-            <button type="button" className="fx-btn fx-edit" data-testid={testId ? `${testId}-edit` : undefined} aria-label={x36.editField(label)} title={x36.editField(label)}
-              onClick={() => { setUnlocked(true); setOpen(true); }}><IconPencil size={15} /></button>
-            {allowEmpty && <button type="button" className="fx-btn fx-x" data-testid={testId ? `${testId}-clear` : undefined} aria-label={x36.clearField(label)} title={x36.clearField(label)}
-              onClick={clearField}><IconClose size={15} /></button>}
-          </span>
-        )}
       </div>
       {hint && <small className="muted">{hint}</small>}
       {open && (
+        <div className="scrim opt-scrim" role="presentation" data-testid="opt-popup" onClick={e => { if (e.target === e.currentTarget) close(); }}
+          onKeyDown={e => { if (e.key === 'Escape') close(); }}>
+        <div className="dialog opt-pop" role="dialog" aria-modal="true" aria-labelledby={`${id}-l`}>
+        <div className="opt-pop-head"><strong>{label}</strong>
+          <button type="button" className="fx-btn opt-pop-close" data-testid="opt-popup-close" aria-label={c.cancel} title={c.cancel} onClick={close}><IconClose size={15} /></button>
+        </div>
         <div className="opt-list" role="listbox" aria-labelledby={`${id}-l`}>
           {searchable && (
             <div className="opt-search">
@@ -180,9 +173,9 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
               </div>
             )}
         </div>
+        </div>
+        </div>
       )}
-      {ask?.kind === 'field' && <Confirm lang={lang} title={x36.fieldQ} body={x36.fieldBody} okLabel={x36.del}
-        onCancel={() => setAsk(null)} onOk={() => { setAsk(null); onChange(undefined); setUnlocked(true); }} />}
       {ask?.kind === 'simple' && <Confirm lang={lang} title={x36.simpleQ(ask.value)} body={x36.simpleBody} okLabel={x36.del}
         onCancel={() => setAsk(null)} onOk={() => doDelete(ask.value)} />}
       {ask?.kind === 'below' && (
