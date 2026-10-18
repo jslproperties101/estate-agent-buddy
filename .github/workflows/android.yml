@@ -103,7 +103,7 @@ jobs:
 
   android:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).
-    # "qa"   = the isolated QA APK (separate package name and storage, automatic updates OFF, release tag qa-<commit>).
+    # "qa"   = the isolated QA APK (separate package name and storage, updates itself from its own beta-updates list, release tag qa-<commit>).
     # Integrated release 2.0.010 (Oct 2026), narrowest safe change:
     #   - a branch whose name contains "qa", or a dated change branch starting with "2." (owner, 17 Oct 2026), builds
     #     ONLY the QA APK (no normal-package APK is built or offered there);
@@ -160,6 +160,27 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.variant == 'prod'
         with: { name: site, path: site }
+      - name: Update list for the QA app (automatic updates for the QA APK only)
+        # JoyChange003: the installed QA app reads this list and downloads the newest QA screens and logic by itself.
+        # It lives on its own branch (beta-updates: the name has no "qa" so it never starts a build) and is rewritten from
+        # scratch each time, so the repository does not grow. The real app's list (GitHub Pages) is never touched.
+        if: matrix.variant == 'qa' && env.PUBLISH_APK == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
+          VERSION=$(node -p "require('./package.json').version")
+          OUTD=$(mktemp -d)
+          (cd dist && zip -qr "$OUTD/bundle-${SHORT}.zip" .)
+          BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/beta-updates"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/qa-${SHORT}/EstateAgentBuddy-QA-${SHORT}-debug.apk"
+          printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
+            "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > "$OUTD/latest.json"
+          cat "$OUTD/latest.json"
+          cd "$OUTD" && git init -q -b beta-updates && git config user.name "github-actions" && git config user.email "actions@users.noreply.github.com"
+          git add -A && git commit -q -m "QA update list for ${SHORT}"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" beta-updates
       - name: Android project
         run: |
           npx cap add android
@@ -215,7 +236,7 @@ jobs:
             if [ "$EAB_QA" = "1" ]; then
               echo "**QA APK (isolated test app)** for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
               echo
-              echo "Package com.jslproperties.estateagentbuddy.qa, app name EAB QA: installs BESIDE your real app, with its own empty storage. Automatic updates are OFF, so it keeps running exactly this commit. Settings -> About shows the commit and says QA."
+              echo "Package com.jslproperties.estateagentbuddy.qa, app name EAB QA: installs BESIDE your real app, with its own empty storage. It updates itself from newer QA builds (never from the real app's updates); Settings -> About shows the commit it is running. Settings -> About shows the commit and says QA."
             else
               echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}. WARNING: same package as your real app; it installs over it and may switch itself to the production bundle. For testing use the QA APK."
             fi

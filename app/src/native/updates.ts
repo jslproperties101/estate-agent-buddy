@@ -45,7 +45,10 @@ export function nativeVersionOf(versionName: string | undefined): number {
 function override(): string | null {
   try { return localStorage.getItem('eab-update-manifest'); } catch { return null; }
 }
-const manifestUrl = () => override() || UPDATE_MANIFEST;
+/** JoyChange003: the QA build updates itself too, but only from its OWN list (the beta-updates branch, written by the QA build in
+ *  GitHub Actions). It can never see the real app's list above, so the QA test app and the real app stay separate. */
+export const QA_UPDATE_MANIFEST = 'https://raw.githubusercontent.com/jslproperties101/estate-agent-buddy/beta-updates/latest.json';
+const manifestUrl = () => override() || (BUILD.qa ? QA_UPDATE_MANIFEST : UPDATE_MANIFEST);
 
 /** Tells the updater this version started properly (otherwise it rolls back to the previous version). */
 export async function appReady(): Promise<void> {
@@ -60,8 +63,7 @@ export async function installedNativeVersion(): Promise<number> {
 
 /** Checks GitHub Pages for a newer version and, in the Android app, downloads it ready for the next start. */
 export async function checkForUpdate(fetchFn: typeof fetch = fetch): Promise<UpdateState> {
-  // The isolated QA build never looks for, downloads or switches to another bundle (it must keep running the commit it was built from).
-  if (BUILD.qa) return { kind: 'none' };
+  // The QA build only ever looks at the QA list (QA_UPDATE_MANIFEST); it never sees the real app's list.
   // The single-file copy opened from the phone's storage cannot update itself.
   // On the web, only the published site checks (not a copy opened from the phone's storage or a local test server).
   if (!isNative() && !override() && !(typeof window !== 'undefined' && window.location.hostname.endsWith('github.io'))) return { kind: 'none' };

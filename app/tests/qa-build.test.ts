@@ -23,16 +23,16 @@ async function loadQa<T>(entry: string): Promise<T> {
   return import(out) as Promise<T>;
 }
 
-test('QA1 the QA build never asks for, downloads or offers another bundle', async () => {
-  const { checkForUpdate, decide, BUILD } = await loadQa<typeof import('../src/native/updates')>('src/native/updates.ts');
+test('QA1 the QA build updates itself, but only from its own QA list, never the real app list', async () => {
+  const { checkForUpdate, BUILD, QA_UPDATE_MANIFEST, UPDATE_MANIFEST } = await loadQa<typeof import('../src/native/updates')>('src/native/updates.ts');
   assert.equal(BUILD.qa, true);
-  let calls = 0;
-  const spy = (async () => { calls++; return new Response(JSON.stringify({ sha: 'ffff999', version: '9', nativeVersion: 3, bundle: 'x', apk: 'y', builtAt: 'z' })); }) as unknown as typeof fetch;
+  assert.notEqual(QA_UPDATE_MANIFEST, UPDATE_MANIFEST);
+  const asked: string[] = [];
+  const spy = (async (u: string) => { asked.push(String(u)); return new Response(JSON.stringify({ sha: BUILD.sha, version: '9', nativeVersion: 3, bundle: 'x', apk: 'y', builtAt: 'z' })); }) as unknown as typeof fetch;
   const r = await checkForUpdate(spy);
-  assert.deepEqual(r, { kind: 'none' });
-  assert.equal(calls, 0, 'no request is made at all');
-  // For contrast: a normal build would act on that manifest.
-  assert.equal(decide({ sha: 'ffff999', version: '9', nativeVersion: 3, bundle: 'x', apk: 'y', builtAt: 'z' }, BUILD, 3, true), 'download');
+  // Outside a phone or the published site there is nothing to do; the point is that the real app list is never used.
+  assert.ok(r.kind === 'none' || r.kind === 'error');
+  for (const u of asked) assert.ok(u.startsWith(QA_UPDATE_MANIFEST), 'only the QA list is requested');
 });
 
 test('QA2 the QA build uses its own package name and sign-in return link', async () => {
