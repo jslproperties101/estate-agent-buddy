@@ -217,7 +217,7 @@ export function MoneyForm({ lang, back, id, kind }: { lang: Lang; back: () => vo
     <section className="stack" data-testid={`${kind}-form`}>
       <div className="card stack-sm">
         <label className="ff">{strings[lang].c.date}<input type="date" value={date} onChange={e => setDate(e.target.value || date)} /></label>
-        <OptionSelect lang={lang} label={kind === 'expense' ? f.f.category : f.f.source} listKey={kind === 'expense' ? 'expenseCategory' : 'incomeSource'} builtIns={builtIns} value={cat} onChange={setCat} />
+        <OptionSelect lang={lang} label={kind === 'expense' ? f.f.category : f.f.source} listKey={kind === 'expense' ? 'expenseCategory' : 'incomeSource'} builtIns={builtIns} value={cat} savedValue={existing ? ('category' in existing ? existing.category : existing.source) : undefined} onChange={setCat} />
         <label className="ff">{f.f.amount}<MoneyInput data-field="amount" aria-invalid={err} value={amount} onChange={n => { setAmount(n); setErr(false); }} /></label>
         {err && <p className="error" role="alert">{f.required}</p>}
         <label className="ff">{f.f.note}<input value={note} onChange={e => setNote(e.target.value)} /></label>

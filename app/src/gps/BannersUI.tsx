@@ -5,6 +5,7 @@
 //  - A banner position comes from the phone's GPS at the banner, a tap on Google Maps, or typed coordinates. Positions
 //    are never invented: without Google Maps the banners are listed with their coordinates and a Navigate button.
 //  - Adding a banner sets the property's status to Yes; taking down the last one sets it to Removed (domain/banners).
+import { useRemembered } from '../ui/screenMemory';
 import { useEffect, useMemo, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -41,7 +42,7 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
   const s = listingStrings[lang];
   const toast = useToast();
   const { maps, status } = useGoogleMaps(lang);
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useRemembered<Filter>('filter', 'all');
   const [sel, setSel] = useState<string | undefined>(propertyId);
   const [adding, setAdding] = useState<string | null>(null);
   const [editing, setEditing] = useState<Banner | null>(null);

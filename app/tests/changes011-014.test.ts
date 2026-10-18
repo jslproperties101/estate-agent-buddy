@@ -138,7 +138,7 @@ test('C14-1 check status: Frontage, Depth, Lot Type and the building specificati
   let l = { id: 'p', created: 1, updated: 1, photos: [], ceilingFt: 28, zoning: 'Industrial' } as Listing;
   l = withVerification(withVerification(l, 'ceilingFt', 'confirmed'), 'zoning', 'unknown');
   assert.equal(shownState(l, 'ceilingFt'), 'confirmed');
-  assert.equal(shownState(l, 'zoning'), 'unknown');
+  assert.equal(shownState(l, 'zoning'), 'check', 'Change 35: Unknown is stored and shown as Need to check');
   assert.equal(shownState(l, 'powerKva'), undefined);
   // an old commission mark stays stored but is no longer shown; the commission figure is unchanged
   const old = { id: 'p', created: 1, updated: 1, photos: [], purpose: 'sale', askingPrice: 1_000_000, commissionPct: 2, verification: { commissionPct: 'confirmed' } } as unknown as Listing;

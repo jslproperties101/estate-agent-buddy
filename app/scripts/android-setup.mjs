@@ -55,6 +55,10 @@ edit(`${A}/AndroidManifest.xml`, s => {
   if (!s.includes('android.speech.RecognitionService')) {
     s = s.replace(/<application/, '<queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n\n    <application');
   }
+  // JoyChange002 Change 30: the page shrinks above the keyboard (rather than the keyboard covering it), so a field being
+  // typed in and any pop-up can be moved into the visible part. Replaces any other soft-input mode on the main activity.
+  s = s.replace(/(<activity[^>]*android:name="[^"]*MainActivity"[^>]*?)\s+android:windowSoftInputMode="[^"]*"/, '$1');
+  s = s.replace(/(<activity)([^>]*android:name="[^"]*MainActivity")/, '$1 android:windowSoftInputMode="adjustResize"$2');
   // The Capacitor template normally already has this filter; add it if not.
   if (!s.includes('@string/custom_url_scheme') && !s.includes(`android:scheme="${APP_ID}"`)) {
     s = s.replace(/(<activity[^>]*android:name="[^"]*MainActivity"[\s\S]*?)(<\/activity>)/, `$1

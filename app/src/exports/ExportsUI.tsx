@@ -1,5 +1,6 @@
 // Change 010: the audit-history export screen (preview and confirmation first, progress with Cancel, then save/share
 // or keep in the app) and Export Management (Saved Exports and Deleted Exports).
+import { useRemembered } from '../ui/screenMemory';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lang } from '../i18n';
 import type { Go } from '../nav';
@@ -150,7 +151,7 @@ export function ExportManagementScreen({ lang, go, section }: { lang: Lang; go: 
   const [tab, setTabRaw] = useState<Section>(section ?? state.settings.exportSection ?? 'saved');
   const setTab = (t: Section) => { setSel([]); setTabRaw(t); store.setSingleton('settings', { exportSection: t }); };
   const [all, setAll] = useState<SavedExport[] | null>(null);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useRemembered('q', '');
   const [fRec, setFRec] = useState('');
   const [fDate, setFDate] = useState('');
   const [fFmt, setFFmt] = useState('');

@@ -1,4 +1,5 @@
 // To-Do, Calendar, appointments, inquiries: real records saved on the phone, with reminders.
+import { useRemembered } from '../ui/screenMemory';
 import { useMemo, useRef, useState } from 'react';
 import { useDraft } from '../ui/useDraft';
 import { DraftBanner } from '../ui/DraftBanner';
@@ -30,7 +31,7 @@ const joinDT = (d: string, t: string) => (d ? (t ? `${d}T${t}` : d) : undefined)
 export function ActivityScreen({ lang, go, propertyId, contactId, tab }: { lang: Lang; go: Go; propertyId?: string; contactId?: string; tab?: 'inquiries' | 'viewings' }) {
   const a = agendaStrings[lang];
   const { state } = useApp();
-  const [t, setT] = useState<'inquiries' | 'viewings'>(tab ?? 'inquiries');
+  const [t, setT] = useRemembered<'inquiries' | 'viewings'>('tab', tab ?? 'inquiries');
   const prop = state.properties.find(p => p.id === propertyId);
   const contact = state.contacts.find(c => c.id === contactId);
   const scoped = (x: { propertyId?: string; contactId?: string }) => (!propertyId || x.propertyId === propertyId) && (!contactId || x.contactId === contactId);
@@ -227,7 +228,7 @@ export function TodoScreen({ lang, go }: { lang: Lang; go: Go }) {
     for (const k of Object.keys(b) as TaskBucket[]) b[k] = sortTasks(b[k]);
     return b;
   }, [state.tasks, state.meta.shared, state.meta.team, by]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [tab, setTab] = useState<TaskBucket>(buckets.overdue.length ? 'overdue' : 'today');
+  const [tab, setTab] = useRemembered<TaskBucket>('tab', buckets.overdue.length ? 'overdue' : 'today');
   const order: TaskBucket[] = ['overdue', 'today', 'upcoming', 'someday', 'done'];
   return (
     <section className="stack" data-testid="todo">
@@ -341,11 +342,11 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
   const { state, store } = useApp();
   const a = agendaStrings[lang];
   const today = ymd(new Date());
-  const [sel, setSel] = useState(date ?? today);
-  const [view, setView] = useState<'month' | 'week'>('month');
-  const [filter, setFilter] = useState<'all' | 'open' | 'completed' | 'cancelled'>('all');
+  const [sel, setSel] = useRemembered('sel', date ?? today);
+  const [view, setView] = useRemembered<'month' | 'week'>('view', 'month');
+  const [filter, setFilter] = useRemembered<'all' | 'open' | 'completed' | 'cancelled'>('filter', 'all');
   const selDate = parseLocal(sel)!;
-  const [month, setMonth] = useState({ y: selDate.getFullYear(), m: selDate.getMonth() });
+  const [month, setMonth] = useRemembered('month', { y: selDate.getFullYear(), m: selDate.getMonth() });
   const days = view === 'month' ? monthGrid(month.y, month.m) : weekOf(selDate);
   const weekdayNames = weekOf(new Date(2026, 9, 12)).map(d => d.toLocaleDateString(localeOf(lang), { weekday: 'short' }));
   // Change 16: my own and shared entries together; Change 15: "Created by" filter (appointments and To-Dos alike).

@@ -18,16 +18,16 @@ const prop = (id: string, extra: Partial<Listing> = {}): Listing => ({ id, creat
 const sync = (s: Store, c: FakeCloud) => syncNow(s, cfg, c.fetch);
 const get = (s: Store, id: string) => s.getState().properties.find(p => p.id === id)!;
 
-test('S3-1 the four agreed states are exactly Confirmed, Owner stated, Need to check, Unknown', () => {
-  assert.deepEqual([...VERIFY_STATES], ['confirmed', 'owner', 'check', 'unknown']);
+test('S3-1 the three agreed states (Change 35: Unknown removed) are exactly Confirmed, Owner stated, Need to check', () => {
+  assert.deepEqual([...VERIFY_STATES], ['confirmed', 'owner', 'check']);
   for (const lang of ['en', 'bm', 'zh'] as const) {
     const v = listingStrings[lang].verify;
     const labels = VERIFY_STATES.map(k => v[k]);
-    assert.equal(new Set(labels).size, 4, `${lang}: four different labels`);
+    assert.equal(new Set(labels).size, 3, `${lang}: three different labels`);
     assert.ok(labels.every(Boolean));
   }
   // Change 009: labels in Title Case.
-  assert.deepEqual(VERIFY_STATES.map(k => listingStrings.en.verify[k]), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
+  assert.deepEqual(VERIFY_STATES.map(k => listingStrings.en.verify[k]), ['Confirmed', 'Owner Stated', 'Need to Check']);
 });
 
 test('S3-2 setting, changing and clearing a state changes only that field and never touches the value', () => {
@@ -47,11 +47,12 @@ test('S3-2 setting, changing and clearing a state changes only that field and ne
   assert.ok(!(VERIFIABLE_FIELDS as readonly string[]).includes('askingPrice') && !(VERIFIABLE_FIELDS as readonly string[]).includes('monthlyRent'));
 });
 
-test('S3-3 unknown or damaged values are never shown as a state; "to check" lists Need to check and Unknown only', () => {
+test('S3-3 damaged values are never shown as a state; an old Unknown mark reads as Need to check (Change 35); "to check" lists Need to check only', () => {
   const l = prop('p1', { verification: { landSqft: 'owner', tenure: 'check', titleType: 'unknown', bedrooms: 'confirmed', parking: 'bogus' as never, headline: 'check' as never } });
   assert.equal(verifyStateOf(l, 'parking'), undefined);
   assert.deepEqual(toCheck(l).sort(), ['tenure', 'titleType']);
-  assert.deepEqual(verifyCounts(l), { confirmed: 1, owner: 1, check: 1, unknown: 1 });
+  assert.equal(verifyStateOf(l, 'titleType'), 'check');
+  assert.deepEqual(verifyCounts(l), { confirmed: 1, owner: 1, check: 2 });
 });
 
 test('S3-4 the state is stored with the record: it survives closing and reopening, and an empty field keeps its mark', async () => {

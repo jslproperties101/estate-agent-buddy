@@ -7,13 +7,24 @@
 // a value that is not in the list can be added straight from the search ("Add …"), then it is remembered with an ✕.
 // ClaudeChanges001 (owner, 17 Oct 2026): every list has the search box (change 9), and a remembered value shows only its
 // ✕, without "Saved by you" (change 6).
+// JoyChange002 Change 36: every remembered entry has a pencil (rename in place) and an X (delete), the pencil first, each in
+// its own small bordered square. Deleting asks first; an address entry with entries saved under it, or used by saved
+// properties, explains what would go with it (listing/optionEdit.ts) and offers Edit / Rename instead. A field whose
+// value is already saved is locked: it opens only with its pencil, and its X asks before emptying it. A value chosen in
+// this visit stays open and its X empties it at once.
 import { ReactNode, useId, useState } from 'react';
 import { useApp } from '../data/useStore';
 import { strings, Lang } from '../i18n';
+import { ChoiceDialog, Confirm } from './common';
+import { c036Strings } from './c036Strings';
+import { IconPencil, IconClose } from '../icons';
+import { useToast } from './toast';
+import { isForeign } from '../team/access';
+import { countBelow, propertiesUsing, optionsAfterDelete, optionsAfterRename, renamedIn, clearedIn } from '../listing/optionEdit';
 
 export interface Choice { value: string; label?: string }
 
-export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, help }: {
+export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, help, savedValue }: {
   lang: Lang; label: string; listKey: string; builtIns: Choice[]; value?: string; onChange: (v: string | undefined) => void;
   allowEmpty?: boolean; emptyLabel?: string; testId?: string; hint?: string;
   /** A Field Help "?" shown after the label. */
@@ -22,6 +33,8 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   normalise?: (v: string) => string;
   /** Returns an error message for a typed value that cannot be used. */
   validate?: (v: string) => string | null;
+  /** Change 36: the value as last saved; while the field still holds it, the field is locked until its pencil is tapped. */
+  savedValue?: string;
 }) {
   const { state, store } = useApp();
   const c = strings[lang].c;
@@ -30,6 +43,14 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   const [typing, setTyping] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const x36 = c036Strings[lang];
+  const toast = useToast();
+  const [unlocked, setUnlocked] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [renameErr, setRenameErr] = useState<string | null>(null);
+  const [ask, setAsk] = useState<null | { kind: 'field' | 'simple' | 'below' | 'props'; value: string; n: number }>(null);
+  const locked = !!value && savedValue !== undefined && value === savedValue && !unlocked;
   const customs = [...(state.options[listKey] ?? [])].sort((a, b) => b.used - a.used)
     .filter(o => !builtIns.some(b => b.value.toLowerCase() === o.value.toLowerCase()));
   const searchable = true;   // ClaudeChanges001 change 9: every list can be searched
@@ -45,6 +66,40 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
     if (v && customs.some(o => o.value === v)) store.touchOption(listKey, v);
     setOpen(false); setTyping(null); setErr(null); setQ('');
   }
+  // ---------- Change 36 ----------
+  const affected = (v: string) => propertiesUsing(store.getState().properties, listKey, v).filter(p => !isForeign(store.getState(), 'properties', p.id));
+  function startRename(v: string) { setAsk(null); setRenaming(v); setRenameText(v); setRenameErr(null); }
+  function doRename(from: string) {
+    const to = (normalise ? normalise(renameText) : renameText).trim();
+    if (!to) { setRenameErr(x36.emptyName); return; }
+    if (to === from) { setRenaming(null); return; }
+    const problem = validate?.(to);
+    if (problem) { setRenameErr(problem); return; }
+    if (builtIns.some(b => b.value.toLowerCase() === to.toLowerCase())) { setRenameErr(x36.taken); return; }
+    const props = affected(from);
+    store.setSingleton('options', optionsAfterRename(store.getState().options, listKey, from, to));
+    for (const p of props) store.upsert('properties', renamedIn(p, listKey, to));
+    if (value === from) onChange(to);
+    setRenaming(null);
+    toast(x36.renamed(props.length));
+  }
+  function askDelete(v: string) {
+    const below = countBelow(store.getState().options, listKey, v);
+    const n = affected(v).length;
+    setAsk(below ? { kind: 'below', value: v, n: below } : n ? { kind: 'props', value: v, n } : { kind: 'simple', value: v, n: 0 });
+  }
+  function doDelete(v: string) {
+    const props = affected(v);
+    store.setSingleton('options', optionsAfterDelete(store.getState().options, listKey, v));
+    for (const p of props) store.upsert('properties', clearedIn(p, listKey));
+    if (value === v) onChange(undefined);
+    setAsk(null);
+  }
+  function clearField() {
+    if (value !== undefined && value === savedValue) { setAsk({ kind: 'field', value, n: 0 }); return; }
+    onChange(undefined); setUnlocked(true);
+  }
+
   function addTyped(text = typing ?? '') {
     const v = (normalise ? normalise(text) : text).trim();
     if (!v) return;
@@ -59,9 +114,20 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   return (
     <div className="ff opt" data-testid={testId}>
       <span><span id={`${id}-l`}>{label}</span>{help}</span>
-      <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}>
-        <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span><span aria-hidden="true" className="opt-caret">▾</span>
-      </button>
+      <div className={`opt-field ${locked ? 'locked' : ''}`}>
+        <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} aria-disabled={locked || undefined}
+          data-locked={locked ? 'yes' : undefined} onClick={() => { if (!locked) setOpen(o => !o); }}>
+          <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span>{!locked && <span aria-hidden="true" className="opt-caret">▾</span>}
+        </button>
+        {value && (
+          <span className="fx-btns">
+            <button type="button" className="fx-btn fx-edit" data-testid={testId ? `${testId}-edit` : undefined} aria-label={x36.editField(label)} title={x36.editField(label)}
+              onClick={() => { setUnlocked(true); setOpen(true); }}><IconPencil size={15} /></button>
+            {allowEmpty && <button type="button" className="fx-btn fx-x" data-testid={testId ? `${testId}-clear` : undefined} aria-label={x36.clearField(label)} title={x36.clearField(label)}
+              onClick={clearField}><IconClose size={15} /></button>}
+          </span>
+        )}
+      </div>
       {hint && <small className="muted">{hint}</small>}
       {open && (
         <div className="opt-list" role="listbox" aria-labelledby={`${id}-l`}>
@@ -80,13 +146,24 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
             </div>
           )}
           {allowEmpty && !q.trim() && <button type="button" role="option" aria-selected={!value} className="opt-item" onClick={() => pick(undefined)}>{emptyLabel ?? c.notSet}</button>}
-          {shownCustoms.map(o => (
+          {shownCustoms.map(o => renaming === o.value ? (
+            <div key={`c-${o.value}`} className="opt-rename" data-testid="opt-rename">
+              <input autoFocus aria-label={x36.renameLabel} value={renameText} aria-invalid={!!renameErr}
+                onChange={e => { setRenameText(e.target.value); setRenameErr(null); }}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); doRename(o.value); } if (e.key === 'Escape') setRenaming(null); }} />
+              <button type="button" className="btn small primary" data-testid="opt-rename-save" onClick={() => doRename(o.value)}>{x36.save}</button>
+              <button type="button" className="btn small ghost" onClick={() => setRenaming(null)}>{x36.cancel}</button>
+              {renameErr && <p className="error" role="alert">{renameErr}</p>}
+            </div>
+          ) : (
             <div key={`c-${o.value}`} className="opt-row">
               <button type="button" role="option" aria-selected={value === o.value} className="opt-item custom" onClick={() => pick(o.value)}>
                 {o.value}
               </button>
-              <button type="button" className="opt-x" aria-label={c.removeValue(o.value)} title={c.removeValue(o.value)}
-                onClick={() => { store.removeOption(listKey, o.value); }}>✕</button>
+              <button type="button" className="fx-btn fx-edit opt-edit" data-testid="opt-edit" aria-label={x36.edit(o.value)} title={x36.edit(o.value)}
+                onClick={() => startRename(o.value)}><IconPencil size={15} /></button>
+              <button type="button" className="fx-btn fx-x opt-x" data-testid="opt-x" aria-label={c.removeValue(o.value)} title={c.removeValue(o.value)}
+                onClick={() => askDelete(o.value)}><IconClose size={15} /></button>
             </div>
           ))}
           {shownBuiltIns.map(b => (
@@ -104,6 +181,22 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
               </div>
             )}
         </div>
+      )}
+      {ask?.kind === 'field' && <Confirm lang={lang} title={x36.fieldQ} body={x36.fieldBody} okLabel={x36.del}
+        onCancel={() => setAsk(null)} onOk={() => { setAsk(null); onChange(undefined); setUnlocked(true); }} />}
+      {ask?.kind === 'simple' && <Confirm lang={lang} title={x36.simpleQ(ask.value)} body={x36.simpleBody} okLabel={x36.del}
+        onCancel={() => setAsk(null)} onOk={() => doDelete(ask.value)} />}
+      {ask?.kind === 'below' && (
+        <ChoiceDialog lang={lang} title={x36.belowQ(ask.value)} body={x36.belowBody(ask.n)} testId="opt-ask-below" cancelLabel={x36.cancel} onCancel={() => setAsk(null)} choices={[
+          { label: x36.del, danger: true, testId: 'opt-below-delete', onPick: () => { const n = affected(ask.value).length; if (n) setAsk({ kind: 'props', value: ask.value, n }); else doDelete(ask.value); } },
+          { label: x36.editInstead, testId: 'opt-below-edit', onPick: () => startRename(ask.value) },
+        ]} />
+      )}
+      {ask?.kind === 'props' && (
+        <ChoiceDialog lang={lang} title={x36.propsQ(ask.n)} body={x36.propsBody(ask.n)} testId="opt-ask-props" cancelLabel={x36.cancel} onCancel={() => setAsk(null)} choices={[
+          { label: x36.continueDel, danger: true, testId: 'opt-props-delete', onPick: () => doDelete(ask.value) },
+          { label: x36.rename, testId: 'opt-props-rename', onPick: () => startRename(ask.value) },
+        ]} />
       )}
     </div>
   );

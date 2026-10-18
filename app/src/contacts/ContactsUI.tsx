@@ -1,6 +1,7 @@
 // Contacts (one dashboard card) → Buyers or Vendors (one contact list, two views), contact page and contact form.
 // Buyers keep the lead colours: Blue = Cold, Yellow = Warm, Red = Hot, Gray = Dropped, Green = Booked / Bought.
 // Vendors have their own status system (Pending Property Info, Pending Follow-up, Listed, …), kept separate.
+import { useRemembered } from '../ui/screenMemory';
 import { useMemo, useState } from 'react';
 import { Lang, strings } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -91,8 +92,8 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
   const s = contactStrings[lang];
   const t = strings[lang];
   const toast = useToast();
-  const [q, setQ] = useState('');
-  const [lead, setLead] = useState<LeadStatus | VendorStatus | 'all'>('all');
+  const [q, setQ] = useRemembered('q', '');
+  const [lead, setLead] = useRemembered<LeadStatus | VendorStatus | 'all'>('lead', 'all');
   // Change 16: my own and shared contacts in one list; Change 15: "Created by" filter.
   const [by, setBy] = useCreatorFilter(`contacts-${role}`);
   const all = useMemo(() => byCreator(state, 'contacts', visible(state, 'contacts', state.contacts), by).filter(c => inRole(c, role)), [state, role, by]);
@@ -269,7 +270,7 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         )}
         {formVendor && <VendorStatusPicker lang={lang} value={d.vendorStatus} onChange={v => setD(x => ({ ...x, vendorStatus: v }))} />}
         {formBuyer && <LeadPicker lang={lang} value={d.leadStatus} onChange={v => setD(x => ({ ...x, leadStatus: v }))} />}
-        <OptionSelect lang={lang} label={s.f.source} listKey="leadSource" builtIns={s.sources.map(v => ({ value: v }))} value={d.source} onChange={v => setD(x => ({ ...x, source: v }))} />
+        <OptionSelect lang={lang} label={s.f.source} listKey="leadSource" builtIns={s.sources.map(v => ({ value: v }))} value={d.source} savedValue={existing?.source} onChange={v => setD(x => ({ ...x, source: v }))} />
         <label className="ff">{s.f.notes}<textarea rows={3} value={d.notes ?? ''} onChange={e => setD(x => ({ ...x, notes: e.target.value || undefined }))} /></label>
       </div>
       {d.roles.some(r => BUYER_ROLES.includes(r)) && <div className="card stack-sm"><RequirementsEditor lang={lang} value={d.requirements ?? []} onChange={v => setD(x => ({ ...x, requirements: v.length ? v : undefined }))} /></div>}

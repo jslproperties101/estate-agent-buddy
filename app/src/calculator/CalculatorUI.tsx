@@ -1,5 +1,6 @@
 // Button 9 — Property Calculator (Malaysia, RM): purchase and loan, entry costs, rental yield and ROI, sale with RPGT,
 // and agent commission. Every result shows its full breakdown. Rates are editable under Assumptions.
+import { useRemembered } from '../ui/screenMemory';
 import { PropertyRow } from '../ui/PropertyPicker';
 import { useMemo, useState } from 'react';
 import { Lang } from '../i18n';
@@ -53,7 +54,7 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
   const [updFor, setUpdFor] = useState<Calculation | null>(null);
   const [pdfFor, setPdfFor] = useState<Calculation | null>(null);
   const [delId, setDelId] = useState<string | null>(null);
-  const [histFilter, setHistFilter] = useState<'all' | 'property'>('all');
+  const [histFilter, setHistFilter] = useRemembered<'all' | 'property'>('histFilter', 'all');
   const prop = state.properties.find(pp => pp.id === propId);
   /** Rates saved with a calculation that was opened from History; until the agent chooses today's rates. */
   const [override, setOverride] = useState<Record<string, number> | undefined>(undefined);

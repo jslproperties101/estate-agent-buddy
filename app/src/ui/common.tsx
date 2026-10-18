@@ -120,7 +120,7 @@ export function Confirm({ lang, title, body, okLabel, danger = true, onOk, onCan
 
 /** A question with two or more answers (ClaudeChanges001: "Sold by you or by others?"). Cancel closes it. */
 export function ChoiceDialog({ lang, title, body, choices, onCancel, testId, cancelLabel }: {
-  lang: Lang; title: string; body?: string; choices: { label: string; onPick: () => void; primary?: boolean; testId?: string }[]; onCancel: () => void; testId?: string; cancelLabel?: string;
+  lang: Lang; title: string; body?: string; choices: { label: string; onPick: () => void; primary?: boolean; danger?: boolean; testId?: string }[]; onCancel: () => void; testId?: string; cancelLabel?: string;
 }) {
   const c = strings[lang].c;
   return (
@@ -128,7 +128,7 @@ export function ChoiceDialog({ lang, title, body, choices, onCancel, testId, can
       <div className="dialog stack-sm" role="alertdialog" aria-modal="true" aria-labelledby="cd-t" data-testid={testId}>
         <h2 id="cd-t">{title}</h2>
         {body && <p>{body}</p>}
-        {choices.map(ch => <button key={ch.label} type="button" className={`btn ${ch.primary ? 'primary' : 'secondary'}`} data-testid={ch.testId} onClick={ch.onPick}>{ch.label}</button>)}
+        {choices.map(ch => <button key={ch.label} type="button" className={`btn ${ch.danger ? 'danger' : ch.primary ? 'primary' : 'secondary'}`} data-testid={ch.testId} onClick={ch.onPick}>{ch.label}</button>)}
         <button type="button" className="btn ghost" data-testid={testId ? `${testId}-cancel` : undefined} onClick={onCancel}>{cancelLabel ?? c.cancel}</button>
       </div>
     </div>

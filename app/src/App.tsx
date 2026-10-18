@@ -2,6 +2,7 @@
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ScreenEntry, newEntryId, forgetEntry, saveScroll, savedScroll } from './ui/screenMemory';
 import { Lang, LANGS, strings, htmlLang } from './i18n';
 import { openBackend } from './data/backend';
 import { Store, AccessError } from './data/store';
@@ -94,6 +95,16 @@ import { ExportManagementScreen, AuditExportScreen } from './exports/ExportsUI';
 import { exportStrings } from './exports/strings';
 
 /** Change 015: the page content is the one scrolling region (main.content); a new screen starts at its top. */
+/** How far the screen is scrolled (the content area scrolls; the window on older layouts). */
+function contentScroll(): number {
+  try { return document.querySelector('main.content')?.scrollTop || window.scrollY || 0; } catch { return 0; }
+}
+/** Change 27: scrolls back to where the screen was left. Lists and photos may still be drawing, so it tries a few times. */
+function restoreScroll(y: number) {
+  const apply = () => { try { const el = document.querySelector('main.content'); if (el) el.scrollTop = y; window.scrollTo(0, y); } catch { /* old browser */ } };
+  apply();
+  for (const ms of [30, 120, 300, 600]) setTimeout(apply, ms);
+}
 function scrollTop() {
   try { document.querySelector('main.content')?.scrollTo(0, 0); } catch { /* old browser */ }
   window.scrollTo(0, 0);
@@ -231,6 +242,11 @@ function Shell() {
   const t = strings[lang];
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
   const stack = useRef<Screen[]>([]);
+  // Change 27: each place in the Back history has an id, so its scroll position and screen state come back with it.
+  const [entry, setEntry] = useState(() => newEntryId());
+  const entryRef = useRef(entry);
+  const ids = useRef<number[]>([]);
+  const restoreTo = useRef<number | undefined>(undefined);
   const [toast, setToast] = useState<{ text: string; kind: ToastKind } | null>(null);
   const [alerts, setAlerts] = useState<DueReminder[]>([]);
   useAutoSync();
@@ -286,7 +302,15 @@ function Shell() {
   useEffect(() => { document.documentElement.lang = htmlLang(lang); }, [lang]);
 
   const go: Go = useCallback((next, opts) => {
-    if (!opts?.replace) { stack.current.push(screen); window.history.pushState({ eab: stack.current.length }, ''); }
+    const cur = entryRef.current;
+    if (!opts?.replace) {
+      saveScroll(cur, contentScroll());
+      stack.current.push(screen); ids.current.push(cur);
+      window.history.pushState({ eab: stack.current.length }, '');
+    } else forgetEntry(cur);
+    const id = newEntryId();
+    entryRef.current = id; setEntry(id);
+    restoreTo.current = undefined;
     setScreen(next);
     scrollTop();
   }, [screen]);
@@ -295,10 +319,20 @@ function Shell() {
   }, []);
   // The Android back button and the browser's Back both arrive here.
   useEffect(() => {
-    const onPop = () => { const prev = stack.current.pop(); setScreen(prev ?? { name: 'home' }); scrollTop(); };
+    const onPop = () => {
+      const prev = stack.current.pop();
+      forgetEntry(entryRef.current);
+      const id = ids.current.pop() ?? newEntryId();
+      entryRef.current = id; setEntry(id);
+      // Change 27: back where it was left (except the main screen, which always opens at the top).
+      restoreTo.current = prev && prev.name !== 'home' ? savedScroll(id) : undefined;
+      setScreen(prev ?? { name: 'home' });
+      scrollTop();
+    };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+  useEffect(() => { const y = restoreTo.current; restoreTo.current = undefined; if (y) restoreScroll(y); }, [entry]);
 
   // Reminders: checked every 30 seconds while the app is open; in the Android app they are also scheduled on the phone.
   useEffect(() => {
@@ -358,7 +392,7 @@ function Shell() {
         <UpdateBanner lang={lang} />
 
         <main className="content">
-          <ScreenView screen={screen} lang={lang} go={go} back={back} />
+          <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
         </main>
 
         {needsStartChoice(state) && <StartChoice lang={lang} />}

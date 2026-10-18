@@ -5,6 +5,7 @@
 // A match is only a recommendation: nothing here ever sends a WhatsApp, an email or a PDF.
 // Archived properties are left out of the choices unless "Show Archived Properties" is set to Yes, and are then marked
 // Archived. A saved match whose property was later archived, sold, rented or taken off the market stays saved and says so.
+import { useRemembered } from '../ui/screenMemory';
 import { useMemo, useState } from 'react';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -63,12 +64,12 @@ export function BuyerMatchesScreen({ lang, contactId, go }: { lang: Lang; contac
   const buyer = state.contacts.find(c => c.id === contactId);
   const req = buyer?.requirements?.find(r => r.purpose || r.budgetMax !== undefined || r.budgetMin !== undefined);
   // Start from what the buyer asked for (purpose and budget); the agent can change every filter.
-  const [f, setF] = useState<Filters>(() => ({
+  const [f, setF] = useRemembered<Filters>('filters', () => ({
     purpose: req?.purpose === 'rent' ? 'rent' : req?.purpose === 'sale' ? 'sale' : undefined,
     priceMin: req?.budgetMin, priceMax: req?.budgetMax,
     type: req?.types?.length === 1 ? req.types[0] : undefined,
   }));
-  const [showArchived, setShowArchived] = useState(false);
+  const [showArchived, setShowArchived] = useRemembered('archived', false);
   const [pick, setPick] = useState<Set<string>>(new Set());
   const [drop, setDrop] = useState<Set<string>>(new Set());
   const props = visible(state, 'properties', state.properties);

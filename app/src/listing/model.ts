@@ -38,6 +38,19 @@ export const TYPE_CATEGORY: Record<string, Category> = {
 export const TENURES: Tenure[] = ['freehold', 'leasehold'];
 export const LOT_TYPES: LotType[] = ['intermediate', 'corner', 'end', 'single'];
 export const STATUSES: Status[] = ['available', 'in_progress', 'sold', 'rented', 'off_market', 'needs_check'];
+/** JoyChange002 Change 40: which stage a Booked property is at. Booked stays status 'in_progress' (so deals, matching,
+ *  filters and sync are unchanged); the stage is kept beside it. A property marked plain "Booked" before Change 40 has
+ *  no stage and keeps showing "Booked" until one of the five is picked. */
+export type BookedStage = 'pending_loan' | 'pending_spa' | 'spa_signed' | 'other_agent' | 'pending_consent';
+export const BOOKED_STAGES: BookedStage[] = ['pending_loan', 'pending_spa', 'spa_signed', 'other_agent', 'pending_consent'];
+/** Change 41: one key per status a property can show, each Booked stage separately and old plain Booked on its own. */
+export type StatusKey = Exclude<Status, 'in_progress'> | `booked_${BookedStage}` | 'booked';
+export const STATUS_KEYS: StatusKey[] = ['available', ...BOOKED_STAGES.map(b => `booked_${b}` as const), 'booked', 'sold', 'rented', 'off_market', 'needs_check'];
+export function statusKey(l: Pick<Listing, 'status' | 'bookedStage'>): StatusKey | undefined {
+  if (!l.status) return undefined;
+  if (l.status === 'in_progress') return l.bookedStage && BOOKED_STAGES.includes(l.bookedStage) ? `booked_${l.bookedStage}` : 'booked';
+  return l.status;
+}
 export const PURPOSES: Purpose[] = ['sale', 'rent', 'sale_or_rent'];
 export const ARRANGEMENTS: Arrangement[] = ['direct', 'referral', 'cobroke', 'other'];
 export const AVAILABILITY: Availability[] = ['immediate', 'from_date', 'tenanted', 'under_construction', 'not_available'];
@@ -197,6 +210,8 @@ export interface Listing {
   /** Banner placed? Where each banner stands is kept in the banners records (data/types.ts). */
   bannerStatus?: BannerStatus;
   status?: Status;
+  /** Change 40: the Booked stage, only while status is 'in_progress'. */
+  bookedStage?: BookedStage;
   handledBy?: string;
   notes?: string;
   documents?: Doc[];
@@ -417,11 +432,34 @@ export interface Filters {
   status?: Status;
   /** e.g. 'cobroke' for the Co-broke card. */
   arrangement?: Arrangement;
+  // JoyChange002 Change 41: tick boxes, so more than one choice per field. An empty or missing list means "any".
+  purposes?: ('sale' | 'rent')[];
+  categories?: Category[];
+  types?: string[];
+  tenures?: Tenure[];
+  lotTypes?: LotType[];
+  /** Status keys (each Booked stage separately, plain "Booked" on its own). Missing: the Subsale List's default (below). */
+  statuses?: StatusKey[];
+  /** Exact bedroom / bathroom counts; 5 means "5 or more" (4 for bathrooms). */
+  beds?: number[];
+  baths?: number[];
 }
 
+/** Change 41: the Subsale List hides Sold, Rented and Withdrawn until they are ticked. */
+export const HIDDEN_BY_DEFAULT: StatusKey[] = ['sold', 'rented', 'off_market'];
+export const DEFAULT_STATUSES: StatusKey[] = STATUS_KEYS.filter(k => !HIDDEN_BY_DEFAULT.includes(k));
+export const BED_CHOICES = [1, 2, 3, 4, 5];
+export const BATH_CHOICES = [1, 2, 3, 4];
+
 export function activeCount(f: Filters): number {
-  return Object.values(f).filter(v => v !== undefined && v !== '').length;
+  return Object.entries(f).filter(([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)).length;
 }
+
+/** Prices are monthly rents when only For Rent is chosen. */
+export const rentPrices = (f: Filters) => f.purpose === 'rent' || (f.purposes?.length === 1 && f.purposes[0] === 'rent');
+const anyOf = <T,>(list: T[] | undefined, v: T | undefined) => !list || list.length === 0 || (v !== undefined && list.includes(v));
+/** A count against ticked counts, the last choice meaning "that many or more". */
+const countIn = (list: number[] | undefined, n: number | undefined, top: number) => !list || list.length === 0 || (n !== undefined && list.some(x => (x >= top ? n >= x : n === x)));
 
 /** A listing passes a filter only when it has that value and it matches. Rent filters use the monthly rent. */
 export function applyFilters(list: Listing[], f: Filters): Listing[] {
@@ -433,7 +471,7 @@ export function applyFilters(list: Listing[], f: Filters): Listing[] {
     if (f.category && categoryOf(l) !== f.category) return false;
     if (f.purpose === 'sale' && !(l.purpose === undefined ? l.askingPrice !== undefined : forSale(l))) return false;
     if (f.purpose === 'rent' && !forRent(l)) return false;
-    const price = f.purpose === 'rent' ? l.monthlyRent : l.askingPrice;
+    const price = rentPrices(f) ? l.monthlyRent : l.askingPrice;
     if (f.priceMin !== undefined && !(price !== undefined && price >= f.priceMin)) return false;
     if (f.priceMax !== undefined && !(price !== undefined && price <= f.priceMax)) return false;
     if (f.bedsMin !== undefined && !(l.bedrooms !== undefined && l.bedrooms >= f.bedsMin)) return false;
@@ -442,6 +480,14 @@ export function applyFilters(list: Listing[], f: Filters): Listing[] {
     if (f.lotType && l.lotType !== f.lotType) return false;
     if (f.status && l.status !== f.status) return false;
     if (f.arrangement && l.arrangement !== f.arrangement) return false;
+    if (f.purposes?.length && !f.purposes.some(p => (p === 'sale' ? (l.purpose === undefined ? l.askingPrice !== undefined : forSale(l)) : forRent(l)))) return false;
+    if (!anyOf(f.categories, categoryOf(l))) return false;
+    if (!anyOf(f.types, l.type)) return false;
+    if (!anyOf(f.tenures, l.tenure)) return false;
+    if (!anyOf(f.lotTypes, l.lotType)) return false;
+    if (f.statuses && f.statuses.length && !f.statuses.includes(statusKey(l) as StatusKey)) return false;
+    if (!countIn(f.beds, l.bedrooms, BED_CHOICES[BED_CHOICES.length - 1])) return false;
+    if (!countIn(f.baths, l.bathrooms, BATH_CHOICES[BATH_CHOICES.length - 1])) return false;
     return true;
   });
 }

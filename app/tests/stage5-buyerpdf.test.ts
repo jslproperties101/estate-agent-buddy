@@ -72,7 +72,7 @@ test('BP5 each important fact keeps its check-status label; anything but Confirm
   assert.deepEqual([by('Asking Price').tag, by('Asking Price').warn], [undefined, undefined]);
   assert.deepEqual([by('Land Size').tag, by('Land Size').warn], ['Owner Stated', true]);
   assert.deepEqual([by('Built-Up').tag, by('Built-Up').warn], ['Need to Check', true]);
-  assert.deepEqual([by('Tenure').tag, by('Tenure').warn], ['Unknown', true]);
+  assert.deepEqual([by('Tenure').tag, by('Tenure').warn], ['Need to Check', true], 'Change 35: an old Unknown mark shows as Need to Check');
   assert.deepEqual([by('Lease Expiry').tag, by('Lease Expiry').warn], ['Need to Check', true], 'Change 009: not marked counts as Need to Check, never confirmed');
   assert.equal(by('Property Type').tag, undefined, 'facts without a check status carry no mark');
   const t = text(buildBuyerDoc(input(l)));

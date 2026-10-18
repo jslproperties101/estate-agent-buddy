@@ -6,7 +6,7 @@
 import type { Lang } from '../i18n';
 import type { Profile } from '../data/types';
 import { Listing, rm, landText, sqft, placeName, yearsRemaining, thisYear, unitLot, restrictionValue } from './model';
-import { listingStrings, ListingStrings, typeLabel } from './strings';
+import { listingStrings, ListingStrings, typeLabel, statusText } from './strings';
 import { isVerifiable, shownState } from './verify';
 import { fmtDate, monthText } from '../lib/dates';
 import type { Doc, Block } from '../lib/pdf';
@@ -51,7 +51,7 @@ export function valueOf(l: Listing, key: keyof Listing, s: ListingStrings, lang:
   switch (key) {
     case 'type': return typeLabel(s, String(v));
     case 'purpose': return s.purpose[String(v)] ?? String(v);
-    case 'status': return s.status[String(v)] ?? String(v);
+    case 'status': return statusText(s, l);   // Change 40: with the Booked stage
     case 'askingPrice': case 'monthlyRent': case 'maintenanceFee': return rm(Number(v)) + (key === 'monthlyRent' || key === 'maintenanceFee' ? ` ${s.perMonth}` : '');
     case 'landSqft': return landText(Number(v));
     case 'builtUpSqft': return sqft(Number(v));

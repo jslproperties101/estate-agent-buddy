@@ -51,7 +51,7 @@ async function newProperty(page) {
 /** Types a value into one remembered list (search box → Add, or the existing entry). */
 async function pickOpt(page, testId, value) {
   const box = page.getByTestId(testId);
-  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await page.getByTestId(`${testId}-search`).fill(value);
   const add = page.getByTestId(`${testId}-add`);
   if (await add.count()) await add.click(); else await box.getByRole('option', { name: value, exact: true }).click();
@@ -83,7 +83,7 @@ test('X1 section 1 "Basic Info and Availability": ID, Availability, Property Typ
   const ys = [await y('[data-testid="ref-preview"]'), await y('[data-field="availability"]'), await y('[data-testid="opt-type"]'), await y('[data-field="purpose"]'), await y('[data-field="arrangement"]')];
   assert.ok(ys.every((v, i) => i === 0 || v > ys[i - 1]), `order ID, Availability, Type, Sale or Rent, Arrangement ${JSON.stringify(ys)}`);
   const avail = await page.locator('[data-field="availability"] option').evaluateAll(os => os.map(o => o.textContent));
-  assert.deepEqual(avail, ['Not Set', 'Available Now', 'Available From', 'Booked', 'Sold', 'Rented', 'Withdrawn']);
+  assert.deepEqual(avail, ['Not Set', 'Available Now', 'Available From', 'Booked - Pending Loan', 'Booked - Pending SPA', 'Booked - SPA Signed', 'Booked - Other Agent (Pending SPA)', 'Booked - Pending Consent', 'Sold', 'Rented', 'Withdrawn']);   // Change 40
   assert.equal(await page.locator('[data-verify="availability"]').count(), 0, 'Availability has no check status');
   const arr = await page.locator('[data-field="arrangement"] option').evaluateAll(os => os.map(o => o.textContent));
   assert.deepEqual(arr, ['Not Set', 'Co-broke', 'Direct']);
@@ -141,13 +141,13 @@ test('X5 location chain: options belong to the level above; changing a level cle
   await pickOpt(page, 'opt-state', 'Negeri Sembilan');
   await pickOpt(page, 'opt-city', 'Nilai');
   await pickOpt(page, 'opt-township', 'Bandar Baru Nilai');
-  await page.getByTestId('opt-neighborhood').locator('.opt-btn').click();
+  await page.getByTestId('opt-neighborhood').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   assert.equal(await page.getByTestId('opt-neighborhood').getByRole('option', { name: 'Laman Kemboja' }).count(), 0, 'not under another township');
-  await page.getByTestId('opt-neighborhood').locator('.opt-btn').click();
+  await page.getByTestId('opt-neighborhood').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   // Back to Kota Seriemas: it is offered again, with an X and without "Saved by you"
   await pickOpt(page, 'opt-township', 'Kota Seriemas');
   const nb = page.getByTestId('opt-neighborhood');
-  await nb.locator('.opt-btn').click();
+  await nb.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   assert.equal(await nb.getByRole('option', { name: 'Laman Kemboja', exact: true }).count(), 1, 'remembered under Kota Seriemas');
   assert.equal(await nb.getByRole('button', { name: 'Remove Laman Kemboja' }).count(), 1, 'with its X');
   assert.doesNotMatch(await nb.innerText(), /Saved by you/i, 'no "Saved by you"');
@@ -261,7 +261,7 @@ test('X9 contact box: phone and WhatsApp username on their own lines, phone book
   assert.ok(contacts.some(c => c.name === 'Encik Tenant' && c.roles.includes('tenant')), 'a typed tenant is kept as a contact');
   // Linked Vendor search by number
   await home(page); await newProperty(page);
-  await page.getByTestId('vendor-pick').locator('.opt-btn').click();
+  await page.getByTestId('vendor-pick').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await page.getByTestId('vendor-pick-search').fill('8887');
   assert.equal(await page.getByTestId('vendor-pick').getByRole('option').count(), 1);
   await page.getByTestId('vendor-pick').getByRole('option', { name: /Puan Vendor/ }).click();
@@ -276,7 +276,7 @@ test('X11 Booked asks to fill in the booking now; the booking page saves people,
   await page.locator('[data-field="purpose"]').selectOption('sale');
   await page.locator('[data-field="askingPrice"]').fill('500000');
   await page.locator('[data-field="commissionPct"]').fill('2');
-  await page.locator('[data-field="availability"]').selectOption('booked');
+  await page.locator('[data-field="availability"]').selectOption('booked_pending_loan')   // Change 40: one of the five Booked stages;
   await page.getByTestId('deal-ask').waitFor();
   assert.match(await page.getByTestId('deal-ask').innerText(), /Fill in booking details now\?/);
   await page.getByTestId('deal-fill-now').click();
@@ -293,7 +293,7 @@ test('X11 Booked asks to fill in the booking now; the booking page saves people,
   await page.getByTestId('deal-files-files').getByText('booking-form.png').waitFor();
   // payment Loan shows the bank
   assert.equal(await page.locator('[data-field="deal.booking.loanBank"]').count(), 0);
-  await page.getByTestId('deal-opt-payment').locator('.opt-btn').click();
+  await page.getByTestId('deal-opt-payment').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await page.getByTestId('deal-opt-payment').getByRole('option', { name: 'Loan' }).click();
   await page.locator('[data-field="deal.booking.loanBank"]').fill('Maybank');
   // add my own field

@@ -52,7 +52,7 @@ import { teamStrings } from '../team/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { ChoiceDialog } from '../ui/common';
 import { cc001Strings } from '../ui/cc001Strings';
-import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, ARRANGEMENT_CHOICES, LocationLevel, locationListKey, clearBelow } from './cc001';
+import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, isBookedChoice, ARRANGEMENT_CHOICES, LocationLevel, locationListKey, clearBelow } from './cc001';
 import { PhotoViewer } from '../ui/PhotoViewer';
 import { ContactPick } from '../ui/ContactPick';
 import type { Screen, DealKind } from '../nav';
@@ -226,7 +226,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   ));
   const Opt = ({ k, listKey, builtIns, labels, onPick }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void }) => withVp(k as string, (
     <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
-      builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined}
+      builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined} savedValue={initial?.[k] as string | undefined}
       onChange={v => (onPick ? onPick(v) : set(k, v as never))} help={<FieldHelp lang={lang} topic={k as string} label={s.l[k as string]} />} />
   ));
   /** Change 5: one level of the location chain. Its remembered options are the ones saved under the level above; choosing
@@ -422,6 +422,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       const v = { ...next.verification }; delete v.commissionFlat; delete v.availability;
       next = { ...next, verification: Object.keys(v).length ? v : undefined };
     }
+    // Change 35: an old "Unknown" mark is saved as "Need to check" (Unknown is no longer a choice).
+    if (next.verification && Object.values(next.verification).includes('unknown')) {
+      next = { ...next, verification: Object.fromEntries(Object.entries(next.verification).map(([k, v]) => [k, v === 'unknown' ? 'check' : v])) };
+    }
     // Change 9: a tenant or co-broke agent typed or picked here is saved as a contact (once per phone number) for next time.
     const own = !(initial && isForeign(store.getState(), 'properties', initial.id));
     if (own && next.tenancy?.tenant) saveTypedContact(store, { name: next.tenancy.tenant, phone: next.tenancy.tenantPhone, whatsapp: next.tenancy.tenantWhatsapp }, 'tenant');
@@ -429,7 +433,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       const cid = saveTypedContact(store, { name: next.cobroke.name, phone: next.cobroke.phone, whatsapp: next.cobroke.whatsapp }, 'other', next.cobroke.agency);
       next = { ...next, cobroke: { ...next.cobroke, contactId: cid } };
     }
-    // Marks that no longer apply go with the field they described (an empty field keeps its mark: "Unknown" is meaningful).
+    // Marks that no longer apply go with the field they described (an empty field keeps its mark).
     if (next.verification) {
       const dropped = (k: string) => (ALL_FORM_FIELDS as readonly string[]).includes(k) && !vf.has(k as FormField)
         || (['askingPrice', 'commissionPct', 'commissionFlat'].includes(k) && !forSale(clean)) || (['monthlyRent', 'rentCommissionMonths', 'rentCommissionFlat'].includes(k) && !forRent(clean))
@@ -552,9 +556,12 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             const v = (e.target.value || undefined) as AvailChoice | undefined;
             setD(prev => ({ ...prev, ...availPatch(v, prev.availableFrom), filledFrom: { ...(prev.filledFrom ?? {}), availability: 'typed', status: 'typed' } }));
             if (v === 'rented') setOpen(o => new Set([...o, 'tenancy']));
-            if (v === 'booked' || v === 'sold' || v === 'rented') setDealAsk(v);
+            // Change 40: any of the five Booked stages asks "Fill in booking details now?" (as plain Booked did).
+            if (isBookedChoice(v)) setDealAsk('booked'); else if (v === 'sold' || v === 'rented') setDealAsk(v);
           }}>
             <option value="">{s.notSet}</option>
+            {/* Change 40: an older plain Booked still shows, but cannot be chosen again. */}
+            {availChoice(d) === 'booked' && <option value="booked" disabled>{x1.avail.booked}</option>}
             {AVAIL_CHOICES.map(o => <option key={o} value={o}>{x1.avail[o]}</option>)}
           </select>
         </label>

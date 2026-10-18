@@ -23,6 +23,7 @@
   --blue: #8EC1F5;
   --ok: #6FD49B;
   --amber: #F0C060;
+  --orange: #F7A24B;   /* Change 35: Owner stated */
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 16px;
   line-height: 1.45;
@@ -208,6 +209,22 @@ label.btn { position: relative; cursor: pointer; }
 .opt-row { display: flex; align-items: stretch; gap: 4px; }
 .opt-row .opt-item { flex: 1; min-width: 0; }
 .opt-x { width: 44px; min-height: 44px; flex: none; border: 1px solid var(--line-2); border-radius: 8px; background: #2A120E; color: var(--red); font-weight: 800; }
+/* JoyChange002 Change 36: pencil then X, at the far right, each a small bordered square (smaller than the old X, not tiny),
+   with a full 44 px touch area around it. */
+.opt-field { position: relative; display: flex; align-items: stretch; gap: 6px; }
+.opt-field .opt-btn { flex: 1 1 auto; min-width: 0; }
+.opt-field.locked .opt-btn { opacity: .85; cursor: default; border-style: dashed; }
+.fx-btns { display: flex; align-items: center; gap: 6px; flex: none; }
+.fx-btn { position: relative; width: 32px; height: 32px; min-width: 32px; min-height: 32px; padding: 0; flex: none; align-self: center; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; border: 1px solid var(--line-2); background: #1E1B15; cursor: pointer; }
+.fx-btn::before { content: ''; position: absolute; inset: -6px; }
+.fx-btn.fx-edit { color: var(--gold-hi); border-color: rgba(212,175,55,.6); }
+.fx-btn.fx-x { color: var(--red); border-color: rgba(255,138,122,.6); background: #2A120E; }
+.opt-row .fx-btn { width: 32px; min-height: 32px; }
+.opt-row { align-items: center; }
+.opt-rename { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 4px 0; }
+.opt-rename input { flex: 1 1 140px; min-width: 0; }
+.opt-rename .error { flex-basis: 100%; }
 .opt-new { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; }
 .opt-search { position: sticky; top: -4px; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: var(--card-2); border-bottom: 1px solid var(--line); }
 .opt-search input { flex: 1 1 160px; }
@@ -755,11 +772,19 @@ label.btn { position: relative; cursor: pointer; }
 .vp { display: flex; align-items: stretch; font-size: 14px; color: var(--muted); }
 .vp select { flex: 1 1 auto; width: 100%; min-width: 0; min-height: 48px; font-size: 16px; }
 .vp-confirmed select { border-color: var(--ok); }
-.vp-owner select { border-color: var(--blue); }
-.vp-check select, .vp-unknown select { border-color: var(--amber); }
+.vp-owner select { border-color: var(--orange); }
+.vp-check select, .vp-unknown select { border-color: var(--red); }
+/* Change 35: the status is written in its colour on the chosen value and on each option in the list. */
+.vc-sel.vc-confirmed { color: var(--ok); }
+.vc-sel.vc-owner { color: var(--orange); }
+.vc-sel.vc-check { color: var(--red); }
+.vc-sel option { font-weight: 700; background: var(--card); }
+.vc-sel option[value="confirmed"] { color: var(--ok); }
+.vc-sel option[value="owner"] { color: var(--orange); }
+.vc-sel option[value="check"] { color: var(--red); }
 .vchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; vertical-align: middle; }
 .vchip-confirmed { color: var(--ok); }
-.vchip-owner { color: var(--blue); }
+.vchip-owner { color: var(--orange); }
 .vchip-check { color: var(--red); }
 .vchip-unknown { color: var(--red); border-style: dashed; }
 .kf .vchip { margin-top: 2px; }
@@ -809,7 +834,7 @@ label.btn { position: relative; cursor: pointer; }
 /* ---------- Change 008/009: Property List cards ---------- */
 /* Verification by font colour: Confirmed green, Owner stated blue, Need to check and Unknown red. */
 .vval.vc-confirmed { color: var(--ok); }
-.vval.vc-owner { color: var(--blue); }
+.vval.vc-owner { color: var(--orange); }
 .vval.vc-check, .vval.vc-unknown { color: var(--red); }
 .lc-card.tappable { cursor: pointer; }
 .lc-tenure { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
@@ -1187,3 +1212,14 @@ button.sync-banner { cursor: pointer; }
 .dev-table td { padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 .dev-bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid var(--line-2); }
 .dev-bar { flex: 1 1 0; min-width: 2px; background: var(--gold); border-radius: 2px 2px 0 0; }
+
+/* ---------- JoyChange002 Change 41: tick-box filters and the Archived button ---------- */
+.filter-ticks { display: flex; flex-direction: column; gap: 10px; }
+.tick-group { border: 1px solid var(--line-2); border-radius: 12px; padding: 6px 10px 8px; margin: 0; min-width: 0; }
+.tick-group legend { padding: 0 4px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.tick-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.tick { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border-radius: 22px; border: 1px solid var(--line-2); background: var(--card-2); font-size: 14px; cursor: pointer; }
+.tick.on { border-color: var(--gold); color: var(--gold-hi); }
+.tick input { width: 18px; height: 18px; accent-color: var(--gold); margin: 0; }
+.lc-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.archived-btn { margin-left: auto; min-height: 44px; }

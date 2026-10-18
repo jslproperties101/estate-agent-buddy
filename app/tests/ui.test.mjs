@@ -89,7 +89,7 @@ const shot = (page, name, fullPage = true) => page.screenshot({ path: `${SHOTS}$
  *  value in the list's search box and adds it ("Add …"), or picks it when it is already in the list. */
 async function setStreet(page, value) {
   const box = page.locator('[data-testid="opt-street"]');
-  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const v = String(value ?? '');
   if (!v) { await box.getByRole('option').first().click(); return; }
   await page.getByTestId('opt-street-search').fill(v);
@@ -97,12 +97,20 @@ async function setStreet(page, value) {
   if (await add.count()) await add.click();
   else await box.getByRole('option', { name: v, exact: true }).click();
 }
+/** JoyChange002 Change 36: deleting a remembered entry asks first (once, or twice when properties use it). */
+async function confirmOptDelete(page) {
+  for (let i = 0; i < 2; i++) {
+    const b = page.locator('.scrim .dialog').getByRole('button', { name: /^(Delete|Continue delete)$/ });
+    if (!(await b.count())) break;
+    await b.first().click();
+  }
+}
 /** ClaudeChanges001 change 7: Delete in the photo menu asks first. */
 async function confirmPhotoDelete(page) { await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click(); await page.getByRole('alertdialog').waitFor({ state: 'detached' }); }
 /** Picks a built-in value in a remembered list (OptionSelect). */
 async function pickOpt(page, testId, name) {
   const box = page.getByTestId(testId);
-  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await box.getByRole('option', { name, exact: true }).click();
 }
 /** The Street shown on the form (ClaudeChanges001). */
@@ -301,6 +309,12 @@ test('U3 Property List: Grid first, Large Cards the default on a first install (
   await loadSample(page);
   await tile(page, 'Property List');
   const seg = page.locator('.lc-tools .seg button');
+  // Change 41: Sold and Rented (and Withdrawn) are hidden until ticked; tick them so all ten sample properties show.
+  assert.equal(await page.getByTestId('listing-card').count(), 8, 'the sold and the rented sample are hidden by default');
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  for (const v of ['sold', 'rented']) await page.getByTestId('tf-status').locator(`[data-v="${v}"] input`).check();
+  assert.equal(await page.getByTestId('listing-card').count(), 10);
+  await page.getByRole('button', { name: /^Filters/ }).click();
   assert.deepEqual(await seg.evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Grid', 'Large Cards']);
   assert.equal(await seg.nth(1).getAttribute('aria-pressed'), 'true', 'Large Cards is the default on a first install (Change 28)');
   assert.equal(await page.locator('ul[data-layout="large"]').count(), 1);
@@ -360,7 +374,7 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   assert.match(await page.getByTestId('ref-error').innerText(), /already.*1011/i);
   await page.getByRole('button', { name: 'Use 1011' }).click();
   // custom prefix through Others
-  await page.getByTestId('ref-prefix').locator('.opt-btn').click();
+  await page.getByTestId('ref-prefix').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const list = page.getByTestId('ref-prefix').locator('.opt-list');
   assert.equal(await list.locator('.opt-x').count(), 0, 'built-in prefixes cannot be deleted');
   await list.getByRole('button', { name: 'Others…' }).click();
@@ -375,11 +389,12 @@ test('U5 references: prefix + unique number, Others remembered and deletable, bu
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   assert.equal(await page.getByTestId('ref-preview').innerText(), 'ID: KL1012');
-  await page.getByTestId('ref-prefix').locator('.opt-btn').click();
+  await page.getByTestId('ref-prefix').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const items = await page.getByTestId('ref-prefix').locator('.opt-list [role="option"]').evaluateAll(b => b.map(x => x.textContent.split('·')[0].trim()));
   assert.deepEqual(items.slice(0, 3), ['KL', 'P', 'A'], 'latest custom prefix first');
   await shot(page, '03-ref-prefix');
   await page.getByTestId('ref-prefix').getByRole('button', { name: 'Remove KL' }).click();
+  await confirmOptDelete(page);
   assert.equal(await page.getByTestId('ref-prefix').locator('.opt-list').getByText('KL', { exact: true }).count(), 0, 'custom prefix deleted with X');
   await page.context().close();
 });
@@ -420,7 +435,7 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   const idx = want.map(w => labels.findIndex(l => l.startsWith(w)));
   assert.ok(idx.every((x, i) => x >= 0 && (i === 0 || x > idx[i - 1])), `location order ${JSON.stringify(idx)}`);
   const town = page.getByTestId('opt-township');
-  await town.locator('.opt-btn').click();
+  await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await town.getByRole('button', { name: 'Others…' }).click();
   await town.locator('.opt-new input').fill('Taman Sri Pajam');
   await town.getByRole('button', { name: 'Add' }).click();
@@ -428,12 +443,13 @@ test('U7 dropdowns with Others: remembered for every property, removable with X,
   await page.waitForSelector('[data-testid="listing-details"]');
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
-  await page.getByTestId('opt-township').locator('.opt-btn').click();
+  await page.getByTestId('opt-township').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const t2 = page.getByTestId('opt-township');
   assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/i }).count(), 1, 'remembered');
   assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sri Pajam' }).count(), 1, 'custom value has X');
   assert.equal(await t2.getByRole('button', { name: /^Remove Putra Nilai/i }).count(), 0, 'built-in values have no X');
   await t2.getByRole('button', { name: 'Remove Taman Sri Pajam' }).click();
+  await confirmOptDelete(page);
   assert.equal(await t2.getByRole('option', { name: /Taman Sri Pajam/i }).count(), 0);
   assert.ok(await t2.getByRole('button', { name: 'Others…' }).isVisible(), 'Others stays available');
   await page.context().close();
@@ -444,7 +460,7 @@ test('U8 Change 009 Add Location: only the map point is saved, the typed address
   await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Add New Property' }).first().click(); await expandForm(page);
   const town = page.getByTestId('opt-township');
-  await town.locator('.opt-btn').click();
+  await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await town.getByRole('button', { name: 'Others…' }).click();
   await town.locator('.opt-new input').fill('Taman Desa Nilai');
   await town.getByRole('button', { name: 'Add' }).click();
@@ -735,7 +751,7 @@ test('U17 Agent Profile (was Profile & Name Card): details, REN/PEA/REA/Others, 
   await page.getByRole('button', { name: 'Edit profile' }).click();
   await page.locator('[data-field="fullName"]').fill('Lee Ah Kow');
   const reg = page.getByTestId('opt-regType');
-  await reg.locator('.opt-btn').click();
+  await reg.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   for (const x of ['REN', 'PEA', 'REA', 'Others…']) assert.equal(await reg.getByRole(x === 'Others…' ? 'button' : 'option', { name: x, exact: true }).count(), 1, x);
   await reg.getByRole('option', { name: 'REN', exact: true }).click();
   await page.locator('[data-field="regNo"]').fill('31234');
@@ -929,7 +945,7 @@ test('U23 form controls: visible borders (≥ 3:1), gold focus, red error, clear
   await shot(page, '23-contact-error', false);
   // Open custom dropdown: gold border on the box and the list.
   await home(page); await tile(page, 'Property List'); await newProperty(page);
-  await page.getByTestId('opt-type').locator('.opt-btn').click();
+  await page.getByTestId('opt-type').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await page.mouse.move(0, 0); await page.waitForTimeout(250);
   assert.equal(await page.getByTestId('opt-type').locator('.opt-btn').evaluate(el => getComputedStyle(el).borderTopColor), 'rgb(212, 175, 55)');
   await shot(page, '23-form-fields', false);
@@ -1387,7 +1403,7 @@ test('U33 phone book: Send Name Card picker fills editable name and number; refu
   // Complete the required profile so the name card is active.
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Edit/i }).first().click();
   await page.locator('[data-field="fullName"]').fill('Agent J'); await page.locator('[data-field="regNo"]').fill('12345');
-  await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
+  await page.getByTestId('opt-regType').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click(); await page.getByRole('option', { name: 'REN' }).click();
   await page.locator('[data-field="agency"]').fill('JSL Properties'); await page.locator('[data-field="phone"]').fill('0123456789');
   await page.getByTestId('save-profile').click();
   await page.getByTestId('send-namecard').click();
@@ -1429,7 +1445,7 @@ test('U34 new user: Populate with Sample Data (recommended) or Start Without; sa
   const page = await phone({ start: 'sample' });
   await tile(page, 'Property List');
   const n = await page.getByTestId('listing-card').count();
-  assert.ok(n >= 10, 'sample properties');
+  assert.ok(n >= 8, 'sample properties (Change 41: the sold and rented ones are hidden until ticked)');
   assert.equal(await page.locator('[data-testid="listing-card"] .lc-sample').count(), n, 'every sample property is marked Sample');
   await home(page); await tile(page, 'Vendor List');
   assert.ok(await page.locator('[data-testid="contact-row"] .sample-tag').count() >= 10, 'sample vendors marked');
@@ -1475,7 +1491,7 @@ test('U36 Agent Profile: Send Name Card stays off until the required details are
   assert.equal(await page.getByTestId('send-namecard').isDisabled(), true, 'still missing the registration');
   assert.match(await page.getByTestId('namecard-hint').innerText(), /Registration type, Registration \/ agent number$/i);
   await page.getByRole('button', { name: /Edit/i }).first().click();
-  await page.getByTestId('opt-regType').locator('.opt-btn').click(); await page.getByRole('option', { name: 'REN' }).click();
+  await page.getByTestId('opt-regType').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click(); await page.getByRole('option', { name: 'REN' }).click();
   await page.locator('[data-field="regNo"]').fill('12345');
   await page.getByTestId('save-profile').click();
   assert.equal(await page.getByTestId('send-namecard').isDisabled(), false, 'switched on automatically');
@@ -2383,8 +2399,8 @@ test('U63 verification: four states, stored with the record, shown the same way 
   const page = await phone();
   await tile(page, 'Property List'); await page.locator('.add-property').click(); await expandForm(page);
   // Change 009: no "Not marked"; a fact without a mark shows as Need to Check.
-  assert.equal(await page.locator('[data-verify="tenure"] option').count(), 4, 'the four states only');
-  assert.deepEqual(await page.locator('[data-verify="tenure"] option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check', 'Unknown']);
+  assert.equal(await page.locator('[data-verify="tenure"] option').count(), 3, 'the three states only (Change 35)');
+  assert.deepEqual(await page.locator('[data-verify="tenure"] option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check']);
   assert.equal(await page.locator('[data-verify="builtUpSqft"]').inputValue(), 'check', 'unmarked = Need to Check');
   assert.equal(await page.locator('[data-verify="headline"]').count(), 0, 'only facts that need checking carry a state');
   // Owner, 17 Oct 2026: the price has no status picker; Built-Up is used for the Owner Stated example instead.
@@ -2392,7 +2408,7 @@ test('U63 verification: four states, stored with the record, shown the same way 
   await page.locator('[data-field="builtUpSqft"]').fill('1450');
   await page.locator('[data-verify="builtUpSqft"]').selectOption('owner');
   await page.locator('[data-verify="tenure"]').selectOption('check');
-  await page.locator('[data-verify="titleType"]').selectOption('unknown');     // an empty field can be "Unknown"
+  await page.locator('[data-verify="titleType"]').selectOption('check');     // an empty field can be marked (Change 35: Unknown is gone)
   await page.locator('[data-verify="landSqft"]').selectOption('confirmed');
   await page.locator('[data-field="landSqft"]').fill('1500');
   assert.equal(await page.locator('[data-verify="builtUpSqft"]').getAttribute('aria-label'), 'Check status: Built-Up (sq ft)');
@@ -2415,7 +2431,7 @@ test('U63 verification: four states, stored with the record, shown the same way 
   // Edit: values shown, change one, clear one.
   await page.getByRole('button', { name: 'Edit', exact: true }).first().click(); await expandForm(page);
   assert.equal(await page.locator('[data-verify="builtUpSqft"]').inputValue(), 'owner');
-  assert.equal(await page.locator('[data-verify="titleType"]').inputValue(), 'unknown');
+  assert.equal(await page.locator('[data-verify="titleType"]').inputValue(), 'check');
   await page.locator('[data-verify="builtUpSqft"]').selectOption('confirmed');
   await page.locator('[data-verify="tenure"]').selectOption('confirmed');
   await page.getByTestId('save-property').click(); await page.waitForSelector('[data-testid="listing-details"]');
@@ -4066,7 +4082,7 @@ test('U97 the sign-in screen always has Connection settings, even when the proje
 test('U100 Change 009 form: section order, price/commission in Price, Tenure and Title Info, Maintenance Fee and Extra Comments in Property Details, Building Specifications after Owner; rental commission in months', async () => {
   const page = await phone();
   await tile(page, 'Property List'); await newProperty(page);
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   await page.getByTestId('opt-type').getByRole('option', { name: 'Semi-D Factory' }).click();
   const order = await page.locator('[data-testid="listing-form"] > .card[id]').evaluateAll(cs => cs.map(c => c.id.replace('sec-', '')));
   assert.deepEqual(order.filter(x => ['basics', 'tenure', 'photos', 'location', 'details', 'owner', 'specs', 'docs'].includes(x)),
@@ -4203,33 +4219,33 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   const page = await phone();
   await tile(page, 'Property List'); await newProperty(page);
   const state = page.getByTestId('opt-state');
-  await state.locator('.opt-btn').click();
+  await state.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await state.getByTestId('opt-state-search').fill('sel');
   assert.deepEqual(await state.getByRole('option').allInnerTexts(), ['Selangor']);
   await state.getByTestId('opt-state-search').press('Enter');
   assert.match(await state.innerText(), /Selangor/i);
   const city = page.getByTestId('opt-city');
-  await city.locator('.opt-btn').click();
+  await city.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await city.getByTestId('opt-city-search').fill('kla');
   assert.deepEqual(await city.getByRole('option').allInnerTexts(), ['Klang', 'Port Klang']);
   await city.getByRole('option', { name: 'Klang', exact: true }).click();
   const town = page.getByTestId('opt-township');
-  await town.locator('.opt-btn').click();
+  await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await town.getByTestId('opt-township-search').fill('Taman Sampel Baru');
   assert.match(await town.innerText(), /Nothing matches/i);
   await town.getByTestId('opt-township-add').click();
   assert.match(await town.innerText(), /Taman Sampel Baru/i);
   // Property type: the four land types together; Land use NIL; restriction NON Bumiputera.
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   const types = await page.getByTestId('opt-type').getByRole('option').allInnerTexts();
   const lands = types.map((t, i) => [t, i]).filter(([t]) => / Land$/.test(t)).map(([, i]) => i);
   assert.equal(lands.length, 4); assert.equal(lands[3] - lands[0], 3, `land types together: ${types.join(', ')}`);
   await page.getByTestId('opt-type').getByRole('option', { name: 'Terrace House' }).click();
   // ClaudeChanges001 change 4: Land Use is a remembered list with Others.
-  await page.locator('[data-testid="opt-landUse"] .opt-btn').click();
+  await page.locator('[data-testid="opt-landUse"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   assert.ok((await page.getByTestId('opt-landUse').getByRole('option').allInnerTexts()).includes('NIL'));
-  await page.locator('[data-testid="opt-landUse"] .opt-btn').click();
-  await page.locator('[data-testid="opt-restriction"] .opt-btn').click();
+  await page.locator('[data-testid="opt-landUse"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
+  await page.locator('[data-testid="opt-restriction"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   const r = await page.getByTestId('opt-restriction').getByRole('option').allInnerTexts();
   assert.ok(r.includes('NON Bumiputera') && !r.some(x => /No restriction/i.test(x)), r.join(', '));
   await page.getByTestId('opt-restriction').getByRole('option', { name: 'NON Bumiputera' }).click();
@@ -4242,9 +4258,10 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   await pickOpt(page, 'opt-state', 'Selangor');
   await pickOpt(page, 'opt-city', 'Klang');
   const t2 = page.getByTestId('opt-township');
-  await t2.locator('.opt-btn').click();
+  await t2.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   assert.equal(await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).count(), 1, 'remembered, with ✕');
   await t2.getByRole('button', { name: 'Remove Taman Sampel Baru' }).click();
+  await confirmOptDelete(page);
   assert.equal(await t2.getByRole('option', { name: /Taman Sampel Baru/i }).count(), 0);
   await page.context().close();
 });
@@ -4285,6 +4302,9 @@ test('U104 Change 009 tenant and banner: Tenanted reveals the tenant contact box
   // Card colours: Confirmed green, unmarked = Need to check red.
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: 'Large cards' }).click();
+  // Change 41: a Rented property shows once Rented is ticked.
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await page.getByTestId('tf-status').locator('[data-v="rented"] input').check();
   const card = page.getByTestId('listing-card').filter({ hasText: 'Jalan Sampel Banner 1' });
   assert.equal(await card.locator('[data-vkey="landSqft"]').getAttribute('data-verify'), 'confirmed');
   assert.equal(await card.locator('[data-vkey="landSqft"]').evaluate(e => getComputedStyle(e).color), 'rgb(111, 212, 155)', 'green');
@@ -4385,7 +4405,7 @@ test('U101 Change 011 (with Change 015): one fixed advert area above the phone n
   await page.getByTestId('listing').waitFor();
   assert.equal(await page.getByTestId('listing-card').count(), n0 - 1);
   await waitStored(page, 'records', `all.some(v => v && v.archived && ${JSON.stringify(addr)}.includes(v.street))`);
-  await page.getByTestId('archived-section').locator('summary').click();
+  await (async () => { if (!(await page.getByTestId('archived-section').count())) await page.getByTestId('archived-btn').click(); })()  /* Change 41: the Archived button at the top */;
   assert.equal(await page.getByTestId('archived-card').count(), 1);
   await page.getByTestId('archived-restore').click();
   assert.equal(await page.getByTestId('listing-card').count(), n0, 'restored, no duplicate');
@@ -4501,7 +4521,7 @@ test('U104 Change 014: Location straight after section 2 with the street first; 
   const street = await page.locator('#sec-location [data-testid="opt-street"]').boundingBox();
   const unit = await page.locator('#sec-location [data-field="unitNo"]').boundingBox();
   assert.ok(unit.y > street.y, 'Unit / Lot Number comes under the street');
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   await page.getByTestId('opt-type').getByRole('option', { name: 'Semi-D Factory' }).click();
   await page.locator('[data-field="purpose"]').selectOption('sale');
   for (const k of ['frontageFt', 'depthFt', 'lotType', 'ceilingFt', 'powerKva', 'loadingBays']) assert.equal(await page.locator(`select[data-verify="${k}"]`).count(), 1, `${k} has a status`);
@@ -4515,10 +4535,10 @@ test('U104 Change 014: Location straight after section 2 with the street first; 
   await page.locator('[data-field="askingPrice"]').fill('1000000');
   assert.match(await page.getByTestId('form-commission').innerText(), /RM 20,000/, 'commission calculation unchanged');
   // land: Lot Type with Frontage and Depth; Zoning, Plan Approval and Current Use each with a status
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   await page.getByTestId('opt-type').getByRole('option', { name: 'Development Land' }).click();
   for (const k of ['frontageFt', 'depthFt', 'lotType', 'zoning', 'approvals']) assert.equal(await page.locator(`select[data-verify="${k}"]`).count(), 1, `land: ${k} has a status`);
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   await page.getByTestId('opt-type').getByRole('option', { name: 'Agricultural Land' }).click();
   assert.equal(await page.locator('select[data-verify="currentUse"]').count(), 1, 'Current Use / Crop has a status');
   await shot(page, '104-form-statuses', false);
@@ -4534,7 +4554,7 @@ test('U22 no requests leave the phone without a configured service, and no error
 /** A property made through the form with the Change 015 specification fields. */
 async function c15Property(page, { street, purpose = 'sale', status = 'available', tenure }) {
   await tile(page, 'Property List'); await newProperty(page);
-  await page.locator('[data-testid="opt-type"] .opt-btn').click();
+  await page.locator('[data-testid="opt-type"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   await page.getByTestId('opt-type').getByRole('option', { name: /^Terrace house$/i }).click();
   await page.locator('[data-field="purpose"]').selectOption(purpose);
   if (purpose !== 'rent') await page.locator('[data-field="askingPrice"]').fill('650000');
@@ -4547,7 +4567,7 @@ async function c15Property(page, { street, purpose = 'sale', status = 'available
   await page.locator('[data-field="landSqft"]').fill('1650');
   await page.locator('[data-field="builtUpSqft"]').fill('2200');
   // ClaudeChanges001 change 10: the status is chosen in Availability; Booked asks about the booking page ("Later").
-  await page.locator('[data-field="availability"]').selectOption({ available: 'available_now', in_progress: 'booked', sold: 'sold', rented: 'rented', off_market: 'withdrawn' }[status]);
+  await page.locator('[data-field="availability"]').selectOption({ available: 'available_now', in_progress: 'booked_pending_loan', sold: 'sold', rented: 'rented', off_market: 'withdrawn' }[status]);
   if (['in_progress', 'sold', 'rented'].includes(status)) await page.getByTestId('deal-ask-cancel').click();
   if (tenure) await page.locator('[data-field="tenure"]').selectOption(tenure);
   await page.getByTestId('save-property').click();
@@ -4697,7 +4717,7 @@ test('U116 Change 015 Delete on the property page archives (recoverable); the ac
   const archived = (await storedRecords(page, 'properties')).find(p => p.headline === 'Photo house');
   assert.equal(archived.id, before.id, 'same record, not deleted');
   assert.equal(archived.photos.length, 1); assert.equal(archived.notes, 'Keep this note');
-  await page.getByTestId('archived-section').locator('summary').click();
+  await (async () => { if (!(await page.getByTestId('archived-section').count())) await page.getByTestId('archived-btn').click(); })()  /* Change 41: the Archived button at the top */;
   await page.getByTestId('archived-restore').click();
   await waitStored(page, 'records', `all.some(v => v && v.headline === 'Photo house' && !v.archived)`);
   assert.equal(await page.getByTestId('listing-card').filter({ hasText: 'Photo house' }).count(), 1);
@@ -4721,7 +4741,7 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   assert.equal(await remove.isDisabled(), true, 'Remove Position is there, disabled with no position');
   // Owner, 17 Oct 2026: Neighborhood is a remembered dropdown (Others… adds, ✕ removes).
   const nb = page.getByTestId('opt-neighborhood');
-  await nb.locator('.opt-btn').click();
+  await nb.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await nb.getByRole('button', { name: 'Others…' }).click();
   await nb.locator('.opt-new input').fill('Taman Bukit');
   await nb.getByRole('button', { name: 'Add' }).click();
@@ -4744,9 +4764,10 @@ test('U117 Change 015 location: form and property page in the order Country, Sta
   // The next property is offered the remembered neighborhood, with ✕; removing it leaves Others… available.
   await home(page); await tile(page, 'Property List'); await newProperty(page);
   const nb2 = page.getByTestId('opt-neighborhood');
-  await nb2.locator('.opt-btn').click();
+  await nb2.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   assert.equal(await nb2.getByRole('option', { name: /Taman Bukit/i }).count(), 1, 'remembered');
   await nb2.getByRole('button', { name: 'Remove Taman Bukit' }).click();
+  await confirmOptDelete(page);
   assert.equal(await nb2.getByRole('option', { name: /Taman Bukit/i }).count(), 0, 'removed with ✕');
   assert.ok(await nb2.getByRole('button', { name: 'Others…' }).isVisible());
   await page.context().close();
@@ -4909,6 +4930,60 @@ test('U122 JoyChange002 Change 32: Large Cards swipe through photos with tappabl
   await shot(page, '122-viewer', false);
   await page.getByTestId('photo-viewer-next').click();
   assert.equal(await page.getByTestId('photo-viewer-count').innerText(), '2 / 3');
+  await page.context().close();
+});
+
+test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (35); a saved dropdown is locked until its pencil (36); X on an address entry warns about what is under it and the properties using it; rename keeps everything; Back restores filters (27)', async () => {
+  const page = await phone();
+  await c15Property(page, { street: 'Jalan Tahap 1', purpose: 'sale', status: 'in_progress' });
+  // Change 40: the card shows the Booked stage.
+  await home(page); await tile(page, 'Property List');
+  const card = page.getByTestId('listing-card').filter({ hasText: 'Jalan Tahap 1' });
+  assert.match(await card.getByTestId('card-status').innerText(), /BOOKED - PENDING LOAN/);
+  // Change 35: the check-status dropdown has three options, each written in its colour.
+  await card.locator('.sc-card').click(); await page.getByTestId('listing-details').waitFor();
+  await page.locator('.rec-actions').getByRole('button', { name: 'Edit', exact: true }).click(); await expandForm(page);
+  const vs = page.locator('[data-verify="bedrooms"]');
+  assert.deepEqual(await vs.locator('option').allInnerTexts(), ['Confirmed', 'Owner Stated', 'Need to Check']);
+  assert.equal(await vs.inputValue(), 'check', 'a new value is Need to check');
+  assert.equal(await vs.evaluate(e => getComputedStyle(e).color), 'rgb(255, 138, 122)', 'red');
+  await vs.selectOption('owner');
+  assert.equal(await vs.evaluate(e => getComputedStyle(e).color), 'rgb(247, 162, 75)', 'orange');
+  // Change 36: the saved Street is locked; its pencil opens it.
+  const st = page.getByTestId('opt-street');
+  assert.equal(await st.locator('.opt-btn').getAttribute('data-locked'), 'yes');
+  await st.locator('.opt-btn').click({ force: true });
+  assert.equal(await st.locator('.opt-list').count(), 0, 'tapping a locked field does not open it');
+  const pen = await st.getByTestId('opt-street-edit').boundingBox(); const x = await st.getByTestId('opt-street-clear').boundingBox();
+  assert.ok(pen.x < x.x && Math.abs(pen.y - x.y) <= 2, 'pencil first, then X, side by side');
+  assert.ok(pen.width < 44 && pen.width >= 28, 'smaller than the old X, not tiny');
+  // X on the saved value asks first.
+  await st.getByTestId('opt-street-clear').click();
+  await page.locator('.scrim .dialog').getByRole('button', { name: 'Cancel' }).click();
+  assert.match(await st.locator('.opt-btn').innerText(), /Jalan Tahap 1/i, 'cancel keeps it');
+  // The city above the street: X on its remembered entry explains what goes with it, and Edit renames instead.
+  await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
+  await home(page); await tile(page, 'Property List'); await newProperty(page);
+  const lv = async id => { const b = page.getByTestId(id); if (!(await b.locator('.opt-list').count())) await b.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click(); return b; };
+  // c15Property leaves the address chain at Street only (state etc. blank), so the street list sits under the country.
+  const streets = await lv('opt-street');
+  await streets.getByRole('button', { name: 'Remove Jalan Tahap 1' }).click();
+  await page.getByTestId('opt-ask-props').waitFor();
+  assert.match(await page.getByTestId('opt-ask-props').innerText(), /1 property uses this[\s\S]*Continue delete[\s\S]*Rename[\s\S]*Cancel/i);
+  await page.getByTestId('opt-props-rename').click();
+  await page.getByTestId('opt-rename').locator('input').fill('Jalan Tahap Satu');
+  await page.getByTestId('opt-rename-save').click();
+  await waitStored(page, 'records', `all.some(v => v && v.street === 'Jalan Tahap Satu')`);
+  assert.equal(await streets.getByRole('option', { name: 'Jalan Tahap Satu', exact: true }).count(), 1, 'renamed in the list');
+  // Change 27: filters come back after opening a property and pressing Back.
+  await home(page); await tile(page, 'Property List');
+  await page.getByRole('button', { name: /^Filters/ }).click();
+  await page.getByTestId('tf-status').locator('[data-v="sold"] input').check();
+  await page.getByTestId('listing-card').first().locator('.sc-card').click(); await page.getByTestId('listing-details').waitFor();
+  await page.goBack(); await page.getByTestId('listing').waitFor();
+  assert.equal(await page.getByTestId('tf-status').locator('[data-v="sold"] input').isChecked(), true, 'the ticks are kept');
+  // Change 41: the Archived button sits at the top once something is archived.
+  assert.equal(await page.getByTestId('archived-btn').count(), 0, 'nothing archived yet, no button');
   await page.context().close();
 });
 

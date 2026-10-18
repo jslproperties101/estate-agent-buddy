@@ -6,15 +6,17 @@
 // the marketing headline. The list has one Add New Property button at the top (no floating copy) and no voice button.
 // Verification is shown by the colour of a value: Confirmed green, Owner stated blue, Need to check / Unknown red; a value
 // with no mark counts as Need to check.
+import { useRemembered } from '../ui/screenMemory';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { RecordStatus, FileBadge } from '../sync/SyncUI';
 import { BannerDot } from '../gps/BannersUI';
 import { activeBanners } from '../domain/banners';
 import { MoneyInput } from '../ui/MoneyInput';
 import { Lang } from '../i18n';
-import { listingStrings, ListingStrings, typeLabel } from './strings';
+import { listingStrings, ListingStrings, typeLabel, statusText, statusKeyText } from './strings';
 import {
-  Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, STATUSES, CATEGORIES,
+  Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, CATEGORIES, STATUS_KEYS, DEFAULT_STATUSES, HIDDEN_BY_DEFAULT,
+  BED_CHOICES, BATH_CHOICES, statusKey, StatusKey, rentPrices,
   rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, rentCommissionRm, forRent, forSale, fieldsFor,
   CONFIDENTIAL_DOCS, DOC_CATEGORIES, hasPosition, phoneDigits, usablePhone, Doc, orderedPhotos, unitLot, restrictionValue,
 } from './model';
@@ -54,7 +56,7 @@ import { transactionLabels, specLines, checkAndMissing } from './change015';
 
 export type Layout = 'grid' | 'large';
 
-const VGLYPH: Record<VerifyState, string> = { confirmed: '✓', owner: '☎', check: '⚠', unknown: '?' };
+const VGLYPH: Record<VerifyState, string> = { confirmed: '✓', owner: '☎', check: '⚠' };
 /** The verification state of one detail, as a word plus a symbol (never colour alone): used in the full detail view. */
 export function VerifyChip({ state, s }: { state?: VerifyState; s: ListingStrings }) {
   if (!state) return null;
@@ -103,7 +105,7 @@ function TenureLine({ l, s, noStoreys, detail }: { l: Listing; s: ListingStrings
 function Badges({ l, s }: { l: Listing; s: ListingStrings }) {
   return (
     <>
-      {l.status && <span className={`lc-status st-${l.status}`}>{s.status[l.status]}</span>}
+      {l.status && <span className={`lc-status st-${l.status}`}>{statusText(s, l)}</span>}
       {l.purpose && <span className="lc-purpose">{s.purpose[l.purpose]}</span>}
     </>
   );
@@ -124,6 +126,24 @@ function CardPhoto({ l, s, className, tall }: { l: Listing; s: ListingStrings; c
 const typeOnly = (l: Listing, s: ListingStrings) => typeLabel(s, l.type);
 
 // ---------- list ----------
+/** Change 41: a filter field as tick boxes. No ticks (or all of them) means "any". */
+function TickGroup({ label, options, value, onChange, testId }: { label: string; options: { v: string; label: string }[]; value?: string[]; onChange: (v: string[] | undefined) => void; testId: string }) {
+  const on = new Set(value ?? []);
+  const flip = (v: string) => { const next = new Set(on); if (next.has(v)) next.delete(v); else next.add(v); onChange(next.size ? options.map(o => o.v).filter(x => next.has(x)) : []); };
+  return (
+    <fieldset className="tick-group" data-testid={testId}>
+      <legend>{label}</legend>
+      <div className="tick-opts">
+        {options.map(o => (
+          <label key={o.v} className={`tick ${on.has(o.v) ? 'on' : ''}`} data-v={o.v}>
+            <input type="checkbox" checked={on.has(o.v)} onChange={() => flip(o.v)} /> <span>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; initial?: Filters }) {
   const { state, store } = useApp();
   const s = listingStrings[lang];
@@ -136,9 +156,11 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const archivedList = inWorkspace.filter(l => l.archived).sort((a, b) => (b.archived?.at ?? 0) - (a.archived?.at ?? 0));
   const layout: Layout = state.settings.layout === 'grid' ? 'grid' : 'large';   // Change 28: Large Cards unless Grid was chosen
   const setLayout = (x: Layout) => store.setSingleton('settings', { layout: x });
-  const [f, setF] = useState<Filters>(initial ?? {});
-  const [open, setOpen] = useState(false);
-  const shown = useMemo(() => applyFilters(listings, f), [listings, f]);
+  const [f, setF] = useRemembered<Filters>('filters', initial ?? {});
+  const [open, setOpen] = useRemembered('filtersOpen', false);
+  // Change 41: until the Status ticks are changed, Sold, Rented and Withdrawn are hidden (a voice command's status still shows).
+  const shown = useMemo(() => applyFilters(listings, f).filter(l => f.statuses || f.status || !HIDDEN_BY_DEFAULT.includes(statusKey(l) as StatusKey)), [listings, f]);
+  const [showArchived, setShowArchived] = useRemembered('archived', false);
   const n = activeCount(f);
   const set = (patch: Partial<Filters>) => setF(prev => ({ ...prev, ...patch }));
   const ownerName = (l: Listing) => state.contacts.find(c => c.id === l.vendorId)?.name ?? l.ownerName;
@@ -177,53 +199,35 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
             <span>{s.large}</span>
           </button>
         </div>
+        {/* Change 41: one small Archived button at the top (archived and deleted are the same list). */}
+        {archivedList.length > 0 && (
+          <button type="button" className={`btn small ${showArchived ? 'primary' : 'secondary'} archived-btn`} aria-pressed={showArchived} data-testid="archived-btn"
+            onClick={() => setShowArchived(x => !x)}>{ts.archivedN(archivedList.length)}</button>
+        )}
       </div>
 
       {open && (
         <div className="card stack-sm" data-testid="filter-panel">
-          <div className="filter-grid">
-            <label>{s.f.purpose}
-              <select aria-label={s.f.purpose} value={f.purpose ?? ''} onChange={e => set({ purpose: (e.target.value || undefined) as Filters['purpose'] })}>
-                <option value="">{s.any}</option>{(['sale', 'rent'] as const).map(x => <option key={x} value={x}>{s.purposeFilter[x]}</option>)}
-              </select>
-            </label>
-            <label>{s.f.category}
-              <select aria-label={s.f.category} value={f.category ?? ''} onChange={e => set({ category: (e.target.value || undefined) as Filters['category'] })}>
-                <option value="">{s.any}</option>{CATEGORIES.map(x => <option key={x} value={x}>{s.category[x]}</option>)}
-              </select>
-            </label>
-            <label>{s.f.type}
-              <select aria-label={s.f.type} value={f.type ?? ''} onChange={e => set({ type: e.target.value || undefined, typeWord: undefined })}>
-                <option value="">{s.any}</option>{TYPES.map(x => <option key={x} value={x}>{typeLabel(s, x)}</option>)}
-              </select>
-            </label>
-            <label>{s.f.status}
-              <select aria-label={s.f.status} value={f.status ?? ''} onChange={e => set({ status: (e.target.value || undefined) as Filters['status'] })}>
-                <option value="">{s.any}</option>{STATUSES.map(x => <option key={x} value={x}>{s.status[x]}</option>)}
-              </select>
-            </label>
-            <label>{s.f.tenure}
-              <select aria-label={s.f.tenure} value={f.tenure ?? ''} onChange={e => set({ tenure: (e.target.value || undefined) as Filters['tenure'] })}>
-                <option value="">{s.any}</option>{TENURES.map(x => <option key={x} value={x}>{s.tenure[x]}</option>)}
-              </select>
-            </label>
-            <label>{s.f.lotType}
-              <select aria-label={s.f.lotType} value={f.lotType ?? ''} onChange={e => set({ lotType: (e.target.value || undefined) as Filters['lotType'] })}>
-                <option value="">{s.any}</option>{LOT_TYPES.map(x => <option key={x} value={x}>{s.lotType[x]}</option>)}
-              </select>
-            </label>
-            <label>{s.f.beds}
-              <select aria-label={s.f.beds} value={f.bedsMin ?? ''} onChange={e => set({ bedsMin: e.target.value ? Number(e.target.value) : undefined })}>
-                <option value="">{s.any}</option>{[1, 2, 3, 4, 5].map(x => <option key={x} value={x}>{x}+</option>)}
-              </select>
-            </label>
-            <label>{s.f.baths}
-              <select aria-label={s.f.baths} value={f.bathsMin ?? ''} onChange={e => set({ bathsMin: e.target.value ? Number(e.target.value) : undefined })}>
-                <option value="">{s.any}</option>{[1, 2, 3, 4].map(x => <option key={x} value={x}>{x}+</option>)}
-              </select>
-            </label>
+          {/* JoyChange002 Change 41: every filter is a set of tick boxes, so more than one choice can be shown at once. */}
+          <div className="filter-ticks">
+            <TickGroup label={s.f.purpose} testId="tf-purpose" value={f.purposes} onChange={v => set({ purposes: v as Filters['purposes'], purpose: undefined })}
+              options={(['sale', 'rent'] as const).map(x => ({ v: x, label: s.purposeFilter[x] }))} />
+            <TickGroup label={s.f.status} testId="tf-status" value={f.statuses ?? (f.status ? undefined : DEFAULT_STATUSES)} onChange={v => set({ statuses: v as Filters['statuses'], status: undefined })}
+              options={STATUS_KEYS.map(x => ({ v: x, label: statusKeyText(s, x) }))} />
+            <TickGroup label={s.f.category} testId="tf-category" value={f.categories} onChange={v => set({ categories: v as Filters['categories'], category: undefined })}
+              options={CATEGORIES.map(x => ({ v: x, label: s.category[x] }))} />
+            <TickGroup label={s.f.type} testId="tf-type" value={f.types} onChange={v => set({ types: v, type: undefined, typeWord: undefined })}
+              options={TYPES.map(x => ({ v: x, label: typeLabel(s, x) }))} />
+            <TickGroup label={s.f.tenure} testId="tf-tenure" value={f.tenures} onChange={v => set({ tenures: v as Filters['tenures'], tenure: undefined })}
+              options={TENURES.map(x => ({ v: x, label: s.tenure[x] }))} />
+            <TickGroup label={s.f.lotType} testId="tf-lot" value={f.lotTypes} onChange={v => set({ lotTypes: v as Filters['lotTypes'], lotType: undefined })}
+              options={LOT_TYPES.map(x => ({ v: x, label: s.lotType[x] }))} />
+            <TickGroup label={s.f.bedsN} testId="tf-beds" value={f.beds?.map(String)} onChange={v => set({ beds: v?.map(Number), bedsMin: undefined })}
+              options={BED_CHOICES.map(x => ({ v: String(x), label: x === BED_CHOICES[BED_CHOICES.length - 1] ? `${x}+` : String(x) }))} />
+            <TickGroup label={s.f.bathsN} testId="tf-baths" value={f.baths?.map(String)} onChange={v => set({ baths: v?.map(Number), bathsMin: undefined })}
+              options={BATH_CHOICES.map(x => ({ v: String(x), label: x === BATH_CHOICES[BATH_CHOICES.length - 1] ? `${x}+` : String(x) }))} />
           </div>
-          <div className="small muted">{f.purpose === 'rent' ? s.priceRent : s.f.price}</div>
+          <div className="small muted">{rentPrices(f) ? s.priceRent : s.f.price}</div>
           <div className="two">
             <label className="ff">{s.min}<MoneyInput aria-label={`${s.f.price} ${s.min}`} value={f.priceMin} onChange={n => set({ priceMin: n })} /></label>
             <label className="ff">{s.max}<MoneyInput aria-label={`${s.f.price} ${s.max}`} value={f.priceMax} onChange={n => set({ priceMax: n })} /></label>
@@ -235,20 +239,9 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
         </div>
       )}
 
-      <CreatorFilter lang={lang} value={by} onChange={setBy} />
-      <div className="small muted" data-testid="listing-count">{s.results(shown.length, listings.length)}</div>
-      {listings.length === 0 ? <p className="muted empty" data-testid="listing-empty">{s.empty}</p> : shown.length === 0 && <p className="muted">{s.none}</p>}
-
-      <ul className={layout === 'grid' ? 'lc-grid sc-list' : 'lc-list sc-list'} data-layout={layout}>
-        {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
-          <SubsaleCard key={x.item.id} l={x.item} lang={lang} large={layout === 'large'} owner={ownerName(x.item)}
-            onOpen={() => openIt(x.item)} onEdit={() => editIt(x.item)} go={go} />
-        ))}
-      </ul>
-
-      {archivedList.length > 0 && (
-        <details className="card stack-sm archived-section" data-testid="archived-section">
-          <summary><strong>{ts.archivedN(archivedList.length)}</strong></summary>
+      {showArchived && archivedList.length > 0 && (
+        <div className="card stack-sm archived-section" data-testid="archived-section">
+          <strong>{ts.archivedN(archivedList.length)}</strong>
           <small className="muted">{ts.archivedHelp}</small>
           <ul className="archived-list">
             {archivedList.map(l => (
@@ -262,8 +255,19 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
               </li>
             ))}
           </ul>
-        </details>
+        </div>
       )}
+      <CreatorFilter lang={lang} value={by} onChange={setBy} />
+      <div className="small muted" data-testid="listing-count">{s.results(shown.length, listings.length)}</div>
+      {listings.length === 0 ? <p className="muted empty" data-testid="listing-empty">{s.empty}</p> : shown.length === 0 && <p className="muted">{s.none}</p>}
+
+      <ul className={layout === 'grid' ? 'lc-grid sc-list' : 'lc-list sc-list'} data-layout={layout}>
+        {withFeedAds(shown).map(x => x.kind === 'ad' ? <li key={`ad-${x.n}`} className="feed-ad-cell"><FeedAd lang={lang} n={x.n} /></li> : (
+          <SubsaleCard key={x.item.id} l={x.item} lang={lang} large={layout === 'large'} owner={ownerName(x.item)}
+            onOpen={() => openIt(x.item)} onEdit={() => editIt(x.item)} go={go} />
+        ))}
+      </ul>
+
     </section>
   );
 }
@@ -583,7 +587,7 @@ export function GridCardButton({ l, s, onOpen, extra }: { l: Listing; s: Listing
       <span className="gc-price"><PriceLine l={l} s={s} short /></span>
       <span className="gc-title" data-testid="card-address">{cardTitle(l) || s.untitled}</span>
       <span className="gc-meta">{typeOnly(l, s) || '—'}</span>
-      <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{s.status[l.status]}</> : '—'}</span>
+      <span className="gc-meta gc-st">{l.status ? <><span className={`gc-dot st-${l.status}`} aria-hidden="true" />{statusText(s, l)}</> : '—'}</span>
       {extra}
       <CreatorTag state={state} collection="properties" id={l.id} />
     </button>
@@ -644,7 +648,7 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
             <span className="sc-dots" data-testid="card-photo-dots" aria-hidden="true">{photos.map((x, k) => <i key={x.id} className={k === at ? 'on' : ''} />)}</span>
           </>}
           {tx.length > 0 && <span className="sc-txs">{tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}</span>}
-          {l.status && <span className={`sc-status st-${l.status}`} data-testid="card-status" data-status={l.status}>{s.status[l.status]}</span>}
+          {l.status && <span className={`sc-status st-${l.status}`} data-testid="card-status" data-status={l.status} data-booked={l.bookedStage}>{statusText(s, l)}</span>}
           {(p.sample || l.sample) && <span className="lc-sample">{p.sample ? s.samplePic : s.sample}</span>}
         </span>
         {/* Change 28: the small Grid card is just the picture (with its status and For Sale / For Rent labels), the address, the

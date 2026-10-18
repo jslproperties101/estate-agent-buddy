@@ -25,7 +25,7 @@ const en = {
   layout: 'Layout',
   grid: 'Grid', large: 'Large cards',
   kf: { landSqft: 'Land size', builtUpSqft: 'Built-up', bedrooms: 'Bedrooms', bathrooms: 'Bathrooms', parking: 'Parking', tenure: 'Tenure' } as Record<string, string>,
-  f: { location: 'Location', type: 'Type', category: 'Category', purpose: 'Sale or rent', price: 'Price (RM)', beds: 'Bedrooms (at least)', baths: 'Bathrooms (at least)', tenure: 'Tenure', lotType: 'Lot type', status: 'Status' },
+  f: { location: 'Location', type: 'Type', category: 'Category', purpose: 'Sale or rent', price: 'Price (RM)', beds: 'Bedrooms (at least)', baths: 'Bathrooms (at least)', bedsN: 'Bedrooms', bathsN: 'Bathrooms', tenure: 'Tenure', lotType: 'Lot type', status: 'Status' },
   priceRent: 'Monthly rent (RM)',
   types: {
     'Terrace house': 'Terrace house', 'Semi-D house': 'Semi-D house', 'Bungalow': 'Bungalow', 'Townhouse': 'Townhouse', 'Condo / apartment': 'Condo / apartment', 'Residential land': 'Residential land',
@@ -38,6 +38,8 @@ const en = {
   tenure: { freehold: 'Freehold', leasehold: 'Leasehold' } as Record<string, string>,
   lotType: { intermediate: 'Intermediate', corner: 'Corner', end: 'End lot', single: 'Standalone' } as Record<string, string>,
   status: { available: 'Available', in_progress: 'Booked', sold: 'Sold', rented: 'Rented', off_market: 'Withdrawn', needs_check: 'Needs check' } as Record<string, string>,
+  // Change 40: the five Booked stages (Title Case like every other status, Change 009).
+  bookedStage: { pending_loan: 'Booked - Pending Loan', pending_spa: 'Booked - Pending SPA', spa_signed: 'Booked - SPA Signed', other_agent: 'Booked - Other Agent (Pending SPA)', pending_consent: 'Booked - Pending Consent' } as Record<string, string>,
   negotiable: { yes: 'Negotiable', no: 'Fixed price' } as Record<string, string>,
   category: { residential: 'Residential', commercial: 'Commercial', industrial: 'Industrial', agricultural: 'Agricultural land', development: 'Development land' } as Record<string, string>,
   purpose: { sale: 'For sale', rent: 'For rent', sale_or_rent: 'Sale or rent' } as Record<string, string>,
@@ -136,7 +138,7 @@ const en = {
   verify: {
     label: 'Check status', none: 'Not marked', confirmed: 'Confirmed', owner: 'Owner stated', check: 'Need to check', unknown: 'Unknown',
     aria: (f: string) => `Check status: ${f}`, summary: (n: number) => `${n} to check`,
-    help: 'Confirmed: you checked it yourself or from a document. Owner stated: the owner told you, not checked. Need to check: look into it before relying on it. Unknown: nobody knows yet.',
+    help: 'Confirmed: you checked it yourself or from a document. Owner stated: the owner told you, not checked. Need to check: look into it before relying on it.',
   } as { label: string; none: string; confirmed: string; owner: string; check: string; unknown: string; aria: (f: string) => string; summary: (n: number) => string; help: string },
   /** Change 009 wording. */
   n9: {
@@ -236,7 +238,7 @@ const bm: ListingStrings = {
   layout: 'Susun atur',
   grid: 'Grid', large: 'Kad besar',
   kf: { landSqft: 'Saiz tanah', builtUpSqft: 'Binaan', bedrooms: 'Bilik tidur', bathrooms: 'Bilik air', parking: 'Parkir', tenure: 'Pegangan' },
-  f: { location: 'Lokasi', type: 'Jenis', category: 'Kategori', purpose: 'Jual atau sewa', price: 'Harga (RM)', beds: 'Bilik tidur (sekurang-kurangnya)', baths: 'Bilik air (sekurang-kurangnya)', tenure: 'Pegangan', lotType: 'Jenis lot', status: 'Status' },
+  f: { location: 'Lokasi', type: 'Jenis', category: 'Kategori', purpose: 'Jual atau sewa', price: 'Harga (RM)', beds: 'Bilik tidur (sekurang-kurangnya)', baths: 'Bilik air (sekurang-kurangnya)', bedsN: 'Bilik tidur', bathsN: 'Bilik air', tenure: 'Pegangan', lotType: 'Jenis lot', status: 'Status' },
   priceRent: 'Sewa bulanan (RM)',
   types: {
     'Terrace house': 'Rumah teres', 'Semi-D house': 'Rumah berkembar', 'Bungalow': 'Banglo', 'Townhouse': 'Rumah bandar', 'Condo / apartment': 'Kondominium / pangsapuri', 'Residential land': 'Tanah kediaman',
@@ -249,6 +251,7 @@ const bm: ListingStrings = {
   tenure: { freehold: 'Pegangan bebas', leasehold: 'Pajakan' },
   lotType: { intermediate: 'Lot tengah', corner: 'Lot tepi', end: 'Lot hujung', single: 'Sendirian' },
   status: { available: 'Ada', in_progress: 'Telah Ditempah', sold: 'Dijual', rented: 'Disewa', off_market: 'Ditarik Balik', needs_check: 'Perlu semak' },
+  bookedStage: { pending_loan: 'Ditempah - Menunggu Pinjaman', pending_spa: 'Ditempah - Menunggu SPA', spa_signed: 'Ditempah - SPA Ditandatangani', other_agent: 'Ditempah - Ejen Lain (Menunggu SPA)', pending_consent: 'Ditempah - Menunggu Kebenaran' },
   negotiable: { yes: 'Boleh runding', no: 'Harga tetap' },
   category: { residential: 'Kediaman', commercial: 'Komersial', industrial: 'Perindustrian', agricultural: 'Tanah pertanian', development: 'Tanah pembangunan' },
   purpose: { sale: 'Untuk dijual', rent: 'Untuk disewa', sale_or_rent: 'Jual atau sewa' },
@@ -346,7 +349,7 @@ const bm: ListingStrings = {
   verify: {
     label: 'Status semakan', none: 'Belum ditanda', confirmed: 'Disahkan', owner: 'Dinyatakan pemilik', check: 'Perlu disemak', unknown: 'Tidak diketahui',
     aria: (f: string) => `Status semakan: ${f}`, summary: (n: number) => `${n} perlu disemak`,
-    help: 'Disahkan: anda sendiri menyemaknya atau daripada dokumen. Dinyatakan pemilik: pemilik memberitahu, belum disemak. Perlu disemak: selidik dahulu sebelum bergantung padanya. Tidak diketahui: belum ada yang tahu.',
+    help: 'Disahkan: anda sendiri menyemaknya atau daripada dokumen. Dinyatakan pemilik: pemilik memberitahu, belum disemak. Perlu disemak: selidik dahulu sebelum bergantung padanya.',
   },
   n9: {
     addLocation: 'Tambah Lokasi', propertyLocation: 'Lokasi Hartanah', locationSaved: 'Lokasi disimpan', noLocation: 'Belum ada lokasi. Guna Tambah Lokasi, lokasi semasa anda, atau tampal pautan Google Maps.',
@@ -444,7 +447,7 @@ const zh: ListingStrings = {
   layout: '显示方式',
   grid: '网格', large: '大卡片',
   kf: { landSqft: '土地面积', builtUpSqft: '建筑面积', bedrooms: '卧室', bathrooms: '浴室', parking: '车位', tenure: '地契' },
-  f: { location: '地点', type: '类型', category: '类别', purpose: '出售或出租', price: '价格 (RM)', beds: '卧室（至少）', baths: '浴室（至少）', tenure: '地契', lotType: '单位位置', status: '状态' },
+  f: { location: '地点', type: '类型', category: '类别', purpose: '出售或出租', price: '价格 (RM)', beds: '卧室（至少）', baths: '浴室（至少）', bedsN: '卧室', bathsN: '浴室', tenure: '地契', lotType: '单位位置', status: '状态' },
   priceRent: '月租 (RM)',
   types: {
     'Terrace house': '排屋', 'Semi-D house': '半独立式洋房', 'Bungalow': '独立式洋房', 'Townhouse': '镇屋', 'Condo / apartment': '公寓', 'Residential land': '住宅地',
@@ -457,6 +460,7 @@ const zh: ListingStrings = {
   tenure: { freehold: '永久地契', leasehold: '租赁地契' },
   lotType: { intermediate: '中间单位', corner: '角头单位', end: '尾端单位', single: '独立单位' },
   status: { available: '可售/可租', in_progress: '已预订', sold: '已售', rented: '已出租', off_market: '已撤回', needs_check: '需核实' },
+  bookedStage: { pending_loan: '已预订 - 等待贷款', pending_spa: '已预订 - 等待买卖合约 (SPA)', spa_signed: '已预订 - 已签买卖合约 (SPA)', other_agent: '已预订 - 其他经纪 (等待 SPA)', pending_consent: '已预订 - 等待转让同意' },
   negotiable: { yes: '可议价', no: '不议价' },
   category: { residential: '住宅', commercial: '商业', industrial: '工业', agricultural: '农业地', development: '发展地' },
   purpose: { sale: '出售', rent: '出租', sale_or_rent: '出售或出租' },
@@ -554,7 +558,7 @@ const zh: ListingStrings = {
   verify: {
     label: '核实状态', none: '未标记', confirmed: '已确认', owner: '屋主所述', check: '需要核实', unknown: '未知',
     aria: (f: string) => `核实状态：${f}`, summary: (n: number) => `${n} 项需核实`,
-    help: '已确认：您亲自或凭文件核实。屋主所述：屋主告知，尚未核实。需要核实：使用前先查证。未知：目前没有人知道。',
+    help: '已确认：您亲自或凭文件核实。屋主所述：屋主告知，尚未核实。需要核实：使用前先查证。',
   },
   n9: {
     addLocation: '添加位置', propertyLocation: '房产位置', locationSaved: '位置已保存', noLocation: '尚无位置。请用“添加位置”、当前位置，或粘贴 Google 地图链接。',
@@ -636,7 +640,7 @@ function titled(o: ListingStrings, lang: Lang): ListingStrings {
   const v = o.verify;
   return {
     ...o, l: t(o.l), sec: t(o.sec), kf: t(o.kf), f: t(o.f), types: t(o.types), titleTypes: t(o.titleTypes), restrictions: t(o.restrictions),
-    tenure: t(o.tenure), lotType: t(o.lotType), status: t(o.status), negotiable: t(o.negotiable), category: t(o.category), purpose: t(o.purpose),
+    tenure: t(o.tenure), lotType: t(o.lotType), status: t(o.status), bookedStage: t(o.bookedStage), negotiable: t(o.negotiable), category: t(o.category), purpose: t(o.purpose),
     purposeFilter: t(o.purposeFilter), arrangement: t(o.arrangement), availability: t(o.availability), condition: t(o.condition),
     furnishing: t(o.furnishing), landUse: t(o.landUse), docCat: t(o.docCat), adStatus: t(o.adStatus), banner: t(o.banner),
     verify: { ...v, label: titleCase(v.label, lang), confirmed: titleCase(v.confirmed, lang), owner: titleCase(v.owner, lang), check: titleCase(v.check, lang), unknown: titleCase(v.unknown, lang) },
@@ -647,3 +651,9 @@ export const listingStrings: Record<Lang, ListingStrings> = titled3({ en: titled
 
 /** Display name of a type, title type, restriction or country value in the chosen language (custom values as typed). */
 export const typeLabel = (s: ListingStrings, v?: string) => (v ? s.types[v] ?? v : '');
+/** Change 40: the status as shown everywhere: a Booked property with a stage shows its stage ("Booked - pending loan"). */
+export const statusText = (s: ListingStrings, l: { status?: string; bookedStage?: string }) =>
+  !l.status ? '' : l.status === 'in_progress' && l.bookedStage && s.bookedStage[l.bookedStage] ? s.bookedStage[l.bookedStage] : s.status[l.status] ?? l.status;
+/** Change 41: the label for one status key (each Booked stage separately, plain "Booked" for older records). */
+export const statusKeyText = (s: ListingStrings, k: string) =>
+  k.startsWith('booked_') ? s.bookedStage[k.slice(7)] ?? k : k === 'booked' ? s.status.in_progress : s.status[k] ?? k;

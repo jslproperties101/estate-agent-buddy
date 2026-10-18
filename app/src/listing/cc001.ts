@@ -3,17 +3,21 @@
 //    filters, cards, matching, exports and sync are unchanged; the form shows one list and writes both.
 //  - Change 5: location options belong to the level above. A typed City is saved under its State, a Township under its
 //    City, and so on down to Street. A blank level is skipped, so its options link to the next level up.
-import type { Listing, Status, Availability } from './model';
+import type { Listing, Status, Availability, BookedStage } from './model';
+import { BOOKED_STAGES } from './model';
 
 /** The one Availability list (Change 10), in the agreed order. */
-export const AVAIL_CHOICES = ['available_now', 'available_from', 'booked', 'sold', 'rented', 'withdrawn'] as const;
-export type AvailChoice = (typeof AVAIL_CHOICES)[number];
+// JoyChange002 Change 40: plain "Booked" is replaced by five Booked stages, then Sold. A property already marked plain
+// Booked keeps showing it (the 'booked' choice below), but it is no longer offered when the status is changed.
+export const AVAIL_CHOICES = ['available_now', 'available_from', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'sold', 'rented', 'withdrawn'] as const;
+export type AvailChoice = (typeof AVAIL_CHOICES)[number] | 'booked';
+export const isBookedChoice = (c?: string) => !!c && (c === 'booked' || c.startsWith('booked_'));
 
 /** Which choice a record shows. The status decides first (a sold property is Sold whatever its old availability said);
  *  older records without a status show their availability. */
-export function availChoice(l: Pick<Listing, 'status' | 'availability'>): AvailChoice | undefined {
+export function availChoice(l: Pick<Listing, 'status' | 'availability'> & { bookedStage?: BookedStage }): AvailChoice | undefined {
   switch (l.status) {
-    case 'in_progress': return 'booked';
+    case 'in_progress': return l.bookedStage && BOOKED_STAGES.includes(l.bookedStage) ? `booked_${l.bookedStage}` as AvailChoice : 'booked';
     case 'sold': return 'sold';
     case 'rented': return 'rented';
     case 'off_market': return 'withdrawn';
@@ -26,7 +30,11 @@ export function availChoice(l: Pick<Listing, 'status' | 'availability'>): AvailC
 }
 
 /** The two stored fields for a choice. "Available From" keeps the chosen month; every other choice clears it. */
-export function availPatch(choice: AvailChoice | undefined, keepFrom?: string): { status?: Status; availability?: Availability; availableFrom?: string } {
+export function availPatch(choice: AvailChoice | undefined, keepFrom?: string): { status?: Status; availability?: Availability; availableFrom?: string; bookedStage?: BookedStage } {
+  if (choice && choice.startsWith('booked_')) return { status: 'in_progress', availability: 'not_available', availableFrom: undefined, bookedStage: choice.slice(7) as BookedStage };
+  return { ...basePatch(choice, keepFrom), bookedStage: undefined };
+}
+function basePatch(choice: AvailChoice | undefined, keepFrom?: string): { status?: Status; availability?: Availability; availableFrom?: string } {
   switch (choice) {
     case 'available_now': return { status: 'available', availability: 'immediate', availableFrom: undefined };
     case 'available_from': return { status: 'available', availability: 'from_date', availableFrom: keepFrom };

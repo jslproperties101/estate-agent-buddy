@@ -37,7 +37,7 @@ const shot = (page, name, fullPage = false) => page.screenshot({ path: `${SHOTS}
  *  value in the list's search box and adds it ("Add …"), or picks it when it is already in the list. */
 async function setStreet(page, value) {
   const box = page.locator('[data-testid="opt-street"]');
-  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn').click();
+  if (await box.locator('.opt-list').count() === 0) await box.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   const v = String(value ?? '');
   if (!v) { await box.getByRole('option').first().click(); return; }
   await page.getByTestId('opt-street-search').fill(v);
@@ -259,9 +259,9 @@ test('C5 View and Edit: editor requests deletion, owner approves; the property g
   assert.equal(cloud.deleteRequests[0].status, 'approved');
   await home(a.page);
   await a.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
-  await a.page.getByTestId('archived-section').waitFor();
+  await a.page.getByTestId('archived-btn').waitFor();
   assert.equal(await a.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).count(), 0, 'not among active listings');
-  await a.page.getByTestId('archived-section').locator('summary').click();
+  await (async () => { if (!(await a.page.getByTestId('archived-section').count())) await a.page.getByTestId('archived-btn').click(); })()  /* Change 41: the Archived button at the top */;
   assert.match(await a.page.getByTestId('archived-card').innerText(), /Jalan Aina 1/);
   await shot(a.page, 'c010-07-archived', true);
   await a.ctx.close(); await b.ctx.close();
@@ -275,9 +275,9 @@ test('C6 owner: Delete archives with confirmation; Restore; Delete permanently o
   await a.page.getByTestId('detail-delete').click();
   assert.match(await a.page.getByRole('alertdialog').innerText(), /Archived section/i);
   await a.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-  await a.page.getByTestId('archived-section').waitFor();
+  await a.page.getByTestId('archived-btn').waitFor();
   assert.equal(await a.page.getByTestId('listing-card').count(), 0);
-  await a.page.getByTestId('archived-section').locator('summary').click();
+  await (async () => { if (!(await a.page.getByTestId('archived-section').count())) await a.page.getByTestId('archived-btn').click(); })()  /* Change 41: the Archived button at the top */;
   await a.page.getByTestId('archived-card').locator('.link-row').click();
   await a.page.getByTestId('archived-banner').waitFor();
   assert.equal(await a.page.locator('.rec-actions').getByRole('button', { name: 'Edit' }).count(), 0, 'archived: restore first');
@@ -285,7 +285,7 @@ test('C6 owner: Delete archives with confirmation; Restore; Delete permanently o
   await a.page.getByTestId('archived-banner').waitFor({ state: 'detached' });
   await a.page.getByTestId('detail-delete').click();
   await a.page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
-  await a.page.getByTestId('archived-section').locator('summary').click();
+  await (async () => { if (!(await a.page.getByTestId('archived-section').count())) await a.page.getByTestId('archived-btn').click(); })()  /* Change 41: the Archived button at the top */;
   await a.page.getByTestId('archived-card').locator('.link-row').click();
   await a.page.getByTestId('delete-permanent').click();
   assert.match(await a.page.getByRole('alertdialog').innerText(), /permanently/i);
