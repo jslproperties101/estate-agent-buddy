@@ -7,6 +7,7 @@ import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { configured, fresh, syncNow, SyncError, supabaseCall, supabaseHeaders, Role, Session } from '../data/sync';
 import { startGoogleSignIn, signOutRemote, canSignInHere } from '../data/auth';
+import { unregisterToken } from '../native/push';
 import { fmtDateTime } from '../lib/dates';
 import { Confirm } from '../ui/common';
 import { BusyLine } from '../ui/BusyLine';
@@ -58,7 +59,7 @@ export function AccountCard({ lang }: { lang: Lang }) {
       {busy && <BusyLine text={a.sync.running} testId="account-busy" />}
       {msg && <p className="small" role="status" data-testid="account-msg">{msg}</p>}
       {ask && s && <Confirm lang={lang} title={a.signOutQ} body={a.signOutBody} okLabel={a.signOut} danger={false} onCancel={() => setAsk(false)}
-        onOk={() => { setAsk(false); void signOutRemote(cfg, s); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? s.workspaceId }); }} />}
+        onOk={() => { setAsk(false); void unregisterToken(store, cfg).finally(() => signOutRemote(cfg, s)); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? s.workspaceId }); }} />}
       {/* Change 14: "Team and access" moved to Opportunities → Team Sharing (TeamSharingCard). */}
     </div>
   );

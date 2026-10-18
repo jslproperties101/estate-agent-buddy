@@ -8,7 +8,7 @@
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
 
 const cfg = JSON.parse(readFileSync('capacitor.config.json', 'utf8'));
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -72,6 +72,18 @@ edit(`${A}/AndroidManifest.xml`, s => {
   }
   return s;
 });
+
+// 1b. JoyChange002 Change 25: Firebase Cloud Messaging. The Capacitor template applies the Google services Gradle plugin
+//     when android/app/google-services.json exists; the one file holds both the real and the QA app.
+{
+  const src = new URL('../android-config/google-services.json', import.meta.url);
+  if (existsSync(src)) {
+    const j = JSON.parse(readFileSync(src, 'utf8'));
+    const ids = (j.client ?? []).map(c => c.client_info?.android_client_info?.package_name);
+    if (!ids.includes(APP_ID)) throw new Error(`google-services.json has no Android app ${APP_ID} (it has ${ids.join(', ')})`);
+    copyFileSync(src, 'android/app/google-services.json');
+  }
+}
 
 // 2. Names and the URL scheme.
 edit(`${A}/res/values/strings.xml`, s => {

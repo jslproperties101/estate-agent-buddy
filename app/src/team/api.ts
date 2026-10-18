@@ -2,6 +2,7 @@
 // Every answer comes from the database, which enforces the rules; the phone only shows what it was told. Until the
 // proposal is applied to the project, the functions do not exist and every call answers "unavailable" (said plainly on
 // the Team Workspace screen; nothing pretends to work).
+import { sendPush } from '../native/push';
 import type { Store } from '../data/store';
 import { fresh, supabaseCall, supabaseHeaders, SyncConfig, SyncError, configured } from '../data/sync';
 import type { CollectionName, DeleteRequest, ShareLevel, ShareScope, TeamAnswer, TeamInvite, TeamMember, TeamState } from '../data/types';
@@ -112,6 +113,8 @@ export function tokenFrom(text: string): string | undefined {
 
 export async function sendInvite(store: Store, cfg: SyncConfig, email: string | null, fetchFn: FetchFn = fetch): Promise<InviteAnswer> {
   const r = await rpc<InviteAnswer>(store, cfg, 'eab_team_invite', { p_email: email ? email.trim().toLowerCase() : null }, fetchFn);
+  // JoyChange002 Change 25: tell the invited person's phone (an email invitation only; a link has nobody to send to yet).
+  if (email && r?.invite_id) void sendPush(store, cfg, 'invite', r.invite_id, fetchFn);
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
   return r;
 }
@@ -121,10 +124,12 @@ export async function cancelInvite(store: Store, cfg: SyncConfig, inviteId: stri
 }
 export async function acceptInvite(store: Store, cfg: SyncConfig, by: { token?: string; inviteId?: string }, fetchFn: FetchFn = fetch) {
   await rpc(store, cfg, 'eab_team_accept', { p_token: by.token ?? null, p_invite: by.inviteId ?? null }, fetchFn);
+  void sendPush(store, cfg, 'answer', by.inviteId, fetchFn);   // Change 25: tell the sender
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
 }
 export async function declineInvite(store: Store, cfg: SyncConfig, by: { token?: string; inviteId?: string }, fetchFn: FetchFn = fetch) {
   await rpc(store, cfg, 'eab_team_decline', { p_token: by.token ?? null, p_invite: by.inviteId ?? null }, fetchFn);
+  void sendPush(store, cfg, 'answer', by.inviteId, fetchFn);   // Change 25: tell the sender
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
 }
 /** Ends the Team Workspace (leave). Shared access is revoked immediately in the cloud; the phone drops every shared-in

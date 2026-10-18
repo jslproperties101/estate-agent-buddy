@@ -12,6 +12,7 @@ import { acceptInvite, declineInvite, teamErrorOf } from './api';
 import { personLabel } from './access';
 import { checkInvitations, openInvites, CHECK_EVERY_MS, RESUME_GAP_MS } from './invitations';
 import { teamStrings } from './strings';
+import { startPush } from '../native/push';
 
 /** `suppress`: true on the Team Workspace screen, which already shows the invitation with its own Accept / Decline buttons. */
 export function InvitePopup({ lang, suppress = false }: { lang: Lang; suppress?: boolean }) {
@@ -34,6 +35,8 @@ export function InvitePopup({ lang, suppress = false }: { lang: Lang; suppress?:
       void checkInvitations(store, cfgRef.current, { inviteTitle: textRef.current.invPhoneTitle, inviteBody: textRef.current.invPhoneBody, acceptedTitle: textRef.current.invAcceptedTitle, declinedTitle: textRef.current.invDeclinedTitle, answerBody: textRef.current.invAnswerBody });
     };
     look();
+    // Change 24 / 25: a push message (or a tap on one) makes the app look straight away.
+    void startPush(store, cfgRef.current, () => store.getState().settings.lang ?? 'en', look);
     const every = setInterval(() => { if (document.visibilityState === 'visible') look(); }, CHECK_EVERY_MS);
     const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - last.current >= RESUME_GAP_MS) look(); };
     document.addEventListener('visibilitychange', onVis);

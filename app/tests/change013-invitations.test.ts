@@ -122,3 +122,68 @@ test('I7 a project without the Change 13 database update (no invites_answered) s
   assert.equal(openInvites(b.store.getState()).length, 1);
   assert.deepEqual(unseenAnswers(b.store.getState()), []);
 });
+
+// ---------- JoyChange002 Changes 24 and 25 ----------
+import { registerToken, unregisterToken, sendPush } from '../src/native/push';
+import { CHECK_EVERY_MS } from '../src/team/invitations';
+
+/** The stand-in cloud, plus a record of every push call (register / unregister / send-push), which it does not know. */
+function spy(cloud: FakeTeamCloud) {
+  const calls: { url: string; body: Record<string, unknown> }[] = [];
+  const fetchFn = (async (url: string, init?: RequestInit) => {
+    if (/eab_push_|functions\/v1\/send-push/.test(url)) { calls.push({ url, body: JSON.parse(String(init?.body ?? '{}')) }); return new Response(url.includes('send-push') ? '{"sent":1}' : '', { status: 200 }); }
+    return cloud.fetch(url, init);
+  }) as typeof fetch;
+  return { calls, fetchFn };
+}
+
+test('J24 while the app is open it looks for invitations every 30 seconds', () => {
+  assert.equal(CHECK_EVERY_MS, 30_000);
+});
+
+test('J25-1 sending an email invitation asks the server to push it; answering tells the sender; a link invitation pushes nothing', async () => {
+  const { cloud, a, b } = await pair();
+  const s = spy(cloud);
+  const inv = await sendInvite(a.store, cfg, 'b@x.com', s.fetchFn);
+  await new Promise(r => setTimeout(r, 20));
+  assert.deepEqual(s.calls.filter(c => c.url.endsWith('/functions/v1/send-push')).map(c => c.body), [{ kind: 'invite', invite_id: inv.invite_id }]);
+  await checkInvitations(b.store, cfg, text, s.fetchFn, Date.now(), async () => true);
+  const id = openInvites(b.store.getState())[0].id;
+  await declineInvite(b.store, cfg, { inviteId: id }, s.fetchFn);
+  await new Promise(r => setTimeout(r, 20));
+  assert.deepEqual(s.calls.filter(c => c.url.endsWith('/functions/v1/send-push')).map(c => c.body.kind), ['invite', 'answer']);
+  const n = s.calls.length;
+  const { cloud: c2, a: a2 } = await pair();
+  const s2 = spy(c2);
+  await sendInvite(a2.store, cfg, null, s2.fetchFn);
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(s2.calls.length, 0, 'a link invitation has nobody to push to');
+  assert.ok(n >= 2);
+});
+
+test('J25-2 the phone registers its push address once per person and language, and removes it on sign-out', async () => {
+  const { cloud, a } = await pair();
+  const s = spy(cloud);
+  assert.equal(await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'bm', s.fetchFn), true);
+  assert.equal(await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'bm', s.fetchFn), true);
+  assert.equal(s.calls.filter(c => c.url.endsWith('/rpc/eab_push_register')).length, 1, 'not sent again when nothing changed');
+  assert.deepEqual(s.calls[0].body, { p_token: 'fcm-token-0123456789abcdef', p_app: 'com.jslproperties.estateagentbuddy', p_platform: 'android', p_lang: 'bm' });
+  await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'en', s.fetchFn);
+  assert.equal(s.calls.filter(c => c.url.endsWith('/rpc/eab_push_register')).length, 2, 'sent again when the language changed');
+  await unregisterToken(a.store, cfg, s.fetchFn);
+  assert.deepEqual(s.calls.at(-1), { url: `${cfg.supabaseUrl}/rest/v1/rpc/eab_push_unregister`, body: { p_token: 'fcm-token-0123456789abcdef' } });
+  assert.equal(a.store.getState().meta.push, undefined);
+});
+
+test('J25-3 push is best effort: a server that is not set up (or offline) never breaks sending an invitation', async () => {
+  const { cloud, a } = await pair();
+  const failing = (async (url: string, init?: RequestInit) => {
+    if (url.includes('send-push')) return new Response('{"error":"not set up"}', { status: 503 });
+    if (url.includes('eab_push_')) throw new TypeError('offline');
+    return cloud.fetch(url, init);
+  }) as typeof fetch;
+  await sendPush(a.store, cfg, 'invite', 'x', failing);
+  const r = await sendInvite(a.store, cfg, 'b@x.com', failing);
+  assert.ok(r.invite_id, 'the invitation itself is sent');
+  assert.equal(await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'en', failing), false);
+});

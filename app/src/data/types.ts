@@ -293,6 +293,8 @@ export interface CustomOption { value: string; added: number; used: number }
 export type OptionLists = Record<string, CustomOption[]>;
 
 export interface Meta {
+  /** JoyChange002 Change 25: this phone's push address as last registered, and for whom, so it is sent again only when it changes. */
+  push?: { token: string; userId: string; lang: string };
   /** Reminder keys already shown, so a reminder is never shown twice. */
   fired: string[];
   /** Records changed since the last cloud sync: "collection:id". */

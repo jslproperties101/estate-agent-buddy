@@ -16,6 +16,7 @@ import { profileStrings } from './strings';
 import { OptionSelect } from '../ui/OptionSelect';
 import { StoredImage, Confirm } from '../ui/common';
 import { signOutRemote } from '../data/auth';
+import { unregisterToken } from '../native/push';
 import { IconGear } from '../icons';
 import { useToast } from '../ui/toast';
 import { DEFAULT_SHARE, shareText, shareFiles, whatsappLink, anyChosen, missingProfile, REQUIRED_PROFILE, RequiredProfileField } from '../domain/namecard';
@@ -76,7 +77,7 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
       {/* Change 29: a red Log out button at the bottom; it asks first. */}
       {session && <button className="btn danger full logout-btn" data-testid="logout" onClick={() => setAskLogout(true)}>{t.logout}</button>}
       {askLogout && session && <Confirm lang={lang} title={t.logoutQ} body={t.logoutBody} okLabel={t.logout} onCancel={() => setAskLogout(false)}
-        onOk={() => { setAskLogout(false); void signOutRemote(config(store.getState().settings), session); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? session.workspaceId }); }} />}
+        onOk={() => { setAskLogout(false); const cfg = config(store.getState().settings); void unregisterToken(store, cfg).finally(() => signOutRemote(cfg, session)); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? session.workspaceId }); }} />}
     </section>
   );
 }

@@ -165,9 +165,11 @@ jobs:
       - name: Build the APK
         run: |
           # Every phone feature must have its native part in the APK, or its button cannot work on the phone.
-          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"' '"@capacitor/filesystem"' '"@capacitor/share"' '"@capacitor-community/admob"'; do
+          for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"' '"@capacitor/filesystem"' '"@capacitor/share"' '"@capacitor-community/admob"' '"@capacitor/push-notifications"'; do
             grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
           done
+          # JoyChange002 Change 25: Firebase push needs google-services.json next to the app's build file.
+          test -s android/app/google-services.json || { echo "android/app/google-services.json missing (push notifications)"; exit 1; }
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
       - name: Check the APK (package name, app name, launcher icons, splash, QA flag)
         run: |
