@@ -30,6 +30,14 @@ create table if not exists public.eab_push_sent (
 alter table public.eab_push_sent enable row level security;
 revoke all on public.eab_push_sent from anon, authenticated;
 
+-- The send-push Edge Function runs as service_role, which needs its own table rights here (found on the QA test: without
+-- these it saw no invitation and answered 404, so no push was sent).
+grant select, delete on public.eab_push_tokens to service_role;
+grant select, insert on public.eab_push_sent to service_role;
+do $$ begin
+  if to_regclass('public.eab_team_invites') is not null then execute 'grant select on public.eab_team_invites to service_role'; end if;
+end $$;
+
 -- The signed-in person's phone says "send my notifications here". A phone that was signed in as someone else before
 -- moves to the new person (one phone, one person). At most 10 phones per person are kept (the newest).
 create or replace function public.eab_push_register(p_token text, p_app text, p_platform text default 'android', p_lang text default 'en')
