@@ -191,3 +191,16 @@ test('JP-1 project prices, unit counts, double booking and commission', () => {
     assert.ok(s.title && s.add && s.b.taken && s.u.add, lang);
   }
 });
+
+// ---------- Change 46: the country list ----------
+import { COUNTRIES as C46, DEFAULT_COUNTRY as D46, countryLabel as label46 } from '../src/domain/places';
+test('J46 every country can be chosen; Malaysia first; the five used before keep their exact names; names translate', () => {
+  assert.ok(C46.length > 150, `${C46.length} countries`);
+  assert.equal(C46[0], D46);
+  for (const c of ['Malaysia', 'Singapore', 'Brunei', 'Indonesia', 'Thailand']) assert.ok(C46.includes(c), c);
+  assert.equal(new Set(C46).size, C46.length, 'no duplicates');
+  assert.equal(label46('Singapore', 'bm'), 'Singapura');
+  assert.equal(label46('Thailand', 'zh'), '泰国');
+  assert.equal(label46('Malaysia', 'en'), 'Malaysia');
+  assert.equal(label46('Nowhere', 'zh'), 'Nowhere');
+});

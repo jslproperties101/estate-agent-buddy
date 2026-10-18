@@ -276,7 +276,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
     const no = nextNumber(state.properties.filter(p => !isForeign(state, 'properties', p.id)));
     const p: Listing = {
       id: newId(), created: Date.now(), updated: Date.now(), photos: [], ref: makeRef(prefix, no), refPrefix: prefix, refNo: no,
-      type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), extraComments: note.trim() || undefined, status: 'needs_check', country: DEFAULT_COUNTRY,
+      type, headline: note.trim() || g.foundHeadline(fmtDate(Date.now(), lang)), extraComments: note.trim() || undefined, status: 'needs_check', country: state.settings.country || DEFAULT_COUNTRY,
       lat: spot.lat, lng: spot.lng, geoSource: spot.source === 'gps' ? 'gps' : 'manual', geoAccuracy: spot.source === 'gps' ? spot.acc : undefined, askingPrice: price || undefined,
       history: [{ at: Date.now(), source: 'map', summary: 'House Shopping' }],
     };

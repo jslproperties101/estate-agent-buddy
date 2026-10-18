@@ -53,15 +53,28 @@ async function call(fetchFn: FetchFn, url: string, init: RequestInit): Promise<R
   return r;
 }
 
-export interface TokenResponse { access_token: string; refresh_token: string; expires_in: number; provider_token?: string; user: { id: string; email: string; user_metadata?: { full_name?: string; name?: string; avatar_url?: string } } }
+export interface TokenResponse { access_token: string; refresh_token: string; expires_in: number; provider_token?: string; user: { id: string; email: string; user_metadata?: { full_name?: string; name?: string; avatar_url?: string; country?: string } } }
 export function toSession(j: TokenResponse, keep?: Partial<Session>): Session {
   return {
     ...keep,
     accessToken: j.access_token, refreshToken: j.refresh_token, expiresAt: Date.now() + j.expires_in * 1000, email: j.user.email, userId: j.user.id,
     name: j.user.user_metadata?.full_name ?? j.user.user_metadata?.name ?? keep?.name,
+    country: j.user.user_metadata?.country ?? keep?.country,
   };
 }
 export { call as supabaseCall, headers as supabaseHeaders };
+
+/** JoyChange002 Change 46: the country is kept on the account itself (Supabase user data), so another phone, a laptop or a
+ *  reinstall already knows it. No table is involved. Reads the account's country (undefined when never chosen). */
+export async function fetchAccountCountry(cfg: SyncConfig, s: Session, fetchFn: FetchFn = fetch): Promise<string | undefined> {
+  const r = await call(fetchFn, `${cfg.supabaseUrl}/auth/v1/user`, { method: 'GET', headers: headers(cfg, s.accessToken) });
+  const c = ((await r.json()) as { user_metadata?: { country?: unknown } }).user_metadata?.country;
+  return typeof c === 'string' && c.trim() ? c.trim() : undefined;
+}
+/** Saves the country on the account. Other user data (name, picture) is kept: Supabase merges what is sent. */
+export async function saveAccountCountry(cfg: SyncConfig, s: Session, country: string, fetchFn: FetchFn = fetch): Promise<void> {
+  await call(fetchFn, `${cfg.supabaseUrl}/auth/v1/user`, { method: 'PUT', headers: headers(cfg, s.accessToken), body: JSON.stringify({ data: { country } }) });
+}
 
 export const configured = (cfg: SyncConfig) => !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
 

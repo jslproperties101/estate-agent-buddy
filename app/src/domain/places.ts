@@ -3,8 +3,27 @@
 // spelling, spacing, capital letters or abbreviation (Tmn / Taman, Jln / Jalan) is treated as the saved value,
 // and nothing new is saved without the agent's confirmation.
 
-export const COUNTRIES = ['Malaysia', 'Singapore', 'Brunei', 'Indonesia', 'Thailand'] as const;
 export const DEFAULT_COUNTRY = 'Malaysia';
+
+// JoyChange002 Change 46: every country can be chosen (the first-login pick and the Country level of the address chain).
+// Names are saved in English, as before (Malaysia, Singapore ... stay exactly as they were); screens show them in the
+// chosen language. Built from the browser's own region names, so no list has to be kept by hand.
+const COUNTRY_CODES = 'AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT HN HK HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI KP KR XK KW KG LA LV LB LS LR LY LI LT LU MO MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG MK NO OM PK PW PS PA PG PY PE PH PL PT QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA SS ES LK SD SR SE CH SY TW TJ TZ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VA VE VN YE ZM ZW'.split(' ');
+const regionNames = (lang: string): { of(code: string): string | undefined } | null => {
+  try { return new Intl.DisplayNames([lang], { type: 'region' }); } catch { return null; }
+};
+const EN_NAMES = regionNames('en');
+const ENGLISH: [string, string][] = COUNTRY_CODES.flatMap(c => { const n = EN_NAMES?.of(c); return n && n !== c ? [[c, n] as [string, string]] : []; });
+/** Malaysia first, then the rest A to Z. If the browser has no region names, the five countries used before. */
+export const COUNTRIES: readonly string[] = ENGLISH.length > 100
+  ? [DEFAULT_COUNTRY, ...ENGLISH.map(x => x[1]).filter(n => n !== DEFAULT_COUNTRY).sort((a, b) => a.localeCompare(b, 'en'))]
+  : ['Malaysia', 'Singapore', 'Brunei', 'Indonesia', 'Thailand'];
+/** A country's name in the app language ('en' | 'bm' | 'zh'); the English name when no translation exists. */
+export function countryLabel(english: string, lang: 'en' | 'bm' | 'zh'): string {
+  const code = ENGLISH.find(x => x[1] === english)?.[0];
+  if (!code || lang === 'en') return english;
+  return regionNames(lang === 'bm' ? 'ms' : 'zh')?.of(code) ?? english;
+}
 
 export const MY_STATES = [
   'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang', 'Perak', 'Perlis', 'Pulau Pinang',

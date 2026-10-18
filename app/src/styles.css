@@ -1295,3 +1295,9 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 @media (min-width: 1500px) {
   html.website .lc-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 }
+
+/* JoyChange002 Change 46: the first-login country pick. */
+.country-choice { gap: 10px; max-height: 100%; }
+.country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 140px; max-height: 42vh; border: 1px solid var(--line); border-radius: 12px; padding: 4px; }
+.country-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--ink); font-weight: 600; }
+.country-row.on { border-color: var(--gold-lo); background: #2A2312; color: var(--gold-hi); }

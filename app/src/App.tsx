@@ -57,6 +57,7 @@ import { diagStrings } from './voice/diagStrings';
 import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
+import { CountryChoice, useCountryChoice } from './ui/CountryChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
   IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMarket, IconCreative, IconMatch,
@@ -360,6 +361,7 @@ function Shell() {
     void scheduleNative([...list, ...ads]);
   }, [state.tasks, state.appointments, state.properties, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const country = useCountryChoice();
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
@@ -397,7 +399,8 @@ function Shell() {
           <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
         </main>
 
-        {needsStartChoice(state) && <StartChoice lang={lang} />}
+        {/* JoyChange002 Change 46: the country is asked first, once; then the sample-data choice. */}
+        {country.ask ? <CountryChoice lang={lang} onChoose={country.choose} /> : needsStartChoice(state) && <StartChoice lang={lang} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
         <BottomAd lang={lang} />

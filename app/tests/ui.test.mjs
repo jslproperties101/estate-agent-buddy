@@ -3960,7 +3960,7 @@ test('U92 Google Drive (stand-in Drive, browser only): restore point and readabl
     const r = indexedDB.open('estate-agent-buddy');
     r.onsuccess = () => {
       const tx = r.result.transaction('records', 'readwrite'); const st = tx.objectStore('records'); const g = st.get('s:meta');
-      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, dirty: [], tombstones: [], syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1' }, drive: drv }, 's:meta');
+      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, dirty: [], tombstones: [], syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1', country: 'Malaysia' }, drive: drv }, 's:meta');
         st.put({ id: 'dk1', created: 1, updated: 1, name: 'Drive Test Buyer', roles: ['buyer'], leadStatus: 'hot' }, 'c:contacts:dk1'); };
       tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
     };
@@ -4018,7 +4018,7 @@ test('U92c Change 17 / 17b (stand-in Drive): Back up now shows a spinner with a 
     const r = indexedDB.open('estate-agent-buddy');
     r.onsuccess = () => {
       const tx = r.result.transaction('records', 'readwrite'); const st = tx.objectStore('records'); const g = st.get('s:meta');
-      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, dirty: [], tombstones: [], syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1' }, drive: { token: 'TOK', expiresAt: Date.now() + 3600000, connectedAt: Date.now() } }, 's:meta');
+      g.onsuccess = () => { const m = g.result ?? {}; st.put({ ...m, dirty: [], tombstones: [], syncSession: { accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 3600000, email: 't@x.com', userId: 'u1', country: 'Malaysia' }, drive: { token: 'TOK', expiresAt: Date.now() + 3600000, connectedAt: Date.now() } }, 's:meta');
         st.put({ id: 'dk1', created: 1, updated: 1, name: 'Drive Test Buyer', roles: ['buyer'], leadStatus: 'hot' }, 'c:contacts:dk1'); };
       tx.oncomplete = () => resolve(true); tx.onerror = () => reject(tx.error);
     };

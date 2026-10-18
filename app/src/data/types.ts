@@ -280,6 +280,9 @@ export interface Settings {
   mapType?: 'roadmap' | 'satellite' | 'hybrid';
   /** The new-user choice on first start: sample data or a clean workspace (asked once per phone). */
   startChoice?: 'sample' | 'empty';
+  /** JoyChange002 Change 46: the country chosen at first login (the Country of new properties), the account it belongs to,
+   *  and whether it still has to be saved on the account (it was chosen offline or the save failed). */
+  country?: string; countryUser?: string; countryPending?: boolean;
   /** Remind about contacts with no interaction for this many days; 0 = off. Default 30. Never changes a contact. */
   followUpDays?: number;
   /** Change 010: which workspace the lists show (switching needs no sign-out). Team only while in a Team Workspace. */
@@ -317,6 +320,8 @@ export interface Meta {
     accessToken: string; refreshToken: string; expiresAt: number; email: string; userId: string;
     /** From the Google account (via Supabase). */
     name?: string;
+    /** JoyChange002 Change 46: the country chosen at first login, kept on the account. */
+    country?: string;
     /** Team workspace and role, from the database (eab_my_membership). */
     workspaceId?: string; workspaceName?: string; role?: 'owner' | 'admin' | 'team_leader' | 'agent' | 'limited';
   };

@@ -108,7 +108,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     if (initial) { const e = forEditing(initial); return prefill ? { ...e, ...prefill, id: e.id, filledFrom: { ...(e.filledFrom ?? {}), ...(prefill.filledFrom ?? {}) } } : e; }
     const prefix = defaultPrefix(state.options.refPrefix, state.settings.lastPrefix);
     const no = nextNumber(ownProps);
-    return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
+    return { id: newId(), created: Date.now(), updated: Date.now(), photos: [], country: state.settings.country || DEFAULT_COUNTRY, refPrefix: prefix, refNo: no, ...prefill };
   });
   const dups = useMemo(() => possibleDuplicates(d, state.properties), [d.street, d.unitNo, d.lotNo, d.township, d.city, d.id, state.properties]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [refNoText, setRefNoText] = useState(String(d.refNo ?? ''));
