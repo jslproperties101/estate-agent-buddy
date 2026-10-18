@@ -36,8 +36,8 @@ import { SectionCard, StoredImage, Confirm } from '../ui/common';
 import { deleteListing } from './deleteListing';
 import { monthText, fmtDate } from '../lib/dates';
 import { navigationUrl } from '../lib/geo';
-import { visible, can, myId } from '../team/access';
-import { WorkspaceSwitch, CreatorTag, SharingLine } from '../team/TeamUI';
+import { visible, can, myId, byCreator } from '../team/access';
+import { CreatorTag, SharingLine, CreatorFilter, CardFoot, useCreatorFilter } from '../team/TeamUI';
 import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { requestDelete, teamErrorOf } from '../team/api';
@@ -126,8 +126,10 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   const { state, store } = useApp();
   const s = listingStrings[lang];
   const ts = teamStrings[lang];
-  // Change 010: only the workspace being looked at (Personal or Team); archived properties go to their own section at the end.
-  const inWorkspace = visible(state, 'properties', state.properties);
+  // Change 16: my own and shared properties in one list; Change 15: "Created by" filter. Archived ones go to their own
+  // section at the end.
+  const [by, setBy] = useCreatorFilter('properties');
+  const inWorkspace = byCreator(state, 'properties', visible(state, 'properties', state.properties), by);
   const listings = inWorkspace.filter(l => !l.archived);
   const archivedList = inWorkspace.filter(l => l.archived).sort((a, b) => (b.archived?.at ?? 0) - (a.archived?.at ?? 0));
   const layout: Layout = state.settings.layout === 'large' ? 'large' : 'grid';
@@ -157,7 +159,6 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
 
   return (
     <section className="stack listing" data-testid="listing">
-      <WorkspaceSwitch lang={lang} />
       <button className="btn primary add-property" onClick={() => go({ name: 'listingForm' })}><span aria-hidden="true">＋</span> {s.add}</button>
       <div className="lc-toolbar">
         <input aria-label={s.f.location} placeholder={s.search} value={f.location ?? ''} onChange={e => set({ location: e.target.value || undefined })} />
@@ -232,6 +233,7 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
         </div>
       )}
 
+      <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <div className="small muted" data-testid="listing-count">{s.results(shown.length, listings.length)}</div>
       {listings.length === 0 ? <p className="muted empty" data-testid="listing-empty">{s.empty}</p> : shown.length === 0 && <p className="muted">{s.none}</p>}
 
@@ -591,7 +593,6 @@ export function GridCardButton({ l, s, onOpen, extra }: { l: Listing; s: Listing
  *  availability line. The counts row has the location button at its right, two lines tall, under the pencil: with a saved
  *  map point it opens Share Location / Open in Google Maps; without one a "Location Not Set" bubble shows for 1.5 s. */
 function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing; lang: Lang; large: boolean; owner?: string; onOpen: () => void; onEdit: () => void; go: Go }) {
-  const { state } = useApp();
   const s = listingStrings[lang];
   const t = c15Strings[lang].card;
   const t17 = c1017Strings[lang];
@@ -652,8 +653,7 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
           </div>
           {large && l.extraComments && <p className="lc-comments pre" data-testid="card-comments">{l.extraComments}</p>}
           {large && owner && <span className="lc-owner">{`${s.owner}: ${owner}`}</span>}
-          <CreatorTag state={state} collection="properties" id={l.id} />
-          <span className="sc-hint" data-testid="card-click-to-open" aria-hidden="true">{t.clickToOpen}</span>
+          <CardFoot lang={lang} collection="properties" id={l.id} />
         </div>
       </article>
       {menu && <LocationMenu lang={lang} l={l} go={go} onClose={() => setMenu(false)} />}

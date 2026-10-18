@@ -88,6 +88,12 @@ test('P1 an invitation shows a pop-up with Accept / Decline / Later; Later hides
   await openNotifications(b.page);
   assert.match(await b.page.getByTestId('notif-invite').innerText(), /Invitation from Aina/);
   await shot(b.page, 'c013-02-notifications');
+  // Change 14: the Opportunities card and its Team Sharing card carry the number too
+  await b.page.locator('header .icon-btn').first().click();
+  assert.equal((await b.page.getByTestId('opportunities-badge').innerText()).trim(), '1');
+  await b.page.locator('nav.grid > button', { hasText: 'Opportunities' }).click();
+  assert.equal((await b.page.getByTestId('team-sharing-badge').innerText()).trim(), '1');
+  await shot(b.page, 'c014-01-team-sharing-badge');
   // opening the app again brings the pop-up back
   await b.page.reload(); await b.page.waitForSelector('nav.grid');
   await b.page.getByTestId('invite-popup').waitFor();
@@ -95,6 +101,7 @@ test('P1 an invitation shows a pop-up with Accept / Decline / Later; Later hides
   await waitFor(() => cloud.invites[0].status === 'accepted');
   await b.page.getByTestId('invite-popup').waitFor({ state: 'detached' });
   assert.equal(await b.page.locator('.notif-btn .top-badge').count(), 0, 'nothing waits on the bell any more');
+  assert.equal(await b.page.getByTestId('opportunities-badge').count(), 0, 'nor on Opportunities');
   assert.deepEqual([...a.errors, ...b.errors], []);
   await a.ctx.close(); await b.ctx.close();
 });
@@ -145,8 +152,8 @@ test('P4 on the Team Workspace screen itself the pop-up stays away (the invitati
   const cloud = new FakeTeamCloud();
   const a = await agent(cloud, 'aina@x.com', 'Aina');
   const b = await agent(cloud, 'badrul@x.com', 'Badrul');
-  await b.page.getByTestId('top-profile').click();
-  await b.page.getByRole('button', { name: /Settings/i }).click();
+  await b.page.locator('nav.grid > button', { hasText: 'Opportunities' }).click();
+  await b.page.getByTestId('team-sharing').waitFor();
   await b.page.getByTestId('open-team').click();
   await b.page.getByTestId('no-team').waitFor();
   await inviteVia(cloud, a.user, 'badrul@x.com');

@@ -82,9 +82,10 @@ import { leadReviewStrings } from './data/leadReviewStrings';
 import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 import { InvitePopup } from './team/InvitePopup';
+import { TeamSharingCard, teamBadgeCount } from './team/TeamEntry';
 import { inviteAlertCount, markAnswersSeen, openInvites, unseenAnswers } from './team/invitations';
 import { personLabel } from './team/access';
-import { TeamScreen, ManageSharingScreen, WorkspaceSwitch, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
+import { TeamScreen, ManageSharingScreen, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
 import { teamStrings } from './team/strings';
 import { AuditSearchScreen } from './audit/AuditUI';
 import { auditStrings } from './audit/strings';
@@ -443,6 +444,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'contactsHome': return <ContactsHome lang={lang} go={go} />;
     case 'opportunities': return (
       <section className="stack" data-testid="opportunities">
+        {/* Change 14 (owner, 17 Oct 2026): Team Sharing at the top of Opportunities. */}
+        <TeamSharingCard lang={lang} go={go} />
         {/* Change 003 follow-up (owner, 15 Oct): Co-broke Opportunities lives here now that the top-bar item is gone. */}
         <button className="card big-card link-card" data-testid="open-cobroke" onClick={() => go({ name: 'cobroke' })}>
           <strong>{t.cobrokeTop}</strong><small className="muted">{t.cobrokePage.intro}</small>
@@ -528,13 +531,13 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
     <section className="stack home">
       {/* ClaudeChanges001 change 2: below the header line, above the cards, only when something did not sync. */}
       <SyncBanner lang={lang} onReview={() => go({ name: 'syncReview' })} />
-      <WorkspaceSwitch lang={lang} />
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
           <button key={tile.key} className={`tile ${tile.key === 'voice' ? 'voice-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
-            aria-label={tileLabel(tile.key)}>
+            aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
+            {tile.key === 'opportunities' && teamBadgeCount(state) > 0 && <span className="tile-badge" data-testid="opportunities-badge" aria-label={teamStrings[lang].newInvites(teamBadgeCount(state))}>{teamBadgeCount(state)}</span>}
           </button>
         ))}
       </nav>

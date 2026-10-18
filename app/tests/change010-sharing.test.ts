@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { syncNow, SyncError } from '../src/data/sync';
 import { AccessError, type Store } from '../src/data/store';
 import { sendInvite, acceptInvite, declineInvite, cancelInvite, leaveTeam, removeMember, setShares, setShareAll, requestDelete, decideDelete, TeamError, tokenFrom, inviteLink, refreshTeam } from '../src/team/api';
-import { can, inView, visible, currentView } from '../src/team/access';
+import { can, visible, creatorKeyOf } from '../src/team/access';
 import { buildBackupManifest } from '../src/data/manifest';
 import type { Listing } from '../src/listing/model';
 import type { Task } from '../src/data/types';
@@ -88,9 +88,9 @@ test('S4 View Only: B gets the record, may read it, and the store itself refuses
   assert.throws(() => b.upsert('properties', { ...get(b, 'p1')!, headline: 'hack' }), AccessError);
   assert.throws(() => b.remove('properties', 'p1'), AccessError);
   assert.equal(get(b, 'p1')?.headline, 'Shop lot');
-  // Personal Workspace shows only B's own; the Team Workspace shows it.
-  assert.equal(inView(b.getState(), 'personal', 'properties', get(b, 'p1')!), false);
-  assert.equal(inView(b.getState(), 'team', 'properties', get(b, 'p1')!), true);
+  // Change 16: one list, with A named as its creator.
+  assert.ok(visible(b.getState(), 'properties', b.getState().properties).some(p => p.id === 'p1'));
+  assert.notEqual(creatorKeyOf(b.getState(), 'properties', 'p1'), 'me');
 });
 
 test('S5 View and Edit: B edits A\'s record; it goes to A\'s workspace, A still owns it, A sees the change', async () => {
@@ -177,7 +177,7 @@ test('S10 leaving ends access at once on this phone: shared records, their histo
   assert.equal(b.getState().meta.dirty.includes('properties:p1'), false);
   assert.deepEqual(await b.revisions('properties:p1'), []);
   assert.equal(has(b, 'pb'), true, 'B keeps own records');
-  assert.equal(currentView(b.getState()), 'personal');
+  assert.deepEqual(visible(b.getState(), 'properties', b.getState().properties).map(p => p.id), ['pb'], 'only B\'s own records are left in the list');
   await sync(a, cloud);
   assert.equal(a.getState().meta.team?.id, undefined, 'A sees the Team Workspace ended');
   assert.equal(get(a, 'p1')?.headline, 'Shop lot', 'the unsent edit never reached A');
@@ -219,14 +219,14 @@ test('S13 my backup never contains records another agent shares with me', async 
   assert.equal(Object.keys(m.cloudVersions).some(k => k === 'properties:p1'), false);
 });
 
-test('S14 the Team Workspace view lists shared records both ways; the calculator never appears there', async () => {
+test('S14 (Change 16) one list holds B\'s own and A\'s shared record; "Created by" separates them; the calculator is never shared', async () => {
   const { a, b, cloud } = await team();
   await setShares(a, cfg, [{ collection: 'properties', id: 'p1', level: 'view' }], cloud.fetch);
   await setShares(b, cfg, [{ collection: 'properties', id: 'pb', level: 'view' }], cloud.fetch);
   await sync(b, cloud);
-  b.setSingleton('settings', { workspaceView: 'team' });
-  assert.deepEqual(visible(b.getState(), 'properties', b.getState().properties).map(p => p.id).sort(), ['p1', 'pb']);
-  b.setSingleton('settings', { workspaceView: 'personal' });
-  assert.deepEqual(visible(b.getState(), 'properties', b.getState().properties).map(p => p.id), ['pb']);
+  const st = b.getState();
+  assert.deepEqual(visible(st, 'properties', st.properties).map(p => p.id).sort(), ['p1', 'pb']);
+  assert.equal(creatorKeyOf(st, 'properties', 'pb'), 'me');
+  assert.equal(creatorKeyOf(st, 'properties', 'p1'), st.meta.shared!['properties:p1'].ownerId);
   void a;
 });

@@ -1164,6 +1164,15 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   assert.match(await page.getByTestId('signed-in-as').innerText(), /Agent J \(agent\.j@gmail\.com\)/i);
   assert.match(await page.getByTestId('workspace-role').innerText(), /Agent J team · Owner/i);
+  // Change 14: "Team and access" is no longer in Settings; it opens from Opportunities → Team Sharing.
+  assert.equal(await page.getByTestId('team').count(), 0, 'not in Settings any more');
+  assert.equal(await page.getByTestId('team-entry').count(), 0);
+  await page.getByTestId('history-exports').waitFor();
+  await home(page); await page.locator('nav.grid > button', { hasText: 'Opportunities' }).click();
+  await page.getByTestId('team-sharing').waitFor();
+  assert.match(await page.getByTestId('team-ws-line').innerText(), /Team Workspace: share chosen listings/i);
+  assert.match(await page.getByTestId('team-access-line').innerText(), /Team and access: who belongs to your agency workspace/i);
+  await page.getByTestId('open-team-access').click();
   await page.getByTestId('team').getByTestId('member').nth(1).waitFor();
   assert.equal(await page.getByTestId('member').count(), 2);
   await page.locator('[data-field="inviteEmail"]').fill('new.agent@gmail.com');
@@ -1173,6 +1182,7 @@ test('U28 Google sign-in: login screen when set up, return from Google, role sho
   assert.ok(seen.includes('POST /rest/v1/rpc/eab_invite'));
   assert.ok(seen.some(x => x === 'GET /rest/v1/eab_records'), 'synced after sign-in');
   await shot(page, '28b-account-team', false);
+  await home(page); await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   // ClaudeChanges001 change 2: no status line on any screen (the banner on the main page appears only on a problem).
   assert.equal(await page.getByTestId('save-status').count(), 0);
   // Easy Bug Report while signed in: screenshot + description are sent, and success is shown only after the service accepted them.
@@ -4544,7 +4554,14 @@ test('U115 Change 015 cards (as changed 17 Oct 2026): far-right gold pencil (lon
       const hint = c.getByTestId('card-click-to-open');
       assert.equal(await hint.evaluate(h => h.closest('button, a') === null && h.tagName === 'SPAN'), true, 'not a button');
       const hb = await hint.boundingBox();
-      assert.ok(Math.abs(hb.x + hb.width / 2 - (card.x + card.width / 2)) <= 3, `${layout} ${i}: centred`);
+      // Change 15 (owner, 17 Oct 2026) replaces "centred": Click to Open at the bottom LEFT, the creator at the right on the same line.
+      const who = await c.getByTestId('card-creator').boundingBox();
+      assert.ok(hb.x - card.x <= 24, `${layout} ${i}: at the left`);
+      assert.ok(card.x + card.width - (who.x + who.width) <= 24, `${layout} ${i}: creator at the right`);
+      // same line on Large cards; on narrow Grid cards the name may move under "Click to Open" rather than be cut
+      if (layout === 'large') assert.ok(Math.abs((hb.y + hb.height / 2) - (who.y + who.height / 2)) <= 6, `${layout} ${i}: same line`);
+      else assert.ok(who.y + who.height / 2 >= hb.y, `${layout} ${i}: on or under the Click to Open line`);
+      assert.equal(await c.getByTestId('card-creator').innerText(), 'You');
       assert.ok(card.y + card.height - (hb.y + hb.height) <= 12, `${layout} ${i}: at the very bottom`);
       assert.equal(await c.locator('.lc-purpose').count(), 0, 'no old purpose badge');
       assert.equal(await c.locator('.sc-body [data-testid="card-tx"]').count(), 0, 'no FOR SALE / FOR RENT under the title');

@@ -13,8 +13,8 @@ import { FieldHelp } from '../ui/FieldHelp';
 import { IconBuyer, IconVendor } from '../icons';
 import { OptionSelect } from '../ui/OptionSelect';
 import { InquiryHistory, ViewingHistory } from '../agenda/History';
-import { visible, can } from '../team/access';
-import { SharingLine } from '../team/TeamUI';
+import { visible, can, byCreator } from '../team/access';
+import { SharingLine, CreatorFilter, CardFoot, useCreatorFilter } from '../team/TeamUI';
 import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { TaskRow } from '../agenda/AgendaUI';
@@ -93,8 +93,9 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
   const toast = useToast();
   const [q, setQ] = useState('');
   const [lead, setLead] = useState<LeadStatus | VendorStatus | 'all'>('all');
-  // Change 010: only the workspace being looked at (Personal or Team).
-  const all = useMemo(() => visible(state, 'contacts', state.contacts).filter(c => inRole(c, role)), [state, role]);
+  // Change 16: my own and shared contacts in one list; Change 15: "Created by" filter.
+  const [by, setBy] = useCreatorFilter(`contacts-${role}`);
+  const all = useMemo(() => byCreator(state, 'contacts', visible(state, 'contacts', state.contacts), by).filter(c => inRole(c, role)), [state, role, by]);
   const statusOf = (c: Contact) => (role === 'vendor' ? c.vendorStatus : c.leadStatus);
   const shown = all
     .filter(c => lead === 'all' || statusOf(c) === lead)
@@ -124,6 +125,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
       <button className="btn primary" onClick={() => go({ name: 'contactForm', role })}>{role === 'vendor' ? s.addVendor : s.addBuyer}</button>
       <button className="btn secondary" onClick={() => void importPhone()} aria-disabled={!phonebookSupported()}>{s.importPhone}</button>
       <input aria-label={s.search} placeholder={s.search} value={q} onChange={e => setQ(e.target.value)} />
+      <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <div className="chip-row" role="radiogroup" aria-label={role === 'vendor' ? t.vendorStatusLabel : t.leadLabel} data-testid="status-filter">
         <button type="button" role="radio" aria-checked={lead === 'all'} className={`chip-btn ${lead === 'all' ? 'on' : ''}`} onClick={() => setLead('all')}>{s.allLeads} <span className="count">{all.length}</span></button>
         {statuses.map(l => (
@@ -143,6 +145,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
                   <strong>{c.name}</strong>
                   <small className="muted">{[c.phone, c.company, props ? `${s.properties}: ${props}` : ''].filter(Boolean).join(' · ') || s.phoneMissing}</small>
                   <span className="row-wrap small">{c.roles.map(r => <span key={r} className="chip-tag">{s.roles[r]}</span>)}{role === 'vendor' ? <VendorDot lang={lang} status={c.vendorStatus} /> : <LeadDot lang={lang} status={c.leadStatus} />}{c.sample && <span className="chip-tag sample-tag">{t.sampleTag}</span>}</span>
+                  <CardFoot lang={lang} collection="contacts" id={c.id} />
                 </button>
                 {usablePhone(c.phone) && <a className="btn small secondary" href={`tel:+${phoneDigits(c.phone)}`} aria-label={`${t.c.call}: ${c.name}`}>{t.c.call}</a>}
               </li>
@@ -209,7 +212,7 @@ export function ContactDetail({ lang, go, id }: { lang: Lang; go: Go; id: string
       <InquiryHistory lang={lang} go={go} contactId={c.id} />
       <ViewingHistory lang={lang} go={go} contactId={c.id} />
       <SectionCard title={s.todos} onEdit={() => go({ name: 'taskForm', prefill: { contactId: c.id } })} editLabel={t.c.add}>
-        {tasks.length === 0 ? <Empty>{s.noTodos}</Empty> : <ul className="task-list">{tasks.map(x => <TaskRow key={x.id} lang={lang} t={x} go={go} onToggle={() => store.upsert('tasks', completeTask(x, !x.done))} />)}</ul>}
+        {tasks.length === 0 ? <Empty>{s.noTodos}</Empty> : <ul className="task-list">{tasks.map(x => <TaskRow key={x.id} lang={lang} t={x} go={go} onToggle={() => { if (can(store.getState(), 'edit', 'tasks', x.id)) store.upsert('tasks', completeTask(x, !x.done)); }} />)}</ul>}
       </SectionCard>
       {!c.sample && <ViewHistory lang={lang} collection="contacts" id={c.id} go={go} />}
     </section>

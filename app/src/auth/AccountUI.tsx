@@ -59,7 +59,7 @@ export function AccountCard({ lang }: { lang: Lang }) {
       {msg && <p className="small" role="status" data-testid="account-msg">{msg}</p>}
       {ask && s && <Confirm lang={lang} title={a.signOutQ} body={a.signOutBody} okLabel={a.signOut} danger={false} onCancel={() => setAsk(false)}
         onOk={() => { setAsk(false); void signOutRemote(cfg, s); store.setSingleton('meta', { syncSession: undefined, syncError: undefined, syncWorkspaceId: store.getState().meta.syncWorkspaceId ?? s.workspaceId }); }} />}
-      {s && (s.role === 'owner' || s.role === 'admin') && configured(cfg) && <TeamCard lang={lang} session={s} />}
+      {/* Change 14: "Team and access" moved to Opportunities → Team Sharing (TeamSharingCard). */}
     </div>
   );
 }
@@ -68,7 +68,8 @@ interface Member { user_id: string; email: string; role: Role; active: boolean; 
 interface Invite { email: string; role: Role; created_at: string }
 interface Audit { action: string; target: string | null; detail: Record<string, unknown> | null; at: string }
 
-function TeamCard({ lang, session }: { lang: Lang; session: Session }) {
+/** The older agency-workspace roles screen ("Team and access"). Since Change 14 it opens from Opportunities → Team Sharing. */
+export function TeamCard({ lang, session }: { lang: Lang; session: Session }) {
   const { state, store } = useApp();
   const a = authStrings[lang];
   const t = a.team;

@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyState } from '../src/data/store';
 import type { AppState, TeamState } from '../src/data/types';
-import { can, levelOf, scopesOf, inView, visible, myShareOf, creatorOf, personLabel, labelForUser, isTeamOwner, currentView, SHAREABLE } from '../src/team/access';
+import { can, levelOf, scopesOf, visible, myShareOf, creatorOf, personLabel, labelForUser, isTeamOwner, SHAREABLE } from '../src/team/access';
 
 const ME = 'u-me', HER = 'u-her';
 const team = (patch: Partial<TeamState> = {}): TeamState => ({
@@ -93,17 +93,18 @@ test('A8 how I share my record: selected and/or Share All, highest level wins', 
   assert.deepEqual(myShareOf(s2, 'properties', { id: 'mine' }), { level: 'edit', via: ['selected', 'all'] });
 });
 
-test('A9 Personal Workspace shows only my records; Team Workspace shows what is shared both ways', () => {
-  const s = state(x => { x.meta.team = team({ sharesGiven: [{ workspaceId: 'wsMe', collection: 'properties', recordId: 'mine', level: 'view' }] }); });
-  assert.deepEqual(s.properties.filter(p => inView(s, 'personal', 'properties', p)).map(p => p.id), ['mine']);
-  assert.deepEqual(s.properties.filter(p => inView(s, 'team', 'properties', p)).map(p => p.id), ['mine', 'theirsView', 'theirsEdit']);
-  s.settings.workspaceView = 'team';
-  assert.equal(currentView(s), 'team');
-  assert.deepEqual(visible(s, 'contacts', s.contacts), [], 'contacts not shared yet');
-  assert.deepEqual(visible(s, 'calculations', s.calculations), [], 'the calculator is never in the Team Workspace');
-  // Leaving the team: the view falls back to Personal by itself.
-  s.meta.team = undefined;
-  assert.equal(currentView(s), 'personal');
+test('A9 (Change 16 replaces the Personal / Team views) one combined list: my own and shared-in records together; private kinds stay mine', () => {
+  const s = state();
+  assert.deepEqual(visible(s, 'properties', s.properties).map(p => p.id), ['mine', 'theirsView', 'theirsEdit']);
+  assert.deepEqual(visible(s, 'contacts', s.contacts).map(c => c.id), ['buyer1', 'vendor1']);
+  assert.deepEqual(visible(s, 'calculations', s.calculations).map(c => c.id), ['calc1'], 'the calculator: always only mine');
+  // an old saved setting from the separate-views design changes nothing
+  s.settings.workspaceView = 'personal';
+  assert.deepEqual(visible(s, 'properties', s.properties).map(p => p.id), ['mine', 'theirsView', 'theirsEdit']);
+  // and access is unchanged: View Only stays read-only in the combined list
+  assert.equal(can(s, 'edit', 'properties', 'theirsView'), false);
+  assert.equal(can(s, 'edit', 'properties', 'theirsEdit'), true);
+  assert.equal(can(s, 'share', 'properties', 'theirsEdit'), false, 'never share onward');
 });
 
 test('A10 names fall back to email; creator of a shared record is its owner', () => {

@@ -100,20 +100,59 @@ export function myShareOf(state: AppState, collection: CollectionName, record: {
   return { level: levels.includes('edit') ? 'edit' : 'view', via: [...(sel ? ['selected' as const] : []), ...(all.length ? ['all' as const] : [])] };
 }
 
-// ---------- Personal Workspace / Team Workspace view ----------
-export type WorkspaceView = 'personal' | 'team';
-/** Personal Workspace: my own records. Team Workspace: what I share with the other agent plus what they share with me. */
-export function inView(state: AppState, view: WorkspaceView, collection: CollectionName, record: { id: string }): boolean {
-  if (view === 'personal') return !isForeign(state, collection, record.id);
-  return isForeign(state, collection, record.id) || !!myShareOf(state, collection, record);
-}
-export const currentView = (state: AppState): WorkspaceView => (state.settings.workspaceView === 'team' && inTeam(state) ? 'team' : 'personal');
-
-/** A list filtered to the workspace being looked at. Calculator and other private kinds are always personal. */
+// ---------- one combined workspace (Change 16, owner 17 Oct 2026; replaces Change 010's Personal / Team views) ----------
+/** Every list shows my own records AND the records another agent shares with me, together. Who created each one is shown
+ *  on the card and can be filtered ("Created by"). Nothing about access changes: a View Only record stays read-only
+ *  (see `can` and the store's own check), and nothing of mine is visible to anyone unless I share it.
+ *  Kinds that can never be shared (calculator, inquiries, deals…) only ever hold my own records. */
 export function visible<T extends { id: string }>(state: AppState, collection: CollectionName, list: T[]): T[] {
-  const view = currentView(state);
-  if (!SHAREABLE.includes(collection)) return view === 'personal' ? list.filter(r => !isForeign(state, collection, r.id)) : [];
-  return list.filter(r => inView(state, view, collection, r));
+  if (SHAREABLE.includes(collection)) return list;
+  return list.filter(r => !isForeign(state, collection, r.id));
+}
+
+// ---------- who created a record (Change 15) ----------
+/** "me" for my own records, otherwise the owner's user id. */
+export const creatorKeyOf = (state: AppState, collection: CollectionName, id: string): string => sharedInfo(state, collection, id)?.ownerId ?? 'me';
+
+/** The other people whose records are on this phone, plus the other member of my Team Workspace. */
+export function otherCreators(state: AppState): { id: string; name?: string | null; email?: string | null }[] {
+  const m = new Map<string, { id: string; name?: string | null; email?: string | null }>();
+  for (const x of Object.values(state.meta.shared ?? {})) if (x.ownerId && x.ownerId !== myId(state) && !m.has(x.ownerId)) m.set(x.ownerId, { id: x.ownerId, name: x.ownerName, email: x.ownerEmail });
+  const p = partnerOf(state);
+  if (p && !m.has(p.userId)) m.set(p.userId, { id: p.userId, name: p.name, email: p.email });
+  return [...m.values()];
+}
+
+const words = (name?: string | null) => (name ?? '').trim().split(/\s+/).filter(Boolean);
+/** First name; the part of the e-mail before "@" when there is no name. */
+export const firstNameOf = (name?: string | null, email?: string | null) => words(name)[0] ?? (email ? email.split('@')[0] : '') ?? '';
+
+/** Short names for the other creators: first name, plus the last name's initial when two of them share a first name. */
+export function creatorNames(state: AppState): Map<string, string> {
+  const others = otherCreators(state);
+  const count = new Map<string, number>();
+  for (const o of others) { const f = firstNameOf(o.name, o.email).toLowerCase(); count.set(f, (count.get(f) ?? 0) + 1); }
+  const out = new Map<string, string>();
+  for (const o of others) {
+    const first = firstNameOf(o.name, o.email) || '—';
+    if ((count.get(first.toLowerCase()) ?? 0) < 2) { out.set(o.id, first); continue; }
+    const w = words(o.name);
+    const extra = w.length > 1 ? `${w[w.length - 1][0].toUpperCase()}.` : (o.email ?? '').split('@')[0];
+    out.set(o.id, extra ? `${first} ${extra}` : first);
+  }
+  return out;
+}
+/** The creator shown on a card: `you` for my own records, the short name for someone else's. */
+export function creatorLabel(state: AppState, collection: CollectionName, id: string, you: string, names = creatorNames(state)): string {
+  const k = creatorKeyOf(state, collection, id);
+  if (k === 'me') return you;
+  const info = sharedInfo(state, collection, id);
+  return names.get(k) ?? (firstNameOf(info?.ownerName, info?.ownerEmail) || '—');
+}
+/** The "Created by" filter: 'all', 'me' or another person's user id. */
+export function byCreator<T extends { id: string }>(state: AppState, collection: CollectionName, list: T[], filter: string): T[] {
+  if (!filter || filter === 'all') return list;
+  return list.filter(r => creatorKeyOf(state, collection, r.id) === filter);
 }
 
 // ---------- names ----------

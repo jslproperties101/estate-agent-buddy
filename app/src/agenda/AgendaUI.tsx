@@ -8,8 +8,8 @@ import { newId } from '../data/store';
 import { agendaStrings } from './strings';
 import { Go } from '../nav';
 import { InquiryHistory, ViewingHistory, ViewingItem } from './History';
-import { visible, can } from '../team/access';
-import { SharingLine } from '../team/TeamUI';
+import { visible, can, byCreator } from '../team/access';
+import { SharingLine, CreatorFilter, CardFoot, useCreatorFilter } from '../team/TeamUI';
 import { ViewHistory } from '../audit/AuditUI';
 import { teamStrings } from '../team/strings';
 import { ContactSelect, PropertySelect, ReminderPicker, LeadPicker, LeadDot, Tabs, Empty, Confirm, SampleTag } from '../ui/common';
@@ -219,17 +219,20 @@ export function TodoScreen({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const a = agendaStrings[lang];
   const now = new Date();
+  // Change 16: my own and shared To-Dos in one list; Change 15: "Created by" filter.
+  const [by, setBy] = useCreatorFilter('tasks');
   const buckets = useMemo(() => {
     const b: Record<TaskBucket, Task[]> = { overdue: [], today: [], upcoming: [], someday: [], done: [] };
-    for (const t of visible(state, 'tasks', state.tasks)) b[taskBucket(t, now)].push(t);
+    for (const t of byCreator(state, 'tasks', visible(state, 'tasks', state.tasks), by)) b[taskBucket(t, now)].push(t);
     for (const k of Object.keys(b) as TaskBucket[]) b[k] = sortTasks(b[k]);
     return b;
-  }, [state.tasks, state.meta.shared, state.meta.team, state.settings.workspaceView]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.tasks, state.meta.shared, state.meta.team, by]); // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState<TaskBucket>(buckets.overdue.length ? 'overdue' : 'today');
   const order: TaskBucket[] = ['overdue', 'today', 'upcoming', 'someday', 'done'];
   return (
     <section className="stack" data-testid="todo">
       <button className="btn primary" onClick={() => go({ name: 'taskForm' })}>{a.todo.add}</button>
+      <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <Tabs label={a.todo.title} value={tab} onChange={setTab} options={order.map(k => ({ value: k, label: a.todo.tabs[k], count: buckets[k].length }))} />
       {tab === 'done' && <small className="muted">{a.todo.history}</small>}
       {buckets[tab].length === 0 ? <Empty>{a.todo.none[tab]}</Empty> : (
@@ -253,9 +256,10 @@ export function TaskRow({ lang, t, go, onToggle }: { lang: Lang; t: Task; go: Go
   const prop = state.properties.find(p => p.id === t.propertyId);
   const contact = state.contacts.find(c => c.id === t.contactId);
   const overdue = taskBucket(t, new Date()) === 'overdue';
+  const editable = can(state, 'edit', 'tasks', t.id);
   return (
     <li className={`task ${t.done ? 'done' : ''} ${overdue ? 'overdue' : ''}`} data-testid="task">
-      <input type="checkbox" checked={t.done} onChange={onToggle} aria-label={t.done ? a.todo.reopen(t.title) : a.todo.markDone(t.title)} />
+      <input type="checkbox" checked={t.done} disabled={!editable} onChange={onToggle} aria-label={t.done ? a.todo.reopen(t.title) : a.todo.markDone(t.title)} />
       <button className="task-main" onClick={() => go({ name: 'taskForm', id: t.id })}>
         <strong>{t.title}</strong>
         <span className="row-wrap small">
@@ -266,6 +270,7 @@ export function TaskRow({ lang, t, go, onToggle }: { lang: Lang; t: Task; go: Go
           {t.done && t.completedAt && <span className="muted">{a.todo.completedOn(fmtDate(t.completedAt, lang))}</span>}
         </span>
         {(prop || contact) && <span className="small muted">{[prop && (cardTitle(prop) || prop.ref), contact?.name].filter(Boolean).join(' · ')}</span>}
+        <CardFoot lang={lang} collection="tasks" id={t.id} />
       </button>
       {contact?.leadStatus && <LeadDot lang={lang} status={contact.leadStatus} withText={false} />}
     </li>
@@ -343,13 +348,17 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
   const [month, setMonth] = useState({ y: selDate.getFullYear(), m: selDate.getMonth() });
   const days = view === 'month' ? monthGrid(month.y, month.m) : weekOf(selDate);
   const weekdayNames = weekOf(new Date(2026, 9, 12)).map(d => d.toLocaleDateString(localeOf(lang), { weekday: 'short' }));
+  // Change 16: my own and shared entries together; Change 15: "Created by" filter (appointments and To-Dos alike).
+  const [by, setBy] = useCreatorFilter('calendar');
+  const apptsAll = byCreator(state, 'appointments', visible(state, 'appointments', state.appointments), by);
+  const tasksAll = byCreator(state, 'tasks', visible(state, 'tasks', state.tasks), by);
   const counts = useMemo(() => {
     const m = new Map<string, { appts: number; tasks: number }>();
-    for (const ap of visible(state, 'appointments', state.appointments)) if (ap.start && ap.status !== 'cancelled') { const k = ap.start.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.appts++; m.set(k, v); }
-    for (const t of visible(state, 'tasks', state.tasks)) if (t.due && !t.done) { const k = t.due.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.tasks++; m.set(k, v); }
+    for (const ap of apptsAll) if (ap.start && ap.status !== 'cancelled') { const k = ap.start.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.appts++; m.set(k, v); }
+    for (const t of tasksAll) if (t.due && !t.done) { const k = t.due.slice(0, 10); const v = m.get(k) ?? { appts: 0, tasks: 0 }; v.tasks++; m.set(k, v); }
     return m;
-  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
-  const items = dayItems(sel, visible(state, 'appointments', state.appointments), visible(state, 'tasks', state.tasks));
+  }, [state, by]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = dayItems(sel, apptsAll, tasksAll);
   const appts = items.appts.filter(x => filter === 'all' || (filter === 'open' ? isOpenAppt(x) : x.status === filter));
   const shift = (n: number) => {
     if (view === 'month') setMonth(p => { const d = new Date(p.y, p.m + n, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
@@ -373,6 +382,7 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
         </div>
         <button className="btn small secondary" onClick={() => { setSel(today); const d = new Date(); setMonth({ y: d.getFullYear(), m: d.getMonth() }); }}>{a.cal.today}</button>
       </div>
+      <CreatorFilter lang={lang} value={by} onChange={setBy} />
       <div className="cal-grid" role="grid" aria-label={title}>
         {weekdayNames.map(w => <span key={w} className="cal-wd" role="columnheader">{w}</span>)}
         {days.map(d => {
@@ -402,11 +412,11 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
         <ul className="act-list">
           {appts.map(ap => ap.kind === 'viewing'
             ? <ViewingItem key={ap.id} lang={lang} v={ap} go={go} showProperty />
-            : <ApptItem key={ap.id} lang={lang} ap={ap} go={go} onStatus={s => store.upsert('appointments', setApptStatus(ap, s))} />)}
+            : <ApptItem key={ap.id} lang={lang} ap={ap} go={go} onStatus={s => { if (can(store.getState(), 'edit', 'appointments', ap.id)) store.upsert('appointments', setApptStatus(ap, s)); }} />)}
         </ul>
         {items.tasks.length > 0 && <>
           <strong className="small">{a.cal.tasksDue}</strong>
-          <ul className="task-list">{items.tasks.map(t => <TaskRow key={t.id} lang={lang} t={t} go={go} onToggle={() => store.upsert('tasks', completeTask(t, !t.done))} />)}</ul>
+          <ul className="task-list">{items.tasks.map(t => <TaskRow key={t.id} lang={lang} t={t} go={go} onToggle={() => { if (can(store.getState(), 'edit', 'tasks', t.id)) store.upsert('tasks', completeTask(t, !t.done)); }} />)}</ul>
         </>}
       </div>
     </section>
@@ -419,6 +429,7 @@ function ApptItem({ lang, ap, go, onStatus }: { lang: Lang; ap: Appointment; go:
   const contact = state.contacts.find(c => c.id === ap.contactId);
   const prop = state.properties.find(p => p.id === ap.propertyId);
   const open = isOpenAppt(ap);
+  const editable = can(state, 'edit', 'appointments', ap.id);
   return (
     <li className={`act-item st-${ap.status}`} data-testid="appt-item">
       <div className="between">
@@ -426,13 +437,14 @@ function ApptItem({ lang, ap, go, onStatus }: { lang: Lang; ap: Appointment; go:
         <span className={`appt-st appt-${ap.status}`}>{a.appt.status[ap.status]}</span>
       </div>
       <small className="muted">{[fmtTime(ap.start, lang), a.appt.kinds[ap.kind], contact?.name, prop && cardTitle(prop)].filter(Boolean).join(' · ')}</small>
-      {open && (
+      {open && editable && (
         <div className="row-wrap">
           <button className="btn small primary" onClick={() => onStatus('completed')}>{a.appt.complete}</button>
           <button className="btn small secondary" onClick={() => onStatus('cancelled')}>{a.appt.cancel}</button>
         </div>
       )}
-      {!open && <button className="btn small ghost" onClick={() => onStatus('scheduled')}>{a.appt.reopen}</button>}
+      {!open && editable && <button className="btn small ghost" onClick={() => onStatus('scheduled')}>{a.appt.reopen}</button>}
+      <CardFoot lang={lang} collection="appointments" id={ap.id} onOpen={() => go({ name: 'apptForm', id: ap.id })} />
     </li>
   );
 }

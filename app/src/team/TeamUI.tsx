@@ -20,7 +20,7 @@ import {
   refreshTeam, sendInvite, cancelInvite, acceptInvite, declineInvite, leaveTeam, removeMember, setShares, setShareAll,
   decideDelete, inviteLink, tokenFrom, teamErrorOf, TeamError,
 } from './api';
-import { partnerOf, myId, personLabel, isTeamOwner, inTeam, currentView, myShareOf, scopesOf, sharedInfo, creatorOf, levelOf, labelForUser, can } from './access';
+import { partnerOf, myId, personLabel, isTeamOwner, inTeam, myShareOf, creatorNames, otherCreators, creatorLabel, creatorKeyOf, scopesOf, sharedInfo, creatorOf, levelOf, labelForUser, can } from './access';
 import { teamStrings, EXACT } from './strings';
 
 const INVITE_KEY = 'eab-team-invite';
@@ -42,17 +42,44 @@ const levelText = (lang: Lang, lv: ShareLevel | 'owner' | null | undefined) => {
   return lv === 'edit' ? t.viewEdit : lv === 'view' ? t.viewOnly : lv === 'owner' ? '' : t.notShared;
 };
 
-// ---------- the Personal / Team switch ----------
-export function WorkspaceSwitch({ lang }: { lang: Lang }) {
-  const { state, store } = useApp();
+// ---------- Change 15: "Created by" on every card, and the filter on every shareable list ----------
+// (Change 16 removed the Personal / Team Workspace switch: own and shared records are in one list.)
+const filterMemory = new Map<string, string>();   // the choice per list, kept while the app is open
+
+/** The "Created by: All / You / <name>" filter for one list. Shown only when someone else's records can be on this phone. */
+export function useCreatorFilter(listKey: string): [string, (v: string) => void] {
+  const [v, setV] = useState(filterMemory.get(listKey) ?? 'all');
+  return [v, (x: string) => { filterMemory.set(listKey, x); setV(x); }];
+}
+export function CreatorFilter({ lang, value, onChange, testId = 'created-by-filter' }: { lang: Lang; value: string; onChange: (v: string) => void; testId?: string }) {
+  const { state } = useApp();
   const t = teamStrings[lang];
-  if (!inTeam(state)) return null;
-  const view = currentView(state);
+  const names = creatorNames(state);
+  const others = otherCreators(state);
+  // a person who is no longer on this phone (team ended) cannot stay selected
+  useEffect(() => { if (value !== 'all' && value !== 'me' && !others.some(o => o.id === value)) onChange('all'); }, [value, others.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!others.length) return null;
+  const opts = [{ v: 'all', label: t.byAll }, { v: 'me', label: t.byYou }, ...others.map(o => ({ v: o.id, label: names.get(o.id) ?? '—' }))];
   return (
-    <div className="seg ws-switch" role="group" aria-label={t.switchLabel} data-testid="workspace-switch">
-      <button aria-pressed={view === 'personal'} onClick={() => store.setSingleton('settings', { workspaceView: 'personal' })}>{t.personal}</button>
-      <button aria-pressed={view === 'team'} onClick={() => store.setSingleton('settings', { workspaceView: 'team' })}>{t.team}</button>
+    <div className="chip-row created-by" role="radiogroup" aria-label={t.createdByLabel} data-testid={testId}>
+      <span className="small muted">{t.createdByLabel}:</span>
+      {opts.map(o => <button key={o.v} type="button" role="radio" aria-checked={value === o.v} className={`chip-btn ${value === o.v ? 'on' : ''}`} data-by={o.v} onClick={() => onChange(o.v)}>{o.label}</button>)}
     </div>
+  );
+}
+/** The bottom line of a card: "Click to Open" at the left, who created it at the right (Change 15). */
+export function CardFoot({ lang, collection, id, onOpen }: { lang: Lang; collection: CollectionName; id: string; onOpen?: () => void }) {
+  const { state } = useApp();
+  const t = teamStrings[lang];
+  const who = creatorLabel(state, collection, id, t.byYou);
+  const mine = creatorKeyOf(state, collection, id) === 'me';
+  return (
+    <span className="card-foot" data-testid="card-foot">
+      {onOpen
+        ? <button type="button" className="cf-open link-btn" data-testid="card-click-to-open" onClick={e => { e.stopPropagation(); onOpen(); }}>{t.clickToOpen}</button>
+        : <span className="cf-open" data-testid="card-click-to-open" aria-hidden="true">{t.clickToOpen}</span>}
+      <span className={`cf-by ${mine ? 'mine' : 'theirs'}`} data-testid="card-creator" data-mine={mine ? 'yes' : 'no'} title={who}>{who}</span>
+    </span>
   );
 }
 

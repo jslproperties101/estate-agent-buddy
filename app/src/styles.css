@@ -1003,6 +1003,23 @@ html { background: #000; }
 .sc-hint { margin-top: auto; padding-top: 4px; align-self: center; text-align: center; font-size: 12px; color: var(--muted); }
 .sc-large .sc-hint { font-size: 13px; }
 .sc .creator-tag { align-self: flex-start; }
+/* Change 15: the bottom line of every shareable card: "Click to Open" at the left, who created it at the right. */
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: auto; padding-top: 6px; font-size: 12px; }
+.card-foot .cf-open { flex: none; white-space: nowrap; color: var(--muted); font-size: 12px; padding: 0; min-height: 0; text-align: left; }
+/* never broken in the middle of a word: a name too long for a narrow card ends with "…" (the full name is on the record) */
+/* The name is never cut or broken: on a card too narrow for both, it moves under "Click to Open", still at the right. */
+.card-foot { flex-wrap: wrap; }
+.card-foot .cf-by { margin-left: auto; flex: none; max-width: 100%; font-weight: 700; border-radius: 8px; padding: 0 8px; white-space: nowrap; text-align: right; }
+.sc-grid .card-foot { gap: 2px 3px; font-size: 10.5px; }
+.sc-grid .card-foot .cf-open { font-size: 10.5px; }
+.sc-grid .card-foot .cf-by { padding: 0 4px; border-radius: 6px; }
+.card-foot .cf-by.theirs { color: #5EEAD4; background: #0F2E2B; border: 1px solid #1F5F58; }
+.card-foot .cf-by.mine { color: var(--muted); border: 1px solid var(--line-2); }
+.sc-large .card-foot { font-size: 13px; }
+.created-by { align-items: center; }
+.tile-badge { position: absolute; top: 6px; right: 6px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
+  font-size: 13px; font-weight: 800; line-height: 22px; text-align: center; }
+.count-badge { display: inline-block; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--red-bg); color: #fff; font-size: 13px; font-weight: 800; line-height: 22px; text-align: center; }
 
 /* Property details: one row per field to check / not filled. */
 .field-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }

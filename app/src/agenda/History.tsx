@@ -14,6 +14,7 @@ import { cardTitle } from '../listing/model';
 import type { Appointment, Inquiry } from '../data/types';
 import { strings } from '../i18n';
 import { can } from '../team/access';
+import { CardFoot } from '../team/TeamUI';
 
 export function InquiryHistory({ lang, go, propertyId, contactId, plain }: { lang: Lang; go: Go; propertyId?: string; contactId?: string; plain?: boolean }) {
   const { state, store } = useApp();
@@ -123,6 +124,7 @@ export function ViewingItem({ lang, v, go, showProperty }: { lang: Lang; v: Appo
         {open && can(state, 'edit', 'appointments', v.id) && <button className="btn small secondary" onClick={() => { if (can(store.getState(), 'edit', 'appointments', v.id)) store.upsert('appointments', setApptStatus(v, 'cancelled')); }}>{a.view.cancelIt}</button>}
         <button className="btn small secondary" onClick={() => go({ name: 'apptForm', id: v.id })}>{strings[lang].c.edit}</button>
       </div>
+      <CardFoot lang={lang} collection="appointments" id={v.id} onOpen={() => go({ name: 'apptForm', id: v.id })} />
     </li>
   );
 }

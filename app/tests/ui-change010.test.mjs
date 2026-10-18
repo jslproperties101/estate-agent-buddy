@@ -84,6 +84,13 @@ async function agent(cloud, email, name, records = {}, opts = {}) {
 }
 let refN = 1000;
 const prop = (id, street, extra = {}) => [`c:properties:${id}`, { id, created: 1, updated: 1, ref: `P${++refN}`, refPrefix: 'P', refNo: refN, street, township: 'Nilai Impian', city: 'Nilai', type: 'Terrace house', photos: [], ...extra }];
+/** Change 14: the Team Workspace opens from Opportunities → Team Sharing (no longer from Settings). */
+async function openTeam(page) {
+  await home(page);
+  await page.locator('nav.grid > button', { hasText: 'Opportunities' }).click();
+  await page.getByTestId('team-sharing').waitFor();
+  await page.getByTestId('open-team').click();
+}
 async function openSettings(page) {
   await page.getByTestId('top-profile').click();
   await page.getByRole('button', { name: /Settings/i }).click();
@@ -105,8 +112,7 @@ async function team(cloud) {
 test('C1 invite by email: waiting invitation with its expiry, cancel; the other agent accepts; two members, Team owner shown', async () => {
   const cloud = new FakeTeamCloud();
   const { a, b } = await team(cloud);
-  await openSettings(a.page);
-  await a.page.getByTestId('open-team').click();
+  await openTeam(a.page);
   await a.page.getByTestId('team-screen').waitFor();
   await a.page.getByTestId('no-team').waitFor();
   await a.page.locator('[data-field="teamInviteEmail"]').fill('badrul@x.com');
@@ -121,8 +127,7 @@ test('C1 invite by email: waiting invitation with its expiry, cancel; the other 
   await a.page.getByTestId('send-invite').click();
   await a.page.getByTestId('invite-waiting').waitFor();
 
-  await openSettings(b.page);
-  await b.page.getByTestId('open-team').click();
+  await openTeam(b.page);
   await b.page.getByTestId('invites-for-me').waitFor();
   assert.match(await b.page.getByTestId('invites-for-me').innerText(), /From Aina/i);
   await shot(b.page, 'c010-02-invite-for-me', true);
@@ -141,12 +146,12 @@ test('C1 invite by email: waiting invitation with its expiry, cancel; the other 
 test('C2 invitation link: shown once, the other agent pastes it and joins', async () => {
   const cloud = new FakeTeamCloud();
   const { a, b } = await team(cloud);
-  await openSettings(a.page); await a.page.getByTestId('open-team').click();
+  await openTeam(a.page);
   await a.page.getByTestId('make-link').click();
   await a.page.getByTestId('invite-link').waitFor();
   const link = (await a.page.locator('[data-testid="invite-link"] code').innerText()).trim();
   assert.match(link, /\?team-invite=[0-9a-f]{16,}/);
-  await openSettings(b.page); await b.page.getByTestId('open-team').click();
+  await openTeam(b.page);
   await b.page.locator('[data-field="inviteLink"]').fill(`Join me: ${link}`);
   await b.page.getByTestId('accept-link').click();
   await waitFor(async () => (await b.page.getByTestId('team-member').count()) === 2);
@@ -166,7 +171,7 @@ async function joined(cloud) {
 test('C3 Manage Sharing (gear): search, View Only for one listing, Share All with confirmation; takes effect at once', async () => {
   const cloud = new FakeTeamCloud();
   const { a, b } = await joined(cloud);
-  await openSettings(a.page); await a.page.getByTestId('open-team').click();
+  await openTeam(a.page);
   await a.page.getByTestId('team-members').getByTestId('open-manage-sharing').click();
   await a.page.getByTestId('manage-sharing').waitFor();
   assert.ok(await a.page.locator('[data-testid="manage-sharing"] svg').count() >= 1, 'gear icon shown');
@@ -189,23 +194,44 @@ test('C3 Manage Sharing (gear): search, View Only for one listing, Share All wit
   await a.ctx.close(); await b.ctx.close();
 });
 
-test('C4 the recipient: shared card shows the creator, Team/Personal switch, View Only has no Edit or Delete', async () => {
+test('C4 the recipient (Change 16: one list): the shared card shows who created it, own cards say "You", "Created by" filters; View Only has no Edit or Delete', async () => {
   const cloud = new FakeTeamCloud();
   const { a, b } = await joined(cloud);
   await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [{ collection: 'properties', id: 'pa1', level: 'view' }] }) });
   await syncNow(b.page);
-  await b.page.getByTestId('workspace-switch').waitFor();
-  await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Team Workspace' }).click();
+  assert.equal(await b.page.getByTestId('workspace-switch').count(), 0, 'no Personal / Team switch any more');
   await b.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
   await b.page.getByTestId('listing').waitFor();
   const card = b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' });
   await card.waitFor();
-  assert.equal(await card.getByTestId('creator-tag').innerText(), 'Aina');
+  assert.equal(await card.getByTestId('card-creator').innerText(), 'Aina');
+  const mine = b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' });
+  assert.equal(await mine.getByTestId('card-creator').innerText(), 'You', 'own and shared in the same list');
   assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 2' }).count(), 0, 'not shared');
+  // Grid (narrow cards): Click to Open at the left; the name at the right, moved under it when there is no room, never cut
+  const open = await card.getByTestId('card-click-to-open').boundingBox();
+  let who = await card.getByTestId('card-creator').boundingBox();
+  const box = await card.locator('.sc-card').boundingBox();
+  assert.ok(open.x < who.x && box.x + box.width - (who.x + who.width) <= 16, 'grid: creator at the right');
+  assert.equal(await card.getByTestId('card-creator').evaluate(e => e.scrollWidth <= e.clientWidth + 1), true, 'grid: the name is not cut');
   await shot(b.page, 'c010-05-team-view-card');
-  await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Personal Workspace' }).click();
-  assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).count(), 0, 'Personal Workspace: only my own');
-  await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Team Workspace' }).click();
+  // Large cards: on the same line
+  await b.page.getByRole('button', { name: 'Large Cards' }).click();
+  const open2 = await card.getByTestId('card-click-to-open').boundingBox();
+  who = await card.getByTestId('card-creator').boundingBox();
+  assert.ok(open2.x < who.x && Math.abs((open2.y + open2.height / 2) - (who.y + who.height / 2)) <= 6, 'large: one line, Click to Open left, creator right');
+  await shot(b.page, 'c010-05b-large-card');
+  await b.page.getByRole('button', { name: 'Grid' }).click();
+  // Created by: You → only my own; Aina → only hers; All → both
+  const filter = b.page.getByTestId('created-by-filter');
+  await filter.locator('[data-by="me"]').click();
+  assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).count(), 0);
+  assert.equal(await mine.count(), 1);
+  await filter.getByRole('radio', { name: 'Aina' }).click();
+  assert.equal(await mine.count(), 0);
+  assert.equal(await card.count(), 1);
+  await filter.locator('[data-by="all"]').click();
+  assert.equal(await mine.count(), 1); assert.equal(await card.count(), 1);
   await card.locator('.sc-card').click();
   await b.page.getByTestId('listing-details').waitFor();
   assert.match(await b.page.getByTestId('sharing-line').innerText(), /Created by Aina[\s\S]*Shared by Aina · Your access: View Only/i);
@@ -223,7 +249,6 @@ test('C5 View and Edit: editor requests deletion, owner approves; the property g
   const { a, b } = await joined(cloud);
   await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [{ collection: 'properties', id: 'pa1', level: 'edit' }] }) });
   await syncNow(b.page);
-  await b.page.getByTestId('workspace-switch').getByRole('button', { name: 'Team Workspace' }).click();
   await b.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
   await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).locator('.sc-card').click();
   await b.page.getByTestId('listing-details').waitFor();
@@ -231,7 +256,7 @@ test('C5 View and Edit: editor requests deletion, owner approves; the property g
   await b.page.getByTestId('request-delete').click();
   await b.page.getByRole('alertdialog').getByRole('button', { name: 'Request Deletion' }).click();
   await waitFor(() => cloud.deleteRequests.length === 1);
-  await openSettings(a.page); await a.page.getByTestId('open-team').click();
+  await openTeam(a.page);
   await a.page.getByTestId('delete-request').waitFor();
   assert.match(await a.page.getByTestId('delete-request').innerText(), /Jalan Aina 1[\s\S]*Requested by Badrul/i);
   await a.page.getByTestId('approve-delete').click();
@@ -280,7 +305,7 @@ test('C7 ending the Team Workspace: the exact warning; shared records disappear 
   const { a, b } = await joined(cloud);
   await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [{ collection: 'properties', id: 'pa1', level: 'edit' }] }) });
   await syncNow(b.page);
-  await openSettings(b.page); await b.page.getByTestId('open-team').click();
+  await openTeam(b.page);
   await b.page.getByTestId('end-team').click();
   const dlg = b.page.getByRole('alertdialog');
   assert.equal((await dlg.locator('h2').innerText()).trim(), 'End this Team Workspace? Shared access will be revoked immediately. Your personal listings will remain in your Personal Workspace.');
@@ -288,7 +313,6 @@ test('C7 ending the Team Workspace: the exact warning; shared records disappear 
   await dlg.getByRole('button', { name: 'End Team Workspace' }).click();
   await b.page.getByTestId('team-msg').waitFor();
   await home(b.page);
-  assert.equal(await b.page.getByTestId('workspace-switch').count(), 0, 'no Team Workspace any more');
   await b.page.locator('nav.grid > button', { hasText: 'Subsale List' }).click();
   assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Aina 1' }).count(), 0);
   assert.equal(await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' }).count(), 1, 'own listings stay');
@@ -298,7 +322,7 @@ test('C7 ending the Team Workspace: the exact warning; shared records disappear 
 test('C8 a cloud without the Change 010 update: the Team Workspace screen says so plainly', async () => {
   const cloud = new FakeTeamCloud(); cloud.available = false;
   const a = await agent(cloud, 'aina@x.com', 'Aina');
-  await openSettings(a.page); await a.page.getByTestId('open-team').click();
+  await openTeam(a.page);
   await a.page.getByTestId('team-unavailable').waitFor();
   assert.match(await a.page.getByTestId('team-unavailable').innerText(), /not switched on in the cloud yet/i);
   await a.ctx.close();
@@ -478,5 +502,78 @@ test('C12 regression: a property shared by the other agent with the same number 
   await b.page.getByTestId('listing-card').filter({ hasText: 'Jalan Badrul 9' }).locator('.sc-card').click();
   await editStreet(b.page, 'Jalan Badrul 10');
   assert.match(await b.page.getByTestId('detail-address').innerText(), /Jalan Badrul 10/);
+  await a.ctx.close(); await b.ctx.close();
+});
+
+test('C14 Changes 14-16: Buyer List, To-Do and Calendar show own and shared together with "Click to Open" and the creator; "Created by" filters; View Only stays read-only; Team Sharing sits in Opportunities, not Settings', async () => {
+  const cloud = new FakeTeamCloud();
+  const today = new Date(); const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const a = await agent(cloud, 'aina@x.com', 'Aina Binti Ali', {
+    'c:contacts:ca': { id: 'ca', created: 1, updated: 1, name: 'Buyer From Aina', roles: ['buyer'], leadStatus: 'hot' },
+    'c:tasks:ta': { id: 'ta', created: 1, updated: 1, title: 'Aina task', priority: 'high', done: false, kind: 'task', reminders: [], due: `${ymd}T09:00` },
+    'c:appointments:apa': { id: 'apa', created: 1, updated: 1, kind: 'meeting', title: 'Aina meeting', start: `${ymd}T10:00`, status: 'scheduled', reminders: [], durationMin: 60 },
+  });
+  const b = await agent(cloud, 'badrul@x.com', 'Badrul', {
+    'c:contacts:cb': { id: 'cb', created: 1, updated: 1, name: 'Buyer Of Badrul', roles: ['buyer'], leadStatus: 'warm' },
+    'c:tasks:tb': { id: 'tb', created: 1, updated: 1, title: 'Badrul task', priority: 'low', done: false, kind: 'task', reminders: [], due: `${ymd}T08:00` },
+  });
+  await waitFor(() => cloud.rows.has('ws-aina@x.com|tasks|ta') && cloud.rows.has('ws-badrul@x.com|tasks|tb'));
+  const inv = await (await cloud.fetch(`${SB}/rest/v1/rpc/eab_team_invite`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_email: 'badrul@x.com' }) })).json();
+  await cloud.fetch(`${SB}/rest/v1/rpc/eab_team_accept`, { method: 'POST', headers: { authorization: `Bearer tok-${b.user.id}` }, body: JSON.stringify({ p_token: inv.token }) });
+  await cloud.fetch(`${SB}/rest/v1/rpc/eab_share_set`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_ws: a.user.ws, p_items: [
+    { collection: 'contacts', id: 'ca', level: 'view' }, { collection: 'tasks', id: 'ta', level: 'view' }, { collection: 'appointments', id: 'apa', level: 'view' }] }) });
+  await syncNow(b.page);
+  // Settings no longer holds the team systems; Opportunities does
+  await openSettings(b.page);
+  assert.equal(await b.page.getByTestId('team-entry').count(), 0);
+  assert.equal(await b.page.getByTestId('open-team').count(), 0, 'Team Workspace is not in Settings');
+  assert.equal(await b.page.getByTestId('history-exports').count(), 1, 'Audit History and Export Management stay in Settings');
+  await home(b.page);
+  await b.page.locator('nav.grid > button', { hasText: 'Opportunities' }).click();
+  await b.page.getByTestId('team-sharing').waitFor();
+  assert.equal(await b.page.locator('[data-testid="opportunities"] > *').first().getAttribute('data-testid'), 'team-sharing', 'Team Sharing is at the top');
+  await shot(b.page, 'c014-02-opportunities-team-sharing');
+  // Buyer List
+  await home(b.page);
+  await b.page.locator('nav.grid > button', { hasText: 'Contacts' }).first().click();
+  await b.page.getByTestId('hub-buyers').click();
+  await b.page.getByTestId('contacts-buyer').waitFor();
+  const theirs = b.page.getByTestId('contact-row').filter({ hasText: 'Buyer From Aina' });
+  const own = b.page.getByTestId('contact-row').filter({ hasText: 'Buyer Of Badrul' });
+  await theirs.waitFor();
+  assert.equal(await theirs.getByTestId('card-creator').innerText(), 'Aina');
+  assert.equal(await own.getByTestId('card-creator').innerText(), 'You');
+  assert.equal(await theirs.getByTestId('card-click-to-open').innerText(), 'Click to Open');
+  await b.page.getByTestId('created-by-filter').locator('[data-by="me"]').click();
+  assert.equal(await theirs.count(), 0); assert.equal(await own.count(), 1);
+  await b.page.getByTestId('created-by-filter').locator('[data-by="all"]').click();
+  await shot(b.page, 'c015-01-buyer-list');
+  // To-Do: both tasks; the shared View Only one cannot be ticked
+  await home(b.page);
+  await b.page.locator('nav.grid > button[data-key="agenda"]').click();
+  await b.page.getByTestId('agenda-todo').click();
+  await b.page.getByTestId('todo').waitFor();
+  const ta = b.page.getByTestId('task').filter({ hasText: 'Aina task' });
+  const tb = b.page.getByTestId('task').filter({ hasText: 'Badrul task' });
+  await ta.waitFor();
+  assert.equal(await ta.getByTestId('card-creator').innerText(), 'Aina');
+  assert.equal(await tb.getByTestId('card-creator').innerText(), 'You');
+  assert.equal(await ta.locator('input[type="checkbox"]').isDisabled(), true, 'View Only: cannot tick it done');
+  assert.equal(await tb.locator('input[type="checkbox"]').isDisabled(), false);
+  await b.page.getByTestId('created-by-filter').getByRole('radio', { name: 'Aina' }).click();
+  assert.equal(await tb.count(), 0); assert.equal(await ta.count(), 1);
+  await shot(b.page, 'c015-02-todo');
+  // Calendar: the shared appointment, read-only (no Complete / Cancel), with its creator
+  await home(b.page);
+  await b.page.locator('nav.grid > button[data-key="agenda"]').click();
+  await b.page.getByTestId('agenda-calendar').click();
+  await b.page.getByTestId('calendar').waitFor();
+  const ap = b.page.getByTestId('appt-item').filter({ hasText: 'Aina meeting' });
+  await ap.waitFor();
+  assert.equal(await ap.getByTestId('card-creator').innerText(), 'Aina');
+  assert.equal(await ap.getByRole('button', { name: 'Complete' }).count(), 0, 'View Only: no status buttons');
+  await ap.getByTestId('card-click-to-open').click();
+  await b.page.waitForTimeout(300);
+  assert.deepEqual([...a.errors, ...b.errors], []);
   await a.ctx.close(); await b.ctx.close();
 });
