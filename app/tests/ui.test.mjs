@@ -335,6 +335,7 @@ test('U3 Property List: Grid first, Large Cards the default on a first install (
   assert.ok(!/P10\d\d/.test(await page.locator('ul[data-layout="large"]').innerText()), 'no reference numbers on large cards');
   await shot(page, '02b-list-large');
   await seg.first().click();
+  await waitStored(page, 'records', "all.some(v => v && v.layout === 'grid')");   // the setting lands a moment after the screen shows it
   await page.reload(); await page.waitForSelector('nav.grid');
   await tile(page, 'Property List');
   assert.equal(await page.locator('ul[data-layout="grid"]').count(), 1, 'the last layout chosen is kept after reopening');
