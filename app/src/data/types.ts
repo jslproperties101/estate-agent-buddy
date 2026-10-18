@@ -305,6 +305,8 @@ export interface Meta {
   /** Google Drive backup access: a short-lived Google token kept only on this phone (never in a backup file or the cloud). */
   drive?: { token: string; expiresAt: number; connectedAt: number };
   driveLastOkAt?: number;
+  /** Change 23: restore points made since the last full re-check of every file */
+  driveFastRuns?: number;
   driveLast?: { at: number; ok: boolean; error?: string; copies?: number; fileName?: string };
   /** Change 006 Layer 2: the last update of the readable Drive folders (status, and how many items wait or failed). */
   driveTree?: { at: number; ok: boolean; status?: 'complete' | 'partial'; waiting?: number; failed?: number; editedOutside?: number; error?: string };

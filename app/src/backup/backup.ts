@@ -46,11 +46,22 @@ export interface BackupResult { bytes: Uint8Array; fileName: string; records: nu
 
 /** Everything one backup holds, before it is packed: used by the backup file (ZIP) and by Drive restore points
  *  (Change 006 Layer 3), so both carry exactly the same content and are restored by the same code. */
-export interface BackupPackage { manifest: PackageManifest; blobs: Map<string, Uint8Array>; missingFiles: string[]; records: number }
+export interface BackupPackage {
+  manifest: PackageManifest; blobs: Map<string, Uint8Array>; missingFiles: string[]; records: number;
+  /** Change 23 (fast mode only): reads one file's bytes when it is really needed (blobs is empty then). */
+  read?: (id: string) => Promise<Uint8Array>;
+  /** Change 23: how many files had to be read and checksummed this time (the others came from the saved checksums). */
+  hashed?: number;
+  /** Change 23: the checksums to save for next time. */
+  hashes?: Record<string, { sha256: string; bytes: number }>;
+}
+/** Change 23: checksums remembered from an earlier backup, by file id. A stored file never changes under its id, and the
+ *  size is checked as well, so a repeat backup does not have to read and checksum every photo again. */
+export type HashCache = Record<string, { sha256: string; bytes: number }>;
 
 const u8buf = (d: Uint8Array) => d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength) as ArrayBuffer;
 
-export async function collectPackage(store: Store, now = Date.now()): Promise<BackupPackage> {
+export async function collectPackage(store: Store, now = Date.now(), fast?: { cache: HashCache }): Promise<BackupPackage> {
   await store.flush();
   const base = await buildBackupManifest(store, now);
   const st = store.getState();
@@ -58,12 +69,23 @@ export async function collectPackage(store: Store, now = Date.now()): Promise<Ba
   const files: BackupManifest['files'] = [];
   const missing: string[] = [];
   const refs = new Map(fileRefs(st).map(r => [r.fileId, r]));
+  const hashes: HashCache = {}; let hashed = 0;
   for (const id of usedFileIds(store)) {
     const blob = await store.getFile(id);
     const r = refs.get(id);
     if (!blob) { missing.push(id); continue; }
+    const meta = { id, collection: r?.collection ?? ('properties' as CollectionName), recordId: r?.recordId ?? '', kind: r?.kind ?? 'photo', name: r?.name };
+    const known = fast?.cache[id];
+    if (fast && known && known.bytes === blob.size) {                       // unchanged since it was last checksummed: not read again
+      files.push({ ...meta, sha256: known.sha256, bytes: blob.size, status: 'backup' });
+      hashes[id] = known;
+      continue;
+    }
     const data = new Uint8Array(await blob.arrayBuffer());
-    files.push({ id, collection: r?.collection ?? ('properties' as CollectionName), recordId: r?.recordId ?? '', kind: r?.kind ?? 'photo', name: r?.name, sha256: await sha256Hex(u8buf(data)), bytes: data.length, status: 'backup' });
+    const sha256 = await sha256Hex(u8buf(data)); hashed++;
+    files.push({ ...meta, sha256, bytes: data.length, status: 'backup' });
+    hashes[id] = { sha256, bytes: data.length };
+    if (fast) continue;                                                      // fast mode: bytes are read again only if they must be uploaded
     blobs.set(id, data);
   }
   const manifest: PackageManifest = {
@@ -71,7 +93,8 @@ export async function collectPackage(store: Store, now = Date.now()): Promise<Ba
     singletons: { profile: structuredClone(st.profile), options: structuredClone(st.options) },
   };
   const records = COLLECTIONS.reduce((n, c) => n + (manifest.records[c]?.length ?? 0), 0);
-  return { manifest, blobs, missingFiles: missing, records };
+  const read = fast ? async (id: string) => { const b = await store.getFile(id); if (!b) throw new Error('file-missing'); return new Uint8Array(await b.arrayBuffer()); } : undefined;
+  return { manifest, blobs, missingFiles: missing, records, ...(fast ? { read, hashed, hashes } : {}) };
 }
 
 export async function createBackup(store: Store, now = Date.now()): Promise<BackupResult> {

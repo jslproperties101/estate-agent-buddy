@@ -25,7 +25,7 @@ import type { Store } from '../data/store';
 import { sha256Hex, stableStringify } from '../data/hash';
 import { COLLECTIONS } from '../data/types';
 import { BUILD } from '../native/updates';
-import { collectPackage, inspectPackage, Inspection, PackageManifest } from './backup';
+import { collectPackage, HashCache, inspectPackage, Inspection, PackageManifest } from './backup';
 import { DriveClient, DriveError, DriveItem, FOLDER_MIME, mytIso, q } from './driveApi';
 import { MANIFEST_VERSION, LOCAL_SCHEMA_VERSION } from '../data/manifest';
 
@@ -34,6 +34,12 @@ export const DR_NAME = 'Disaster Recovery';
 export const POINT_FORMAT = 'eab-restore-point';
 export const POINT_VERSION = 1;
 export const KEEP_POINTS = 30;
+/** Change 23: every 7th restore point re-reads and re-checks every photo and document instead of trusting saved checksums. */
+export const FULL_EVERY = 7;
+const HASH_KEY = 'drivecache:hashes';
+export async function loadHashes(store: Store): Promise<HashCache> {
+  return ((await store.listLocal('drivecache:')).find(x => x.key === HASH_KEY)?.value as HashCache | undefined) ?? {};
+}
 /** An incomplete point older than this is binned by the next run. */
 export const STALE_INCOMPLETE_MS = 24 * 3600_000;
 export const POINT_NAME = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}(\.\d{3})?Z$/;
@@ -121,27 +127,32 @@ async function readManifest(d: DriveClient, manifestId: string): Promise<PointMa
   return m;
 }
 
-export interface PointRun { name: string; records: number; files: number; uploadedObjects: number; kept: number; binnedPoints: number; binnedObjects: number }
+export interface PointRun { name: string; records: number; files: number; uploadedObjects: number; /** Change 23: files read and checksummed this time, and whether this was the full re-check */ readFiles: number; full: boolean; kept: number; binnedPoints: number; binnedObjects: number }
 
 /** Makes one verified restore point, then applies retention. Throws DriveError on failure (nothing half-marked as done). */
-export async function createRestorePoint(store: Store, d: DriveClient, reason: PointReason, now = Date.now(), onProgress?: (done: number, total: number) => void): Promise<PointRun> {
-  const pkg = await collectPackage(store, now);
+export async function createRestorePoint(store: Store, d: DriveClient, reason: PointReason, now = Date.now(), onProgress?: (done: number, total: number) => void, full = false): Promise<PointRun> {
+  // Change 23: a repeat backup trusts the checksums saved by an earlier one (the app's own copy of each file never
+  // changes under its id) and reads a file again only to upload it; the full re-check ignores the saved checksums.
+  const pkg = await collectPackage(store, now, { cache: full ? {} : await loadHashes(store) });
   // Change 17b: progress for the person (one step per file, then records.json, manifest.json, the summary and the tidy-up)
   const total = pkg.manifest.files.length + 4; let step = 0;
   const tick = () => { try { onProgress?.(Math.min(++step, total), total); } catch { /* progress is only a display */ } };
   const f = await drFolders(d);
   // 1. objects, once each
-  const have = new Map((await d.children(f.objects)).map(o => [o.name, o]));
+  const have = new Map<string, DriveItem>();
+  for (const o of await d.children(f.objects)) { const prev = have.get(o.name); if (!prev || Number(o.size) === (pkg.manifest.files.find(x => x.sha256 === o.name)?.bytes ?? -1)) have.set(o.name, o); }
   const objects = new Map<string, number>();
   let uploadedObjects = 0;
   for (const file of pkg.manifest.files) {
     tick();
-    const data = pkg.blobs.get(file.id)!;
-    const sha = file.sha256 ?? await shaOf(data);
-    objects.set(sha, data.length);
+    const sha = file.sha256!; const size = file.bytes ?? 0;
+    objects.set(sha, size);
     const there = have.get(sha);
-    if (there && Number(there.size) === data.length) continue;
-    const made = await d.create(f.objects, sha, 'application/octet-stream', data);
+    if (there && Number(there.size) === size) continue;             // already safe in Drive (re-uploaded below if it was removed or is the wrong size)
+    const data = pkg.blobs.get(file.id) ?? await pkg.read!(file.id);
+    if (data.length !== size) throw new DriveError('notVerified', 'file changed during backup');
+    const made = await d.create(f.objects, sha, 'application/octet-stream', data);   // checked after upload
+    if (there) { try { await d.trash(there.id); } catch { /* a leftover wrong-size copy is only untidy; the next run bins it */ } }
     have.set(sha, made); uploadedObjects++;
   }
   // 2. the point's folder and records.json, read back and checked
@@ -176,7 +187,8 @@ export async function createRestorePoint(store: Store, d: DriveClient, reason: P
   tick();
   const pruned = await prunePoints(store, d, f, now, name);
   tick();
-  return { name, records: pkg.records, files: pkg.manifest.files.length, uploadedObjects, ...pruned };
+  try { await store.putLocalNow(HASH_KEY, pkg.hashes ?? {}); } catch { /* only a speed-up */ }
+  return { name, records: pkg.records, files: pkg.manifest.files.length, uploadedObjects, readFiles: pkg.hashed ?? 0, full, ...pruned };
 }
 
 function summaryText(m: PointManifest): string {

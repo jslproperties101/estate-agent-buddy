@@ -16,7 +16,7 @@
 // server holding a long-lived refresh token.
 import type { Store } from '../data/store';
 import { DriveClient } from './driveApi';
-import { createRestorePoint, PointRun } from './restorePoints';
+import { createRestorePoint, FULL_EVERY, PointRun } from './restorePoints';
 import { exportTree, TreeRun } from './driveTree';
 import { usage } from '../usage/logger';
 
@@ -134,8 +134,10 @@ export async function runDriveBackup(store: Store, fetchFn: FetchFn = fetch, now
   show(0);
   if (willPoint) {
     try {
-      out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now, part(0, willTree ? 50 : 100));
-      store.setSingleton('meta', { driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: out.point.kept, fileName: out.point.name } });
+      // Change 23: every 7th restore point is a full re-check of every file; the ones between use saved checksums
+      const full = (store.getState().meta.driveFastRuns ?? FULL_EVERY - 1) >= FULL_EVERY - 1;
+      out.point = await createRestorePoint(store, client, opts.force ? 'manual' : 'daily', now, part(0, willTree ? 50 : 100), full);
+      store.setSingleton('meta', { driveFastRuns: full ? 0 : (store.getState().meta.driveFastRuns ?? 0) + 1, driveLastOkAt: now, lastBackupAt: now, driveLast: { at: now, ok: true, copies: out.point.kept, fileName: out.point.name } });
       usage.sync('drive.restore_point', true);
     } catch (e) {
       out.pointError = failure(e); out.ok = false; out.error = out.pointError;
