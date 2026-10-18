@@ -347,6 +347,8 @@ export interface Meta {
   /** Change 13: which invitation alerts the phone has already announced (so each is announced once), and which
    *  "accepted / declined" notes I have read. Ids only. */
   inviteAlerts?: { notified: string[]; seenAnswers: string[] };
+  /** Change 25: this phone's push address as given to the cloud, for whom, in which language, and when. */
+  push?: { token: string; userId: string; lang: string; at: number; test?: boolean };
   /** Change 010: records another agent shares with me right now ("collection:id" → owner and my access). Everything
    *  NOT listed here is my own record. Kept up to date by every sync; an entry disappears the moment access ends. */
   shared?: Record<string, SharedInfo>;

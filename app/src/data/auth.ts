@@ -6,6 +6,7 @@
 // Supabase redirect list (docs/SETUP.md). Nothing here pretends: a session exists only after Supabase issued one.
 import { isNative, openInBrowser, closeBrowser, AUTH_CALLBACK } from '../native/native';
 import { SyncConfig, SyncError, Session, TokenResponse, toSession, supabaseCall, supabaseHeaders, configured, membership } from './sync';
+import { unregisterPush } from '../native/push';
 
 type FetchFn = typeof fetch;
 const PKCE_KEY = 'eab-pkce-verifier';
@@ -106,5 +107,6 @@ export function cleanWebAddress(): void {
 
 /** Signs out on the server (best effort) — the caller removes the session on the phone. */
 export async function signOutRemote(cfg: SyncConfig, s: Session, fetchFn: FetchFn = fetch): Promise<void> {
+  await unregisterPush(cfg, s, fetchFn);   // Change 25: this phone stops getting this person's invitation alerts
   try { await fetchFn(`${cfg.supabaseUrl}/auth/v1/logout`, { method: 'POST', headers: supabaseHeaders(cfg, s.accessToken) }); } catch { /* offline: the phone still forgets the session */ }
 }

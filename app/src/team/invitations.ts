@@ -1,6 +1,7 @@
 // Change 13: invitation alerts. The app looks for invitations when it opens, when it comes back to the front and now and
 // then while it is open (one small call to the cloud: eab_team_status, already used by the Team Workspace screen). It
-// cannot look while it is fully closed: there is no push service (a possible later change).
+// cannot look while it is fully closed. Change 24 adds a live connection while the app is on screen (live.ts) and
+// Change 25 phone notifications by push while it is closed (native/push.ts); these checks stay as the safety net.
 //  - An invitation for me: a pop-up (Accept / Decline / Later), an entry in Notifications, a number on the bell and one
 //    phone notification. "Later" hides the pop-up until the app is opened again; it comes back every time the app is
 //    opened until I answer it, the sender cancels it or it expires (7 days).
@@ -15,6 +16,8 @@ import { personLabel } from './access';
 type FetchFn = typeof fetch;
 /** Looks again after this long while the app stays open. */
 export const CHECK_EVERY_MS = 15 * 60_000;
+/** Change 24: while the live connection is not working, look this often instead. */
+export const LIVE_LOST_CHECK_MS = 60_000;
 /** Coming back to the front looks again only if the last look was at least this long ago. */
 export const RESUME_GAP_MS = 2 * 60_000;
 

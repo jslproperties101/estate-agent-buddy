@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { isNative, plugin, platform } from './native';
 
-export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string; /** Release label (e.g. "2.0.010", the integrated Changes 001–010 milestone). Display only: never compared for updates. */ release?: string; qa?: boolean }
+export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string; /** Release label (e.g. "2.0.010", the integrated Changes 001–010 milestone). Display only: never compared for updates. */ release?: string; qa?: boolean; /** Change 25: built with Firebase settings (push notifications) */ push?: boolean }
 declare const __EAB_BUILD__: BuildInfo | undefined;
 export const BUILD: BuildInfo = (typeof __EAB_BUILD__ !== 'undefined' && __EAB_BUILD__) || { sha: 'dev', version: '0.0.0', nativeVersion: 1, builtAt: '' };
 

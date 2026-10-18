@@ -13,6 +13,8 @@
 #   EAB_EXPERT_API_URL        optional Ask Expert AI function URL
 #   EAB_QA_SUPABASE_URL       the separate TEST Supabase project's URL, for the QA APK only (optional)
 #   EAB_QA_SUPABASE_ANON_KEY  that test project's anon (public) key, for the QA APK only (optional)
+#   EAB_GOOGLE_SERVICES_JSON  Change 25: the Firebase google-services.json (holds both the app and the QA app), for push
+#                             notifications (optional; without it the APK has no push and works as before)
 name: Build
 
 on:
@@ -93,6 +95,9 @@ jobs:
       - name: Changes 19 and 20 - usage log and Developer Dashboard, developer-only access (local PostgreSQL)
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
         run: bash supabase/tests/change019-test.sh
+      - name: Changes 24 and 25 - live invitation changes and phone notifications, who may be told (local PostgreSQL)
+        env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres }
+        run: bash supabase/tests/change025-test.sh
       - name: Existing roles and row-level security again, with the Change 010 proposal on top
         env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: postgres, EAB_WITH_CHANGE010: '1' }
         run: bash supabase/tests/rls-test.sh
@@ -122,6 +127,9 @@ jobs:
       EAB_SUPABASE_URL: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_URL || matrix.variant != 'qa' && secrets.EAB_SUPABASE_URL || '' }}
       EAB_SUPABASE_ANON_KEY: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_ANON_KEY || matrix.variant != 'qa' && secrets.EAB_SUPABASE_ANON_KEY || '' }}
       EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
+      # Change 25: push only when the Firebase settings exist (the web build is told, so it never starts push without them)
+      EAB_GOOGLE_SERVICES_JSON: ${{ secrets.EAB_GOOGLE_SERVICES_JSON }}
+      EAB_PUSH: ${{ secrets.EAB_GOOGLE_SERVICES_JSON != '' && '1' || '' }}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
       - uses: actions/checkout@v4
@@ -131,7 +139,8 @@ jobs:
         with: { distribution: temurin, java-version: '21' }
       - name: Install (Android packages as regular dependencies, so Capacitor bundles their native parts)
         run: |
-          node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
+          # Change 25: the push plugin goes into the APK only when the Firebase settings exist (otherwise the APK is as before)
+          node -e "const f='package.json',p=require('./'+f);p.dependencies={...p.dependencies,...p.optionalDependencies};delete p.optionalDependencies;if(process.env.EAB_PUSH!=='1')delete p.dependencies['@capacitor/push-notifications'];require('fs').writeFileSync(f,JSON.stringify(p,null,2))"
           npm install --no-audit --no-fund
       - name: Build for the Google Maps check (without sign-in, so the check reaches Settings)
         if: env.EAB_GOOGLE_MAPS_API_KEY != '' && matrix.variant == 'prod'
@@ -162,12 +171,19 @@ jobs:
           npx @capacitor/assets generate --android --iconBackgroundColor '#08080A' --iconBackgroundColorDark '#08080A' --splashBackgroundColor '#08080A' --splashBackgroundColorDark '#08080A'
           npx cap sync android
           node scripts/android-setup.mjs
+      - name: Firebase settings for push notifications (Change 25, only with the secret)
+        if: env.EAB_PUSH == '1'
+        run: |
+          printf '%s' "$EAB_GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          APPID=$([ "$EAB_QA" = "1" ] && echo com.jslproperties.estateagentbuddy.qa || echo com.jslproperties.estateagentbuddy)
+          node -e "const j=JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'));const ids=(j.client||[]).map(c=>c.client_info.android_client_info.package_name);console.log('Firebase apps:',ids.join(', '));if(!ids.includes(process.argv[1])){console.error('google-services.json has no Android app for '+process.argv[1]+': add it in the Firebase console and update the secret');process.exit(1)}" "$APPID"
       - name: Build the APK
         run: |
           # Every phone feature must have its native part in the APK, or its button cannot work on the phone.
           for P in '"@capacitor/app"' '"@capacitor-community/speech-recognition"' '"@capacitor-community/contacts"' '"@capacitor/local-notifications"' '"@capacitor/filesystem"' '"@capacitor/share"' '"@capacitor-community/admob"'; do
             grep -q "$P" android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: $P"; cat android/app/src/main/assets/capacitor.plugins.json; exit 1; }
           done
+          if [ "$EAB_PUSH" = "1" ]; then grep -q '"@capacitor/push-notifications"' android/app/src/main/assets/capacitor.plugins.json || { echo "Native plugin missing: push-notifications"; exit 1; }; fi
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
       - name: Check the APK (package name, app name, launcher icons, splash, QA flag)
         run: |

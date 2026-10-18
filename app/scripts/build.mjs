@@ -35,9 +35,11 @@ if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-p
 // (so it can never download the production bundle). See docs/QA.md. Normal builds do not set it.
 // Not a secret, so it is read even with --no-env (the screen tests build a QA copy).
 const qa = process.env.EAB_QA === '1';
+// Change 25: EAB_PUSH=1 only when the Android build has Firebase settings (google-services.json from a GitHub secret).
+// Without them the app never touches the push plugin, because Google's library would stop the app at start.
 // releaseLabel (package.json) is a display-only milestone name ("2.0.010" = the integrated Changes 001-010). It is never
 // compared: installs and updates use the commit (sha), the semantic version and nativeVersion only.
-const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}) };
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}), ...(process.env.EAB_PUSH === '1' ? { push: true } : {}) };
 
 // EAB_OUTDIR: another output folder (the screen tests build a QA copy beside dist/). Default dist/.
 const OUT = process.env.EAB_OUTDIR || 'dist';

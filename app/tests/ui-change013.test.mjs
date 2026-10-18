@@ -43,6 +43,7 @@ async function agent(cloud, email, name, records = {}, opts = {}) {
     const res = await cloud.fetch(req.url(), { method: req.method(), headers: req.headers(), body: req.postData() ?? undefined });
     return route.fulfill({ status: res.status, headers: { ...cors, 'content-type': 'application/json' }, body: await res.text() });
   });
+  if (opts.ws) await ctx.routeWebSocket(/\/realtime\/v1\/websocket/, opts.ws);   // Change 24: a stand-in for Supabase Realtime
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -163,6 +164,43 @@ test('P4 on the Team Workspace screen itself the pop-up stays away (the invitati
   assert.equal(await b.page.getByTestId('invite-popup').count(), 0, 'no pop-up on top of the Team Workspace screen');
   await b.page.getByTestId('accept-invite').click();
   await waitFor(() => cloud.invites[0].status === 'accepted');
+  assert.deepEqual([...a.errors, ...b.errors], []);
+  await a.ctx.close(); await b.ctx.close();
+});
+
+test('P5 Change 24: with the live connection, a new invitation pops up within seconds, without reopening anything; the connection closes in the background', async () => {
+  const cloud = new FakeTeamCloud();
+  const a = await agent(cloud, 'aina@x.com', 'Aina');
+  const live = { sockets: [], joins: [], closed: 0 };
+  const b = await agent(cloud, 'badrul@x.com', 'Badrul', {}, { ws: ws => {
+    live.sockets.push(ws);
+    ws.onMessage(raw => {
+      const m = JSON.parse(String(raw));
+      if (m.event === 'phx_join') { live.joins.push(m); ws.send(JSON.stringify({ topic: m.topic, event: 'phx_reply', ref: m.ref, join_ref: m.join_ref, payload: { status: 'ok', response: { postgres_changes: [{ id: 7, event: '*', schema: 'public', table: 'eab_team_invites' }] } } })); }
+    });
+    ws.onClose(() => { live.closed++; });
+  } });
+  await waitFor(() => live.joins.length > 0);
+  const j = live.joins[live.joins.length - 1];
+  assert.equal(j.topic, 'realtime:eab-team-invites');
+  assert.equal(j.payload.access_token, `tok-${b.user.id}`, 'joined as the signed-in person (the database decides what they hear)');
+  assert.deepEqual(j.payload.config.postgres_changes, [{ event: '*', schema: 'public', table: 'eab_team_invites' }]);
+  await b.page.waitForTimeout(700);
+  assert.equal(await b.page.getByTestId('invite-popup').count(), 0, 'nothing yet');
+  // Aina sends the invitation; Supabase tells Badrul's open app that something changed
+  await inviteVia(cloud, a.user, 'badrul@x.com');
+  const t0 = Date.now();
+  live.sockets[live.sockets.length - 1].send(JSON.stringify({ topic: 'realtime:eab-team-invites', event: 'postgres_changes', ref: null, payload: { ids: [7], data: { type: 'INSERT', table: 'eab_team_invites', schema: 'public' } } }));
+  await b.page.getByTestId('invite-popup').waitFor({ timeout: 5000 });
+  assert.ok(Date.now() - t0 < 5000, 'within seconds (before, up to 15 minutes)');
+  assert.match(await b.page.getByTestId('invite-popup').innerText(), /Aina/);
+  await shot(b.page, 'c024-01-live-popup');
+  // the app goes to the background: the live connection is closed (battery); back on screen: it connects again
+  const before = live.sockets.length;
+  await b.page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await waitFor(() => live.closed >= 1);
+  await b.page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); });
+  await waitFor(() => live.sockets.length > before);
   assert.deepEqual([...a.errors, ...b.errors], []);
   await a.ctx.close(); await b.ctx.close();
 });

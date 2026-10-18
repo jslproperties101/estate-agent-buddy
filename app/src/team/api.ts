@@ -6,6 +6,7 @@ import type { Store } from '../data/store';
 import { fresh, supabaseCall, supabaseHeaders, SyncConfig, SyncError, configured } from '../data/sync';
 import type { CollectionName, DeleteRequest, ShareLevel, ShareScope, TeamAnswer, TeamInvite, TeamMember, TeamState } from '../data/types';
 import { usage } from '../usage/logger';
+import { announce } from '../native/push';
 
 type FetchFn = typeof fetch;
 
@@ -112,6 +113,7 @@ export function tokenFrom(text: string): string | undefined {
 
 export async function sendInvite(store: Store, cfg: SyncConfig, email: string | null, fetchFn: FetchFn = fetch): Promise<InviteAnswer> {
   const r = await rpc<InviteAnswer>(store, cfg, 'eab_team_invite', { p_email: email ? email.trim().toLowerCase() : null }, fetchFn);
+  if (email && r?.invite_id) void announce(store, cfg, r.invite_id, 'invite', fetchFn);   // Change 25: tell the other agent's phone
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
   return r;
 }
@@ -121,10 +123,12 @@ export async function cancelInvite(store: Store, cfg: SyncConfig, inviteId: stri
 }
 export async function acceptInvite(store: Store, cfg: SyncConfig, by: { token?: string; inviteId?: string }, fetchFn: FetchFn = fetch) {
   await rpc(store, cfg, 'eab_team_accept', { p_token: by.token ?? null, p_invite: by.inviteId ?? null }, fetchFn);
+  if (by.inviteId) void announce(store, cfg, by.inviteId, 'answer', fetchFn);              // Change 25: tell the sender's phone
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
 }
 export async function declineInvite(store: Store, cfg: SyncConfig, by: { token?: string; inviteId?: string }, fetchFn: FetchFn = fetch) {
   await rpc(store, cfg, 'eab_team_decline', { p_token: by.token ?? null, p_invite: by.inviteId ?? null }, fetchFn);
+  if (by.inviteId) void announce(store, cfg, by.inviteId, 'answer', fetchFn);              // Change 25: tell the sender's phone
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
 }
 /** Ends the Team Workspace (leave). Shared access is revoked immediately in the cloud; the phone drops every shared-in
