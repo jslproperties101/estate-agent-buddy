@@ -119,7 +119,7 @@ Deno.serve(async req => {
     if (r.ok) { sent++; continue; }
     // A phone that uninstalled the app or turned notifications off for good: forget its address.
     const err = await r.text();
-    if (r.status === 404 || /UNREGISTERED|INVALID_ARGUMENT/.test(err)) await admin(`eab_push_tokens?token=eq.${q(t.token)}`, { method: 'DELETE' });
+    if (r.status === 404 || /UNREGISTERED/.test(err)) await admin(`eab_push_tokens?token=eq.${q(t.token)}`, { method: 'DELETE' });
   }
   return json({ sent });
 });
