@@ -1,5 +1,5 @@
 // Change 25: the part of the notify-invite function that does the work, kept free of Deno so the app's Node tests can
-// check it with a fake Google and a fake database (app/tests/change025-push.test.ts). index.ts only wires it to Deno.
+// check it with a fake Google and a fake database (app/tests/change024-025.test.ts). index.ts only wires it to Deno.
 //
 // Flow: the caller is the signed-in agent whose phone has just sent an invitation ('invite') or answered one ('answer').
 //  1. Supabase checked the caller's sign-in token before this code runs; we ask Supabase Auth who it is.
