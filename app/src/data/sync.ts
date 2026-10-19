@@ -30,6 +30,7 @@ import { syncFiles, FileSyncOptions } from './filesync';
 import { syncShared, sharedWorkspaces } from '../team/sharedSync';
 import { TeamError, dropAllShared } from '../team/api';
 import { syncAudit } from '../audit/auditSync';
+import { allAsChanges, applyRows, queue, settle, type OptRow } from './optionSync';
 
 export interface SyncConfig { supabaseUrl: string; supabaseAnonKey: string }
 export type Session = NonNullable<Meta['syncSession']>;
@@ -137,7 +138,9 @@ export interface CloudRow { collection: string; id: string; data: Rec | null; de
 
 export interface SyncResult { pushed: number; pulled: number; removed: number; conflicts: number; filesUp?: number; filesDown?: number; filesFailed?: number;
   /** Change 010: shared records taken in / dropped because access ended; the Team Workspace part failed (network). */
-  sharedIn?: number; sharedGone?: number; teamFailed?: boolean; auditSent?: number; auditReceived?: number; auditFailed?: boolean }
+  sharedIn?: number; sharedGone?: number; teamFailed?: boolean; auditSent?: number; auditReceived?: number; auditFailed?: boolean;
+  /** JoyChange003 Change 51: remembered dropdown values sent to / taken from the account; the account part failed. */
+  optionsSent?: number; optionsReceived?: number; optionsFailed?: boolean }
 
 /** Runs one sync. While it runs the store reports `syncing`, so the status line can say "Syncing…" and only say
  *  "Synced" after the cloud really answered. */
@@ -348,6 +351,9 @@ async function syncOnce(store: Store, cfg: SyncConfig, fetchFn: FetchFn, opts: S
     again = await pullAll(store, cfg, session, ws, fetchFn, tally);
     again = (await pushAll(store, cfg, session, ws, fetchFn, tally, mine)) || again;
   }
+  // JoyChange003 Change 51: the person's remembered dropdown values (never fails the sync of the records).
+  try { const o = await syncOptions(store, cfg, session, fetchFn); if (o) { tally.optionsSent = o.sent; tally.optionsReceived = o.received; } }
+  catch { tally.optionsFailed = true; }
   // Change 010: Team Workspace, records shared with me (fetch new, drop revoked, send my edits). A cloud without the
   // Change 010 functions simply has no Team Workspace; that never fails the sync of my own records.
   if (opts.team !== false) {
@@ -416,4 +422,51 @@ export function resolveConflict(store: Store, key: string, choice: { fields?: Re
   }
   if (cf.kind === 'reference') { dropConflict(store, key); return true; }   // check again on the next sync
   return false;
+}
+
+// ---------- JoyChange003 Change 51 (Batch B2): remembered dropdown values on the account ----------
+const OPT_PAGE = 1000;
+/** Sends this phone's waiting changes to the person's own values and takes in the ones changed elsewhere. Undefined when
+ *  the cloud has no account values yet (an older database): nothing is changed then. */
+export async function syncOptions(store: Store, cfg: SyncConfig, session: Session, fetchFn: FetchFn = fetch): Promise<{ sent: number; received: number } | undefined> {
+  if (!session.userId) return undefined;
+  let os = metaNow(store).optSync;
+  if (!os || os.userId !== session.userId) {
+    if (os?.userId) {
+      // Another account signs in on this phone: its values replace the previous person's (theirs stay on their account).
+      store.applyCloudOptions({});
+      os = { userId: session.userId, since: 0, pending: {} };
+    } else {
+      // The first sync of this phone: everything already remembered here is offered to the account.
+      os = { userId: session.userId, since: 0, pending: queue({}, allAsChanges(store.getState().options, Date.now())) };
+    }
+    store.setSingleton('meta', { optSync: os });
+  }
+  const rpc = async (fn: string, body: unknown) => {
+    try { return await call(fetchFn, `${cfg.supabaseUrl}/rest/v1/rpc/${fn}`, { method: 'POST', headers: headers(cfg, session.accessToken), body: JSON.stringify(body) }); }
+    catch (e) { if (e instanceof SyncError && e.code === 'server' && /^404\b/.test(e.message)) return null; throw e; }
+  };
+  let sent = 0, received = 0;
+  const waiting = Object.values(metaNow(store).optSync?.pending ?? {});
+  for (let i = 0; i < waiting.length; i += 500) {
+    const chunk = waiting.slice(i, i + 500);
+    const r = await rpc('eab_options_push', { p_rows: chunk });
+    if (!r) return undefined;
+    const cur = metaNow(store).optSync!;
+    store.setSingleton('meta', { optSync: { ...cur, pending: settle(cur.pending, chunk) } });
+    sent += chunk.length;
+  }
+  for (let page = 0; page < 50; page++) {
+    const since = metaNow(store).optSync?.since ?? 0;
+    const r = await rpc('eab_options_pull', { p_since: since, p_limit: OPT_PAGE });
+    if (!r) return undefined;
+    const rows = ((await r.json()) as OptRow[]).map(x => ({ ...x, added: Number(x.added), used: Number(x.used), updated: Number(x.updated), seq: Number(x.seq) }));
+    const cur = metaNow(store).optSync!;
+    const next = applyRows(store.getState().options, rows, cur.pending);
+    if (next) store.applyCloudOptions(next);
+    received += rows.length;
+    if (rows.length) store.setSingleton('meta', { optSync: { ...metaNow(store).optSync!, since: Math.max(since, ...rows.map(x => x.seq)) } });
+    if (rows.length < OPT_PAGE) break;
+  }
+  return { sent, received };
 }

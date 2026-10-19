@@ -49,7 +49,7 @@ Before building, the handover was checked against the original discussion (chat 
 - "WhatsApp this buyer and remind our appointment" (or "WhatsApp this owner about the price", "WhatsApp Lim about the property") opens the suggested messages, filled in from the saved records (name, property, appointment date and time, price); a detail that is not saved is left out, never made up. The one that fits what was said is first.
 - Own texts: **+ Add New**, and the pencil and X inside the list (as in Change 51). They may use {name}, {property}, {date}, {time}, {price}.
 - Picking a text shows it to change, then **Open WhatsApp** opens WhatsApp to that person with the text typed in. The app never sends it.
-- NOT done: own texts are saved on this phone only (like the remembered dropdown values); following the account across devices is part of Batch B2.
+- Own texts follow the account to the other phones and the website since Batch B2 (`JOYCHANGE003_BATCH_B2.md`).
 
 ## Change 65 - logo on the AI Assisted Command page
 - The logo and app name (as on the main screen) sit under the title bar and its gold line, centred, about 10% of the screen, with the text box right under; they scroll away with the page.

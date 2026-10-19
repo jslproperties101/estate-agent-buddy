@@ -19,6 +19,7 @@ Model chosen by Joe: Sonnet 5.5 + High.
 
 ### NOT done (needs a decision)
 - **51: "new items remembered on the account across devices".** Remembered dropdown values are saved on the phone only (the `options` singleton in `src/data/store.ts`; the sync engine in `src/data/sync.ts` only carries the record collections). Making them follow the account needs either a new synced collection (touches types, sync merge, team access, backup, tests, and cannot be tested end to end here) or the account metadata used for the country (Change 46; the metadata travels inside the sign-in token, so a long list is risky). Recommendation: do it as its own step (call it Batch B2) with a collection-based design, after Batch B is tested on the phone.
+  **Done in Batch B2** (`JOYCHANGE003_BATCH_B2.md`), with a per-account table instead of a record collection.
 
 ## New changes from Joe, added during Batch B
 - **88 - Country picker: shorter list, Continue visible.** On the first-login "Where do you work?" screen the Continue button was hidden under the ad. Fixed in `src/styles.css` (`.start-scrim .sheet` height now leaves room for the ad, `.country-list` about 26% of the screen height, Continue stays at the bottom of the card) and a smaller logo in `src/ui/CountryChoice.tsx`. Test: K1 in `tests/ui-change046.test.mjs` checks the button is on the screen above the ad and the list is short.

@@ -34,6 +34,10 @@ export class FakeCloud {
   /** Runs after the cloud has accepted a push but before the phone hears about it (to edit "during the upload"). */
   duringPush?: () => void;
   uploads = 0;
+  /** JoyChange003 Change 51: eab_user_options, as in 20261019120000_joychange003_user_options.sql. false = an older cloud without it. */
+  options = new Map<string, { user: string; list: string; value: string; deleted: boolean; added: number; used: number; updated: number; seq: number }>();
+  optionsTable = true;
+  optSeq = 0;
 
   addUser(email: string, role: RoleName | null = 'owner') { this.users.set(email, { id: `u-${email}`, role }); return this.users.get(email)!; }
   setRole(email: string, role: RoleName | null) { this.users.get(email)!.role = role; }
@@ -95,9 +99,34 @@ export class FakeCloud {
       return this.json(out);
     }
     if (path === '/rest/v1/rpc/eab_push_records') return this.push(me, JSON.parse(String(init.body)));
+    if (path === '/rest/v1/rpc/eab_options_push' && this.optionsTable) return this.optionsPush(me.id, JSON.parse(String(init.body)).p_rows);
+    if (path === '/rest/v1/rpc/eab_options_pull' && this.optionsTable) {
+      const b = JSON.parse(String(init.body));
+      return this.json([...this.options.values()].filter(o => o.user === me.id && o.seq > (b.p_since ?? 0)).sort((x, y) => x.seq - y.seq).slice(0, b.p_limit ?? 1000)
+        .map(o => ({ list: o.list, value: o.value, deleted: o.deleted, added: o.added, used: o.used, updated: o.updated, seq: o.seq })));
+    }
     if (path === '/rest/v1/eab_files') return this.filesTable(me, method, u, init);
     if (path.startsWith('/storage/v1/object/')) return this.storage(me, method, path, init);
     return new Response('not found', { status: 404 });
+  }
+
+  /** The change made last wins, per person, list and value (any letter case); a deletion is kept as a deleted row. */
+  private optionsPush(user: string, rows: Rec[]): Response {
+    if (!Array.isArray(rows) || rows.length > 500) return new Response('bad', { status: 400 });
+    let n = 0;
+    for (const r of rows) {
+      const list = String(r.list ?? ''), value = String(r.value ?? '').trim();
+      if (!list || !value) continue;
+      const key = `${user}|${list}|${value.toLowerCase()}`;
+      const cur = this.options.get(key);
+      const updated = Number(r.updated ?? 0);
+      n++;
+      if (cur && updated < cur.updated) continue;
+      const added = Number(r.added ?? 0);
+      this.options.set(key, { user, list, value, deleted: !!r.deleted, added: cur ? (cur.added && added ? Math.min(cur.added, added) : cur.added || added) : added,
+        used: Math.max(cur?.used ?? 0, Number(r.used ?? 0)), updated, seq: ++this.optSeq });
+    }
+    return this.json(n);
   }
 
   private ownerOfRef(no: number) { return this.refs.get(no); }

@@ -362,6 +362,9 @@ export interface Meta {
   lastAuditSeq?: number;
   /** JoyChange003 Change 72: notifications the person dismissed (kept as History) or snoozed with "Remind me later". This phone only. */
   notifs?: { dismissed: Record<string, { at: number; title: string }>; snoozed: Record<string, number> };
+  /** JoyChange003 Change 51 (Batch B2): the account whose remembered values this phone holds, the position in the cloud's
+   *  change order up to which they were taken, and the changes made here that wait to be sent (data/optionSync.ts). */
+  optSync?: { userId?: string; since: number; pending: Record<string, { list: string; value: string; deleted: boolean; added: number; used: number; updated: number }> };
   /** JoyChange003 Change 62: the last 10 commands on the AI Assisted Command screen (this phone only). */
   recentCmds?: string[];
 }

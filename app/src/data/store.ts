@@ -2,9 +2,10 @@
 // and tells the screens to redraw. Screens never write to storage directly (see useStore.ts).
 import { Backend } from './backend';
 import {
-  AppState, CollectionName, Collections, COLLECTIONS, SingletonName, Singletons, CustomOption,
+  AppState, CollectionName, Collections, COLLECTIONS, SingletonName, Singletons, CustomOption, OptionLists,
 } from './types';
 import { recordHash } from './hash';
+import { diffOptions, queue } from './optionSync';
 import { fileRefs } from './fileRefs';
 import { AuditEntry, actionFor, diffFields, newestFirst } from '../audit/model';
 
@@ -428,9 +429,24 @@ export class Store {
 
   setSingleton<S extends SingletonName>(s: S, patch: Partial<Singletons[S]>) {
     const value = { ...this.state[s], ...patch } as Singletons[S];
+    // JoyChange003 Change 51 (Batch B2): every change to the remembered values waits to be sent to the account. Before the
+    // first sync of this phone nothing is queued: that sync offers everything on the phone (data/optionSync.ts).
+    const os = s === 'options' && !this.optionsFromCloud ? this.state.meta.optSync : undefined;
+    const changes = os ? diffOptions(this.state.options, value as OptionLists, Date.now()) : [];
     this.state = { ...this.state, [s]: value };
     this.write(() => this.backend.put(singleKey(s), value));
+    if (os && changes.length) {
+      const meta = { ...this.state.meta, optSync: { ...os, pending: queue(os.pending, changes) } };
+      this.state = { ...this.state, meta };
+      this.write(() => this.backend.put(singleKey('meta'), meta));
+    }
     this.emit();
+  }
+  private optionsFromCloud = false;
+  /** Change 51: remembered values that came from the account (not queued to be sent back). */
+  applyCloudOptions(next: OptionLists) {
+    this.optionsFromCloud = true;
+    try { this.state = { ...this.state, options: {} }; this.setSingleton('options', next); } finally { this.optionsFromCloud = false; }
   }
 
   // ---------- remembered custom dropdown values ----------
