@@ -510,7 +510,7 @@ test('C14 Changes 14-16: Buyer List, To-Do and Calendar show own and shared toge
   });
   const b = await agent(cloud, 'badrul@x.com', 'Badrul', {
     'c:contacts:cb': { id: 'cb', created: 1, updated: 1, name: 'Buyer Of Badrul', roles: ['buyer'], leadStatus: 'warm' },
-    'c:tasks:tb': { id: 'tb', created: 1, updated: 1, title: 'Badrul task', priority: 'low', done: false, kind: 'task', reminders: [], due: `${ymd}T08:00` },
+    'c:tasks:tb': { id: 'tb', created: 1, updated: 1, title: 'Badrul task', priority: 'low', done: false, kind: 'task', reminders: [], due: `${ymd}T09:00` },   // same time as Aina's, so both are always in the same To-Do tab (between 8 and 9 they were not)
   });
   await waitFor(() => cloud.rows.has('ws-aina@x.com|tasks|ta') && cloud.rows.has('ws-badrul@x.com|tasks|tb'));
   const inv = await (await cloud.fetch(`${SB}/rest/v1/rpc/eab_team_invite`, { method: 'POST', headers: { authorization: `Bearer tok-${a.user.id}` }, body: JSON.stringify({ p_email: 'badrul@x.com' }) })).json();
