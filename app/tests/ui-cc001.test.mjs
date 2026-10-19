@@ -180,12 +180,10 @@ test('X7 photos: one per row, small handle and menu, Set as Main Photo and red D
   await page.locator('[data-testid="form-photo"]').nth(2).waitFor();
   const boxes = await page.locator('[data-testid="form-photo"]').evaluateAll(xs => xs.map(x => { const r = x.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; }));
   assert.ok(boxes.every(b => b[0] === boxes[0][0]) && boxes[0][1] > 300, `one photo per row, full width ${JSON.stringify(boxes)}`);
-  const handle = await page.locator('[data-testid="photo-drag"]').first().evaluate(el => { const r = el.getBoundingClientRect(); const b = getComputedStyle(el, '::before'); return { w: r.width, h: r.height, vis: parseFloat(b.width) }; });
-  assert.ok(handle.w >= 44 && handle.h >= 44, 'the touch area stays 44 px');
-  assert.ok(handle.vis <= 26, `the visible handle is smaller (${handle.vis}px)`);
+  assert.equal(await page.getByTestId('photo-drag').count(), 0, 'Change 67: no drag handle on the list, reordering has its own screen');
   await page.getByTestId('photo-menu').nth(1).click();
   const items = await page.getByTestId('photo-menu-list').getByRole('menuitem').allInnerTexts();
-  assert.deepEqual(items.map(x => x.trim()), ['Set as Main Photo', 'Delete']);
+  assert.deepEqual(items.map(x => x.trim()), ['Set as Main Photo', 'Reorder Photos', 'Delete']);
   const red = await page.getByTestId('photo-remove').evaluate(el => getComputedStyle(el).color);
   const [r, g, b] = red.match(/\d+/g).map(Number);
   assert.ok(r > 200 && g < 140 && b < 140, `Delete is red (${red})`);

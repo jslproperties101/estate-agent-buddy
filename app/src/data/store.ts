@@ -469,7 +469,15 @@ export class Store {
     this.setFileEntry({ id, status, bytes: blob.size, mime: blob.type || undefined, addedAt: old?.addedAt ?? Date.now(), ...extra });
     this.old_url(id);
   }
-  private old_url(id: string) { const u = this.fileUrls.get(id); if (u) { URL.revokeObjectURL(u); this.fileUrls.delete(id); } }
+  /** Change 54 (JoyChange003): a picture's web address is dropped from the list at once (the next screen gets a fresh one), but
+   *  the old one is only cancelled 30 seconds later, so a picture still on screen never goes blank when its file is written again. */
+  private old_url(id: string) {
+    const u = this.fileUrls.get(id);
+    if (!u) return;
+    this.fileUrls.delete(id);
+    const t = setTimeout(() => URL.revokeObjectURL(u), 30000);
+    (t as unknown as { unref?: () => void }).unref?.();
+  }
   fileEntry(id: string): FileEntry | undefined { return this.fileEntries.get(id); }
   allFileEntries(): FileEntry[] { return [...this.fileEntries.values()]; }
   setFileEntry(e: FileEntry) {
@@ -483,15 +491,26 @@ export class Store {
     if (cur) this.setFileEntry({ ...cur, ...patch });
   }
   hasFile(id: string) { return this.backend.getFile(id).then(b => !!b); }
+  /** One web address per stored file: screens asking for the same picture at the same moment share one lookup, so two
+   *  boxes can never end up holding different addresses of which one is later cancelled (the empty photo box of Change 54). */
+  private urlPending = new Map<string, Promise<string | undefined>>();
   async fileUrl(id: string): Promise<string | undefined> {
     const known = this.fileUrls.get(id);
     if (known) return known;
-    const blob = await this.backend.getFile(id);
-    if (!blob) return undefined;
-    const url = URL.createObjectURL(blob);
-    this.fileUrls.set(id, url);
-    return url;
+    const pending = this.urlPending.get(id);
+    if (pending) return pending;
+    const p = (async () => {
+      const blob = await this.backend.getFile(id);
+      if (!blob) return undefined;
+      const url = URL.createObjectURL(blob);
+      this.fileUrls.set(id, url);
+      return url;
+    })().finally(() => { this.urlPending.delete(id); });
+    this.urlPending.set(id, p);
+    return p;
   }
+  /** A picture that would not show: make a fresh web address for it (the old one is cancelled later). */
+  async refreshFileUrl(id: string): Promise<string | undefined> { this.old_url(id); return this.fileUrl(id); }
   getFile(id: string) { return this.backend.getFile(id); }
   /** A record no longer lists this file. The file itself stays on the phone for 30 days (so a deleted record can be
    *  brought back, and a failed upload never loses the only copy); purgeOld() deletes it after that. */

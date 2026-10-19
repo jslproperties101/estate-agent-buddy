@@ -1,6 +1,6 @@
 // Small shared screen pieces.
-import { ReactNode, useState } from 'react';
-import { useApp, useFileStatus, useFileUrl } from '../data/useStore';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { useApp, useFileStatus, useFileUrl, useStore } from '../data/useStore';
 import { strings, Lang } from '../i18n';
 import { leadReviewStrings } from '../data/leadReviewStrings';
 import { LEAD_COLOURS, LEAD_STATUSES, LeadStatus, Contact, ContactRole, VENDOR_COLOURS, VENDOR_STATUSES, VendorStatus } from '../data/types';
@@ -85,10 +85,21 @@ export function LeadPicker({ lang, value, onChange }: { lang: Lang; value?: Lead
 }
 
 export function StoredImage({ fileId, url, alt = '', className }: { fileId?: string; url?: string; alt?: string; className?: string }) {
+  const store = useStore();
   const stored = useFileUrl(fileId);
   const status = useFileStatus(fileId);
-  const src = url ?? stored;
-  if (src) return <img src={src} alt={alt} className={className} />;
+  // Change 54: a picture that fails to draw (its address was cancelled, or the phone dropped the decoded image) is asked for
+  // once more with a fresh address, instead of staying an empty box.
+  const [fresh, setFresh] = useState<string | undefined>(undefined);
+  const tried = useRef(false);
+  useEffect(() => { tried.current = false; setFresh(undefined); }, [fileId, stored]);
+  const src = url ?? fresh ?? stored;
+  const onError = () => {
+    if (!fileId || url || tried.current) return;
+    tried.current = true;
+    void store.refreshFileUrl(fileId).then(u => setFresh(u));
+  };
+  if (src) return <img src={src} alt={alt} className={className} onError={onError} />;
   // Not on this phone: still loading, or waiting for the cloud copy, or it is gone / not allowed. The record stays usable.
   const gone = status === 'missing' || status === 'denied';
   return <span className={`img-wait ${gone ? 'img-missing' : ''} ${className ?? ''}`} data-testid={gone ? 'img-missing' : undefined} data-state={status} aria-hidden={gone ? undefined : 'true'} role={gone ? 'img' : undefined} aria-label={gone ? alt || 'Picture not available' : undefined} />;

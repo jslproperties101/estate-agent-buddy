@@ -1177,6 +1177,10 @@ button.sync-banner { cursor: pointer; }
 /* Change 32: Large Cards swipe through the property's photos; small arrows (44 px touch area) and dots on the picture. */
 .sc-photo.wide.swipe { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .sc-photo.wide.swipe img { pointer-events: none; -webkit-user-drag: none; }
+/* Change 53 (JoyChange003): the next picture glides in from the side the finger (or arrow) came from. */
+.sc-photo[data-slide] > img, .sc-photo[data-slide] > .img-wait { animation: sc-glide .3s cubic-bezier(.16, .84, .3, 1) both; }
+@keyframes sc-glide { from { transform: translateX(var(--slide-from, 30%)); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sc-photo[data-slide] > img, .sc-photo[data-slide] > .img-wait { animation-duration: .01s; } }
 .sc-arrow { position: absolute; top: 50%; z-index: 2; width: 30px; height: 30px; margin: -15px 0 0; padding: 0; border-radius: 50%; display: inline-flex; align-items: center;
   justify-content: center; border: 1px solid rgba(246,227,161,.45); background: rgba(8,8,10,.62); color: var(--gold-hi); font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; }
 .sc-arrow::before { content: ''; position: absolute; inset: -7px; } /* a 44 × 44 touch area around the small circle */
@@ -1201,6 +1205,13 @@ button.sync-banner { cursor: pointer; }
 .pv-stage { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: stretch; justify-content: center; touch-action: none;
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 .pv-img { flex: 0 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; transform-origin: center center; will-change: transform; }
+/* Change 53 (JoyChange003): smooth, flowy photo swipes. The photo springs back after a short drag; the next photo glides in. */
+.pv-img.settle { transition: transform .26s cubic-bezier(.2, .8, .2, 1); }
+.pv-img.sliding-a { animation: pv-glide-a .3s cubic-bezier(.16, .84, .3, 1) both; }
+.pv-img.sliding-b { animation: pv-glide-b .3s cubic-bezier(.16, .84, .3, 1) both; }
+@keyframes pv-glide-a { from { transform: translateX(var(--slide-from, 40%)); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@keyframes pv-glide-b { from { transform: translateX(var(--slide-from, 40%)); opacity: .35; } to { transform: translateX(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pv-img.sliding-a, .pv-img.sliding-b { animation-duration: .01s; } .pv-img.settle { transition-duration: .01s; } }
 .pv-img img { display: block; width: 100%; height: auto; max-height: max(120px, var(--pv-room)); object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
 .pv-img .img-wait { display: block; width: 100%; aspect-ratio: 4 / 3; max-height: max(120px, var(--pv-room)); }
 .pv-nav { position: relative; z-index: 1; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 16px 0; }
@@ -1319,3 +1330,19 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 .country-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 96px; max-height: min(26dvh, 220px); flex: 0 1 auto; border: 1px solid var(--box-line); border-radius: 12px; padding: 4px; }
 .country-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--ink); font-weight: 600; }
 .country-row.on { border-color: var(--gold-lo); background: #2A2312; color: var(--gold-hi); }
+
+/* Change 67 (JoyChange003): the Reorder Photos screen. Four small pictures per row, nothing drawn on them; drag to move, tap to enlarge. */
+.pr { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding: 12px 12px calc(12px + var(--ad-h, 0px)); }
+.pr-top { display: flex; align-items: center; gap: 8px; }
+.pr-top strong { flex: 1; font-size: 18px; color: var(--gold-hi); }
+.pr-x { position: static; }
+.pr-hint { margin: 0; text-align: center; }
+.pr-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 2px; }
+.pr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.pr-tile { position: relative; aspect-ratio: 1 / 1; border: 1px solid var(--box-line); border-radius: 8px; overflow: hidden; background: var(--card-2); touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; }
+.pr-tile img, .pr-tile .img-wait { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; -webkit-user-drag: none; }
+.pr-tile.dragging { opacity: .5; outline: 2px dashed var(--gold); }
+.pr-tile.drop-target { outline: 3px solid var(--gold); }
+/* Change 68 (JoyChange003): "Main" along the bottom of the main picture, centred and bigger (the Add Pictures list only). */
+.photo-list .pg-item .pg-main { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; min-height: 0; padding: 18px 8px 8px; justify-content: center; text-align: center; font-size: 22px; letter-spacing: .04em;
+  background: linear-gradient(to top, rgba(0, 0, 0, .82), rgba(0, 0, 0, 0)); pointer-events: none; }

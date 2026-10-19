@@ -4321,12 +4321,22 @@ test('U102 Change 009 photos: a visible loading spinner, errors named, no Make M
   await page.getByTestId('form-photo').nth(2).getByTestId('photo-menu').click();
   await page.getByTestId('photo-make-main').click();
   assert.deepEqual(await names(), [ids0[2], ids0[0], ids0[1]]);
-  // Drag photo 2 onto the first place: it becomes the main photo.
+  // Change 67: Reorder Photos opens its own screen; dragging photo 2 onto the first place makes it the main photo.
   await page.getByTestId('photo-grid').evaluate(el => el.scrollIntoView({ block: 'center' }));   // clear of the top bar
-  const h = await page.getByTestId('photo-drag').nth(1).boundingBox();
-  const t0 = await page.getByTestId('form-photo').nth(0).boundingBox();
+  await page.getByTestId('form-photo').nth(1).getByTestId('photo-menu').click();
+  await page.getByTestId('photo-reorder-open').click();
+  await page.getByTestId('photo-reorder').waitFor();
+  assert.equal(await page.getByTestId('photo-reorder-hint').innerText(), 'Click to enlarge, drag to move order');
+  assert.equal(await page.getByTestId('reorder-tile').count(), 3);
+  const row = await page.getByTestId('reorder-tile').evaluateAll(xs => xs.map(x => Math.round(x.getBoundingClientRect().top)));
+  assert.ok(new Set(row).size <= 1 || row.length <= 4, 'up to four pictures per row');
+  assert.equal(await page.getByTestId('photo-reorder').locator('button[role="menuitem"], .pg-menu-btn, .pg-main').count(), 0, 'no icons, labels or menus on the pictures');
+  const rt = page.getByTestId('reorder-tile');
+  const h = await rt.nth(1).boundingBox(); const t0 = await rt.nth(0).boundingBox();
   await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2); await page.mouse.down();
-  await page.mouse.move(t0.x + t0.width / 2, t0.y + t0.height / 2, { steps: 6 }); await page.mouse.up();
+  await page.mouse.move(t0.x + t0.width / 2, t0.y + t0.height / 2, { steps: 8 }); await page.mouse.up();
+  await page.getByTestId('photo-reorder-done').click();
+  await page.getByTestId('photo-reorder').waitFor({ state: 'detached' });
   assert.deepEqual(await names(), [ids0[0], ids0[2], ids0[1]], 'dragged to the front');
   assert.equal(await page.getByTestId('form-photo').first().getByTestId('photo-main').count(), 1);
   // Deleting the main photo makes the next one main; deleting all leaves a safe empty list.
@@ -5133,7 +5143,7 @@ test('U119 Change 015 photos: no arrows or Remove button; a small menu with exac
   await photos.nth(2).getByTestId('photo-menu').click();
   const items = await page.getByTestId('photo-menu-list').getByRole('menuitem').allInnerTexts();
   // ClaudeChanges001 change 7: the menu says Set as Main Photo and Delete.
-  assert.deepEqual(items, ['Set as Main Photo', 'Delete']);
+  assert.deepEqual(items, ['Set as Main Photo', 'Reorder Photos', 'Delete']);
   await page.getByTestId('photo-make-main').click();
   assert.deepEqual(await photos.evaluateAll(xs => xs.map(x => x.dataset.photoId)), [ids0[2], ids0[0], ids0[1]]);
   assert.equal(await photos.first().getByTestId('photo-main').count(), 1);

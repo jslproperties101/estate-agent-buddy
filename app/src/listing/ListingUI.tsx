@@ -612,7 +612,22 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
   const at = photos.length ? Math.min(pi, photos.length - 1) : 0;
   const p = photos[at] ?? mainPhoto(l)!;
   const many = photos.length > 1;
-  const swipe = useCardSwipe(many, d => setPi(k => (Math.min(k, photos.length - 1) + d + photos.length) % photos.length));
+  // Change 53 (JoyChange003): the picture follows the finger and the next one glides in from that side (arrows glide too).
+  const photoBox = useRef<HTMLSpanElement | null>(null);
+  const slideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(slideTimer.current), []);
+  const stepTo = (d: 1 | -1, dragged = 0) => {
+    const box = photoBox.current;
+    if (box) {
+      const w = box.clientWidth || 300;
+      box.style.setProperty('--slide-from', `${Math.round(dragged + d * w * 0.6)}px`);
+      box.setAttribute('data-slide', d > 0 ? 'next' : 'prev');
+      clearTimeout(slideTimer.current);
+      slideTimer.current = setTimeout(() => box.removeAttribute('data-slide'), 340);
+    }
+    setPi(k => (Math.min(k, photos.length - 1) + d + photos.length) % photos.length);
+  };
+  const swipe = useCardSwipe(many, stepTo);
   const tp = cc001Strings[lang].photo;
   const tx = transactionLabels(l);
   const lines = specLines(l, { ...t, type: typeOnly(l, s) || undefined, lotType: l.lotType ? s.lotType[l.lotType] ?? l.lotType : undefined });
@@ -638,13 +653,13 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
           the same action (its click reaches the card's handler). */}
       <article className="sc-card" onClick={onOpen}>
         <button type="button" className="sc-open" data-testid="card-open-area" aria-label={t.openOf(label)} />
-        <span className={`sc-photo ${large ? 'wide' : ''} ${many ? 'swipe' : ''}`} data-testid="card-photo" data-index={at} {...(many ? swipe : {})}>
+        <span ref={photoBox} className={`sc-photo ${large ? 'wide' : ''} ${many ? 'swipe' : ''}`} data-testid="card-photo" data-index={at} {...(many ? swipe : {})}>
           <StoredImage key={p.id} fileId={p.fileId} url={p.url} />
           {many && <>
             <button type="button" className="sc-arrow prev" data-testid="card-photo-prev" aria-label={tp.prev} title={tp.prev}
-              onClick={e => { e.stopPropagation(); setPi(k => (Math.min(k, photos.length - 1) - 1 + photos.length) % photos.length); }}>‹</button>
+              onClick={e => { e.stopPropagation(); stepTo(-1); }}>‹</button>
             <button type="button" className="sc-arrow next" data-testid="card-photo-next" aria-label={tp.next} title={tp.next}
-              onClick={e => { e.stopPropagation(); setPi(k => (Math.min(k, photos.length - 1) + 1) % photos.length); }}>›</button>
+              onClick={e => { e.stopPropagation(); stepTo(1); }}>›</button>
             <span className="sc-dots" data-testid="card-photo-dots" aria-hidden="true">{photos.map((x, k) => <i key={x.id} className={k === at ? 'on' : ''} />)}</span>
           </>}
           {tx.length > 0 && <span className="sc-txs">{tx.map(x => <span key={x} className={`sc-tx sc-tx-${x}`} data-testid="card-tx" data-tx={x}>{x === 'sale' ? t.forSale : t.forRent}</span>)}</span>}
@@ -702,35 +717,45 @@ function SubsaleCard({ l, lang, large, owner, onOpen, onEdit, go }: { l: Listing
 /** Change 32: sideways swipes on a Large Card's picture. Only a clearly horizontal drag counts (touch-action: pan-y leaves
  *  up and down to the page, so the list still scrolls); a swipe changes the photo and the click that follows it is
  *  swallowed so the card does not open. A plain tap still opens the card. */
-type SwipePtr = { pointerId: number; clientX: number; clientY: number; target: EventTarget | null };
-function useCardSwipe(on: boolean, step: (d: 1 | -1) => void) {
-  const g = useRef<{ id?: number; x: number; y: number; dx: number; side: boolean; eat: boolean }>({ x: 0, y: 0, dx: 0, side: false, eat: false });
+type SwipePtr = { pointerId: number; clientX: number; clientY: number; target: EventTarget | null; currentTarget?: EventTarget | null };
+/** Change 53: the picture inside a Large Card, moved with the finger (set directly on the element, so nothing is redrawn). */
+const cardImg = (e: SwipePtr) => (e.currentTarget as Element | null)?.querySelector?.(':scope > img, :scope > .img-wait') as HTMLElement | null | undefined;
+function useCardSwipe(on: boolean, step: (d: 1 | -1, dragged: number) => void) {
+  const g = useRef<{ id?: number; x: number; y: number; dx: number; side: boolean; eat: boolean; lx: number; lt: number; v: number }>({ x: 0, y: 0, dx: 0, side: false, eat: false, lx: 0, lt: 0, v: 0 });
   const end = () => { g.current.id = undefined; };
   return {
     onPointerDown: (e: SwipePtr) => {
       g.current.eat = false;
       if (!on || (e.target as Element | null)?.closest?.('button')) { end(); return; }   // an arrow: its own click
-      g.current = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, side: false, eat: false };
+      g.current = { id: e.pointerId, x: e.clientX, y: e.clientY, dx: 0, side: false, eat: false, lx: e.clientX, lt: Date.now(), v: 0 };
+      const img = cardImg(e); if (img) img.style.transition = 'none';
     },
     onPointerMove: (e: SwipePtr) => {
       const s0 = g.current;
       if (s0.id !== e.pointerId) return;
       const dx = e.clientX - s0.x; const dy = e.clientY - s0.y;
       s0.dx = dx;
+      const now = Date.now(); const dt = now - s0.lt;
+      if (dt > 0) { s0.v = 0.6 * ((e.clientX - s0.lx) / dt) + 0.4 * s0.v; s0.lx = e.clientX; s0.lt = now; }
       if (!s0.side && Math.abs(dx) > CARD_SWIPE_SLOP && Math.abs(dx) > Math.abs(dy) * 1.2) s0.side = true;
-      if (!s0.side && Math.abs(dy) > CARD_SWIPE_SLOP && Math.abs(dy) >= Math.abs(dx)) end();   // the page is scrolling
+      if (!s0.side && Math.abs(dy) > CARD_SWIPE_SLOP && Math.abs(dy) >= Math.abs(dx)) { end(); return; }   // the page is scrolling
+      if (s0.side) { const img = cardImg(e); if (img) img.style.transform = `translateX(${Math.round(dx * 0.9)}px)`; }
     },
     onPointerUp: (e: SwipePtr) => {
       const s0 = g.current;
       if (s0.id !== e.pointerId) return;
       end();
       const dx = e.clientX - s0.x;
+      const img = cardImg(e);
       if (s0.side || Math.abs(dx) > CARD_SWIPE_SLOP) {
         s0.eat = true;   // a drag, not a tap: the card must not open
-        if (Math.abs(dx) >= CARD_SWIPE) step(dx < 0 ? 1 : -1);
+        // A long enough drag, or a quick flick the same way, moves on; otherwise the picture springs back.
+        const go = Math.abs(dx) >= CARD_SWIPE || (Math.abs(s0.v) > CARD_FLICK && Math.abs(dx) > CARD_SWIPE_SLOP && Math.sign(s0.v) === Math.sign(dx));
+        if (go) { if (img) { img.style.transition = ''; img.style.transform = ''; } step(dx < 0 ? 1 : -1, dx * 0.9); return; }
       }
+      if (img) { img.style.transition = 'transform .26s cubic-bezier(.2, .8, .2, 1)'; img.style.transform = ''; }
     },
-    onPointerCancel: end,
+    onPointerCancel: (e: SwipePtr) => { end(); const img = cardImg(e); if (img) { img.style.transition = 'transform .26s cubic-bezier(.2, .8, .2, 1)'; img.style.transform = ''; } },
     onClickCapture: (e: { target: EventTarget | null; stopPropagation(): void; preventDefault(): void }) => {
       if ((e.target as Element | null)?.closest?.('button')) { g.current.eat = false; return; }
       if (g.current.eat) { g.current.eat = false; e.stopPropagation(); e.preventDefault(); }
@@ -739,6 +764,8 @@ function useCardSwipe(on: boolean, step: (d: 1 | -1) => void) {
 }
 const CARD_SWIPE_SLOP = 10;
 const CARD_SWIPE = 40;
+/** A flick faster than this (pixels per millisecond) moves on even after a short drag. */
+const CARD_FLICK = 0.45;
 
 /** How long the "Location Not Set" bubble stays (owner, 17 Oct 2026). */
 export const LOCATION_BUBBLE_MS = 1500;

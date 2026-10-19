@@ -52,6 +52,7 @@ import { ChoiceDialog } from '../ui/common';
 import { cc001Strings } from '../ui/cc001Strings';
 import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, isBookedChoice, ARRANGEMENT_CHOICES, LocationLevel, locationListKey, clearBelow } from './cc001';
 import { PhotoViewer } from '../ui/PhotoViewer';
+import { PhotoReorder } from './PhotoReorder';
 import { ContactPick } from '../ui/ContactPick';
 import type { Screen, DealKind } from '../nav';
 import { saveTypedContact } from '../deals/contacts';
@@ -125,8 +126,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [open, setOpen] = useState<Set<string>>(() => new Set(startSection ? [startSection] : []));
   const [photoMsg, setPhotoMsg] = useState<{ text: string; error: boolean }[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [dragFrom, setDragFrom] = useState<number | null>(null);
-  const [dragOver, setDragOver] = useState<number | null>(null);
+  /** Change 67: the Reorder Photos screen is open. */
+  const [reorderOpen, setReorderOpen] = useState(false);
   const [bannerPicker, setBannerPicker] = useState(false);
   const [bannerPick, setBannerPick] = useState<{ lat: number; lng: number } | null>(null);
   const [tenantPick, setTenantPick] = useState<PickedContact | null>(null);
@@ -273,27 +274,6 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   }
   /** New order of the photos; the first one is the main photo. */
   const reorder = (from: number, to: number) => setD(prev => { const photos = movePhoto(prev.photos, from, to); return { ...prev, photos, mainPhotoId: photos[0]?.id }; });
-  /** Drag by the ⠿ handle (finger, pen or mouse): the photo under the pointer is where it goes. The move and release are
-   *  followed on the whole window, so a finger that slides off the small handle still drops the photo in the right place. */
-  const dragProps = (i: number) => ({
-    onPointerDown: (e: { preventDefault(): void }) => {
-      if (busy) return;
-      e.preventDefault();
-      let over = i;
-      setDragFrom(i); setDragOver(i);
-      const move = (ev: PointerEvent) => {
-        const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-photo-index]');
-        const to = el ? Number(el.getAttribute('data-photo-index')) : NaN;
-        if (Number.isFinite(to)) { over = to; setDragOver(to); }
-      };
-      const end = (ev: PointerEvent) => {
-        window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
-        if (ev.type === 'pointerup' && over !== i) reorder(i, over);
-        setDragFrom(null); setDragOver(null);
-      };
-      window.addEventListener('pointermove', move); window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
-    },
-  });
   async function addDocs(category: DocCategory, files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
@@ -678,19 +658,17 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       {/* 4. Photos */}
       <Sec id="photos" title={`4 · ${s.sec.photos}`} {...secProps('photos')}>
         <small className="muted">{s.photosNote}</small>
-        {d.photos.length > 1 && <small className="muted" data-testid="drag-hint">{s.n9.dragHint}</small>}
         {d.photos.length > 0 && (
           <div className="photo-grid photo-list" data-testid="photo-grid">
             {d.photos.map((p, i) => (
               <div key={p.id} data-photo-index={i}
-                className={`pg-item ${i === 0 ? 'main' : ''} ${dragFrom === i ? 'dragging' : ''} ${dragFrom !== null && dragOver === i && dragFrom !== i ? 'drop-target' : ''}`}
+                className={`pg-item ${i === 0 ? 'main' : ''}`}
                 data-testid="form-photo" data-photo-id={p.id}>
                 {/* Change 7: one photo per row; a tap on the picture opens it full screen (pinch to zoom, swipe between photos). */}
                 <button type="button" className="pg-open" aria-label={x1.photo.open(i + 1)} data-testid="photo-open" onClick={() => setViewer(i)}>
                   <StoredImage fileId={p.fileId} url={p.url} />
                 </button>
-                <button type="button" className="pg-handle" aria-label={s.n9.dragLabel(i + 1)} title={s.n9.dragHint} data-testid="photo-drag" {...dragProps(i)}>⠿</button>
-                {i === 0 && <span className="pg-main" data-testid="photo-main">{s.mainPhoto}</span>}
+                {i === 0 && <span className="pg-main" data-testid="photo-main">{x1.photo.mainLabel}</span>}
                 {/* Change 015: one small menu per photo, with exactly Make as Main Photo and Remove (no arrows, no Remove button). */}
                 <div className="pg-menu-wrap">
                   <button type="button" className="pg-menu-btn" aria-haspopup="menu" aria-expanded={photoMenu === p.id} disabled={busy}
@@ -701,6 +679,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
                         setPhotoMenu(null);
                         setD(prev => ({ ...prev, ...makeMainPhoto(prev.photos, p.id) }));
                       }}>{x1.photo.setMain}</button>
+                      {/* Change 67: Reorder Photos opens its own screen (4 pictures per row, drag to move). */}
+                      <button type="button" role="menuitem" data-testid="photo-reorder-open" disabled={d.photos.length < 2} onClick={() => { setPhotoMenu(null); setReorderOpen(true); }}>{x1.photo.reorder}</button>
                       {/* Change 7: Delete, in red, asks first. */}
                       <button type="button" role="menuitem" className="danger-text" data-testid="photo-remove" onClick={() => { setPhotoMenu(null); setAskPhotoDelete(p.id); }}>{x1.photo.delete}</button>
                     </div>
@@ -924,6 +904,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           }} />
       )}
       {viewer !== null && d.photos.length > 0 && <PhotoViewer lang={lang} photos={d.photos} start={viewer} onClose={() => setViewer(null)} />}
+      {reorderOpen && d.photos.length > 1 && <PhotoReorder lang={lang} photos={d.photos} onMove={reorder} onClose={() => setReorderOpen(false)} />}
       {ownerPick && <Confirm lang={lang} title={contactStrings[lang].replaceQ} danger={false} okLabel={contactStrings[lang].replaceOk}
         body={contactStrings[lang].replaceBody([d.ownerName, d.ownerPhone].filter(Boolean).join(' · '), [ownerPick.name, ownerPick.tel].filter(Boolean).join(' · '))}
         onCancel={() => setOwnerPick(null)} onOk={() => { applyOwner(ownerPick); setOwnerPick(null); }} />}

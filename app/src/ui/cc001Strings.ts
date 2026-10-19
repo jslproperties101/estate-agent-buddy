@@ -49,6 +49,9 @@ const en = {
     open: (i: number) => `Open photo ${i} full screen`,
     // Change 32: written on the property page photo and under the photo in the viewer (kept as typed, not Title Case)
     enlarge: 'Click to enlarge', slide: 'Slide to next',
+    // Changes 67 / 68 (JoyChange003): the Reorder screen and the Main label
+    reorder: 'Reorder Photos', reorderTitle: 'Reorder Photos', reorderHint: 'Click to enlarge, drag to move order', done: 'Done', mainLabel: 'Main',
+    reorderTile: (i: number) => `Photo ${i}: tap to enlarge, drag to move`,
   },
   // Change 11: prompts when Booked / Sold / Rented is chosen
   deal: {
@@ -118,6 +121,8 @@ const bm: CC001 = {
     viewer: 'Pemapar foto', close: 'Tutup', counter: (i, n) => `${i} / ${n}`, prev: 'Foto sebelumnya', next: 'Foto seterusnya',
     open: i => `Buka foto ${i} skrin penuh`,
     enlarge: 'Klik untuk besarkan', slide: 'Leret untuk seterusnya',
+    reorder: 'Susun Semula Foto', reorderTitle: 'Susun Semula Foto', reorderHint: 'Klik untuk besarkan, seret untuk tukar susunan', done: 'Selesai', mainLabel: 'Utama',
+    reorderTile: i => `Foto ${i}: ketik untuk besarkan, seret untuk alih`,
   },
   deal: {
     bookedQ: 'Isi butiran tempahan sekarang?', bookedBody: 'Hartanah disimpan dahulu, kemudian halaman tempahan dibuka.',
@@ -184,6 +189,8 @@ const zh: CC001 = {
     viewer: '照片查看器', close: '关闭', counter: (i, n) => `${i} / ${n}`, prev: '上一张', next: '下一张',
     open: i => `全屏打开第 ${i} 张照片`,
     enlarge: '点击放大', slide: '滑动查看下一张',
+    reorder: '调整照片顺序', reorderTitle: '调整照片顺序', reorderHint: '点击放大，拖动调整顺序', done: '完成', mainLabel: '主图',
+    reorderTile: i => `第 ${i} 张照片：点击放大，拖动移动`,
   },
   deal: {
     bookedQ: '现在填写预订资料？', bookedBody: '先保存房产，然后打开预订页面。',
