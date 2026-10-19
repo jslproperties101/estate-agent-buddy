@@ -36,3 +36,6 @@ Marketing Studio, downloads and Photo Studio. Model: Opus 5.5 (Joe asked for my 
 ## Tests
 - `tests/joychange003-batchF.test.ts` (unit F75-1, F76-1/2, F77-1, F81-1, F78-1), `tests/ui-batchF.test.mjs` (BF1 Marketing Studio, BF2 Photo Studio).
 - Updated: `tests/stage6-marketing.test.ts` MK2/MK7 (Change 76), `tests/ui.test.mjs` U81/U82/U83 and the screen tour (grid first, icons), U84 (style tile instead of the dropdown), U85 (address offered but unticked), U86 (portrait ticks 4 photos).
+
+## Corrected in Batch E
+Some details above did not match what Joe agreed (the handover had lost them). They were corrected in Batch E: see "Corrections to Batches D and F" in `JOYCHANGE003_BATCH_E.md`. Where this file and that section differ, that section is right.

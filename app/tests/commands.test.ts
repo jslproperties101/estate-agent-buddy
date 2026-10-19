@@ -12,7 +12,8 @@ test('C1 the brief example becomes a proposed new property with exactly the stat
   assert.equal(r.kind, 'create');
   if (r.kind !== 'create') return;
   assert.deepEqual(Object.fromEntries(r.changes.map(c => [c.key, c.value])), {
-    type: 'Semi-D factory', city: 'Salak Tinggi', landSqft: 20000, builtUpSqft: 12000, askingPrice: 3200000, tenure: 'leasehold',
+    // JoyChange003 Change 58: the state comes from the address chain of the place that was said.
+    type: 'Semi-D factory', city: 'Salak Tinggi', state: 'Selangor', landSqft: 20000, builtUpSqft: 12000, askingPrice: 3200000, tenure: 'leasehold',
   });
 });
 

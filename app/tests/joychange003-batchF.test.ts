@@ -10,15 +10,15 @@ import { photoStrings } from '../src/photos/strings';
 import { c11Strings } from '../src/ui/c011Strings';
 import type { Listing } from '../src/listing/model';
 
-test('F75-1 the A4 flyer takes the main photo plus up to 8 in the strip, 4 to a row; the portrait post takes up to 4 small ones', () => {
+test('F75-1 the A4 flyer takes up to 8 photos in total (main + 7 in the strip, 4 to a row); the portrait post takes up to 4 small ones', () => {
   assert.equal(FORMATS.a4.maxPhotos, 1 + STRIP_MAX);
-  assert.equal(STRIP_MAX, 8); assert.equal(STRIP_ROW, 4);
+  assert.equal(FORMATS.a4.maxPhotos, 8); assert.equal(STRIP_ROW, 4);
   assert.equal(FORMATS.portrait.maxPhotos, 5);
   assert.deepEqual([stripGrid(3, 1100).cols, stripGrid(3, 1100).rows], [3, 1]);
   assert.deepEqual([stripGrid(4, 1100).cols, stripGrid(4, 1100).rows], [4, 1]);
   assert.deepEqual([stripGrid(6, 1100).cols, stripGrid(6, 1100).rows], [3, 2]);
-  assert.deepEqual([stripGrid(8, 1100).cols, stripGrid(8, 1100).rows], [4, 2]);
-  const g = stripGrid(8, 1100);
+  assert.deepEqual([stripGrid(7, 1100).cols, stripGrid(7, 1100).rows], [4, 2]);
+  const g = stripGrid(7, 1100);
   assert.ok(Math.abs(g.cols * g.tw + (g.cols - 1) * g.gap - 1100) < 0.01, 'the row fills the width');
   assert.ok(FOOT_GAP >= 24, 'a clear gap above the gold footer line');
 });
@@ -26,14 +26,18 @@ test('F75-1 the A4 flyer takes the main photo plus up to 8 in the strip, 4 to a 
 const rec = (o: Partial<Listing> = {}): Listing => ({ id: 'p1', ref: 'P1', type: 'terrace', purpose: 'sale', street: 'Jalan Mawar 3', unitNo: '12', township: 'Taman Indah', city: 'Nilai', state: 'Negeri Sembilan',
   builtUpSqft: 1800, floors: 2, frontageFt: 22, depthFt: 70, photos: [], createdAt: 1, updatedAt: 1, ...o } as unknown as Listing);
 
-test('F76-1 Details to Show offers the address and the size extras, all unticked at first', () => {
+test('F76-1 Details to Show offers the agreed "Address and size extras" group, all unticked at first (and nothing from the other groups)', () => {
   const keys = MARKETING_KEYS.map(k => String(k.key));
-  for (const k of ['street', 'unitNo', 'floors', 'frontageFt', 'depthFt', 'ceilingFt', 'powerKva', 'loadingBays']) {
+  for (const k of ['ceilingFt', 'powerKva', 'loadingBays', 'zoning', 'maintenanceFee']) assert.ok(!keys.includes(k), `${k} was not agreed`);
+  for (const k of ['street', 'unitNo', 'neighborhood', 'floors', 'frontageFt', 'depthFt', 'pricePerSqft']) {
     assert.ok(keys.includes(k), `${k} offered`);
     assert.equal(MARKETING_KEYS.find(m => m.key === k)!.on, false, `${k} unticked at first`);
   }
-  const fields = marketingFields(rec(), 'en');
+  const fields = marketingFields(rec({ neighborhood: 'Taman Mawar', askingPrice: 540000 }), 'en');
   assert.equal(fields.find(f => f.key === 'street')!.on, false);
+  assert.equal(fields.find(f => f.key === 'neighborhood')!.value, 'Taman Mawar');
+  assert.equal(fields.find(f => String(f.key) === 'pricePerSqft')!.value, 'RM 300 per sq ft', '540,000 / 1,800 sq ft');
+  assert.equal(marketingFields(rec({ askingPrice: undefined }), 'en').find(f => String(f.key) === 'pricePerSqft')!.value, undefined, 'no price: nothing worked out');
 });
 
 test('F76-2 a ticked address leads the place line; size extras become facts', () => {
@@ -46,7 +50,7 @@ test('F76-2 a ticked address leads the place line; size extras become facts', ()
   assert.ok(c.facts.some(f => f.key === 'floors') && c.facts.some(f => f.key === 'frontageFt'));
 });
 
-test('F77-1 pictures go to the Gallery as well as Downloads; PDFs and other files to Downloads only', () => {
+test('F77-1 pictures go to the Gallery; PDFs and other files go to Downloads', () => {
   assert.equal(goesToGallery('image/png'), true); assert.equal(goesToGallery('image/jpeg'), true); assert.equal(goesToGallery('image/webp'), true);
   assert.equal(goesToGallery('application/pdf'), false);
   assert.equal(mimeOf(new Blob([]), 'a.pdf'), 'application/pdf');

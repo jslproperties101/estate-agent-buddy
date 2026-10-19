@@ -24,6 +24,7 @@ const en = {
   // JoyChange003 Changes 78 / 79
   all: 'All photos', of: (i: number, n: number) => `${i} of ${n}`, prev: 'Previous photo', next: 'Next photo', gridHint: 'Tap a photo to edit it.',
   swipeHint: 'Swipe the picture left or right to move to the next photo.', swipeKeep: 'Save or reset your changes before moving to another photo.',
+  leaveTitle: 'Save your changes?', leaveBody: 'This photo has changes that are not saved yet.', leaveSave: 'Save as new photo', leaveDiscard: 'Discard changes',
   tools: 'Adjustment', tool: { brightness: 'Brightness', contrast: 'Contrast', colour: 'Colour', clarity: 'Clarity', straighten: 'Straighten', rotate: 'Turn', crop: 'Crop' },
 };
 export type PhotoStrings = typeof en;
@@ -48,6 +49,7 @@ const bm: PhotoStrings = {
   declutter: 'Pembersihan bersepah dengan AI tidak tersedia. Ia memerlukan perkhidmatan AI dalam talian dan persetujuan jelas anda, dan tiada perkhidmatan dipilih atau diluluskan.',
   all: 'Semua foto', of: (i: number, n: number) => `${i} daripada ${n}`, prev: 'Foto sebelumnya', next: 'Foto seterusnya', gridHint: 'Ketik foto untuk menyuntingnya.',
   swipeHint: 'Leret gambar ke kiri atau kanan untuk ke foto seterusnya.', swipeKeep: 'Simpan atau set semula perubahan anda sebelum ke foto lain.',
+  leaveTitle: 'Simpan perubahan anda?', leaveBody: 'Foto ini ada perubahan yang belum disimpan.', leaveSave: 'Simpan sebagai foto baharu', leaveDiscard: 'Buang perubahan',
   tools: 'Pelarasan', tool: { brightness: 'Kecerahan', contrast: 'Kontras', colour: 'Warna', clarity: 'Kejelasan', straighten: 'Luruskan', rotate: 'Putar', crop: 'Potong' },
 };
 const zh: PhotoStrings = {
@@ -71,6 +73,7 @@ const zh: PhotoStrings = {
   declutter: 'AI 清理杂物功能不可用。它需要联网的 AI 服务和您的明确同意，目前尚未选择或批准任何服务。',
   all: '全部照片', of: (i: number, n: number) => `第 ${i} 张，共 ${n} 张`, prev: '上一张', next: '下一张', gridHint: '点击照片进行编辑。',
   swipeHint: '左右滑动图片可切换到下一张照片。', swipeKeep: '切换到其他照片前，请先保存或重置更改。',
+  leaveTitle: '保存更改吗？', leaveBody: '这张照片有尚未保存的更改。', leaveSave: '另存为新照片', leaveDiscard: '放弃更改',
   tools: '调整', tool: { brightness: '亮度', contrast: '对比度', colour: '色彩', clarity: '清晰度', straighten: '拉直', rotate: '旋转', crop: '裁剪' },
 };
 export const photoStrings: Record<Lang, PhotoStrings> = titled3({ en, bm, zh });

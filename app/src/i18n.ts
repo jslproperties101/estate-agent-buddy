@@ -39,7 +39,7 @@ const en = {
     syncWaiting: (n: number) => `${n} change${n === 1 ? '' : 's'} saved on this phone, waiting to sync.`,
     syncFailed: 'The last sync failed. Your changes are saved on this phone and the app will try again.',
     previewTitle: 'How announcements will look (sample, not live)',
-    dismiss: 'Dismiss', remindLater: 'Remind me later', snoozeTitle: 'Remind me', snooze: { hour: 'In 1 hour', fourHours: 'In 4 hours', tomorrow: 'Tomorrow, 9:00', threeDays: 'In 3 days, 9:00' },
+    dismiss: 'Dismiss', remindLater: 'Remind me later', snoozeTitle: 'Remind me', snooze: { hour: 'In 1 hour', tonight: 'Tonight, 8 pm', tomorrow: 'Tomorrow, 9 am' },
     history: 'History', historyHint: 'Dismissed notifications.', historyEmpty: 'Nothing dismissed yet.', restore: 'Put back', snoozedUntil: (when: string) => `Reminding you ${when}`,
   },
   c: {
@@ -181,7 +181,7 @@ const bm: Strings = {
     syncWaiting: (n: number) => `${n} perubahan disimpan dalam telefon ini, menunggu segerak.`,
     syncFailed: 'Penyegerakan terakhir gagal. Perubahan anda disimpan dalam telefon ini dan aplikasi akan mencuba lagi.',
     previewTitle: 'Rupa pengumuman nanti (contoh, tidak langsung)',
-    dismiss: 'Tutup', remindLater: 'Ingatkan saya nanti', snoozeTitle: 'Ingatkan saya', snooze: { hour: 'Dalam 1 jam', fourHours: 'Dalam 4 jam', tomorrow: 'Esok, 9:00', threeDays: 'Dalam 3 hari, 9:00' },
+    dismiss: 'Tutup', remindLater: 'Ingatkan saya nanti', snoozeTitle: 'Ingatkan saya', snooze: { hour: 'Dalam 1 jam', tonight: 'Malam ini, 8 malam', tomorrow: 'Esok, 9 pagi' },
     history: 'Sejarah', historyHint: 'Pemberitahuan yang telah ditutup.', historyEmpty: 'Belum ada yang ditutup.', restore: 'Letak semula', snoozedUntil: (when: string) => `Akan mengingatkan ${when}`,
   },
   c: {
@@ -321,7 +321,7 @@ const zh: Strings = {
     syncWaiting: (n: number) => `${n} 项更改已保存在本手机，等待同步。`,
     syncFailed: '上次同步失败。您的更改已保存在本手机，应用会再试。',
     previewTitle: '公告的显示效果（示例，非实时）',
-    dismiss: '忽略', remindLater: '稍后提醒我', snoozeTitle: '提醒我', snooze: { hour: '1 小时后', fourHours: '4 小时后', tomorrow: '明天 9:00', threeDays: '3 天后 9:00' },
+    dismiss: '忽略', remindLater: '稍后提醒我', snoozeTitle: '提醒我', snooze: { hour: '1 小时后', tonight: '今晚 8 点', tomorrow: '明天上午 9 点' },
     history: '历史记录', historyHint: '已忽略的通知。', historyEmpty: '还没有忽略过的通知。', restore: '恢复', snoozedUntil: (when: string) => `将在${when}提醒您`,
   },
   c: {

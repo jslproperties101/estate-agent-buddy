@@ -26,11 +26,12 @@ test('D72-2 Remind me later hides it only until the chosen time, and it does not
   assert.equal(isShown(m, 'b', NOW + 1e9), false, 'dismissing replaces the snooze');
 });
 
-test('D72-3 snooze times: 1 hour, 4 hours, tomorrow 9:00, in 3 days 9:00', () => {
+test('D72-3 snooze times (as agreed): 1 hour, tonight 8 pm, tomorrow 9 am', () => {
   assert.equal(snoozeUntil('hour', NOW) - NOW, 3_600_000);
-  assert.equal(snoozeUntil('fourHours', NOW) - NOW, 4 * 3_600_000);
+  const n = new Date(snoozeUntil('tonight', NOW)); assert.deepEqual([n.getDate(), n.getHours(), n.getMinutes()], [19, 20, 0]);
+  const late = new Date(2026, 9, 19, 19, 50).getTime();
+  assert.equal(snoozeUntil('tonight', late) - late, 2 * 3_600_000, 'already evening: two hours from now');
   const t = new Date(snoozeUntil('tomorrow', NOW)); assert.deepEqual([t.getDate(), t.getHours(), t.getMinutes()], [20, 9, 0]);
-  const d = new Date(snoozeUntil('threeDays', NOW)); assert.deepEqual([d.getDate(), d.getHours()], [22, 9]);
 });
 
 test('D72-4 History keeps only the newest ones', () => {
@@ -45,6 +46,6 @@ test('D72-5 the new words exist in English, Bahasa Malaysia (bm) and Chinese', (
   for (const l of ['en', 'bm', 'zh'] as const) {
     const n = strings[l].notif;
     for (const k of ['dismiss', 'remindLater', 'history', 'restore', 'historyEmpty'] as const) assert.ok(n[k], `${l}.${k}`);
-    for (const c of ['hour', 'fourHours', 'tomorrow', 'threeDays'] as const) assert.ok(n.snooze[c], `${l}.snooze.${c}`);
+    for (const c of ['hour', 'tonight', 'tomorrow'] as const) assert.ok(n.snooze[c], `${l}.snooze.${c}`);
   }
 });

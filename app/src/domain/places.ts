@@ -51,6 +51,9 @@ export const MY_CITIES: Record<string, string[]> = {
   'Putrajaya': ['Putrajaya'],
 };
 export const MY_TOWNSHIPS: Record<string, string[]> = {
+  // JoyChange003 Change 58: common Kuala Lumpur areas, so a command like "add new listing in Sungai Besi" is understood.
+  'Kuala Lumpur': ['Sungai Besi', 'Cheras', 'Bukit Jalil', 'Sri Petaling', 'Kepong', 'Setapak', 'Wangsa Maju', 'Bangsar', 'Mont Kiara', 'Sri Hartamas',
+    'Taman Tun Dr Ismail', 'Segambut', 'Sentul', 'Titiwangsa', 'Bukit Bintang', 'Brickfields', 'Desa ParkCity', 'Old Klang Road', 'Seputeh', 'Salak South', 'Kuchai Lama'],
   'Nilai': ['Putra Nilai', 'Bandar Baru Nilai', 'Kota Seriemas', 'Bandar Enstek', 'Kawasan Perindustrian Nilai'],
   'Salak Tinggi': ['Bandar Baru Salak Tinggi', 'Kota Warisan'],
   'Sepang': ['Kota Warisan', 'Bandar Baru Salak Tinggi'],
@@ -58,6 +61,21 @@ export const MY_TOWNSHIPS: Record<string, string[]> = {
 
 export const allBuiltInCities = () => [...new Set(Object.values(MY_CITIES).flat())];
 export const allBuiltInTownships = () => [...new Set(Object.values(MY_TOWNSHIPS).flat())];
+/** Change 58: the address chain above a place: a township's city and state, or a city's state (built-in lists only). */
+export function chainFor(place: string): { township?: string; city?: string; state?: string } {
+  const low = place.trim().toLowerCase();
+  const cityState = (city: string) => Object.entries(MY_CITIES).find(([, cs]) => cs.some(c => c.toLowerCase() === city.toLowerCase()))?.[0];
+  for (const [city, ts] of Object.entries(MY_TOWNSHIPS)) {
+    const t = ts.find(x => x.toLowerCase() === low);
+    if (t) return { township: t, city, state: cityState(city) };
+  }
+  for (const [state, cs] of Object.entries(MY_CITIES)) {
+    const c = cs.find(x => x.toLowerCase() === low);
+    if (c) return { city: c, state };
+  }
+  const st = MY_STATES.find(x => x.toLowerCase() === low);
+  return st ? { state: st } : {};
+}
 export const citiesFor = (state?: string) => (state && MY_CITIES[state]) || allBuiltInCities();
 export const townshipsFor = (city?: string) => (city && MY_TOWNSHIPS[city]) || allBuiltInTownships();
 

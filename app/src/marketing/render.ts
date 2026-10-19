@@ -110,8 +110,8 @@ function foot(ctx: Ctx, c: PosterContent, p: Pal, x: number, yBottom: number, w:
 interface Section { h: number; paint: (y: number) => void }
 const sum = (xs: Section[]) => xs.reduce((n, x) => n + x.h, 0);
 
-/** Change 75: photos after the main one on the A4 flyer: at most this many, this many to a row. */
-export const STRIP_MAX = 8, STRIP_ROW = 4;
+/** Change 75: photos after the main one on the A4 flyer: at most this many (8 photos in total), this many to a row. */
+export const STRIP_MAX = 7, STRIP_ROW = 4;
 /** Space between the last section of the A4 flyer and the gold line above its bottom bar. */
 export const FOOT_GAP = 36;
 /** Layout of the A4 photo strip for n photos across width w. */
@@ -125,7 +125,7 @@ export function stripGrid(n: number, w: number) {
 function drawA4(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElement | undefined)[], W: number, H: number) {
   ctx.fillStyle = p.bg; ctx.fillRect(0, 0, W, H);
   const m = 70, cw = W - m * 2;
-  // JoyChange003 Change 75: the strip under the text takes every chosen photo after the main one (up to 8), 4 to a row.
+  // JoyChange003 Change 75: the strip under the text takes every chosen photo after the main one (up to 7, so 8 in total), 4 to a row.
   const strip = imgs.slice(1, 1 + STRIP_MAX);
   // Bottom bar: contact lines, reference and the notes. Its height follows what is in it.
   ctx.font = font(20);

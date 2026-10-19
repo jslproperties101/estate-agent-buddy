@@ -20,7 +20,7 @@ export interface FormatSpec {
 }
 /** Sizes: A4 is 210 × 297 mm drawn at 150 dpi (1240 × 1754). The two post sizes (1080 × 1080 square, 1080 × 1350 portrait 4:5) are common social-post sizes from a third-party guide and are NOT verified against any platform, so no screen text names a platform. */
 export const FORMATS: Record<FormatId, FormatSpec> = {
-  a4: { id: 'a4', w: 1240, h: 1754, outputs: ['pdf', 'png', 'jpg'], maxPhotos: 9 },
+  a4: { id: 'a4', w: 1240, h: 1754, outputs: ['pdf', 'png', 'jpg'], maxPhotos: 8 },
   square: { id: 'square', w: 1080, h: 1080, outputs: ['png', 'jpg', 'webp'], maxPhotos: 1 },
   portrait: { id: 'portrait', w: 1080, h: 1350, outputs: ['png', 'jpg', 'webp'], maxPhotos: 5 },
 };
@@ -28,27 +28,46 @@ export const FORMAT_IDS: FormatId[] = ['a4', 'square', 'portrait'];
 export const MIME: Record<OutputId, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
 
 /** The details the agent can tick, in the order they are listed. `on` = ticked at first when the record has a value. */
+/** Change 76: not a field of the record; worked out from the asking price and the built-up size (else the land size). */
+export const PSF = 'pricePerSqft' as keyof Listing;
 export const MARKETING_KEYS: { key: keyof Listing; on: boolean; price?: boolean }[] = [
   { key: 'askingPrice', on: true, price: true }, { key: 'monthlyRent', on: true, price: true },
   { key: 'type', on: true },
-  // JoyChange003 Change 76: the address (unit/lot and street), off until the agent ticks it.
-  { key: 'unitNo', on: false }, { key: 'street', on: false },
+  // JoyChange003 Change 76 ("Address and size extras"): unit/lot, street and neighbourhood, off until the agent ticks them.
+  { key: 'unitNo', on: false }, { key: 'street', on: false }, { key: 'neighborhood', on: false },
   { key: 'township', on: true }, { key: 'city', on: true }, { key: 'state', on: true },
   { key: 'bedrooms', on: true }, { key: 'bathrooms', on: true }, { key: 'parking', on: true },
   { key: 'builtUpSqft', on: true }, { key: 'landSqft', on: true },
-  // Change 76: the size extras, off until ticked.
-  { key: 'floors', on: false }, { key: 'frontageFt', on: false }, { key: 'depthFt', on: false }, { key: 'ceilingFt', on: false }, { key: 'powerKva', on: false }, { key: 'loadingBays', on: false },
+  // Change 76: storeys, frontage, depth and the price per sq ft (worked out from the price and the size), off until ticked.
+  { key: 'floors', on: false }, { key: 'frontageFt', on: false }, { key: 'depthFt', on: false }, { key: PSF, on: false },
   { key: 'tenure', on: true }, { key: 'furnishing', on: true },
   { key: 'condition', on: false }, { key: 'availability', on: false }, { key: 'titleType', on: false }, { key: 'lotType', on: false },
   { key: 'features', on: true },
 ];
-const LOCATION_KEYS = ['unitNo', 'street', 'township', 'city', 'state'];
+const LOCATION_KEYS = ['unitNo', 'street', 'neighborhood', 'township', 'city', 'state'];
 
+/** Change 76: price per sq ft, from the asking price and the built-up size (else the land size). Undefined when either is missing. */
+export function pricePerSqft(l: Pick<Listing, 'askingPrice' | 'builtUpSqft' | 'landSqft'>): number | undefined {
+  const size = l.builtUpSqft || l.landSqft;
+  return l.askingPrice && size ? Math.round(l.askingPrice / size) : undefined;
+}
+const PSF_WORDS: Record<Lang, { label: string; unit: string }> = {
+  en: { label: 'Price per sq ft', unit: 'per sq ft' }, bm: { label: 'Harga sekaki persegi', unit: 'sekaki persegi' }, zh: { label: '每平方英尺价格', unit: '每平方英尺' },
+};
 export const marketingFields = (l: Listing, lang: Lang): BuyerField[] => {
   const all = buyerFields(l, lang);
+  const s = listingStrings[lang];
   return MARKETING_KEYS.map(m => {
-    const f = all.find(x => x.key === m.key)!;
-    return { ...f, on: m.on && f.value !== undefined };
+    if (m.key === PSF) {
+      const v = pricePerSqft(l);
+      return { key: PSF, group: 'money', label: PSF_WORDS[lang].label, value: v === undefined ? undefined : `RM ${v.toLocaleString('en-US')} ${PSF_WORDS[lang].unit}`, on: false } as BuyerField;
+    }
+    const f = all.find(x => x.key === m.key);
+    if (f) return { ...f, on: m.on && f.value !== undefined };
+    // A detail the buyer PDF does not list (the neighbourhood): written as it is in the record.
+    const raw = l[m.key];
+    const value = raw === undefined || raw === null || String(raw).trim() === '' ? undefined : String(raw);
+    return { key: m.key, group: 'location', label: s.l[String(m.key)] ?? String(m.key), value, on: false } as BuyerField;
   });
 };
 export const defaultMarketingSelection = (fields: BuyerField[]): Record<string, boolean> => Object.fromEntries(fields.filter(f => f.on).map(f => [String(f.key), true]));

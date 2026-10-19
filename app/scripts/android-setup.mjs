@@ -167,6 +167,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // JoyChange003 Change 77: the app's own file plugin (saves to Downloads and the Gallery, opens a saved file).
         registerPlugin(EabFilesPlugin.class);
+        // JoyChange003 Change 55: the app's own speech plugin (one warm recogniser, every event reported, clean restarts).
+        registerPlugin(EabSpeechPlugin.class);
         super.onCreate(savedInstanceState);
         // Change 015: solid black system navigation area; app content (web page and AdMob banner) directly above it.
         getWindow().getDecorView().setBackgroundColor(Color.BLACK);
@@ -217,10 +219,10 @@ public class MainActivity extends BridgeActivity {
 });
 
 // JoyChange003 Change 77: a small plugin of the app's own, next to MainActivity. Downloads go where Android lists them:
-// every file in Download/Estate Agent Buddy (the Files app's Downloads), and pictures also in Pictures/Estate Agent Buddy (the
-// Gallery). Android 10 and newer: through MediaStore (no permission needed). Android 9 and older: written to the public
-// folder and scanned (needs the storage permission, already in the manifest up to Android 10). open() hands a saved file
-// to the app that shows it (Gallery, a PDF viewer).
+// pictures to the Gallery, in a "Estate Agent AI Buddy" album (Pictures/Estate Agent AI Buddy); PDFs and other files to
+// the Downloads folder (the Downloads / Files app). Android 10 and newer: through MediaStore (no permission needed).
+// Android 9 and older: written to the public folder and scanned (needs the storage permission, already in the manifest
+// up to Android 10). open() hands a saved file to the app that shows it (Gallery, a PDF viewer).
 {
   const pkg = /^package ([^;]+);/m.exec(readFileSync(mainActivity, 'utf8'))?.[1];
   if (!pkg) throw new Error(`No package line in ${mainActivity}`);
@@ -248,7 +250,7 @@ import java.io.OutputStream;
 
 @CapacitorPlugin(name = "EabFiles")
 public class EabFilesPlugin extends Plugin {
-    private static final String FOLDER = "Estate Agent Buddy";
+    private static final String ALBUM = "Estate Agent AI Buddy";
 
     @PluginMethod
     public void saveToPublic(PluginCall call) {
@@ -260,8 +262,8 @@ public class EabFilesPlugin extends Plugin {
         try {
             byte[] bytes = Base64.decode(data, Base64.DEFAULT);
             JSObject ret = new JSObject();
-            ret.put("download", write(bytes, name, mime, false).toString());
-            if (image) ret.put("gallery", write(bytes, name, mime, true).toString());
+            ret.put("uri", write(bytes, name, mime, image).toString());
+            ret.put("place", image ? "gallery" : "downloads");
             call.resolve(ret);
         } catch (Exception e) {
             call.reject(e.getMessage() == null ? "save failed" : e.getMessage());
@@ -274,7 +276,7 @@ public class EabFilesPlugin extends Plugin {
             ContentValues v = new ContentValues();
             v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
             v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
-            v.put(MediaStore.MediaColumns.RELATIVE_PATH, (gallery ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS) + "/" + FOLDER);
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, gallery ? Environment.DIRECTORY_PICTURES + "/" + ALBUM : Environment.DIRECTORY_DOWNLOADS);
             v.put(MediaStore.MediaColumns.IS_PENDING, 1);
             Uri where = gallery ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) : MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
             Uri uri = r.insert(where, v);
@@ -291,7 +293,8 @@ public class EabFilesPlugin extends Plugin {
             r.update(uri, done, null, null);
             return uri;
         }
-        File dir = new File(Environment.getExternalStoragePublicDirectory(gallery ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS), FOLDER);
+        File base = Environment.getExternalStoragePublicDirectory(gallery ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS);
+        File dir = gallery ? new File(base, ALBUM) : base;
         if (!dir.exists() && !dir.mkdirs()) throw new IOException("could not make the folder");
         File f = new File(dir, name);
         try (OutputStream o = new FileOutputStream(f)) { o.write(bytes); }
@@ -315,6 +318,148 @@ public class EabFilesPlugin extends Plugin {
         } catch (Exception e) {
             call.reject(e.getMessage() == null ? "no app can open this file" : e.getMessage());
         }
+    }
+}
+`);
+}
+
+// JoyChange003 Change 55: the app's own speech plugin, next to MainActivity. The community plugin answers start() at
+// once when live words are on, so a later "no speech", "busy" or "network" error is sent to an answer that was already
+// given and never reaches the app (it then waits, looks frozen, and finally says nothing was captured). It also destroys
+// and re-creates Android's recogniser on every start, which some phones refuse while the previous one is still closing
+// (no start sound). This plugin keeps ONE recogniser, made when the AI Assisted Command screen opens (prepare), closes the
+// previous session before a new one (cancel), and reports every step as a "speech" event tagged with the session number:
+// ready (the start sound has played: speak now), speaking, endOfSpeech, partial, final, error. The app retries once when
+// Android says it is busy.
+{
+  const pkg = /^package ([^;]+);/m.exec(readFileSync(mainActivity, 'utf8'))?.[1];
+  if (!pkg) throw new Error(`No package line in ${mainActivity}`);
+  writeFileSync(mainActivity.replace(/MainActivity\.java$/, 'EabSpeechPlugin.java'), `package ${pkg};
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.ArrayList;
+
+@CapacitorPlugin(name = "EabSpeech")
+public class EabSpeechPlugin extends Plugin {
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private SpeechRecognizer recognizer;
+
+    private void ensure() {
+        if (recognizer == null) recognizer = SpeechRecognizer.createSpeechRecognizer(getActivity());
+    }
+
+    private static String reason(Exception e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+    }
+
+    @PluginMethod
+    public void prepare(PluginCall call) {
+        main.post(() -> {
+            try {
+                if (!SpeechRecognizer.isRecognitionAvailable(getContext())) { call.reject("not available"); return; }
+                ensure();
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(reason(e));
+            }
+        });
+    }
+
+    @PluginMethod
+    public void start(PluginCall call) {
+        final String language = call.getString("language", "en-MY");
+        final int session = call.getInt("session", 0);
+        main.post(() -> {
+            try {
+                ensure();
+                recognizer.cancel();
+                recognizer.setRecognitionListener(new Listener(session));
+                Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language);
+                intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+                intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
+                intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getActivity().getPackageName());
+                recognizer.startListening(intent);
+                call.resolve();
+            } catch (Exception e) {
+                call.reject(reason(e));
+            }
+        });
+    }
+
+    @PluginMethod
+    public void stop(PluginCall call) {
+        main.post(() -> {
+            try { if (recognizer != null) recognizer.stopListening(); } catch (Exception e) { /* already stopped */ }
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void cancel(PluginCall call) {
+        main.post(() -> {
+            try { if (recognizer != null) recognizer.cancel(); } catch (Exception e) { /* already stopped */ }
+            call.resolve();
+        });
+    }
+
+    /** After a "busy" or "client" error the recogniser is thrown away, so the next start makes a fresh one. */
+    @PluginMethod
+    public void reset(PluginCall call) {
+        main.post(() -> {
+            try { if (recognizer != null) { recognizer.cancel(); recognizer.destroy(); } } catch (Exception e) { /* ignore */ }
+            recognizer = null;
+            call.resolve();
+        });
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        try { if (recognizer != null) recognizer.destroy(); } catch (Exception e) { /* ignore */ }
+        recognizer = null;
+    }
+
+    private class Listener implements RecognitionListener {
+        private final int session;
+
+        Listener(int session) { this.session = session; }
+
+        private void emit(String type, String text, Integer code) {
+            JSObject o = new JSObject();
+            o.put("session", session);
+            o.put("type", type);
+            if (text != null) o.put("text", text);
+            if (code != null) o.put("code", code.intValue());
+            notifyListeners("speech", o);
+        }
+
+        private String first(Bundle b) {
+            if (b == null) return null;
+            ArrayList<String> m = b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+            return m == null || m.isEmpty() ? null : m.get(0);
+        }
+
+        @Override public void onReadyForSpeech(Bundle params) { emit("ready", null, null); }
+        @Override public void onBeginningOfSpeech() { emit("speaking", null, null); }
+        @Override public void onRmsChanged(float rmsdB) {}
+        @Override public void onBufferReceived(byte[] buffer) {}
+        @Override public void onEndOfSpeech() { emit("endOfSpeech", null, null); }
+        @Override public void onError(int error) { emit("error", null, error); }
+        @Override public void onResults(Bundle results) { emit("final", first(results), null); }
+        @Override public void onPartialResults(Bundle partial) { String t = first(partial); if (t != null && !t.isEmpty()) emit("partial", t, null); }
+        @Override public void onEvent(int eventType, Bundle params) {}
     }
 }
 `);

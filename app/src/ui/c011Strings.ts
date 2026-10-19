@@ -76,7 +76,7 @@ const en = {
   file: {
     saving: 'Saving the file…', sharing: 'Opening the share menu…',
     saved: (where: string) => `Saved: ${where}`,
-    savedDownloads: 'Saved to Downloads.', savedGallery: 'Saved to Gallery and Downloads.', openFile: 'Open', openFail: 'No app on this phone can open this file.',
+    savedDownloads: 'Saved to Downloads.', savedGallery: 'Saved to Gallery.', openFile: 'Open', openFail: 'No app on this phone can open this file.',
     savedWeb: 'Downloaded to this device’s downloads.',
     shared: 'Share menu opened.', cancelled: 'Sharing cancelled.',
     failed: 'The file could not be saved or shared. Nothing was changed; please try again.',
@@ -162,7 +162,7 @@ const bm: C11Strings = {
   file: {
     saving: 'Sedang menyimpan fail…', sharing: 'Sedang membuka menu kongsi…',
     saved: (where: string) => `Disimpan: ${where}`,
-    savedDownloads: 'Disimpan ke Muat Turun.', savedGallery: 'Disimpan ke Galeri dan Muat Turun.', openFile: 'Buka', openFail: 'Tiada aplikasi dalam telefon ini boleh membuka fail ini.',
+    savedDownloads: 'Disimpan ke Muat Turun.', savedGallery: 'Disimpan ke Galeri.', openFile: 'Buka', openFail: 'Tiada aplikasi dalam telefon ini boleh membuka fail ini.',
     savedWeb: 'Dimuat turun ke folder muat turun peranti ini.',
     shared: 'Menu kongsi dibuka.', cancelled: 'Perkongsian dibatalkan.',
     failed: 'Fail tidak dapat disimpan atau dikongsi. Tiada apa diubah; sila cuba lagi.',
@@ -247,7 +247,7 @@ const zh: C11Strings = {
   file: {
     saving: '正在保存文件…', sharing: '正在打开分享菜单…',
     saved: (where: string) => `已保存：${where}`,
-    savedDownloads: '已保存到下载。', savedGallery: '已保存到图库和下载。', openFile: '打开', openFail: '此手机上没有可以打开此文件的应用。',
+    savedDownloads: '已保存到下载。', savedGallery: '已保存到图库。', openFile: '打开', openFail: '此手机上没有可以打开此文件的应用。',
     savedWeb: '已下载到此设备的下载文件夹。',
     shared: '已打开分享菜单。', cancelled: '已取消分享。',
     failed: '无法保存或分享文件。没有任何改动，请重试。',

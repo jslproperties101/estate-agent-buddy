@@ -112,7 +112,7 @@ export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'failed' | 'un
 
 /** Where a saved file went (Android: Downloads, and the Gallery for pictures; older APKs: Documents; browser: the downloads).
  *  `open` (Android only) is the saved copy that the Open button hands to the phone. */
-export interface SaveResult { ok: boolean; where?: string; reason?: 'failed' | 'needApk' | 'noFile'; open?: { uri: string; mime: string }; gallery?: boolean }
+export interface SaveResult { ok: boolean; where?: string; reason?: 'failed' | 'needApk' | 'noFile'; open?: { uri: string; mime: string }; place?: 'gallery' | 'downloads' }
 
 /** Folder inside the phone's public Documents folder that saved files go to in the Android app. */
 export const SAVE_FOLDER = 'Estate Agent Buddy';
@@ -139,7 +139,7 @@ type FsPlugin = {
 };
 /** JoyChange003 Change 77: the app's own file plugin (scripts/android-setup.mjs writes it into the APK). */
 type EabFilesPlugin = {
-  saveToPublic(o: { name: string; mime: string; data: string; image: boolean }): Promise<{ download: string; gallery?: string }>;
+  saveToPublic(o: { name: string; mime: string; data: string; image: boolean }): Promise<{ uri: string; place: 'gallery' | 'downloads' }>;
   open(o: { uri: string; mime: string }): Promise<void>;
 };
 const IMAGE = /^image\/(png|jpe?g|webp)$/;
@@ -150,7 +150,7 @@ export function mimeOf(blob: Blob, fileName: string): string {
   return ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp'
     : ext === 'csv' ? 'text/csv' : ext === 'json' ? 'application/json' : 'application/octet-stream';
 }
-/** Pictures also go to the Gallery; everything goes to Downloads. */
+/** Change 77: pictures go to the Gallery (an "Estate Agent AI Buddy" album); PDFs and other files go to Downloads. */
 export const goesToGallery = (mime: string) => IMAGE.test(mime);
 type SharePlugin = { share(o: { title?: string; dialogTitle?: string; files?: string[]; url?: string }): Promise<unknown>; canShare?: () => Promise<{ value: boolean }> };
 
@@ -159,13 +159,13 @@ export async function saveFile(blob: Blob | null | undefined, fileName: string):
   if (!blob || !blob.size) return { ok: false, reason: 'noFile' };
   if (isNative()) {
     const mime = mimeOf(blob, fileName);
-    // Change 77: Downloads (and the Gallery for pictures), where Android's own apps list them.
+    // Change 77: pictures to the Gallery, other files to Downloads, where Android's own apps list them.
     const files = plugin<EabFilesPlugin>('EabFiles');
     if (files && !pluginMissing('EabFiles')) {
       try {
         const image = goesToGallery(mime);
         const r = await files.saveToPublic({ name: fileName, mime, data: await blobToBase64(blob), image });
-        return { ok: true, where: `Download/${SAVE_FOLDER}`, gallery: image && !!r.gallery, open: { uri: r.gallery ?? r.download, mime } };
+        return { ok: true, place: r.place, open: { uri: r.uri, mime } };
       } catch { /* an older Android without permission: fall back to Documents below */ }
     }
     const fs = plugin<FsPlugin>('Filesystem');

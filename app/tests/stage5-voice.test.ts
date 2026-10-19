@@ -10,6 +10,7 @@ import { browserOf, diagnose, reportText, VoiceProbe } from '../src/voice/diagno
 import { diagMessage, diagMessages, diagStrings } from '../src/voice/diagStrings';
 import { lastVoice, listen, resetLastVoice, VoiceError } from '../src/voice/recognizer';
 import { voiceCommandStrings } from '../src/voice/VoiceCommandUI';
+import { c056Strings } from '../src/voice/c056Strings';
 import { MemoryBackend } from '../src/data/backend';
 import { Store } from '../src/data/store';
 import type { Contact, Inquiry, Appointment } from '../src/data/types';
@@ -242,15 +243,19 @@ test('VS1 Voice Command and diagnostics text exists in English, Bahasa Malaysia 
   const en = keys(voiceCommandStrings.en).sort();
   assert.deepEqual(keys(voiceCommandStrings.bm).sort(), en); assert.deepEqual(keys(voiceCommandStrings.zh).sort(), en);
   assert.deepEqual(keys(diagStrings.bm).sort(), keys(diagStrings.en).sort()); assert.deepEqual(keys(diagStrings.zh).sort(), keys(diagStrings.en).sort());
+  // JoyChange003 Change 57: the examples live in c056Strings (grouped by task); every one of them is checked in
+  // tests/joychange003-batchE.test.ts. Here: price, status and buyers are still covered.
   for (const lang of ['en', 'bm', 'zh'] as const) {
-    const ex = voiceCommandStrings[lang].examples.join('\n');
+    const ex = c056Strings[lang].groups.flatMap(g => g.examples).join('\n');
     assert.ok(/asking price|harga/i.test(ex) && /Sold|terjual/i.test(ex) && /buyers|pembeli/i.test(ex), `${lang} examples cover price, status and buyers`);
   }
-  assert.ok(/[一-鿿]/.test(voiceCommandStrings.zh.more.diag) && /[一-鿿]/.test(diagStrings.zh.title));
+  assert.ok(/[一-鿿]/.test(c056Strings.zh.diag) && /[一-鿿]/.test(diagStrings.zh.title));
   assert.notEqual(voiceCommandStrings.bm.more.apply, voiceCommandStrings.en.more.apply);
   // the example commands really are understood
   for (const lang of ['en', 'bm'] as const) {
-    const [price, status, buyers] = voiceCommandStrings[lang].examples.slice(-3);
+    const change = c056Strings[lang].groups[1].examples;
+    const price = change.find(x => /harga|price/i.test(x) && /P100\d/.test(x))!, status = change.find(x => /status/i.test(x) && /P100\d/.test(x))!;
+    const buyers = c056Strings[lang].groups[3].examples.find(x => /find|cari/i.test(x))!;
     assert.equal(parseTargetedUpdate(price, props, [])?.kind, 'update', price);
     assert.equal(parseTargetedUpdate(status, props, [])?.kind, 'update', status);
     assert.ok(parseBuyerQuery(buyers, [])?.any, buyers);

@@ -54,13 +54,13 @@ async function saved(page, n) {
   await page.waitForSelector('[data-testid="listing-details"]');
 }
 
-test('BF1 Changes 75 / 81: A4 takes up to 9 photos; 8 styles in a gold-bordered picker', async () => {
+test('BF1 Changes 75 / 81: A4 takes up to 8 photos; 8 styles in a gold-bordered picker', async () => {
   const page = await phone();
   await saved(page, 6);
   await page.getByTestId('open-marketing-studio').click();
   await page.getByTestId('marketing-studio').waitFor();
   await page.getByTestId('ms-format-a4').check();
-  assert.match(await page.getByTestId('ms-photo-count').innerText(), /6 of 9/i);
+  assert.match(await page.getByTestId('ms-photo-count').innerText(), /6 of 8/i);
   // Change 81: the picker
   const tiles = page.getByTestId('ms-theme').locator('[role="radio"]');
   assert.equal(await tiles.count(), 8);
@@ -106,15 +106,29 @@ test('BF2 Changes 78 / 79: Photo Studio grid 2 to a row, tap opens one photo, 7 
   assert.match(await page.getByTestId('ps-pos').innerText(), /2 of 3/i);
   await page.getByTestId('ps-prev').click();
   assert.match(await page.getByTestId('ps-pos').innerText(), /1 of 3/i);
-  // with an unsaved change, moving on is held back
+  // the icon row and its control sit right under the pinned photo (Change 78)
+  const lay = await page.evaluate(() => { const st = document.querySelector('[data-testid="ps-stage"]').getBoundingClientRect(); const tl = document.querySelector('[data-testid="ps-tools"]').getBoundingClientRect(); return { gap: tl.top - st.bottom, inPin: !!document.querySelector('[data-testid="ps-pin"] [data-testid="ps-tools"]') }; });
+  assert.ok(lay.inPin && lay.gap >= 0 && lay.gap < 60, `tools right under the photo (${JSON.stringify(lay)})`);
+  // with an unsaved change, moving on asks Save or Discard (Change 79)
   await page.getByTestId('ps-tool-brightness').click();
   await page.getByTestId('ps-brightness').fill('60');
   await page.getByTestId('ps-next').click();
-  assert.match(await page.getByTestId('ps-pos').innerText(), /1 of 3/i);
-  assert.match(await page.getByTestId('ps-note').innerText(), /save or reset/i);
-  // save it: the grid shows the "Enhanced copy" label below the picture, not on it
-  await page.getByTestId('ps-save-new').click();
-  await page.getByTestId('ps-msg').waitFor();
+  await page.getByTestId('ps-leave').waitFor();
+  await page.getByTestId('ps-leave-stay').click();
+  assert.match(await page.getByTestId('ps-pos').innerText(), /1 of 3/i, 'Cancel stays on the photo');
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), false, 'and keeps the change');
+  await page.getByTestId('ps-next').click();
+  await page.getByTestId('ps-leave-save').click();
+  // saved as a new photo (it sits next to its original, so there are 4), then on to the next original photo
+  await page.waitForFunction(() => /3 of 4/i.test(document.querySelector('[data-testid="ps-pos"]')?.textContent ?? ''));
+  // Discard: the change is dropped and it moves on
+  await page.getByTestId('ps-tool-contrast').click();
+  await page.getByTestId('ps-contrast').fill('40');
+  await page.getByTestId('ps-prev').click();
+  await page.getByTestId('ps-leave-discard').click();
+  assert.match(await page.getByTestId('ps-pos').innerText(), /2 of 4/i);
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'nothing left to save');
+  // the grid shows the "Enhanced copy" label below the picture, not on it
   await page.getByTestId('ps-all').click();
   await page.getByTestId('ps-chip').first().waitFor();
   const g = await page.evaluate(() => { const c = document.querySelector('[data-testid="ps-chip"]'); const btn = c.parentElement.querySelector('[data-testid="ps-photo"]'); return { chipTop: c.getBoundingClientRect().top, imgBottom: btn.getBoundingClientRect().bottom, inside: btn.contains(c) }; });

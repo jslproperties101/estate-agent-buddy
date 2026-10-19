@@ -26,7 +26,7 @@ export function FileActions({ lang, blob, fileName, title, mime = 'application/p
       if (kind === 'save') {
         const r = await saveFile(held, fileName);
         // JoyChange003 Change 77: a short message, with an Open button when the phone can show the saved file.
-        setMsg(r.ok ? { text: r.where?.startsWith('Download/') ? (r.gallery ? f.savedGallery : f.savedDownloads) : r.where ? f.saved(r.where) : f.savedWeb, error: false, open: r.open } : { text: r.reason === 'needApk' ? f.needApk : r.reason === 'noFile' ? f.noFile : f.failed, error: true });
+        setMsg(r.ok ? { text: r.place === 'gallery' ? f.savedGallery : r.place === 'downloads' ? f.savedDownloads : r.where ? f.saved(r.where) : f.savedWeb, error: false, open: r.open } : { text: r.reason === 'needApk' ? f.needApk : r.reason === 'noFile' ? f.noFile : f.failed, error: true });
       } else {
         const r = await shareFile(held, fileName, title, mime);
         setMsg(r === 'shared' ? { text: f.shared, error: false } : r === 'cancelled' ? { text: f.cancelled, error: false }

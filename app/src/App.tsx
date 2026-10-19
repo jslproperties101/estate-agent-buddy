@@ -18,7 +18,7 @@ import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
 import { beginStartup, startupLang, StartupPhase, SPLASH_MS, splashStep } from './startup/startup';
 import { startupStrings } from './startup/strings';
-import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './domain/workflow';
+import { dueReminders, upcomingReminders, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
 import { isShown, dismissMarks, snoozeMarks, restoreMarks, historyList, snoozeUntil, SNOOZE_CHOICES } from './lib/notifState';
 import { showNow, scheduleNative, idFor } from './lib/notify';
@@ -89,7 +89,7 @@ import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 import { InvitePopup } from './team/InvitePopup';
 import { TeamSharingCard, teamBadgeCount } from './team/TeamEntry';
-import { inviteAlertCount, markAnswersSeen, openInvites, unseenAnswers } from './team/invitations';
+import { markAnswersSeen, openInvites, unseenAnswers } from './team/invitations';
 import { personLabel } from './team/access';
 import { TeamScreen, ManageSharingScreen, captureInviteFromUrl, pendingInviteToken } from './team/TeamUI';
 import { teamStrings } from './team/strings';
@@ -366,9 +366,12 @@ function Shell() {
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
-  // Change 72: an invitation that was dismissed or snoozed no longer counts on the bell.
-  const hiddenInvites = openInvites(state).filter(i => !isShown(state.meta, `invite:${i.id}`, Date.now())).length;
-  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue + inviteAlertCount(state) - hiddenInvites;
+  // Change 72: the red number counts only notifications that need attention now and were not dismissed or snoozed
+  // (reminders that are due, follow-ups, reviews, invitations, a failed sync…); reminders coming up later do not count.
+  const bellNow = Date.now();
+  const syncFailed = saveState === 'failed-phone' || (!!state.meta.syncSession && saveState === 'failed-sync');
+  const notifCount = notifData(state, store.allDrafts().length, bellNow).attentionKeys.filter(k => isShown(state.meta, k, bellNow)).length + (syncFailed ? 1 : 0);
+  void alerts;
 
   return (
     <ToastContext.Provider value={showToast}>
@@ -378,7 +381,9 @@ function Shell() {
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
           {/* ClaudeChanges001 change 2: no "Saved on This Phone" line under the title; a problem shows as a banner on the main page. */}
           <div className="title-col">
-            {screen.name === 'home' ? null : <h1>{title}</h1>}
+            {screen.name === 'home'
+              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
+              : <h1>{title}</h1>}
           </div>
           {screen.name === 'home' && <>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
@@ -397,8 +402,6 @@ function Shell() {
         <UpdateBanner lang={lang} />
 
         <main className="content" data-screen={screen.name}>
-          {/* JoyChange003 Change 65: the logo and app name sit at the top of the main page (about a tenth of the screen) and scroll away with it. */}
-          {screen.name === 'home' && <h1 className="brand brand-strip" aria-label={t.appName} data-testid="brand-strip"><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>}
           <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
         </main>
 
@@ -686,33 +689,59 @@ function NotifBox({ k, title, lang, children, actions = true }: { k: string; tit
  *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet.
  *  JoyChange003 Change 72: every notification is its own box with a gap between boxes, can be dismissed (kept in History) or
  *  snoozed. Cloud-sync messages are in Settings only; only a FAILED sync shows here, a good sync never does. */
+/** Change 72: everything that can appear in System Notifications, with the key each box is dismissed or snoozed by.
+ *  `attention` lists the keys that need attention now (they count on the bell); reminders coming up later do not. */
+function notifData(state: ReturnType<Store['getState']>, draftCount: number, now: number) {
+  const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
+  // Change 004: the main screen no longer pops up due reminders; the ones from the last 24 hours (to-dos not done,
+  // appointments still scheduled) are listed here instead, so none is missed.
+  const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30);
+  const adAttn = attention(state.properties.filter(p => !p.archived), ymd(new Date(now)));
+  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
+  const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
+  const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || now - state.meta.driveLastOkAt > STALE_MS);
+  const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
+  const follow = followUpDue(state.contacts, now, followDays);
+  const k = {
+    review: `review:${state.meta.leadReview?.at ?? 0}`, conflicts: `conflicts:${conflictCount}`, drafts: `drafts:${draftCount}`, adverts: `adverts:${adAttn.length}`,
+    follow: `follow:${follow.map(x => x.contact.id).join(',')}`, drive: `drive:${state.meta.driveLastOkAt ?? 0}`,
+  };
+  const invites = openInvites(state, now);
+  const answers = unseenAnswers(state);
+  const attentionKeys = [
+    ...(review > 0 ? [k.review] : []), ...(conflictCount > 0 ? [k.conflicts] : []), ...(draftCount > 0 ? [k.drafts] : []), ...(adAttn.length ? [k.adverts] : []),
+    ...(follow.length ? [k.follow] : []), ...(driveStale ? [k.drive] : []), ...invites.map(i => `invite:${i.id}`), ...answers.map(a => `answer:${a.id}`),
+    ...recent.map(r => `rem:${r.key}`),
+  ];
+  return { soon, recent, adAttn, review, conflictCount, driveStale, followDays, follow, k, invites, answers, attentionKeys };
+}
+
+/** Notifications, in two clear sections. System Notifications: reminders and the cloud-sync status. News / Announcements:
+ *  messages published by the owner. Publishing is not built yet, so that section is empty for now; the earlier sample
+ *  News cards are kept under a clearly marked "sample, not live" preview rather than deleted. Push notifications to the
+ *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet.
+ *  JoyChange003 Change 72: every notification is its own box with a gap between boxes, can be dismissed (kept in History, at
+ *  the bottom of the screen) or snoozed. Cloud-sync messages are in Settings only; only a FAILED sync shows here. */
 function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const t = strings[lang];
   const ss = saveStrings[lang];
   const sync = useSaveState();
   const now = Date.now();
-  const show = (k: string) => isShown(state.meta, k, now);
-  const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30).filter(r => show(`rem:${r.key}`));
-  // Change 004: the main screen no longer pops up due reminders; the ones from the last 24 hours (to-dos not done,
-  // appointments still scheduled) are listed here instead, so none is missed.
-  const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30).filter(r => show(`rem:${r.key}`));
-  const adAttn = attention(state.properties.filter(p => !p.archived), ymd(new Date()));
+  const show = (key: string) => isShown(state.meta, key, now);
+  const draftCount = store.allDrafts().length;
+  const nd = notifData(state, draftCount, now);
+  const { adAttn, review, conflictCount, driveStale, followDays, follow } = nd;
+  const soon = nd.soon.filter(r => show(`rem:${r.key}`));
+  const recent = nd.recent.filter(r => show(`rem:${r.key}`));
   const perm = permission();
   const signedIn = !!state.meta.syncSession;
   const syncLine = sync === 'failed-phone' ? ss.failedPhone : signedIn && sync === 'failed-sync' ? t.notif.syncFailed : null;
-  const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
-  const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
-  const draftCount = store.allDrafts().length;
-  const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
-  const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
-  const follow = followUpDue(state.contacts, now, followDays);
-  const kReview = `review:${state.meta.leadReview?.at ?? 0}`, kConf = `conflicts:${conflictCount}`, kDraft = `drafts:${draftCount}`, kAd = `adverts:${adAttn.length}`;
-  const kFollow = `follow:${follow.map(x => x.contact.id).join(',')}`, kDrive = `drive:${state.meta.driveLastOkAt ?? 0}`;
+  const { review: kReview, conflicts: kConf, drafts: kDraft, adverts: kAd, follow: kFollow, drive: kDrive } = nd.k;
   const showReview = review > 0 && show(kReview), showConf = conflictCount > 0 && show(kConf), showDraft = draftCount > 0 && show(kDraft);
   const showAd = adAttn.length > 0 && show(kAd), showFollow = follow.length > 0 && show(kFollow), showDrive = driveStale && show(kDrive);
-  const invites = openInvites(state).filter(i => show(`invite:${i.id}`));
-  const answers = unseenAnswers(state);
+  const invites = nd.invites.filter(i => show(`invite:${i.id}`));
+  const answers = nd.answers;
   const history = historyList(state.meta);
   const systemEmpty = !showFollow && soon.length === 0 && recent.length === 0 && !showAd && !syncLine && !showReview && !showConf && !showDraft && !showDrive && invites.length === 0 && answers.length === 0;
   const n = t.newsPage;
@@ -800,20 +829,6 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
           <div className="notif-stack" data-testid="notif-recent">{recent.map(remRow)}</div>
         </>}
         {soon.length > 0 && <div className="notif-stack" data-testid="notif-soon">{soon.map(remRow)}</div>}
-        <details className="notif-history" data-testid="notif-history">
-          <summary>{t.notif.history} ({history.length})</summary>
-          {history.length === 0 ? <small className="muted" data-testid="notif-history-empty">{t.notif.historyEmpty}</small> : (
-            <div className="notif-stack">
-              <small className="muted">{t.notif.historyHint}</small>
-              {history.map(h => (
-                <div key={h.key} className="notif-box notif-hist-row" data-testid="notif-history-row">
-                  <strong>{h.title}</strong><small className="muted">{fmtDateTime(h.at, lang)}</small>
-                  <div className="notif-actions"><button type="button" className="btn small secondary" data-testid="notif-restore" onClick={() => store.setSingleton('meta', { notifs: restoreMarks(store.getState().meta, h.key) })}>{t.notif.restore}</button></div>
-                </div>
-              ))}
-            </div>
-          )}
-        </details>
       </div>
       <div className="card stack-sm" data-testid="notif-news">
         <div className="card-title">{t.notif.newsTitle}</div>
@@ -841,6 +856,23 @@ function Notifications({ lang, go }: { lang: Lang; go: Go }) {
         <div className="card-title">{t.notif.settings}</div>
         <small className="muted">{t.reminders.note}</small>
         {perm === 'granted' ? <small className="ok-text">{t.reminders.allowed}</small> : perm === 'denied' ? <small className="warn-text">{t.reminders.blocked}</small> : null}
+      </div>
+      {/* Change 72: History, at the bottom of the screen. */}
+      <div className="card stack-sm notif-history-card">
+          <details className="notif-history" data-testid="notif-history">
+          <summary>{t.notif.history} ({history.length})</summary>
+          {history.length === 0 ? <small className="muted" data-testid="notif-history-empty">{t.notif.historyEmpty}</small> : (
+            <div className="notif-stack">
+              <small className="muted">{t.notif.historyHint}</small>
+              {history.map(h => (
+                <div key={h.key} className="notif-box notif-hist-row" data-testid="notif-history-row">
+                  <strong>{h.title}</strong><small className="muted">{fmtDateTime(h.at, lang)}</small>
+                  <div className="notif-actions"><button type="button" className="btn small secondary" data-testid="notif-restore" onClick={() => store.setSingleton('meta', { notifs: restoreMarks(store.getState().meta, h.key) })}>{t.notif.restore}</button></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </details>
       </div>
     </section>
   );

@@ -24,6 +24,8 @@ export interface Handlers {
   final: (text: string) => void;
   error: (code: VoiceError) => void;
   end: () => void;
+  /** JoyChange003 Change 55: the recogniser is really listening now (the start sound has played): the moment to speak. */
+  ready?: () => void;
 }
 
 function ctor(): any {
@@ -31,6 +33,9 @@ function ctor(): any {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 const nativeSpeech = (): any => plugin('SpeechRecognition');
+/** JoyChange003 Change 55: the app's own speech plugin (scripts/android-setup.mjs), in APKs built from this version on. */
+const eabSpeech = (): EabSpeech | undefined => plugin<EabSpeech>('EabSpeech');
+const eabUsable = () => !!eabSpeech() && !pluginMissing('EabSpeech');
 export const speechSupported = () => !!nativeSpeech() || !!ctor();
 
 export interface Listening { stop(): void; abort(): void }
@@ -52,6 +57,7 @@ export function listen(lang: string, h: Handlers, maxMs = 60000): Listening | nu
 }
 
 function listenInner(lang: string, h: Handlers, maxMs: number): Listening | null {
+  if (eabUsable()) return listenEab(eabSpeech()!, nativeSpeech(), lang, h, maxMs);
   if (pluginMissing('SpeechRecognition')) { h.error('plugin-missing'); return null; }
   const n = nativeSpeech();
   if (n) return listenNative(n, lang, h, maxMs);
@@ -76,6 +82,8 @@ function listenInner(lang: string, h: Handlers, maxMs: number): Listening | null
     h.interim(lastInterim);
   };
   r.onerror = (e: any) => { failed = true; h.error(KNOWN.includes(e?.error) ? e.error : 'other'); };
+  // Change 55: "Listening…" only once the microphone is really open.
+  r.onaudiostart = () => { if (!ended) h.ready?.(); };
   r.onend = () => {
     if (ended) return;
     ended = true; clearTimeout(timer);
@@ -157,6 +165,7 @@ export function listenNative(n: any, lang: string, h: Handlers, maxMs: number, w
       subs.push(await n.addListener('partialResults', (d: { matches?: string[] }) => words(d?.matches)));
       subs.push(await n.addListener('listeningState', (d: { status?: string }) => { if (d?.status === 'stopped') awaitResult(); }));
       const r = await n.start({ language: lang, maxResults: 1, partialResults: true, popup: false });
+      h.ready?.();
       // Some plugin versions resolve start() with the final words instead of sending an event.
       if (r?.matches?.length) { stopping = true; words(r.matches); }
     } catch (e) {
@@ -170,5 +179,137 @@ export function listenNative(n: any, lang: string, h: Handlers, maxMs: number, w
   return {
     stop: () => { if (ended) return; void Promise.resolve(n.stop()).catch(() => {}); awaitResult(); },
     abort: () => { last = ''; void Promise.resolve(n.stop()).catch(() => {}); finish(); },
+  };
+}
+
+// ---------- JoyChange003 Change 55: the app's own speech plugin ----------
+/** One event from the app's speech plugin. `session` is the number given to start(), so events of an earlier session are ignored. */
+export interface EabSpeechEvent { session: number; type: 'ready' | 'speaking' | 'endOfSpeech' | 'partial' | 'final' | 'error'; text?: string; code?: number }
+export interface EabSpeech {
+  prepare(): Promise<void>;
+  start(o: { language: string; session: number }): Promise<void>;
+  stop(): Promise<void>;
+  cancel(): Promise<void>;
+  reset(): Promise<void>;
+  addListener(event: 'speech', fn: (e: EabSpeechEvent) => void): Promise<{ remove: () => Promise<void> }>;
+}
+/** The community plugin's permission calls (the microphone permission is shared). */
+export interface SpeechPermissions {
+  checkPermissions(): Promise<{ speechRecognition?: string }>;
+  requestPermissions(): Promise<{ speechRecognition?: string }>;
+}
+
+/** Android SpeechRecognizer error numbers → the app's error codes. 5 (client) and 8 (busy) mean "try again". */
+export function androidErrorCode(code: number | undefined): VoiceError {
+  switch (code) {
+    case 1: case 2: case 4: case 11: return 'network';
+    case 3: return 'audio-capture';
+    case 5: case 8: case 10: return 'busy';
+    case 6: case 7: return 'no-speech';
+    case 9: return 'not-allowed';
+    case 12: case 13: return 'language-not-supported';
+    default: return 'other';
+  }
+}
+
+/** How long to wait for "ready" after start before trying once more (a recogniser that never opens the microphone). */
+export const READY_WAIT_MS = 3500;
+
+/** One listener for all sessions, added once (adding it on every tap cost a round trip before listening could begin). */
+const sessions = new Map<number, (e: EabSpeechEvent) => void>();
+let hub: Promise<unknown> | null = null;
+let sessionNo = 0;
+let micGranted = false;
+function ensureHub(n: EabSpeech) {
+  if (!hub) hub = n.addListener('speech', e => sessions.get(e?.session)?.(e)).catch(err => { hub = null; throw err; });
+  return hub;
+}
+/** For tests: forget the listener and the permission so a new fake plugin can be used. */
+export function resetEabForTests() { hub = null; sessions.clear(); sessionNo = 0; micGranted = false; }
+
+/** Change 55: called when the AI Assisted Command screen opens. Makes Android's recogniser and the event listener ready,
+ *  so the first tap on the microphone starts listening at once. Never asks for a permission. Safe to call often. */
+export async function prepareVoice(): Promise<boolean> {
+  const n = eabSpeech();
+  if (!n || pluginMissing('EabSpeech')) return false;
+  try { await ensureHub(n); await n.prepare(); return true; } catch { return false; }
+}
+
+/** Android app with the app's own plugin: start → "ready" (speak now) → live words → final words, or a clear error.
+ *  The previous session is always closed first (by the plugin); a "busy" or "client" error before listening began is
+ *  retried once with a fresh recogniser; after End recording the final words are awaited (RESULT_WAIT_MS at most). */
+export function listenEab(n: EabSpeech, perms: SpeechPermissions | undefined, lang: string, h: Handlers, maxMs = 60000, waitMs = RESULT_WAIT_MS, readyMs = READY_WAIT_MS): Listening {
+  const id = ++sessionNo;
+  let ended = false, ready = false, stopping = false, retried = false;
+  let last = '';
+  let wait: ReturnType<typeof setTimeout> | undefined;
+  let readyTimer: ReturnType<typeof setTimeout> | undefined;
+  const timer = setTimeout(() => { void n.stop().catch(() => {}); awaitResult(); }, maxMs);
+  const finish = (ifEmpty?: VoiceError) => {
+    if (ended) return;
+    ended = true;
+    clearTimeout(timer); clearTimeout(wait); clearTimeout(readyTimer);
+    sessions.delete(id);
+    if (last) h.final(last);
+    else if (ifEmpty) h.error(ifEmpty);
+    h.interim('');
+    h.end();
+  };
+  const awaitResult = () => {
+    if (stopping || ended) return;
+    stopping = true;
+    wait = setTimeout(() => finish('no-result'), waitMs);
+  };
+  const begin = async () => {
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(() => { if (!ready && !ended) void retry('busy'); }, readyMs);
+    await n.start({ language: lang, session: id });
+  };
+  const retry = async (why: VoiceError) => {
+    if (ended) return;
+    if (retried || last) { h.error(why); finish(); return; }
+    retried = true;
+    clearTimeout(readyTimer);
+    try { await n.reset(); } catch { /* a fresh one is made anyway */ }
+    setTimeout(() => { if (!ended) begin().catch(e => { h.error(nativeErrorCode(String((e as Error)?.message ?? e))); finish(); }); }, 250);
+  };
+  sessions.set(id, e => {
+    if (ended) return;
+    switch (e.type) {
+      case 'ready': ready = true; clearTimeout(readyTimer); h.ready?.(); break;
+      case 'speaking': if (!ready) { ready = true; clearTimeout(readyTimer); h.ready?.(); } break;
+      case 'partial': if (e.text?.trim()) { last = e.text.trim(); h.interim(last); } break;
+      case 'endOfSpeech': awaitResult(); break;
+      case 'final': if (e.text?.trim()) last = e.text.trim(); finish(last ? undefined : 'no-result'); break;
+      case 'error': {
+        const code = androidErrorCode(e.code);
+        if (code === 'busy' && !ready && !last) { void retry('busy'); break; }
+        if (code === 'no-speech' || (code === 'busy' && stopping)) { finish(last ? undefined : stopping ? 'no-result' : 'no-speech'); break; }
+        if (last) { finish(); break; }
+        h.error(code); finish();
+        break;
+      }
+    }
+  });
+  void (async () => {
+    try {
+      await ensureHub(n);
+      if (perms && !micGranted) {
+        let p = await perms.checkPermissions();
+        if (p?.speechRecognition !== 'granted') p = await perms.requestPermissions();
+        if (p?.speechRecognition !== 'granted') { h.error('not-allowed'); finish(); return; }
+        micGranted = true;
+      }
+      if (ended) return;
+      await begin();
+    } catch (e) {
+      const code = nativeErrorCode(String((e as Error)?.message ?? e));
+      if (code === 'busy') void retry('busy'); else { h.error(code); finish(); }
+    }
+  })();
+  return {
+    // Before the microphone opened there is nothing to wait for: close quietly.
+    stop: () => { if (ended) return; if (!ready && !last) { void n.cancel().catch(() => {}); finish(); return; } void n.stop().catch(() => {}); awaitResult(); },
+    abort: () => { last = ''; void n.cancel().catch(() => {}); finish(); },
   };
 }

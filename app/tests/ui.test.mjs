@@ -809,14 +809,16 @@ test('U19 Voice Command: property, to-do, calendar and contact commands open the
   await tile(page, 'Voice Command');
   const box = page.getByTestId('voice-cmd').locator('textarea');
   await box.fill('Remind me to call Buyer K tomorrow at 3pm');
-  await page.getByRole('button', { name: 'Show proposed details' }).click();
+  await page.getByTestId('cmd-process').click();
+  // JoyChange003 Change 60: a card says what was understood; "Edit in the form" opens the to-do form.
+  await page.getByTestId('step-task').getByTestId('step-edit').click();
   await page.waitForSelector('[data-testid="task-form"]');
   assert.equal(await page.locator('[data-field="title"]').inputValue(), 'Call Buyer K');
   assert.equal(await page.locator('[data-field="dueTime"]').inputValue(), '15:00');
   await home(page);
   await tile(page, 'Voice Command');
   await box.fill('Create a new terrace house in Putra Nilai for sale, asking price RM580,000, four bedrooms, freehold, owner Encik Ahmad 012 345 6789');
-  await page.getByRole('button', { name: 'Show proposed details' }).click();
+  await page.getByTestId('cmd-process').click();
   assert.match(await page.getByTestId('proposal').innerText(), /Encik Ahmad/i);
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await expandForm(page);
@@ -1415,7 +1417,8 @@ test('U124 JoyChange002 Batch D: AI Assisted Command is minimal (48); speech wai
   // 48: the box, the send arrow, the voice button and How to use; nothing else.
   const scr = page.getByTestId('voice-command');
   assert.equal(await scr.locator('textarea').count(), 1);
-  for (const id of ['cmd-send', 'voice-start', 'cmd-howto']) assert.equal(await scr.getByTestId(id).count(), 1, id);
+  // JoyChange003 Changes 56 / 59: the send arrow became AI Process, with Clear between it and the microphone.
+  for (const id of ['cmd-process', 'cmd-clear', 'voice-start', 'cmd-howto']) assert.equal(await scr.getByTestId(id).count(), 1, id);
   assert.equal(await scr.locator('.notice, .chip-row, details.examples').count(), 0, 'no intro, language chips or example list');
   assert.equal(await page.getByTestId('cmd-howto-list').count(), 0, 'How to use starts closed');
   const tb = await scr.locator('textarea').boundingBox(); const mic = await page.getByTestId('voice-start').boundingBox();
@@ -1438,7 +1441,7 @@ test('U124 JoyChange002 Batch D: AI Assisted Command is minimal (48); speech wai
   assert.equal(await scr.locator('textarea').inputValue(), 'create a new terrace house at Jalan Tahap 1 freehold Non Bumiputera owner Victor Vendor 013 222 3333');
   assert.equal(await page.getByTestId('proposal').count(), 0, 'nothing happens until send');
   // 50: the review area: the property and the contact, best match first, photo rows.
-  await page.getByTestId('cmd-send').click();
+  await page.getByTestId('cmd-process').click();
   await page.getByTestId('proposal').waitFor();
   const mp = page.getByTestId('match-property');
   assert.match(await mp.getByTestId('mp-addr').first().innerText(), /Jalan Tahap 1/i, 'the matching property is chosen');
@@ -2477,7 +2480,7 @@ test('U61 no Fill with Voice on the form (owner, 17 Oct 2026); voice-command det
   assert.equal(await page.getByTestId('voice-fill-btn').count() + await page.getByTestId('voice-panel').count(), 0, 'no Fill with Voice button or panel');
   await home(page); await tile(page, 'Voice Command');
   await page.getByTestId('voice-cmd').locator('textarea').first().fill('Create a new terrace house in Nilai for sale, asking price RM580,000, four bedrooms, three bathrooms, freehold.');
-  await page.getByRole('button', { name: 'Show proposed details' }).click();
+  await page.getByTestId('cmd-process').click();
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await expandForm(page);
   const banner = page.getByTestId('review-banner');
@@ -2508,7 +2511,7 @@ test('U62 voice command prefill (Voice Command card; the Property List has no vo
   assert.equal(await page.locator('.lc-tools .voice-btn').count(), 0, 'Change 009: no voice button in the Property List');
   await home(page); await tile(page, 'Voice Command');
   await page.getByTestId('voice-cmd').locator('textarea').first().fill('Create a new terrace house in Putra Nilai for rent, rental RM1,800 per month, three bedrooms, two bathrooms.');
-  await page.getByRole('button', { name: 'Show proposed details' }).click();
+  await page.getByTestId('cmd-process').click();
   await page.getByRole('button', { name: 'Open in the form to review' }).click();
   await expandForm(page);
   assert.ok(await page.getByTestId('review-banner').count() === 1, 'the review notice is shown');
@@ -3133,7 +3136,7 @@ test('U77 Voice Command: set the asking price, change the status to Sold and fin
   const page = await phone();
   await loadSample(page);
   await tile(page, 'Voice Command');
-  const say = async t => { await page.getByTestId('voice-cmd').locator('textarea').fill(t); await page.getByRole('button', { name: 'Show proposed details' }).click(); };
+  const say = async t => { await page.getByTestId('voice-cmd').locator('textarea').fill(t); await page.getByTestId('cmd-process').click(); };
   const p1004 = async () => (await storedRecords(page, 'properties')).find(p => p.ref === 'P1004');
   // 1. asking price by reference
   await say('Set the asking price of P1004 to RM600,000');
@@ -3179,8 +3182,9 @@ test('U77 Voice Command: set the asking price, change the status to Sold and fin
   await tile(page, 'Voice Command');
   await say('Find buyers looking for a bungalow in Kajang');
   assert.match(await page.getByTestId('buyers-none').innerText(), /No buyer or tenant matches/i);
-  // 5. the existing commands still work
+  // 5. the existing commands still work (JoyChange003 Change 60: through the confirm card)
   await say('Remind me to call Buyer K tomorrow at 3pm');
+  await page.getByTestId('step-task').getByTestId('step-edit').click();
   await page.waitForSelector('[data-testid="task-form"]');
   await page.context().close();
 });

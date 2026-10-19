@@ -38,6 +38,12 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<Tool>('brightness');
   const swipe = useRef<{ x: number; y: number } | null>(null);
+  const [dragX, setDragX] = useState(0);
+  const [slide, setSlide] = useState<1 | -1 | 0>(0);
+  /** Change 79: moving to another photo with unsaved edits: which way, until the person answers. */
+  const [leave, setLeave] = useState<1 | -1 | 0>(0);
+  const list = l?.photos ?? [];
+  const at = photo ? list.findIndex(p => p.id === photo.id) : -1;
   const [edit, setEdit] = useState<PhotoEdit>(NO_EDIT);
   const [tab, setTab] = useState<'adjust' | 'mask'>('adjust');
   const [mode, setMode] = useState<MaskMode>('solid');
@@ -111,10 +117,23 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
     const r = area.current!.getBoundingClientRect();
     return { x: Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)) };
   };
-  const down = (ev: PointerLike) => { if (tab !== 'mask') { swipe.current = { x: ev.clientX, y: ev.clientY }; return; } if (view !== 'edited') return; (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId); start.current = norm(ev); setDrag(null); };
-  const move = (ev: PointerLike) => { if (!start.current) return; const p = norm(ev); setDrag(rectFrom(start.current.x, start.current.y, p.x, p.y)); };
+  // Change 79 (with the Change 53 feel): on the Improve tab the picture follows the finger sideways; a swipe slides in the
+  // next or previous photo, a short drag springs back.
+  const down = (ev: PointerLike) => {
+    if (tab !== 'mask') { swipe.current = { x: ev.clientX, y: ev.clientY }; return; }
+    if (view !== 'edited') return;
+    (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId); start.current = norm(ev); setDrag(null);
+  };
+  const move = (ev: PointerLike) => {
+    if (swipe.current) { const dx = ev.clientX - swipe.current.x; if (Math.abs(dx) > 8 && list.length > 1) setDragX(dx); return; }
+    if (!start.current) return; const p = norm(ev); setDrag(rectFrom(start.current.x, start.current.y, p.x, p.y));
+  };
   const up = (ev: PointerLike) => {
-    if (swipe.current) { const d = { x: ev.clientX - swipe.current.x, y: ev.clientY - swipe.current.y }; swipe.current = null; if (isSwipe(d.x, d.y)) step(d.x < 0 ? 1 : -1); return; }
+    if (swipe.current) {
+      const d = { x: ev.clientX - swipe.current.x, y: ev.clientY - swipe.current.y }; swipe.current = null; setDragX(0);
+      if (isSwipe(d.x, d.y)) step(d.x < 0 ? 1 : -1);
+      return;
+    }
     if (!start.current) return;
     const p = norm(ev); const r = rectFrom(start.current.x, start.current.y, p.x, p.y);
     start.current = null; setDrag(null);
@@ -122,14 +141,15 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
   };
 
   const changed = hasChange(edit);
-  const list = l?.photos ?? [];
-  const at = photo ? list.findIndex(p => p.id === photo.id) : -1;
-  /** Change 79: the next (+1) or previous (-1) photo. Unsaved changes are kept: the person saves or resets first. */
+  /** Change 79: the next (+1) or previous (-1) photo. With unsaved changes the app asks first: Save, Discard or stay. */
   function step(d: 1 | -1) {
     if (at < 0 || list.length < 2) return;
-    if (hasChange(edit)) { setNote(t.swipeKeep); return; }
+    if (hasChange(edit)) { setLeave(d); return; }
+    go(d);
+  }
+  function go(d: 1 | -1) {
     const next = list[(at + d + list.length) % list.length];
-    setSel(next.id); setMsg(undefined);
+    setSlide(d); setSel(next.id); setMsg(undefined); setNote(undefined);
   }
   const openPhoto = (id: string) => { setSel(id); setMsg(undefined); setEditing(true); window.scrollTo?.(0, 0); };
   const kind = editKind(hasEnhance(edit), edit.masks.length > 0);
@@ -140,17 +160,18 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
     const c = renderEdit(img, edit, SAVE_SIDE);
     return { blob: await toJpeg(c), kind };
   }
-  async function saveNew() {
-    if (!l || !photo || busy) return;
+  async function saveNew(): Promise<boolean> {
+    if (!l || !photo || busy) return false;
     setBusy(true); setMsg(undefined);
     try {
       const made = await make();
-      if (!made) { setMsg(t.noChange); return; }
+      if (!made) { setMsg(t.noChange); return false; }
       const fileId = await store.putFile(made.blob);
       const cur = store.getState().properties.find(p => p.id === l.id) ?? l;
       store.upsert('properties', addEditedCopy(cur, photo.id, { id: newId(), fileId, name: copyName(photo.name, made.kind, t.copyWords), bytes: made.blob.size, kind: made.kind }, Date.now()));
       setEdit(NO_EDIT); setNote(undefined); setMsg(t.saved);
-    } catch { setMsg(t.loadFail); } finally { setBusy(false); }
+      return true;
+    } catch { setMsg(t.loadFail); return false; } finally { setBusy(false); }
   }
   async function doReplace() {
     setAsk(false);
@@ -210,27 +231,22 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
               <button type="button" className="icon-btn" aria-label={t.next} onClick={() => step(1)} data-testid="ps-next">›</button>
             </>}
           </div>
-          <div className="ps-pin">
-            <div className="ps-stage" ref={area} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { swipe.current = null; }} data-testid="ps-stage" data-mode={tab}>
-              {preview ? <img src={preview} alt={photo.name} draggable={false} data-testid="ps-preview" /> : <div className="img-wait" />}
-              {drag && <div className="ps-drag" style={{ left: `${drag.x * 100}%`, top: `${drag.y * 100}%`, width: `${drag.w * 100}%`, height: `${drag.h * 100}%` }} />}
-            </div>
-            {photo.edit && <small className="chip-tag ps-under" data-testid="ps-chip-current">{t.chip[photo.edit]}</small>}
-          </div>
-          {list.length > 1 && tab === 'adjust' && <small className="muted" data-testid="ps-swipe-hint">{t.swipeHint}</small>}
-          <div className="two" role="group" aria-label={t.compare}>
-            <button className={`btn small ${view === 'edited' ? 'primary' : 'secondary'}`} onClick={() => setView('edited')} data-testid="ps-show-edited">{t.showEdited}</button>
-            <button className={`btn small ${view === 'original' ? 'primary' : 'secondary'}`} onClick={() => setView('original')} data-testid="ps-show-original">{t.showOriginal}</button>
-          </div>
           <div className="two" role="tablist">
             <button role="tab" aria-selected={tab === 'adjust'} className={`btn small ${tab === 'adjust' ? 'primary' : 'secondary'}`} onClick={() => setTab('adjust')} data-testid="ps-tab-adjust">{t.tabs.adjust}</button>
             <button role="tab" aria-selected={tab === 'mask'} className={`btn small ${tab === 'mask' ? 'primary' : 'secondary'}`} onClick={() => setTab('mask')} data-testid="ps-tab-mask">{t.tabs.mask}{masksCount ? ` (${masksCount})` : ''}</button>
           </div>
-          {note && <p className="notice" role="status" data-testid="ps-note">{note}</p>}
-
-          {tab === 'adjust' && (
-            <div className="card stack-sm" data-testid="ps-adjust">
-              <label className="check"><input type="checkbox" checked={e.auto} onChange={ev => enh({ auto: ev.target.checked })} data-testid="ps-auto" /> <span>{t.autoEnhance}</span></label>
+          {/* Change 78: the photo is pinned at the top; the icon row and its one control sit right under it. */}
+          <div className="ps-pin" data-testid="ps-pin">
+            <div className="ps-stage" ref={area} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { swipe.current = null; setDragX(0); }} data-testid="ps-stage" data-mode={tab}>
+              {preview
+                ? <img key={photo.id} src={preview} alt={photo.name} draggable={false} data-testid="ps-preview"
+                    className={dragX ? 'dragging' : slide ? (slide > 0 ? 'ps-in-next' : 'ps-in-prev') : ''} onAnimationEnd={() => setSlide(0)}
+                    style={dragX ? { transform: `translateX(${dragX}px)` } : undefined} />
+                : <div className="img-wait" />}
+              {drag && <div className="ps-drag" style={{ left: `${drag.x * 100}%`, top: `${drag.y * 100}%`, width: `${drag.w * 100}%`, height: `${drag.h * 100}%` }} />}
+            </div>
+            {photo.edit && <small className="chip-tag ps-under" data-testid="ps-chip-current">{t.chip[photo.edit]}</small>}
+            {tab === 'adjust' && <>
               <div className="ps-tools" role="toolbar" aria-label={t.tools} data-testid="ps-tools">
                 {TOOLS.map(k => (
                   <button key={k} type="button" className={`ps-tool ${tool === k ? 'on' : ''}`} aria-pressed={tool === k} onClick={() => setTool(k)} data-testid={`ps-tool-${k}`}>
@@ -265,6 +281,18 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
                   </div>
                 )}
               </div>
+            </>}
+          </div>
+          {note && <p className="notice" role="status" data-testid="ps-note">{note}</p>}
+          {list.length > 1 && tab === 'adjust' && <small className="muted" data-testid="ps-swipe-hint">{t.swipeHint}</small>}
+          <div className="two" role="group" aria-label={t.compare}>
+            <button className={`btn small ${view === 'edited' ? 'primary' : 'secondary'}`} onClick={() => setView('edited')} data-testid="ps-show-edited">{t.showEdited}</button>
+            <button className={`btn small ${view === 'original' ? 'primary' : 'secondary'}`} onClick={() => setView('original')} data-testid="ps-show-original">{t.showOriginal}</button>
+          </div>
+
+          {tab === 'adjust' && (
+            <div className="card stack-sm" data-testid="ps-adjust">
+              <label className="check"><input type="checkbox" checked={e.auto} onChange={ev => enh({ auto: ev.target.checked })} data-testid="ps-auto" /> <span>{t.autoEnhance}</span></label>
               <button className="btn small ghost" onClick={() => { setEdit(NO_EDIT); setNote(undefined); }} data-testid="ps-reset">{t.reset}</button>
             </div>
           )}
@@ -300,6 +328,17 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
             <small className="muted" data-testid="ps-declutter">{t.declutter}</small>
           </div>
         </>
+      )}
+      {leave !== 0 && (
+        <div className="scrim" role="presentation" onClick={() => setLeave(0)}>
+          <div className="dialog stack-sm" role="alertdialog" aria-modal="true" aria-labelledby="ps-leave-t" data-testid="ps-leave" onClick={ev => ev.stopPropagation()}>
+            <h2 id="ps-leave-t">{t.leaveTitle}</h2>
+            <p>{t.leaveBody}</p>
+            <button type="button" className="btn primary" disabled={busy} data-testid="ps-leave-save" onClick={() => { const d = leave; setLeave(0); void saveNew().then(ok => { if (ok) go(d as 1 | -1); }); }}>{t.leaveSave}</button>
+            <button type="button" className="btn secondary danger-text" data-testid="ps-leave-discard" onClick={() => { const d = leave; setLeave(0); setEdit(NO_EDIT); go(d as 1 | -1); }}>{t.leaveDiscard}</button>
+            <button type="button" className="btn ghost" data-testid="ps-leave-stay" onClick={() => setLeave(0)}>{t.cancel}</button>
+          </div>
+        </div>
       )}
       {ask && <Confirm lang={lang} title={t.replaceTitle} body={t.replaceBody} okLabel={t.replaceOk} onOk={() => void doReplace()} onCancel={() => setAsk(false)} />}
     </section>

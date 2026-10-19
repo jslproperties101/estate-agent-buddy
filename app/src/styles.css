@@ -691,10 +691,17 @@ label.btn { position: relative; cursor: pointer; }
 .topbar.home .top-btn { width: 44px; min-width: 44px; }
 .top-badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
   font-size: 14px; font-weight: 800; line-height: 22px; text-align: center; }
-/* JoyChange003 Change 65 (replaces Change 44): the logo and wording are a strip at the top of the main page, about a tenth of the
-   screen tall, inside the scrolling page so it scrolls away. The bar above keeps only the bell, language and profile buttons. */
-.topbar.home .title-col { flex: 1; min-width: 0; }
-.brand-strip { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 10dvh; margin: 0 0 8px; font-family: 'Noto Serif', Georgia, serif; font-weight: 700; }
+/* Change 44: on the main page the logo and wording fill the bar from top to bottom. The bar keeps its height (the logo is as
+   66px tall with -10px margins, so it counts as 46px in the row and uses the 10px padding above and below); the
+   wording grows with the screen width as far as the space left of the three buttons allows. */
+.topbar.home h1.brand { gap: 6px; }
+.topbar.home h1.brand img.logo-img { width: 66px; height: 66px; margin: -10px 0; }
+.topbar.home .wordmark { justify-content: center; }
+.topbar.home .wordmark span { font-size: clamp(13px, 4.5vw, 20px); white-space: nowrap; }
+.topbar.home .wordmark em { font-size: clamp(18px, 6.4vw, 30px); white-space: nowrap; }
+/* JoyChange003 Change 65: on the AI Assisted Command page the logo and app name (as on the main screen) sit centred under
+   the title bar, about a tenth of the screen tall, at the top of the page so they scroll away. */
+.brand-strip { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 10dvh; margin: 0; font-family: 'Noto Serif', Georgia, serif; font-weight: 700; }
 .brand-strip img.logo-img { width: 66px; height: 66px; }
 .brand-strip .wordmark { justify-content: center; }
 .brand-strip .wordmark span { font-size: clamp(14px, 4.8vw, 22px); white-space: nowrap; }
@@ -1382,8 +1389,15 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 .ps-nav { display: flex; align-items: center; gap: 8px; }
 .ps-nav .btn { margin-right: auto; }
 /* Change 78: the picture stays pinned at the top while the controls below it scroll. */
-.ps-pin { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; background: var(--bg, #08080A); }
-.ps-pin .ps-stage img { max-height: 42dvh; width: 100%; object-fit: contain; }
+.ps-pin { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 8px; padding: 4px 0 10px; background: var(--bg, #08080A); }
+.ps-pin .ps-stage img { max-height: 38dvh; width: 100%; object-fit: contain; transition: transform .25s ease-out; }
+.ps-pin .ps-stage img.dragging { transition: none; }
+/* Change 79 with the Change 53 feel: the next photo slides in from the side it was swiped from. */
+.ps-pin .ps-stage img.ps-in-next { animation: ps-in-next .3s cubic-bezier(.2, .8, .2, 1); }
+.ps-pin .ps-stage img.ps-in-prev { animation: ps-in-prev .3s cubic-bezier(.2, .8, .2, 1); }
+@keyframes ps-in-next { from { transform: translateX(45%); opacity: .3; } to { transform: none; opacity: 1; } }
+@keyframes ps-in-prev { from { transform: translateX(-45%); opacity: .3; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ps-pin .ps-stage img.ps-in-next, .ps-pin .ps-stage img.ps-in-prev { animation: none; } }
 .ps-stage[data-mode="adjust"] { touch-action: pan-y; }
 .ps-tools { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .ps-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; padding: 4px 2px; border-radius: 12px;
@@ -1392,3 +1406,50 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 .ps-tool-ico { font-size: 20px; line-height: 1; }
 .ps-tool.on { border: 2px solid var(--gold, #c9a227); color: var(--gold-hi); background: #1B1810; }
 .ps-control { min-height: 64px; }
+
+/* ---------- JoyChange003 Batch E: the AI Assisted Command screen ---------- */
+/* Change 65: the logo strip under the title bar (the same look as the main screen's), scrolls with the page. */
+.cmd-brand { margin: -6px 0 0; }
+/* Changes 56 / 59: full-width box; mic, Clear and AI Process centred in one row below it. */
+.cmd-input.full textarea { width: 100%; }
+.cmd-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.cmd-row .mic-round { align-self: center; }
+.cmd-row .btn { min-height: 52px; padding: 0 16px; }
+.ai-process { background: var(--gold-grad); color: var(--on-gold); border: 0; font-weight: 800; }
+.btn.ai-process:disabled { background: var(--gold-grad); color: var(--on-gold); opacity: .45; }
+/* Change 55: "Getting ready…" then "Listening…" (only once the phone really listens). */
+.mic-round.starting { background: #5A4A1E; border-color: var(--gold); animation: none; }
+.voice-status { text-align: center; margin: 0; font-weight: 700; color: var(--muted); }
+.voice-status.live { color: #FF8A7A; }
+/* Change 60 / 61: a card per command; the saved line with Undo. */
+.step-card .cmd-part { color: var(--gold-hi); font-weight: 700; }
+.cmd-rows { display: flex; flex-direction: column; gap: 6px; }
+.cmd-done { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--box-line); background: #12261A; color: #CFF5DC; font-weight: 600; }
+/* Change 64: the list under the buttons, and the selected record. */
+.cmd-list .cmd-list-rows { max-height: min(46dvh, 380px); overflow-y: auto; touch-action: pan-y; }
+.cmd-selected { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--box-line); background: var(--card-2); }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Change 62: suggestions and recent commands. */
+.cmd-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.cmd-chip { min-height: 44px; padding: 8px 12px; border-radius: 22px; border: 1px solid var(--box-line); background: #1E1A10; color: var(--gold-hi); font-weight: 600; text-align: left; }
+.cmd-recent summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--gold-hi); }
+.cmd-recent-row { display: flex; align-items: center; gap: 8px; }
+.cmd-recent-text { flex: 1 1 auto; min-width: 0; min-height: 44px; text-align: left; background: var(--card-2); border: 1px solid var(--line-2); border-radius: 10px; color: var(--ink); padding: 8px 10px; overflow-wrap: anywhere; }
+/* Change 57: shiny gold example boxes (softer than the gold Save button), with clear gaps between and inside sections. */
+.howto .howto-group { display: flex; flex-direction: column; gap: 10px; }
+.howto .howto-group + .howto-group { margin-top: 22px; }
+.howto .howto-title { font-size: 17px; color: var(--gold-hi); margin-bottom: 4px; }
+.gold-example { background: linear-gradient(135deg, rgba(248, 232, 168, .20) 0%, rgba(226, 191, 82, .12) 35%, rgba(184, 144, 43, .08) 60%, rgba(241, 213, 126, .18) 100%), var(--card-2);
+  border: 1px solid var(--box-line); box-shadow: inset 0 1px 0 rgba(255, 240, 190, .18), 0 2px 8px rgba(0, 0, 0, .35); color: var(--ink); }
+/* Change 64: WhatsApp messages list. */
+.wa-list { display: flex; flex-direction: column; gap: 8px; }
+.wa-opt { text-align: left; min-height: 48px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--box-line); background: var(--card-2); color: var(--ink); overflow-wrap: anywhere; flex: 1 1 auto; min-width: 0; }
+.wa-opt-row { display: flex; align-items: center; gap: 6px; }
+.wa-add { color: var(--gold-hi); font-weight: 700; }
+.wa-sub { margin-top: 4px; }
+.cmd-sel-row { display: flex; align-items: center; gap: 8px; }
+.cmd-sel-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.cmd-sel-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.icon-btn.small-icon { width: 44px; height: 44px; min-width: 44px; font-size: 18px; text-decoration: none; }
+.step-card .btn-row .btn { flex: 1 1 0; width: auto; }

@@ -22,3 +22,6 @@ Logo/name strip and notification boxes. Model chosen by Joe: Sonnet 5.5 + High. 
 
 ## Tests
 - `tests/joychange003-batchD.test.ts` (unit D72-1..5), `tests/ui-batchD.test.mjs` (BD1 logo strip, BD2 boxes/Dismiss/History/Put back, BD3 Remind me later).
+
+## Corrected in Batch E
+Some details above did not match what Joe agreed (the handover had lost them). They were corrected in Batch E: see "Corrections to Batches D and F" in `JOYCHANGE003_BATCH_E.md`. Where this file and that section differ, that section is right.

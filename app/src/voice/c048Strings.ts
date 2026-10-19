@@ -5,7 +5,7 @@ interface Group { title: string; examples: string[] }
 const en = {
   howTo: 'How to use and examples', hideHowTo: 'Hide how to use',
   howIntro: 'Type, or tap the microphone and speak. What you said goes into the box above so you can fix it; nothing happens until you tap the send arrow. Then the app shows what it understood, and nothing is saved until you confirm.',
-  send: 'Show proposed details', speak: 'Speak', listening: 'Listening. Tap again to stop.', working: 'Writing down what you said…',
+  send: 'Show proposed details', speak: 'Speak', listening: 'Listening… speak now. Tap the microphone to stop.', working: 'Writing down what you said…', gettingReady: 'Getting ready… wait for the sound, then speak.',
   tapToUse: 'Tap an example to put it in the box.',
   note: 'Commands are understood in English and Bahasa Malaysia. Chinese speech becomes text, but its commands are not understood yet.',
   diag: 'Voice not working? Open Voice diagnostics',
@@ -29,7 +29,7 @@ export type C048 = typeof en;
 const bm: C048 = {
   howTo: 'Cara guna dan contoh', hideHowTo: 'Sembunyi cara guna',
   howIntro: 'Taip, atau tekan mikrofon dan bercakap. Apa yang anda sebut masuk ke kotak di atas supaya boleh dibetulkan; tiada apa berlaku sehingga anda tekan anak panah hantar. Kemudian aplikasi menunjukkan apa yang difahami, dan tiada apa disimpan sehingga anda sahkan.',
-  send: 'Tunjuk butiran dicadangkan', speak: 'Bercakap', listening: 'Sedang mendengar. Tekan sekali lagi untuk berhenti.', working: 'Menulis apa yang anda sebut…',
+  send: 'Tunjuk butiran dicadangkan', speak: 'Bercakap', listening: 'Sedang mendengar… bercakap sekarang. Tekan mikrofon untuk berhenti.', working: 'Menulis apa yang anda sebut…', gettingReady: 'Sedang bersedia… tunggu bunyi, kemudian bercakap.',
   tapToUse: 'Tekan contoh untuk memasukkannya ke kotak.',
   note: 'Arahan difahami dalam Bahasa Inggeris dan Bahasa Malaysia. Pertuturan Cina menjadi teks tetapi arahannya belum difahami.',
   diag: 'Suara tidak berfungsi? Buka Diagnostik suara',
@@ -51,7 +51,7 @@ const bm: C048 = {
 const zh: C048 = {
   howTo: '使用方法和示例', hideHowTo: '隐藏使用方法',
   howIntro: '输入文字，或点击麦克风说话。您说的话会进入上面的输入框，方便修改；点击发送箭头之前不会有任何操作。之后应用会显示理解的内容，确认前不会保存。',
-  send: '显示建议的资料', speak: '说话', listening: '正在聆听。再点一次停止。', working: '正在记录您说的话…',
+  send: '显示建议的资料', speak: '说话', listening: '正在聆听…请说话。点击麦克风停止。', working: '正在记录您说的话…', gettingReady: '正在准备…听到提示音后再说话。',
   tapToUse: '点击示例即可放入输入框。',
   note: '命令目前可识别英文和马来文。中文语音会转成文字，但其命令暂时无法理解。',
   diag: '语音不能用？打开语音诊断',

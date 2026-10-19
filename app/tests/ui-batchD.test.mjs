@@ -51,17 +51,14 @@ async function todo(page, title, days) {
   await page.waitForSelector('nav.grid');
 }
 
-test('BD1 Change 65: logo and app name are a strip at the top of the main page, about a tenth of the screen, inside the scrolling page', async () => {
+test('BD1 Change 65 (corrected in Batch E): the main page keeps its logo and name in the top bar; the strip is on the AI Assisted Command page', async () => {
   const page = await phone();
-  const g = await page.evaluate(() => {
-    const s = document.querySelector('[data-testid="brand-strip"]'); const r = s.getBoundingClientRect();
-    return { h: r.height, inContent: !!s.closest('main.content'), inBar: !!document.querySelector('header.topbar .brand'), img: !!s.querySelector('img, svg'), text: s.innerText.replace(/\s+/g, ' ').trim(), vh: innerHeight };
-  });
-  assert.ok(g.inContent && !g.inBar, 'in the page, not in the fixed bar');
-  assert.ok(g.img && /Estate Agent/i.test(g.text), g.text);
-  assert.ok(g.h >= g.vh * 0.08 && g.h <= g.vh * 0.14, `about 10% of the screen (${g.h} of ${g.vh})`);
+  assert.equal(await page.locator('header.topbar h1.brand').count(), 1, 'logo and name in the main page top bar, as before');
+  assert.equal(await page.getByTestId('brand-strip').count(), 0, 'no strip on the main page');
   assert.equal(await page.getByTestId('top-notifications').count(), 1, 'bell still in the bar');
-  assert.equal(await page.getByTestId('top-profile').count(), 1, 'profile still in the bar');
+  await page.locator('nav.grid > button[data-key="voice"]').click();
+  await page.getByTestId('cmd-brand').waitFor();
+  assert.equal(await page.getByTestId('cmd-brand').evaluate(el => !!el.closest('main.content')), true, 'the strip scrolls with the AI page');
   await page.context().close();
 });
 
@@ -96,7 +93,7 @@ test('BD3 Change 72: Remind me later offers times and hides the notification; it
   await page.getByTestId('notif-box').first().waitFor();
   await page.getByTestId('notif-later').first().click();
   const choices = await page.getByTestId('notif-snooze').locator('button').allInnerTexts();
-  assert.deepEqual(choices.map(x => x.toLowerCase()), ['in 1 hour', 'in 4 hours', 'tomorrow, 9:00', 'in 3 days, 9:00']);
+  assert.deepEqual(choices.map(x => x.toLowerCase()), ['in 1 hour', 'tonight, 8 pm', 'tomorrow, 9 am']);
   await page.getByTestId('notif-snooze-hour').click();
   while (await page.getByTestId('notif-box').count()) { await page.getByTestId('notif-later').first().click(); await page.getByTestId('notif-snooze-hour').click(); }
   assert.equal(await page.getByTestId('notif-box').count(), 0);

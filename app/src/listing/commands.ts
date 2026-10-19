@@ -5,19 +5,21 @@
 
 import { normaliseSpoken } from '../voice/spoken';
 import { Listing, Tenure, Purpose, Status, TYPES, normalisePhone } from './model';
-import { allBuiltInCities } from '../domain/places';
+import { allBuiltInCities, allBuiltInTownships, chainFor } from '../domain/places';
 
 export type ChangeKey =
   | 'type' | 'city' | 'township' | 'street' | 'unitNo' | 'lotNo' | 'landSqft' | 'builtUpSqft' | 'askingPrice' | 'monthlyRent'
   | 'tenure' | 'leaseExpiryYear' | 'bedrooms' | 'bathrooms' | 'parking' | 'floors' | 'purpose' | 'ceilingFt' | 'powerKva' | 'status'
-  | 'ownerName' | 'ownerPhone' | 'notes' | 'tenancy.tenant' | 'tenancy.rent' | 'tenancy.start' | 'tenancy.end';
+  | 'ownerName' | 'ownerPhone' | 'notes' | 'tenancy.tenant' | 'tenancy.rent' | 'tenancy.start' | 'tenancy.end' | 'state';
 
 export interface Change { key: ChangeKey; value: string | number; note?: 'unitAssumed' | 'added' | 'appended' }
 
 export type Command =
   | { kind: 'create'; changes: Change[]; unclear: string[] }
   | { kind: 'update'; changes: Change[]; unclear: string[] }
-  | { kind: 'find'; type?: string; typeWord?: 'factory'; area?: string; purpose?: 'sale' | 'rent' }
+  | { kind: 'find'; type?: string; typeWord?: 'factory'; area?: string; purpose?: 'sale' | 'rent';
+      /** JoyChange003 Change 57 ("Search and find"): price range, least bedrooms, tenure and status, when said. */
+      priceMin?: number; priceMax?: number; bedsMin?: number; tenure?: Tenure; status?: Status }
   | { kind: 'ask'; topic: 'tenancy' | 'note'; prefix?: string }
   | { kind: 'unknown' };
 
@@ -107,13 +109,25 @@ function monthYear(s: string): string | undefined {
   return i >= 0 ? `${m[2]}-${String(i + 1).padStart(2, '0')}` : undefined;
 }
 
+/** Words that end a place name said in lower case ("in sungai besi for sale" → "Sungai Besi"). */
+const PLACE_END = new Set(['for', 'to', 'with', 'asking', 'price', 'at', 'and', 'owner', 'harga', 'untuk', 'dengan', 'pemilik', 'kepada', 'dan', 'yang',
+  'freehold', 'leasehold', 'rent', 'rental', 'sale', 'sewa', 'jual', 'dijual', 'disewa', 'bedroom', 'bedrooms', 'bilik', 'land', 'built', 'built-up', 'near', 'dekat',
+  'under', 'below', 'above', 'over', 'between', 'bawah', 'atas', 'antara', 'priced', 'tenure', 'status', 'pegangan', 'rm', 'ringgit', 'call', 'phone', 'telefon']);
+const titleWords = (s: string) => s.replace(/\b\w/g, c => c.toUpperCase());
 function findArea(original: string, extra: string[] = []): string | undefined {
   const low = original.toLowerCase();
-  const all = [...extra, ...KNOWN_AREAS].sort((a, b) => b.length - a.length);
+  // Change 58: the agent's own places first, then the built-in towns and areas (so "Sungai Besi" is known).
+  const all = [...new Set([...extra, ...KNOWN_AREAS, ...allBuiltInTownships(), ...allBuiltInCities()])].sort((a, b) => b.length - a.length);
   const known = all.find(a => new RegExp(`\\b${a.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(low));
   if (known) return known;
   const m = /\b(?:in|at|di)\s+((?!Jalan\b|Jln\b|Lorong\b)[A-Z][\w']*(?:\s+[A-Z][\w']*){0,3})/.exec(original);
-  return m?.[1];
+  if (m) return m[1];
+  // Speech often comes in lower case: up to three words after "in" / "di", stopping at a word that starts something else.
+  const lower = /\b(?:in|di)\s+([a-z][a-z']*(?:\s+[a-z][a-z']*){0,2})/.exec(original);
+  if (!lower) return undefined;
+  const words: string[] = [];
+  for (const w of lower[1].split(/\s+/)) { if (PLACE_END.has(w) || /^(?:jalan|jln|lorong|the|a|an)$/.test(w)) break; words.push(w); }
+  return words.length ? titleWords(words.join(' ')) : undefined;
 }
 
 /** A place said in a command goes to City when it is a known town, otherwise to Township. */
@@ -137,7 +151,13 @@ export function readDetails(original: string, places: string[] = []): { changes:
   else if (/\bfactor(?:y|ies)\b|\bkilang\b/i.test(t)) unclear.push('factory');
 
   const place = findArea(original, places);
-  if (place) add(placeKey(place), place);
+  if (place) {
+    add(placeKey(place), place);
+    // Change 58: the rest of the address chain from the built-in lists (township → city → state).
+    const chain = chainFor(place);
+    if (chain.township && placeKey(place) === 'township') { add('city', chain.city); add('state', chain.state); }
+    else if (chain.city) add('state', chain.state);
+  }
   const street = /\b((?:jalan|jln\.?|lorong|lrg\.?|persiaran)\s+[A-Za-z0-9][\w/ ]*?)(?=\s*(?:,|\.(?:\s|$)|$|\bin\b|\bdi\b|\bnear\b))/i.exec(original);
   if (street) add('street', street[1].replace(/^jln\.?/i, 'Jalan').replace(/^lrg\.?/i, 'Lorong').replace(/\s+/g, ' ').replace(/^\w/, c => c.toUpperCase()));
   // One Unit/Lot Number field (Change 009): "unit 7" and "lot 2/14" both go there, together when both are said.
@@ -147,6 +167,16 @@ export function readDetails(original: string, places: string[] = []): { changes:
   if (unitLotText) add('unitNo', unitLotText);
   const owner = /\b(?:owner|pemilik|tuan\s+rumah)\s+(?:is\s+|ialah\s+|named\s+|bernama\s+)?((?:(?:Mr|Mrs|Ms|Madam|Encik|En|Puan|Pn|Cik|Dato'?|Datuk|Dr)\.?\s+)?[A-Z][\w'.-]*(?:\s+(?:bin|binti|a\/l|a\/p|[A-Z][\w'.-]*)){0,4})/.exec(original);
   if (owner && !/^(?:Wants|Says|Is)\b/.test(owner[1])) add('ownerName', owner[1].trim());
+  else {
+    // Change 58: a name said in lower case ("owner ahmad bin ali 012…"): up to four words, written in Title Case.
+    const lowOwner = /\b(?:owner|pemilik|tuan\s+rumah)\s+(?:is\s+|ialah\s+|named\s+|bernama\s+)?((?:encik|en|puan|pn|cik|mr|mrs|ms|madam|dato'?|datuk|dr)?\.?\s*[a-z][a-z'.-]*(?:\s+(?:bin|binti|a\/l|a\/p|[a-z][a-z'.-]*)){0,3})/i.exec(original);
+    const name = lowOwner?.[1].split(/\s+/).filter(Boolean);
+    if (name?.length) {
+      const stop = name.findIndex((w, i) => i > 0 && PLACE_END.has(w.toLowerCase()));
+      const kept = (stop > 0 ? name.slice(0, stop) : name).join(' ');
+      if (!/^(?:wants|says|is|phone|number)\b/i.test(kept)) add('ownerName', titleWords(kept.toLowerCase()).replace(/\b(Bin|Binti|A\/l|A\/p)\b/g, m => m.toLowerCase()));
+    }
+  }
   const phone = /(?:\+?6?0)1\d[\s-]?\d{3,4}[\s-]?\d{4}\b|\b0[3-9][\s-]?\d{3,4}[\s-]?\d{4}\b/.exec(t);
   if (phone) add('ownerPhone', normalisePhone(phone[0]) ?? phone[0]);
 
@@ -168,10 +198,16 @@ export function readDetails(original: string, places: string[] = []): { changes:
 
   const rent = new RegExp(String.raw`(?:rent(?:al)?|sewa(?:an)?)\s*(?:is|of|at|to|price|harga)?\s*(?:to\s*)?(?:${MONEY})`, 'i').exec(low)
     ?? new RegExp(String.raw`(?:${MONEY})\s*(?:per|a|sebulan|setiap)\s*(?:month|bulan)|(?:${MONEY})\s*monthly`, 'i').exec(low);
-  const rentValue = rent ? [1, 2, 3, 4, 5, 6].map(i => rent[i]).find(Boolean) : undefined;
+  // JoyChange003 Change 58: speech often leaves out "RM" ("rental 1800 per month", "asking price 500k"): a plain number
+  // straight after the word is the amount when it is big enough to be one (never "3 bedrooms").
+  const NOT_MONEY = String.raw`(?!\s*(?:sq|square|kaki|bed|bilik|bath|acre|ekar|storey|tingkat|%|per\s*cent|parking|car))`;
+  const bareRent = rent ? null : new RegExp(String.raw`\b(?:monthly\s+rent(?:al)?|rent(?:al)?|sewa(?:an)?(?:\s+bulanan)?)\s*(?:is|of|at|to|:)?\s*([\d.]+)\b${NOT_MONEY}`, 'i').exec(low);
+  const rentValue = rent ? [1, 2, 3, 4, 5, 6].map(i => rent[i]).find(Boolean) : bareRent && n(bareRent[1]) >= 100 ? bareRent[1] : undefined;
   if (rentValue && !/tenan(?:t|cy)|penyewa/.test(low)) add('monthlyRent', n(rentValue));
   const price = new RegExp(String.raw`(?:asking(?:\s+price)?|price|harga(?:\s+diminta)?|selling\s+(?:at|for)|jual(?:\s+pada)?)\s*(?:is|of|at|to|:)?\s*(?:to\s*)?(?:${MONEY})`, 'i').exec(low);
+  const barePrice = price ? null : new RegExp(String.raw`\b(?:asking\s+price|selling\s+price|price|harga(?:\s+diminta|\s+jualan)?)\s*(?:is|of|at|to|:)?\s*([\d.]+)\b${NOT_MONEY}`, 'i').exec(low);
   if (price) add('askingPrice', money(price));
+  else if (barePrice && n(barePrice[1]) >= 1000) add('askingPrice', n(barePrice[1]));
   else if (!rentValue) {
     const any = new RegExp(MONEY, 'i').exec(low);
     if (any && !/tenan(?:t|cy)|penyewa/.test(low)) add('askingPrice', money(any));
@@ -213,6 +249,7 @@ export function parseCommand(text: string, current?: Listing, places: string[] =
     return {
       kind: 'find', type: pick('type'), ...(r.unclear.includes('factory') ? { typeWord: 'factory' as const } : {}),
       area: pick('township') ?? pick('city'), purpose: purpose === 'rent' ? 'rent' : purpose === 'sale' ? 'sale' : undefined,
+      ...findFilters(t),
     };
   }
 
@@ -276,7 +313,7 @@ export function parseCommand(text: string, current?: Listing, places: string[] =
 
   for (const c of readDetails(original, places).changes) if (!changes.some(x => x.key === c.key) && !(c.key === 'parking')) changes.push(c);
   // A place, street, unit, lot or owner mentioned in an edit is only used when the agent says to change it.
-  const LOCATION_KEYS: ChangeKey[] = ['city', 'township', 'street', 'unitNo', 'lotNo'];
+  const LOCATION_KEYS: ChangeKey[] = ['city', 'township', 'street', 'unitNo', 'lotNo', 'state'];
   const filtered = changes.filter(c =>
     (!LOCATION_KEYS.includes(c.key) || /\b(?:location|area|address|street|jalan|unit|lot|township|city|kawasan|lokasi|alamat)\b/i.test(low))
     && (!['ownerName', 'ownerPhone'].includes(c.key) || /\b(?:owner|pemilik|phone|telefon|number|nombor)\b/i.test(low)));
@@ -284,6 +321,29 @@ export function parseCommand(text: string, current?: Listing, places: string[] =
 }
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+/** Change 57 ("Search and find"): "under RM500k", "above 1 million", "between RM400k and RM600k", "at least 3 bedrooms",
+ *  "freehold", "sold" / "available" — only what was said. `t` is the prepared text (numbers already in digits). */
+export function findFilters(t: string): { priceMin?: number; priceMax?: number; bedsMin?: number; tenure?: Tenure; status?: Status } {
+  const low = t.toLowerCase();
+  const num = String.raw`(?:rm|ringgit)?\s*(\d+(?:\.\d+)?)`;
+  const out: { priceMin?: number; priceMax?: number; bedsMin?: number; tenure?: Tenure; status?: Status } = {};
+  const between = new RegExp(String.raw`\b(?:between|antara)\s+${num}\s+(?:and|to|dan|hingga)\s+${num}`).exec(low);
+  if (between) { out.priceMin = parseFloat(between[1]); out.priceMax = parseFloat(between[2]); }
+  else {
+    const max = new RegExp(String.raw`\b(?:under|below|less\s+than|up\s+to|max(?:imum)?|within|bawah|kurang\s+(?:dari(?:pada)?|daripada)|tidak\s+melebihi)\s+${num}`).exec(low);
+    if (max) out.priceMax = parseFloat(max[1]);
+    const min = new RegExp(String.raw`\b(?:above|over|more\s+than|from|min(?:imum)?|atas|lebih\s+(?:dari(?:pada)?|daripada))\s+${num}`).exec(low);
+    if (min) out.priceMin = parseFloat(min[1]);
+  }
+  const beds = /\b(?:at\s+least\s+|minimum\s+|min\s+|sekurang-kurangnya\s+)?(\d+)\s*(?:\+\s*)?(?:bed(?:room)?s?\b|bilik(?:\s+tidur)?\b|rooms?\b)/.exec(low);
+  if (beds) out.bedsMin = Number(beds[1]);
+  if (/\bfree\s?hold|pegangan\s+bebas|hak\s+milik\s+kekal/.test(low)) out.tenure = 'freehold';
+  else if (/\blease\s?hold|pajakan/.test(low)) out.tenure = 'leasehold';
+  const st = /\b(available|sold|rented|tersedia|terjual|disewa|tersewa)\b/.exec(low)?.[1];
+  if (st) out.status = STATUS_MAP[st];
+  return out;
+}
 
 /** Applies reviewed changes to a property. Notes are added on a new line, never replacing earlier notes. */
 export function applyChanges(l: Listing, changes: Change[]): Listing {
