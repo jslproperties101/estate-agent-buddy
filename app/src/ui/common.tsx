@@ -8,6 +8,7 @@ import { REMINDER_CHOICES } from '../domain/workflow';
 import { cardTitle, normalisePhone } from '../listing/model';
 import { newId } from '../data/store';
 import { PropertyPicker } from './PropertyPicker';
+import { Select } from './Select';
 
 /** A record section with its own small Edit button at the bottom right. */
 export function SectionCard({ title, onEdit, editLabel, children, testId, className = '' }: {
@@ -164,9 +165,9 @@ export function ReminderPicker({ lang, value, onChange }: { lang: Lang; value: n
       <div className="row-wrap">
         <span className="small muted">{r.custom}</span>
         <input aria-label={r.custom} className="num-sm" inputMode="numeric" value={n} onChange={e => setN(e.target.value.replace(/\D/g, ''))} />
-        <select aria-label={r.custom} value={unit} onChange={e => setUnit(e.target.value as 'min' | 'hour' | 'day')}>
+        <Select aria-label={r.custom} value={unit} onChange={e => setUnit(e.target.value as 'min' | 'hour' | 'day')}>
           {(['min', 'hour', 'day'] as const).map(u => <option key={u} value={u}>{r.unit[u]}</option>)}
-        </select>
+        </Select>
         <button type="button" className="btn small secondary" disabled={!Number(n)} onClick={() => {
           const m = Number(n) * (unit === 'day' ? 1440 : unit === 'hour' ? 60 : 1);
           if (m > 0 && !value.includes(m)) onChange([...value, m].sort((a, b) => a - b));
@@ -198,10 +199,10 @@ export function ContactSelect({ lang, value, onChange, label, roles, filter, req
   return (
     <div className="ff">
       <label className="ff">{label ?? c.contact}
-        <select data-field="contactId" aria-invalid={invalid || undefined} value={value ?? ''} onChange={e => onChange(e.target.value || undefined)}>
+        <Select data-field="contactId" aria-invalid={invalid || undefined} value={value ?? ''} onChange={e => onChange(e.target.value || undefined)}>
           <option value="">{required ? c.choose : c.noContact}</option>
           {list.map(x => <option key={x.id} value={x.id}>{x.name}{x.phone ? ` · ${x.phone}` : ''}</option>)}
-        </select>
+        </Select>
       </label>
       {!adding ? <button type="button" className="btn small ghost" onClick={() => setAdding(true)}>{c.newContact}</button> : (
         <div className="sub-card stack-sm">

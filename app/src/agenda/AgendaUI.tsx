@@ -24,6 +24,7 @@ import {
 } from '../domain/workflow';
 import { addDays, datePart, fmtDate, fmtDateTime, fmtTime, localeOf, monthGrid, parseLocal, timePart, weekOf, ymd, ymdhm } from '../lib/dates';
 import { cardTitle } from '../listing/model';
+import { Select } from '../ui/Select';
 
 const joinDT = (d: string, t: string) => (d ? (t ? `${d}T${t}` : d) : undefined);
 
@@ -95,9 +96,9 @@ export function InquiryForm({ lang, back, id, propertyId, contactId }: { lang: L
         <PropertySelect lang={lang} value={d.propertyId} onChange={v => setD(x => ({ ...x, propertyId: v }))} />
         <label className="ff">{a.inq.at}<input type="datetime-local" value={d.at} onChange={e => setD(x => ({ ...x, at: e.target.value || x.at }))} /></label>
         <label className="ff">{a.inq.channel}
-          <select value={d.channel} onChange={e => setD(x => ({ ...x, channel: e.target.value as InquiryChannel }))}>
+          <Select value={d.channel} onChange={e => setD(x => ({ ...x, channel: e.target.value as InquiryChannel }))}>
             {INQUIRY_CHANNELS.map(ch => <option key={ch} value={ch}>{a.inq.channels[ch]}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="ff">{a.inq.message}<textarea rows={3} value={d.message ?? ''} onChange={e => setD(x => ({ ...x, message: e.target.value || undefined }))} /></label>
         <label className="ff">{a.inq.followUp}<input type="date" value={follow} onChange={e => setFollow(e.target.value)} /></label>
@@ -163,14 +164,14 @@ export function ApptForm({ lang, back, id, kind, propertyId, contactId, date, ti
       <DraftBanner lang={lang} draft={draft} />
       <div className="card stack-sm">
         <label className="ff">{a.appt.kind}
-          <select data-field="kind" value={d.kind} onChange={e => setD(x => ({ ...x, kind: e.target.value as ApptKind }))}>
+          <Select data-field="kind" value={d.kind} onChange={e => setD(x => ({ ...x, kind: e.target.value as ApptKind }))}>
             {APPT_KINDS.map(k => <option key={k} value={k}>{a.appt.kinds[k]}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="ff">{strings[lang].c.status}
-          <select data-field="status" value={d.status} onChange={e => setD(x => ({ ...x, status: e.target.value as Appointment['status'] }))}>
+          <Select data-field="status" value={d.status} onChange={e => setD(x => ({ ...x, status: e.target.value as Appointment['status'] }))}>
             {APPT_STATUSES.map(s => <option key={s} value={s}>{statusLabel(s)}</option>)}
-          </select>
+          </Select>
         </label>
         {d.status === 'pending' && <small className="muted">{a.appt.pendingHint}</small>}
         <label className="ff">{a.appt.title}<input data-field="title" value={d.title ?? ''} onChange={e => setD(x => ({ ...x, title: e.target.value || undefined }))} /></label>
@@ -307,9 +308,9 @@ export function TaskForm({ lang, back, id, prefill, go }: { lang: Lang; back: ()
           <label className="ff">{a.todo.fields.time}<input type="time" data-field="dueTime" value={dTime} onChange={e => setDTime(e.target.value)} /></label>
         </div>
         <label className="ff">{a.todo.fields.priority}
-          <select data-field="priority" value={d.priority} onChange={e => setD(x => ({ ...x, priority: e.target.value as Priority }))}>
+          <Select data-field="priority" value={d.priority} onChange={e => setD(x => ({ ...x, priority: e.target.value as Priority }))}>
             {PRIORITIES.map(p => <option key={p} value={p}>{a.todo.priority[p]}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="check"><input type="checkbox" checked={d.kind === 'follow_up'} onChange={e => setD(x => ({ ...x, kind: e.target.checked ? 'follow_up' : 'task' }))} /> {a.todo.fields.followUp}</label>
         <PropertySelect lang={lang} value={d.propertyId} onChange={v => setD(x => ({ ...x, propertyId: v }))} />

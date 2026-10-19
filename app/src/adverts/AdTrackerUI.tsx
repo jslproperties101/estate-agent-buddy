@@ -15,6 +15,7 @@ import { Confirm, Empty, StoredImage } from '../ui/common';
 import { compressImage } from '../lib/images';
 import { fmtDate, ymd } from '../lib/dates';
 import { rm2 } from '../lib/money';
+import { Select } from '../ui/Select';
 
 const OTHER = '__other__';
 const title = (l: Listing) => [l.ref, cardTitle(l)].filter(Boolean).join(' · ') || '—';
@@ -94,26 +95,26 @@ function Editor({ lang, l, initial, isNew, onClose }: { lang: Lang; l: Listing; 
     <div className="card stack-sm" data-testid="ad-editor-form">
       {a.fake && <><FakeBadge lang={lang} /><small className="muted">{t.fakeNote}</small></>}
       <label className="ff">{t.f.platform}
-        <select value={other ? OTHER : a.platform} onChange={e => { if (e.target.value === OTHER) { setOther(true); set({ platform: known ? '' : a.platform }); } else { setOther(false); set({ platform: e.target.value }); } }} data-testid="ad-platform">
+        <Select value={other ? OTHER : a.platform} onChange={e => { if (e.target.value === OTHER) { setOther(true); set({ platform: known ? '' : a.platform }); } else { setOther(false); set({ platform: e.target.value }); } }} data-testid="ad-platform">
           {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
           <option value={OTHER}>{t.otherOption}</option>
-        </select>
+        </Select>
       </label>
       {other && <label className="ff">{t.f.platformOther}<input value={a.platform} onChange={e => set({ platform: e.target.value })} aria-invalid={issues.includes('platform')} data-testid="ad-platform-other" /></label>}
       {issues.includes('platform') && <small className="warn-text" role="alert">{t.err.platform}</small>}
       <label className="ff">{t.f.type}
-        <select value={a.type ?? 'listing'} onChange={e => set({ type: e.target.value as AdType })} data-testid="ad-type">
+        <Select value={a.type ?? 'listing'} onChange={e => set({ type: e.target.value as AdType })} data-testid="ad-type">
           {AD_TYPES.map(x => <option key={x} value={x}>{t.types[x]}</option>)}
-        </select>
+        </Select>
       </label>
       <label className="ff">{t.f.title}<input value={a.title ?? ''} onChange={e => set({ title: e.target.value })} data-testid="ad-title" /></label>
       <label className="ff">{t.f.url}<input inputMode="url" value={a.url ?? ''} onChange={e => set({ url: e.target.value })} aria-invalid={issues.includes('url')} data-testid="ad-url" /></label>
       {issues.includes('url') && <small className="warn-text" role="alert">{t.err.url}</small>}
       <label className="ff">{t.f.ref}<input value={a.ref ?? ''} onChange={e => set({ ref: e.target.value })} data-testid="ad-ref" /></label>
       <label className="ff">{t.f.status}
-        <select value={a.status ?? ''} onChange={e => set({ status: (e.target.value || undefined) as Advert['status'] })} data-testid="ad-status-select">
+        <Select value={a.status ?? ''} onChange={e => set({ status: (e.target.value || undefined) as Advert['status'] })} data-testid="ad-status-select">
           <option value="">{ls.notSet}</option>{AD_STATUSES.map(x => <option key={x} value={x}>{ls.adStatus[x]}</option>)}
-        </select>
+        </Select>
       </label>
       <div className="two">
         <label className="ff">{t.f.start}<input type="date" value={a.start ?? ''} onChange={e => set({ start: e.target.value || undefined })} data-testid="ad-start" /></label>
@@ -121,9 +122,9 @@ function Editor({ lang, l, initial, isNew, onClose }: { lang: Lang; l: Listing; 
       </div>
       {issues.includes('dates') && <small className="warn-text" role="alert">{t.err.dates}</small>}
       <label className="ff">{t.f.remind}
-        <select value={a.remindDays ?? DEFAULT_REMIND_DAYS} onChange={e => set({ remindDays: Number(e.target.value) })} data-testid="ad-remind">
+        <Select value={a.remindDays ?? DEFAULT_REMIND_DAYS} onChange={e => set({ remindDays: Number(e.target.value) })} data-testid="ad-remind">
           {[0, 1, 3, 7, 14].map(d => <option key={d} value={d}>{t.remindOpt(d)}</option>)}
-        </select>
+        </Select>
       </label>
       <label className="ff">{t.f.cost} (RM)<MoneyInput value={a.cost} onChange={n => set({ cost: n })} aria-label={t.f.cost} data-field="ad-cost" /></label>
       {issues.includes('cost') && <small className="warn-text" role="alert">{t.err.cost}</small>}

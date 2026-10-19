@@ -21,6 +21,7 @@ import {
   Project, ProjectBooking, UnitType, PROJECT_STATUSES, BOOKING_STATUSES, priceRange, unitCounts, unitTaken, bookingCommission, placeOf,
 } from './model';
 import { projectStrings } from './strings';
+import { Select } from '../ui/Select';
 
 const num = (s: string) => { const t = s.replace(/[, ]/g, ''); if (!t) return undefined; const n = Number(t); return Number.isFinite(n) ? n : undefined; };
 const priceText = (p: Project, t: ReturnType<typeof strings2>) => {
@@ -173,15 +174,15 @@ function BookingEditor({ lang, p, b, onCancel, onSave, onDelete }: { lang: Lang;
       <div className="sheet stack-sm" role="dialog" aria-modal="true" aria-labelledby="bk-t" data-testid="booking-editor">
         <h2 id="bk-t">{onDelete ? t.b.edit : t.b.add}</h2>
         <label className="ff">{t.b.unitType}
-          <select data-field="unitTypeId" value={d.unitTypeId ?? ''} onChange={e => set({ unitTypeId: e.target.value || undefined })}>
+          <Select data-field="unitTypeId" value={d.unitTypeId ?? ''} onChange={e => set({ unitTypeId: e.target.value || undefined })}>
             <option value="">{t.b.anyType}</option>{p.unitTypes.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+          </Select>
         </label>
         <label className="ff">{t.b.unitNo}<input data-field="unitNo" value={d.unitNo} aria-invalid={!!err} onChange={e => set({ unitNo: e.target.value })} /></label>
         <label className="ff">{t.b.status}
-          <select data-field="bookingStatus" value={d.status} onChange={e => set({ status: e.target.value as ProjectBooking['status'] })}>
+          <Select data-field="bookingStatus" value={d.status} onChange={e => set({ status: e.target.value as ProjectBooking['status'] })}>
             {BOOKING_STATUSES.map(s => <option key={s} value={s}>{t.booking[s]}</option>)}
-          </select>
+          </Select>
         </label>
         <ContactPick lang={lang} label={t.b.buyer} contacts={buyers} value={d.buyerId} onChange={v => set({ buyerId: v })} noneLabel={t.b.buyerNone} testId="booking-buyer" />
         {!d.buyerId && <div className="two">
@@ -242,22 +243,22 @@ export function ProjectForm({ lang, id, go, back }: { lang: Lang; id?: string; g
         {text('developer', t.f.developer)}
         <div className="two">{text('developerContact', t.f.developerContact)}{text('developerPhone', t.f.developerPhone, { type: 'tel', inputMode: 'tel' })}</div>
         <label className="ff">{t.f.state}
-          <select data-field="state" value={d.state ?? ''} onChange={e => set({ state: e.target.value || undefined })}>
+          <Select data-field="state" value={d.state ?? ''} onChange={e => set({ state: e.target.value || undefined })}>
             <option value="">{ls.notSet}</option>{MY_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          </Select>
         </label>
         <div className="two">{text('city', t.f.city)}{text('township', t.f.township)}</div>
         {text('address', t.f.address)}
         <div className="two">
           <label className="ff">{t.f.tenure}
-            <select data-field="tenure" value={d.tenure ?? ''} onChange={e => set({ tenure: (e.target.value || undefined) as Project['tenure'] })}>
+            <Select data-field="tenure" value={d.tenure ?? ''} onChange={e => set({ tenure: (e.target.value || undefined) as Project['tenure'] })}>
               <option value="">{ls.notSet}</option>{(['freehold', 'leasehold'] as const).map(x => <option key={x} value={x}>{t.tenure[x]}</option>)}
-            </select>
+            </Select>
           </label>
           <label className="ff">{t.f.status}
-            <select data-field="projectStatus" value={d.status} onChange={e => set({ status: e.target.value as Project['status'] })}>
+            <Select data-field="projectStatus" value={d.status} onChange={e => set({ status: e.target.value as Project['status'] })}>
               {PROJECT_STATUSES.map(x => <option key={x} value={x}>{t.status[x]}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
       </div>
@@ -280,9 +281,9 @@ export function ProjectForm({ lang, id, go, back }: { lang: Lang; id?: string; g
               <button type="button" className="btn small ghost danger-text" onClick={() => setD(v => ({ ...v, unitTypes: v.unitTypes.filter(x => x.id !== u.id) }))}>{t.u.remove}</button></div>
             <label className="ff">{t.u.name}<input data-field="unitName" placeholder={t.u.namePh} value={u.name} onChange={e => setUnit(u.id, { name: e.target.value })} /></label>
             <label className="ff">{t.u.layout}
-              <select data-field="unitLayout" value={u.layout ?? ''} onChange={e => setUnit(u.id, { layout: e.target.value || undefined })}>
+              <Select data-field="unitLayout" value={u.layout ?? ''} onChange={e => setUnit(u.id, { layout: e.target.value || undefined })}>
                 <option value="">{ls.notSet}</option>{TYPES.map(x => <option key={x} value={x}>{typeLabel(ls, x)}</option>)}
-              </select>
+              </Select>
             </label>
             <div className="two">
               <label className="ff">{t.u.builtUp}<input data-field="unitBuiltUp" inputMode="decimal" value={u.builtUpSqft ?? ''} onChange={e => setUnit(u.id, { builtUpSqft: num(e.target.value) })} /></label>

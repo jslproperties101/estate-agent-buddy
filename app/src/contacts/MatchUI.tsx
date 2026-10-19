@@ -11,6 +11,7 @@ import { MoneyInput } from '../ui/MoneyInput';
 import { Criterion, isEmptyRequirement, matchesForBuyer, matchesForProperty, Level } from '../domain/matching';
 import { Go } from '../nav';
 import { SectionCard, Empty } from '../ui/common';
+import { Select } from '../ui/Select';
 
 const numOrUndef = (v: string) => { const n = Number(v.replace(/[^\d.]/g, '')); return v.trim() && Number.isFinite(n) ? n : undefined; };
 
@@ -28,9 +29,9 @@ export function RequirementsEditor({ lang, value, onChange }: { lang: Lang; valu
         <div key={r.id} className="card stack-sm" data-testid="requirement" data-index={i}>
           <label className="ff">{m.f.label}<input data-field={`req-label-${i}`} value={r.label ?? ''} onChange={e => set(r.id, { label: e.target.value || undefined })} /></label>
           <label className="ff">{m.f.purpose}
-            <select data-field={`req-purpose-${i}`} value={r.purpose ?? ''} onChange={e => set(r.id, { purpose: (e.target.value || undefined) as BuyerRequirement['purpose'] })}>
+            <Select data-field={`req-purpose-${i}`} value={r.purpose ?? ''} onChange={e => set(r.id, { purpose: (e.target.value || undefined) as BuyerRequirement['purpose'] })}>
               <option value="">{m.any}</option>{Object.entries(m.purposes).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
+            </Select>
           </label>
           <fieldset className="ff"><legend>{m.f.types}</legend>
             <div className="chip-row">{TYPES.map(t => { const on = !!r.types?.includes(t); return (
@@ -56,14 +57,14 @@ export function RequirementsEditor({ lang, value, onChange }: { lang: Lang; valu
           </div>
           <div className="two">
             <label className="ff">{m.f.tenure}
-              <select data-field={`req-tenure-${i}`} value={r.tenure ?? ''} onChange={e => set(r.id, { tenure: (e.target.value || undefined) as BuyerRequirement['tenure'] })}>
+              <Select data-field={`req-tenure-${i}`} value={r.tenure ?? ''} onChange={e => set(r.id, { tenure: (e.target.value || undefined) as BuyerRequirement['tenure'] })}>
                 <option value="">{m.any}</option>{Object.entries(m.tenures).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              </Select>
             </label>
             <label className="ff">{m.f.financing}
-              <select data-field={`req-fin-${i}`} value={r.financing ?? ''} onChange={e => set(r.id, { financing: (e.target.value || undefined) as FinancingState | undefined })}>
+              <Select data-field={`req-fin-${i}`} value={r.financing ?? ''} onChange={e => set(r.id, { financing: (e.target.value || undefined) as FinancingState | undefined })}>
                 <option value="">{m.any}</option>{FINANCING_STATES.map(k => <option key={k} value={k}>{m.financing[k]}</option>)}
-              </select>
+              </Select>
             </label>
           </div>
           <label className="ff">{m.f.notes}<textarea rows={2} value={r.notes ?? ''} onChange={e => set(r.id, { notes: e.target.value || undefined })} /></label>

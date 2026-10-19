@@ -15,6 +15,7 @@ import { NO_EDIT, PhotoEdit, hasChange, hasEnhance, loadImage, renderEdit, toJpe
 import { MaskMode, Rect, editKind, isTiny, rectFrom } from '../lib/photoOps';
 import { addEditedCopy, copyName, replaceOriginal } from '../domain/photoStudio';
 import { cardTitle } from '../listing/model';
+import { Select } from '../ui/Select';
 
 /** The parts of a pointer event this screen reads. */
 interface PointerLike { clientX: number; clientY: number; pointerId: number; currentTarget: unknown }
@@ -302,9 +303,9 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
               <p className="warn-text" data-testid="ps-mask-warning">{t.maskWarning}</p>
               <small className="muted">{t.maskIntro}</small>
               <label className="ff">
-                <select value={mode} onChange={ev => setMode(ev.target.value as MaskMode)} data-testid="ps-mask-mode" aria-label={t.tabs.mask}>
+                <Select value={mode} onChange={ev => setMode(ev.target.value as MaskMode)} data-testid="ps-mask-mode" aria-label={t.tabs.mask}>
                   <option value="solid">{t.maskSolid}</option><option value="pixelate">{t.maskPixel}</option>
-                </select>
+                </Select>
               </label>
               {!maskItems.length && <small className="muted" data-testid="ps-mask-empty">{t.maskEmpty}</small>}
               {maskItems.length > 0 && <small data-testid="ps-mask-count">{t.maskList(maskItems.length)}</small>}

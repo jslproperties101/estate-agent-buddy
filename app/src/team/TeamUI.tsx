@@ -22,6 +22,7 @@ import {
 } from './api';
 import { partnerOf, myId, personLabel, isTeamOwner, inTeam, myShareOf, creatorNames, otherCreators, creatorLabel, creatorKeyOf, scopesOf, sharedInfo, creatorOf, levelOf, labelForUser, can } from './access';
 import { teamStrings, EXACT } from './strings';
+import { Select } from '../ui/Select';
 
 const INVITE_KEY = 'eab-team-invite';
 /** Reads ?team-invite=… from the address the app was opened with (then removes it from the address bar). */
@@ -370,10 +371,10 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
           {SHARE_SCOPES.map(scope => (
             <label key={scope} className="between share-row" data-scope={scope}>
               <span>{t.scope[scope]}</span>
-              <select aria-label={`${t.shareAll}: ${t.scope[scope]}`} value={allLevel(scope) ?? ''} disabled={busy} data-testid={`share-all-${scope}`}
+              <Select aria-label={`${t.shareAll}: ${t.scope[scope]}`} value={allLevel(scope) ?? ''} disabled={busy} data-testid={`share-all-${scope}`}
                 onChange={e => { const v = (e.target.value || null) as ShareLevel | null; if (v && !allLevel(scope)) setAskAll({ scope, level: v }); else void applyAll(scope, v); }}>
                 <option value="">{t.notShared}</option><option value="view">{t.viewOnly}</option><option value="edit">{t.viewEdit}</option>
-              </select>
+              </Select>
             </label>
           ))}
           <small className="muted">{t.calculatorPrivate}</small>
@@ -390,9 +391,9 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
                 return (
                   <li key={k} className="share-row" data-testid="share-row" data-key={k}>
                     <span className="stack-sm"><strong>{r.title}</strong><small className="muted">{t.scope[r.scopes[0]]}{r.viaAll ? ` · ${t.viaAll}: ${levelText(lang, r.viaAll)}` : ''}</small></span>
-                    <select aria-label={`${r.title}: ${t.recipient}`} value={level(r) ?? ''} onChange={e => setChanges(c => ({ ...c, [k]: (e.target.value || null) as ShareLevel | null }))}>
+                    <Select aria-label={`${r.title}: ${t.recipient}`} value={level(r) ?? ''} onChange={e => setChanges(c => ({ ...c, [k]: (e.target.value || null) as ShareLevel | null }))}>
                       <option value="">{t.notShared}</option><option value="view">{t.viewOnly}</option><option value="edit">{t.viewEdit}</option>
-                    </select>
+                    </Select>
                   </li>
                 );
               })}

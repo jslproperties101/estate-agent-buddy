@@ -17,6 +17,7 @@ import { rpc } from '../team/api';
 import type { Store } from '../data/store';
 import { AuditEntry, ACTION_FILTERS, ActionFilter, filterOf, fmtMyt, showValue, newestFirst, ymdMyt } from './model';
 import { auditStrings } from './strings';
+import { Select } from '../ui/Select';
 
 // ---------- who may see which history ----------
 /** May I see this record's audit history right now? "team" = Team Workspace events kept on this phone. A record I own
@@ -115,9 +116,9 @@ function Filters({ lang, entries, person, setPerson, actions, setActions }: {
   return (
     <div className="stack-sm" data-testid="audit-filters">
       <label className="ff">{a.person}
-        <select value={person} onChange={x => setPerson(x.target.value)} data-testid="audit-person">
+        <Select value={person} onChange={x => setPerson(x.target.value)} data-testid="audit-person">
           <option value="">{a.everyone}</option>{people.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select>
+        </Select>
       </label>
       <div className="row-wrap" role="group" aria-label={a.actions}>
         {ACTION_FILTERS.map(f => (

@@ -15,6 +15,7 @@ import { gather, generate, prepare, ExportResult } from './generate';
 import { estimateBytes, fmtBytes, LARGE_BYTES, Report, ExportFormat, ExportMode, recLine } from './report';
 import { keepExport, listExports, bulk, refusedFor, canAccessExport, canDeleteExport, SavedExport, BulkResult } from './saved';
 import { exportStrings, EXACT_EXPORT } from './strings';
+import { Select } from '../ui/Select';
 
 // ---------- export ----------
 export function AuditExportScreen({ lang, go, keys, person: person0, actions: actions0 }: { lang: Lang; go: Go; keys: string[]; person?: string; actions?: string[] }) {
@@ -81,9 +82,9 @@ export function AuditExportScreen({ lang, go, keys, person: person0, actions: ac
           </div>
           {mode === 'snapshot' && <small className="muted">{s.snapshotHelp}</small>}
           <label className="ff">{s.person}
-            <select value={person} disabled={phase === 'running'} onChange={e => setPerson(e.target.value)} data-testid="export-person">
+            <Select value={person} disabled={phase === 'running'} onChange={e => setPerson(e.target.value)} data-testid="export-person">
               <option value="">{s.everyone}</option>{people.map(([id, l]) => <option key={id} value={id}>{l}</option>)}
-            </select>
+            </Select>
           </label>
           <div className="row-wrap" role="group" aria-label={s.actions}>
             {ACTION_FILTERS.map(f => <label key={f} className="check"><input type="checkbox" disabled={phase === 'running'} checked={actions.includes(f)} data-export-action={f} onChange={e => setActions(e.target.checked ? [...actions, f] : actions.filter(x => x !== f))} /> {a.filter[f]}</label>)}
@@ -204,8 +205,8 @@ export function ExportManagementScreen({ lang, go, section }: { lang: Lang; go: 
         </>}
         <label className="ff">{s.search}<input value={q} onChange={e => { setSel([]); setQ(e.target.value); }} data-field="exportSearch" /></label>
         <div className="filter-grid">
-          <label>{s.fRecord}<select value={fRec} onChange={e => { setSel([]); setFRec(e.target.value); }} data-testid="filter-record"><option value="">{s.any}</option>{recordChoices.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
-          <label>{s.fFormat}<select value={fFmt} onChange={e => { setSel([]); setFFmt(e.target.value); }} data-testid="filter-format"><option value="">{s.any}</option><option value="pdf">PDF</option><option value="xlsx">XLSX</option></select></label>
+          <label>{s.fRecord}<Select value={fRec} onChange={e => { setSel([]); setFRec(e.target.value); }} data-testid="filter-record"><option value="">{s.any}</option>{recordChoices.map(r => <option key={r} value={r}>{r}</option>)}</Select></label>
+          <label>{s.fFormat}<Select value={fFmt} onChange={e => { setSel([]); setFFmt(e.target.value); }} data-testid="filter-format"><option value="">{s.any}</option><option value="pdf">PDF</option><option value="xlsx">XLSX</option></Select></label>
           <label>{s.fDate}<input type="date" value={fDate} onChange={e => { setSel([]); setFDate(e.target.value); }} data-testid="filter-date" /></label>
         </div>
       </div>

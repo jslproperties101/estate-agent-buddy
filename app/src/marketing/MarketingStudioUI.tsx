@@ -14,6 +14,7 @@ import { FileActions } from '../ui/FileActions';
 import { BusyLine } from '../ui/BusyLine';
 import { c11Strings } from '../ui/c011Strings';
 import { loadImage } from '../lib/photoStudio';
+import { Select } from '../ui/Select';
 
 type Made = { blob: Blob; url: string; format: FormatId; output: OutputId; w: number; h: number; fileName: string };
 
@@ -102,9 +103,9 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
           </label>
         ))}
         <label className="ff">{t.output}
-          <select value={out} onChange={e => { setOutput(e.target.value as OutputId); touch(); }} data-testid="ms-output">
+          <Select value={out} onChange={e => { setOutput(e.target.value as OutputId); touch(); }} data-testid="ms-output">
             {outputs.map(o => <option key={o} value={o}>{t.outputs[o]}</option>)}
-          </select>
+          </Select>
         </label>
         {!webp && format !== 'a4' && <small className="muted" data-testid="ms-webp-no">{t.webpNo}</small>}
         {/* JoyChange003 Change 81: the style picker is a gold-bordered black box of style tiles; each tile shows the style's colours. */}
@@ -124,9 +125,9 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
           </div>
         </div>
         <label className="ff">{t.language}
-          <select value={dLang} onChange={e => { setDLang(e.target.value as Lang); setSel(null); touch(); }} data-testid="ms-lang">
+          <Select value={dLang} onChange={e => { setDLang(e.target.value as Lang); setSel(null); touch(); }} data-testid="ms-lang">
             {VOICE_LANGS.map(v => { const code = v.code.startsWith('ms') ? 'bm' : v.code.startsWith('zh') ? 'zh' : 'en'; return <option key={code} value={code}>{v.label}</option>; })}
-          </select>
+          </Select>
         </label>
       </div>
 

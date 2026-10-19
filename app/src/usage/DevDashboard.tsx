@@ -11,6 +11,7 @@ import {
   BreakdownRow, DevApi, DailyRow, EventRow, Filters, HistoryRow, Overview, Preset, UserRow, bytesText, dayText, devErrorText, minutesText, myDate,
   rangeOf, recordsText, whenText,
 } from './api';
+import { Select } from '../ui/Select';
 
 type Tab = 'overview' | 'users' | 'google' | 'events' | 'history';
 const TABS: { value: Tab; label: string }[] = [
@@ -153,7 +154,7 @@ export function DevDashboard() {
             {draft.user && <div className="between"><small>User: <strong>{draft.userEmail ?? draft.user}</strong></small><button type="button" className="link-btn small" onClick={() => setDraft(d => ({ ...d, user: undefined, userEmail: undefined }))}>Remove</button></div>}
             <label className="ff">App version<input value={draft.appVersion ?? ''} onChange={e => setDraft(d => ({ ...d, appVersion: e.target.value }))} autoCapitalize="none" /></label>
             <label className="ff">Kind
-              <select value={draft.kind ?? ''} onChange={e => setDraft(d => ({ ...d, kind: e.target.value || undefined }))} data-testid="dev-kind"><option value="">All</option>{KINDS.map(k => <option key={k} value={k}>{k}</option>)}</select>
+              <Select value={draft.kind ?? ''} onChange={e => setDraft(d => ({ ...d, kind: e.target.value || undefined }))} data-testid="dev-kind"><option value="">All</option>{KINDS.map(k => <option key={k} value={k}>{k}</option>)}</Select>
             </label>
             <label className="ff">Name (exact, e.g. geocoding.reverse)<input value={draft.name ?? ''} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))} autoCapitalize="none" data-testid="dev-name" /></label>
             <label className="ff">Screen (e.g. location-picker)<input value={draft.screen ?? ''} onChange={e => setDraft(d => ({ ...d, screen: e.target.value }))} autoCapitalize="none" data-testid="dev-screen" /></label>
@@ -200,10 +201,10 @@ export function DevDashboard() {
       {tab === 'users' && (
         <div className="stack" data-testid="dev-users">
           <label className="ff">Sort by
-            <select value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="dev-sort">
+            <Select value={sort} onChange={e => setSort(e.target.value as typeof sort)} data-testid="dev-sort">
               <option value="last">Last active</option><option value="minutes">Time in the app</option><option value="google">Google calls</option>
               <option value="records">Records</option><option value="storage">Storage</option><option value="errors">Errors</option>
-            </select>
+            </Select>
           </label>
           {users.loading && !users.data && <p className="muted" role="status">Loading…</p>}
           {users.data && sortedUsers.length === 0 && <Empty>No users match.</Empty>}

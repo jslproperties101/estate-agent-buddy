@@ -24,6 +24,7 @@ import {
 import { saveTypedContact } from './contacts';
 import { syncDealReminders } from './reminders';
 import { fmtDate } from '../lib/dates';
+import { Select } from '../ui/Select';
 
 /** Which role a person on a deal page gets as a contact. */
 const PERSON_ROLE: Record<string, ContactRole> = {
@@ -171,9 +172,9 @@ function DealField({ lang, sec, f, value, onChange, docs, onAddFiles, onRemoveDo
     case 'date': return <label className="ff">{label}<input data-field={field} type="date" value={typeof value === 'string' ? value : ''} onChange={e => onChange(e.target.value || undefined)} /></label>;
     case 'yesno': return (
       <label className="ff">{label}
-        <select data-field={field} value={value === true ? 'yes' : value === false ? 'no' : ''} onChange={e => onChange(e.target.value === 'yes' ? true : e.target.value === 'no' ? false : undefined)}>
+        <Select data-field={field} value={value === true ? 'yes' : value === false ? 'no' : ''} onChange={e => onChange(e.target.value === 'yes' ? true : e.target.value === 'no' ? false : undefined)}>
           <option value="">{x.deal.notSet}</option><option value="yes">{x.deal.yes}</option><option value="no">{x.deal.no}</option>
-        </select>
+        </Select>
       </label>
     );
     case 'select': return (
@@ -207,9 +208,9 @@ function DealField({ lang, sec, f, value, onChange, docs, onAddFiles, onRemoveDo
                 if (col.type === 'money') return <label key={col.key} className="ff">{col.label[lang]}<MoneyInput data-field={name} value={typeof r[col.key] === 'number' ? r[col.key] as number : undefined} onChange={n => setRow(i, col.key, n)} /></label>;
                 if (col.type === 'select') return (
                   <label key={col.key} className="ff">{col.label[lang]}
-                    <select data-field={name} value={String(r[col.key] ?? '')} onChange={e => setRow(i, col.key, e.target.value || undefined)}>
+                    <Select data-field={name} value={String(r[col.key] ?? '')} onChange={e => setRow(i, col.key, e.target.value || undefined)}>
                       <option value="">{x.deal.notSet}</option>{(col.options ?? []).map(o => <option key={o.value} value={o.value}>{o.label[lang]}</option>)}
-                    </select>
+                    </Select>
                   </label>
                 );
                 return <label key={col.key} className="ff">{col.label[lang]}<input data-field={name} type={col.type === 'date' ? 'date' : undefined} value={String(r[col.key] ?? '')} onChange={e => setRow(i, col.key, e.target.value || undefined)} /></label>;

@@ -15,6 +15,7 @@ import { usage } from '../usage/logger';
 import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
+import { Select } from '../ui/Select';
 
 type FieldKey = 'country' | 'state' | 'city' | 'township' | 'street';
 const FIELDS: { key: FieldKey; list?: string; builtIns: () => readonly string[] }[] = [
@@ -196,10 +197,10 @@ export function LocationPicker({ lang, current, onApply, onCancel, pointOnly, ti
                   </div>
                   {ch?.kind === 'existing' && (picking === f.key || (!existing && f.list)) && (
                     <label className="ff">{m.chooseSaved}
-                      <select value={ch.value ?? ''} onChange={e => choose(f.key, { kind: 'existing', value: e.target.value || undefined })}>
+                      <Select value={ch.value ?? ''} onChange={e => choose(f.key, { kind: 'existing', value: e.target.value || undefined })}>
                         <option value="">{c.choose}</option>
                         {saved.map(v => <option key={v} value={v}>{v}</option>)}
-                      </select>
+                      </Select>
                     </label>
                   )}
                   {ch?.kind === 'typed' && (

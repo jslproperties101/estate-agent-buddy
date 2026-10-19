@@ -25,6 +25,7 @@ import { ContactSelect, PropertySelect, Empty, Confirm, Tabs, SampleTag } from '
 import { OptionSelect } from '../ui/OptionSelect';
 import { useToast } from '../ui/toast';
 import { MoneyInput } from '../ui/MoneyInput';
+import { Select } from '../ui/Select';
 
 const num = (v: string) => { const x = parseFloat(v.replace(/[^\d.]/g, '')); return Number.isFinite(x) ? x : undefined; };
 
@@ -169,7 +170,7 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
         }} />
         <ContactSelect lang={lang} label={f.f.contact} roles={['buyer']} value={d.contactId} onChange={v => setD(x => ({ ...x, contactId: v }))} />
         <label className="ff">{f.f.side}
-          <select value={d.side} onChange={e => setD(x => ({ ...x, side: e.target.value as Deal['side'] }))}>{(['sale', 'rent'] as const).map(x => <option key={x} value={x}>{f.side[x]}</option>)}</select>
+          <Select value={d.side} onChange={e => setD(x => ({ ...x, side: e.target.value as Deal['side'] }))}>{(['sale', 'rent'] as const).map(x => <option key={x} value={x}>{f.side[x]}</option>)}</Select>
         </label>
         <label className="ff">{f.f.date}<input type="date" value={d.date} onChange={e => setD(x => ({ ...x, date: e.target.value || x.date }))} /></label>
         {field('value', f.f.value)}
@@ -178,9 +179,9 @@ export function DealForm({ lang, back, id, propertyId }: { lang: Lang; back: () 
         {field('commission', f.f.commission)}
         <strong className="small" data-testid="my-commission">{f.f.mine(rm(myCommission(d)))}</strong>
         <label className="ff">{f.f.status}
-          <select data-field="status" value={d.status} onChange={e => setD(x => ({ ...x, status: e.target.value as Deal['status'], receivedDate: e.target.value === 'received' ? x.receivedDate ?? ymd(new Date()) : x.receivedDate }))}>
+          <Select data-field="status" value={d.status} onChange={e => setD(x => ({ ...x, status: e.target.value as Deal['status'], receivedDate: e.target.value === 'received' ? x.receivedDate ?? ymd(new Date()) : x.receivedDate }))}>
             {DEAL_STATUSES.map(x => <option key={x} value={x}>{f.dealStatus[x]}</option>)}
-          </select>
+          </Select>
         </label>
         {d.status === 'received' && <>
           <label className="ff">{f.f.receivedDate}<input type="date" value={d.receivedDate ?? ''} onChange={e => setD(x => ({ ...x, receivedDate: e.target.value || undefined }))} /></label>

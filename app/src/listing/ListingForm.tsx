@@ -56,6 +56,7 @@ import { PhotoReorder } from './PhotoReorder';
 import { ContactPick } from '../ui/ContactPick';
 import type { Screen, DealKind } from '../nav';
 import { saveTypedContact } from '../deals/contacts';
+import { Select as PickList } from '../ui/Select';
 
 /** Sections of the form, in order, and the details each one holds (for the "n filled" line on a closed section). */
 const SECTION_IDS = ['basics', 'tenure', 'location', 'photos', 'details', 'tenancy', 'owner', 'specs', 'banner', 'marketing', 'notes', 'docs'];
@@ -196,10 +197,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
     return (
       <label className={`vp vp-${cur}`}>
         {/* Change 014: no separate "Check status" text; the dropdown shows the status itself, as tall and wide as the field above. */}
-        <select data-verify={k} aria-label={s.verify.aria(label)} value={cur} className={`vc-sel vc-${cur}`}
+        <PickList data-verify={k} aria-label={s.verify.aria(label)} value={cur} className={`vc-sel vc-${cur}`}
           onChange={e => setD(prev => withVerification(prev, k, e.target.value as VerifyState))}>
           {VERIFY_STATES.map(v => <option key={v} value={v}>{s.verify[v]}</option>)}
-        </select>
+        </PickList>
       </label>
     );
   };
@@ -219,10 +220,10 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const Select = ({ k, options, labels }: { k: keyof Listing; options: readonly string[]; labels?: Record<string, string> }) => withVp(k as string, (
     <label className="ff" key={k}>
       <span className="between"><span>{s.l[k as string]}</span>{fromWords(k)}</span>
-      <select data-field={k} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)}>
+      <PickList data-field={k} value={(d[k] as string) ?? ''} onChange={e => set(k, (e.target.value || undefined) as never)}>
         <option value="">{s.notSet}</option>
         {options.map(o => <option key={o} value={o}>{labels ? labels[o] : o}</option>)}
-      </select>
+      </PickList>
     </label>
   ));
   const Opt = ({ k, listKey, builtIns, labels, onPick }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void }) => withVp(k as string, (
@@ -532,7 +533,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {/* Change 8 / 10: Availability, with Status merged into it, no check status. */}
         <label className="ff">
           <span>{x1.avail.label}</span>
-          <select data-field="availability" value={availChoice(d) ?? ''} onChange={e => {
+          <PickList data-field="availability" value={availChoice(d) ?? ''} onChange={e => {
             const v = (e.target.value || undefined) as AvailChoice | undefined;
             setD(prev => ({ ...prev, ...availPatch(v, prev.availableFrom), filledFrom: { ...(prev.filledFrom ?? {}), availability: 'typed', status: 'typed' } }));
             if (v === 'rented') setOpen(o => new Set([...o, 'tenancy']));
@@ -543,7 +544,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             {/* Change 40: an older plain Booked still shows, but cannot be chosen again. */}
             {availChoice(d) === 'booked' && <option value="booked" disabled>{x1.avail.booked}</option>}
             {AVAIL_CHOICES.map(o => <option key={o} value={o}>{x1.avail[o]}</option>)}
-          </select>
+          </PickList>
         </label>
         {availChoice(d) === 'available_from' && (
           <label className="ff">{x1.avail.fromMonth}<input data-field="availableFrom" type="month" value={d.availableFrom ?? ''} onChange={e => set('availableFrom', e.target.value || undefined)} /></label>
@@ -554,11 +555,11 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
         {/* Change 10: Co-broke or Direct; for Co-broke the other agent's name, agency and contact. */}
         <label className="ff">
           <span>{s.l.arrangement}</span>
-          <select data-field="arrangement" value={d.arrangement === 'cobroke' || d.arrangement === 'direct' ? d.arrangement : ''}
+          <PickList data-field="arrangement" value={d.arrangement === 'cobroke' || d.arrangement === 'direct' ? d.arrangement : ''}
             onChange={e => set('arrangement', (e.target.value || undefined) as Listing['arrangement'])}>
             <option value="">{s.notSet}</option>
             {ARRANGEMENT_CHOICES.map(o => <option key={o} value={o}>{x1.arrangement[o]}</option>)}
-          </select>
+          </PickList>
         </label>
         {d.arrangement === 'cobroke' && (
           <div className="sub-card stack-sm" data-testid="cobroke-details">
@@ -584,9 +585,9 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {/* Sale commission (owner, 15 Oct): a percentage of the price, or a flat fee in RM. */}
           <div className="two">
             <label className="ff">{s.l.commissionType}
-              <select data-field="commissionType" value={d.commissionType ?? 'pct'} onChange={e => set('commissionType', e.target.value as Listing['commissionType'])}>
+              <PickList data-field="commissionType" value={d.commissionType ?? 'pct'} onChange={e => set('commissionType', e.target.value as Listing['commissionType'])}>
                 {SALE_COMMISSION_TYPES.map(x => <option key={x} value={x}>{x === 'pct' ? s.n9.typePct : s.n9.typeFlat}</option>)}
-              </select>
+              </PickList>
             </label>
             {(d.commissionType ?? 'pct') === 'pct' ? Text({ k: 'commissionPct', numeric: true }) : Text({ k: 'commissionFlat', money: true })}
           </div>
@@ -596,14 +597,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
           {Text({ k: 'monthlyRent', money: true })}
           {/* Rental commission (owner, 15 Oct): months of rent (1, 1.5, 2 or any number typed), or a flat fee in RM. Never a %. */}
           <label className="ff">{s.l.rentCommissionType}
-            <select data-field="rentCommissionType" value={d.rentCommissionType ?? 'months'} onChange={e => set('rentCommissionType', e.target.value as Listing['rentCommissionType'])}>
+            <PickList data-field="rentCommissionType" value={d.rentCommissionType ?? 'months'} onChange={e => set('rentCommissionType', e.target.value as Listing['rentCommissionType'])}>
               {RENT_COMMISSION_TYPES.map(x => <option key={x} value={x}>{x === 'months' ? s.n9.typeMonths : s.n9.typeFlat}</option>)}
-            </select>
+            </PickList>
           </label>
           {(d.rentCommissionType ?? 'months') === 'months' ? withVp('rentCommissionMonths', (
             <div className="ff" key="rentCommissionMonths">
               <label htmlFor="rent-months">{s.l.rentCommissionMonths}</label>
-              <select id="rent-months" data-field="rentCommissionMonths" value={monthsCustom ? 'custom' : d.rentCommissionMonths ?? ''}
+              <PickList id="rent-months" data-field="rentCommissionMonths" value={monthsCustom ? 'custom' : d.rentCommissionMonths ?? ''}
                 onChange={e => {
                   if (e.target.value === 'custom') { setMonthsCustom(true); return; }
                   setMonthsCustom(false); set('rentCommissionMonths', e.target.value ? Number(e.target.value) : undefined);
@@ -611,7 +612,7 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
                 <option value="">{s.notSet}</option>
                 {RENT_COMMISSION_MONTHS.map(m => <option key={m} value={m}>{s.n9.rentMonths(m)}</option>)}
                 <option value="custom">{s.n9.customMonths}</option>
-              </select>
+              </PickList>
               {monthsCustom && (
                 <input data-field="rentCommissionMonthsCustom" inputMode="decimal" aria-label={s.n9.monthsInput} placeholder={s.n9.monthsInput}
                   value={raw.rentMonths ?? (d.rentCommissionMonths ?? '')}
@@ -779,18 +780,18 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       <Sec id="marketing" title={s.sec.marketing} testId="sec-marketing" {...secProps('marketing')}>
         {Text({ k: 'headline' })}
         <label className="ff">{s.l.advertised}
-          <select data-field="advertised" value={mk.advertised ?? ''} onChange={e => setMk({ advertised: (e.target.value || undefined) as 'yes' | 'no' | undefined })}>
+          <PickList data-field="advertised" value={mk.advertised ?? ''} onChange={e => setMk({ advertised: (e.target.value || undefined) as 'yes' | 'no' | undefined })}>
             <option value="">{s.notSet}</option><option value="yes">{s.yesNo.yes}</option><option value="no">{s.yesNo.no}</option>
-          </select>
+          </PickList>
         </label>
         {mk.ads.map((a, i) => (
           <div key={a.id} className="sub-card stack-sm" data-testid="ad-editor">
             {a.fake && <FakeBadge lang={lang} />}
             <OptionSelect lang={lang} label={`${s.l.platform} ${i + 1}`} listKey="platform" allowEmpty={false} builtIns={PLATFORMS.map(p => ({ value: p }))} value={a.platform} onChange={v => setAd(a.id, { platform: v ?? PLATFORMS[0] })} />
             <label className="ff">{s.l.adStatus}
-              <select aria-label={`${s.l.adStatus} ${i + 1}`} value={a.status ?? ''} onChange={e => setAd(a.id, { status: (e.target.value || undefined) as Advert['status'] })}>
+              <PickList aria-label={`${s.l.adStatus} ${i + 1}`} value={a.status ?? ''} onChange={e => setAd(a.id, { status: (e.target.value || undefined) as Advert['status'] })}>
                 <option value="">{s.notSet}</option>{AD_STATUSES.map(x => <option key={x} value={x}>{s.adStatus[x]}</option>)}
-              </select>
+              </PickList>
             </label>
             <div className="two">
               <label className="ff">{s.l.adStart}<input type="date" value={a.start ?? ''} onChange={e => setAd(a.id, { start: e.target.value || undefined })} /></label>

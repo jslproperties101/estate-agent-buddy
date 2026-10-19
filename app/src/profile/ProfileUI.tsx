@@ -32,6 +32,7 @@ import { DataSafetyCard } from '../sync/SyncUI';
 import { permission, requestPermission } from '../lib/notify';
 import { loadSampleInto } from '../data/sample';
 import { DevEntry } from '../usage/DevDashboard';
+import { Select } from '../ui/Select';
 
 export const REG_TYPES = ['REN', 'PEA', 'REA'] as const;
 
@@ -205,10 +206,10 @@ export function NameCardSend({ lang }: { lang: Lang }) {
           {(['app', 'phone', 'typed'] as Source[]).map(s => <button key={s} aria-pressed={source === s} onClick={() => { setSource(s); setMsg(''); }}>{s === 'app' ? t.fromApp : s === 'phone' ? t.fromPhone : t.typed}</button>)}
         </div>
         {source === 'app' && (
-          <select aria-label={t.fromApp} data-testid="recipient-app" value={contactId} onChange={e => setContactId(e.target.value)}>
+          <Select aria-label={t.fromApp} data-testid="recipient-app" value={contactId} onChange={e => setContactId(e.target.value)}>
             <option value="">{strings[lang].c.choose}</option>
             {[...state.contacts].filter(x => x.phone).sort((a, b) => a.name.localeCompare(b.name)).map(x => <option key={x.id} value={x.id}>{x.name} · {x.phone}</option>)}
-          </select>
+          </Select>
         )}
         {source === 'phone' && <PhonebookButton lang={lang} testId="namecard-pick" onPicked={c => { setToName(c.name); setToTel(normalisePhone(c.tel) ?? ''); setMsg(''); }} />}
         {source !== 'app' && (

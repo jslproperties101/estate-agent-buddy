@@ -12,6 +12,7 @@ import {
 } from './buyerPdf';
 import { VOICE_LANGS } from '../voice/recognizer';
 import type { Doc } from '../lib/pdf';
+import { Select } from '../ui/Select';
 
 type Ready = { photos: { src: string; w: number; h: number }[]; skipped: number };
 
@@ -79,9 +80,9 @@ export function BuyerPdfScreen({ lang, propertyId }: { lang: Lang; propertyId: s
       <p className="small muted">{[l.ref, cardTitle(l)].filter(Boolean).join(' · ')}</p>
 
       <label className="ff">{b.language}
-        <select value={pdfLang} onChange={e => { setPdfLang(e.target.value as Lang); setSel(null); }} data-testid="buyer-pdf-lang">
+        <Select value={pdfLang} onChange={e => { setPdfLang(e.target.value as Lang); setSel(null); }} data-testid="buyer-pdf-lang">
           {VOICE_LANGS.map(v => { const code = v.code.startsWith('ms') ? 'bm' : v.code.startsWith('zh') ? 'zh' : 'en'; return <option key={code} value={code}>{v.label}</option>; })}
-        </select>
+        </Select>
       </label>
 
       <div className="card stack-sm" data-testid="buyer-pdf-fields">

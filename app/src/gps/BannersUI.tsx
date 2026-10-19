@@ -22,6 +22,7 @@ import { compressImage } from '../lib/images';
 import { Confirm, Empty, StoredImage } from '../ui/common';
 import { useToast } from '../ui/toast';
 import type { Banner } from '../data/types';
+import { Select } from '../ui/Select';
 
 type Filter = BannerStatus | 'unset' | 'all';
 
@@ -118,10 +119,10 @@ export function BannerScreen({ lang, go, propertyId }: { lang: Lang; go: Go; pro
                   <BannerDot status={p.bannerStatus} lang={lang} />
                 </div>
                 <label className="ff">{s.bannerQ}
-                  <select data-field="bannerStatus" value={p.bannerStatus ?? ''} onChange={e => setStatus(p, (e.target.value || undefined) as BannerStatus | undefined)}>
+                  <Select data-field="bannerStatus" value={p.bannerStatus ?? ''} onChange={e => setStatus(p, (e.target.value || undefined) as BannerStatus | undefined)}>
                     <option value="">{s.banner.unset}</option>
                     {BANNER_STATUSES.map(v => <option key={v} value={v}>{s.banner[v]}</option>)}
-                  </select>
+                  </Select>
                 </label>
                 {active.length === 0 ? <small className="muted">{b.none}</small> : active.map(x => <BannerRow key={x.id} x={x} lang={lang} onTakeDown={() => setTakeDown(x)} onEdit={() => { setSel(p.id); setEditing(x); }} />)}
                 <div className="two">

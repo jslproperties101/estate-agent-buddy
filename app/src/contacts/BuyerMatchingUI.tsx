@@ -21,6 +21,7 @@ import { LeadDot, Empty } from '../ui/common';
 import { MoneyInput } from '../ui/MoneyInput';
 import { useToast } from '../ui/toast';
 import { can, visible } from '../team/access';
+import { Select } from '../ui/Select';
 
 const isBuyer = (c: Contact) => c.roles.some(r => BUYER_ROLES.includes(r));
 
@@ -153,14 +154,14 @@ export function BuyerMatchesScreen({ lang, contactId, go }: { lang: Lang; contac
         <input aria-label={ls.f.location} placeholder={ls.search} value={f.location ?? ''} onChange={e => set({ location: e.target.value || undefined })} data-testid="bm-search" />
         <div className="filter-grid">
           <label>{ls.f.purpose}
-            <select aria-label={ls.f.purpose} value={f.purpose ?? ''} onChange={e => set({ purpose: (e.target.value || undefined) as Filters['purpose'] })} data-testid="bm-purpose">
+            <Select aria-label={ls.f.purpose} value={f.purpose ?? ''} onChange={e => set({ purpose: (e.target.value || undefined) as Filters['purpose'] })} data-testid="bm-purpose">
               <option value="">{ls.any}</option>{(['sale', 'rent'] as const).map(x => <option key={x} value={x}>{ls.purposeFilter[x]}</option>)}
-            </select>
+            </Select>
           </label>
           <label>{ls.f.type}
-            <select aria-label={ls.f.type} value={f.type ?? ''} onChange={e => set({ type: e.target.value || undefined })} data-testid="bm-type">
+            <Select aria-label={ls.f.type} value={f.type ?? ''} onChange={e => set({ type: e.target.value || undefined })} data-testid="bm-type">
               <option value="">{ls.any}</option>{TYPES.map(x => <option key={x} value={x}>{typeLabel(ls, x)}</option>)}
-            </select>
+            </Select>
           </label>
         </div>
         <div className="two">
@@ -168,9 +169,9 @@ export function BuyerMatchesScreen({ lang, contactId, go }: { lang: Lang; contac
           <label className="ff">{ls.max}<MoneyInput aria-label={`${ls.f.price} ${ls.max}`} value={f.priceMax} onChange={n => set({ priceMax: n })} /></label>
         </div>
         <label className="ff">{t.showArchived}
-          <select value={showArchived ? 'yes' : 'no'} onChange={e => setShowArchived(e.target.value === 'yes')} data-testid="bm-show-archived">
+          <Select value={showArchived ? 'yes' : 'no'} onChange={e => setShowArchived(e.target.value === 'yes')} data-testid="bm-show-archived">
             <option value="no">{t.archivedNo}</option><option value="yes">{t.archivedYes}</option>
-          </select>
+          </Select>
         </label>
         <div className="btn-row"><button className="btn secondary" onClick={() => setF({})} data-testid="bm-clear">{ls.clear}</button></div>
       </div>

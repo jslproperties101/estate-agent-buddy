@@ -20,6 +20,7 @@ import { applyPropertyUpdates, buildCalculation, fromFlat, headline, proposeUpda
 import { PdfPreview } from '../ui/PdfPreview';
 import { buildCalculationDoc } from './pdfDoc';
 import { fmtDate } from '../lib/dates';
+import { Select } from '../ui/Select';
 
 type Tab = CalcKind | 'assumptions' | 'history';
 
@@ -143,10 +144,10 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
           </div>
         )}
         <label className="ff">{cx.client.label}
-          <select value={contactId ?? ''} onChange={e => setContactId(e.target.value || undefined)} data-testid="calc-client">
+          <Select value={contactId ?? ''} onChange={e => setContactId(e.target.value || undefined)} data-testid="calc-client">
             <option value="">{cx.client.none}</option>
             {[...state.contacts].sort((c1, c2) => c1.name.localeCompare(c2.name)).map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ''}</option>)}
-          </select>
+          </Select>
         </label>
       </div>
       {override && (
@@ -166,9 +167,9 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
           <Num label={t.in.rate} value={p.ratePct} onChange={n => setP(x => ({ ...x, ratePct: n }))} testId="rate" />
           {tab === 'purchase' && <>
             <label className="ff">{t.in.buyer}
-              <select value={p.buyer} onChange={e => setP(x => ({ ...x, buyer: e.target.value as PurchaseInput['buyer'] }))}>
+              <Select value={p.buyer} onChange={e => setP(x => ({ ...x, buyer: e.target.value as PurchaseInput['buyer'] }))}>
                 <option value="citizen">{t.in.citizen}</option><option value="non_citizen">{t.in.nonCitizen}</option>
-              </select>
+              </Select>
             </label>
             {p.buyer === 'citizen' && <label className="check"><input type="checkbox" checked={p.firstHome} onChange={e => setP(x => ({ ...x, firstHome: e.target.checked }))} /> {t.in.firstHome} (≤ {rm(a.firstHomeCap)})</label>}
             <div className="two">

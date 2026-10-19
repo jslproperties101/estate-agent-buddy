@@ -15,6 +15,7 @@ import { config } from '../config';
 import { fmtDateTime } from '../lib/dates';
 import { IconExpert } from '../icons';
 import { usage } from '../usage/logger';
+import { Select } from '../ui/Select';
 
 export function ExpertHome({ lang, go }: { lang: Lang; go: Go }) {
   const { state } = useApp();
@@ -122,10 +123,10 @@ export function ExpertThreadScreen({ lang, go, id }: { lang: Lang; go: Go; id: s
             <small className="muted">{e.noExpertContacts(who)}</small>
             <button className="btn small secondary" onClick={() => go({ name: 'contactForm', role: 'professional' })}>{e.addExpertContact}</button>
           </> : <>
-            <select aria-label={e.chooseExpert(who)} value={contactId} onChange={ev => setContactId(ev.target.value)}>
+            <Select aria-label={e.chooseExpert(who)} value={contactId} onChange={ev => setContactId(ev.target.value)}>
               <option value="">{e.chooseExpert(who)}</option>
               {pros.map(x => <option key={x.id} value={x.id}>{x.name}{x.company ? ` · ${x.company}` : ''}</option>)}
-            </select>
+            </Select>
             <a className={`btn primary ${pro ? '' : 'disabled'}`} aria-disabled={!pro} target="_blank" rel="noreferrer"
               href={pro ? whatsappLink(pro.phone, e.waText(pro.name, t.question, propertyLabel(prop))) : undefined}
               onClick={ev => { if (!pro) { ev.preventDefault(); return; } add({ from: 'me', text: t.question, via: 'whatsapp', contactId: pro.id }); }}>WhatsApp</a>

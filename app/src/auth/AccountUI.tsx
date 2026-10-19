@@ -13,6 +13,7 @@ import { Confirm } from '../ui/common';
 import { BusyLine } from '../ui/BusyLine';
 import { authStrings } from './strings';
 import { useGoogleReturn } from './LoginScreen';
+import { Select } from '../ui/Select';
 
 const ROLES: Role[] = ['owner', 'admin', 'team_leader', 'agent', 'limited'];
 
@@ -125,9 +126,9 @@ export function TeamCard({ lang, session }: { lang: Lang; session: Session }) {
                   <small className={m.active ? 'ok-text' : 'warn-text'}>{a.roles[m.role]} · {m.active ? t.active : t.inactive}</small></span>
                 {canChange(m) && (
                   <span className="row-wrap">
-                    <select aria-label={`${t.changeRole}: ${m.email}`} value={m.role} onChange={e => void rpc('eab_set_member', { ws, p_user: m.user_id, p_role: e.target.value, p_active: m.active })}>
+                    <Select aria-label={`${t.changeRole}: ${m.email}`} value={m.role} onChange={e => void rpc('eab_set_member', { ws, p_user: m.user_id, p_role: e.target.value, p_active: m.active })}>
                       {roleChoices.map(r => <option key={r} value={r}>{a.roles[r]}</option>)}
-                    </select>
+                    </Select>
                     <button className="btn small secondary" onClick={() => void rpc('eab_set_member', { ws, p_user: m.user_id, p_role: m.role, p_active: !m.active })}>{m.active ? t.deactivate : t.reactivate}</button>
                   </span>
                 )}
@@ -141,9 +142,9 @@ export function TeamCard({ lang, session }: { lang: Lang; session: Session }) {
           ))}
           <label className="ff">{t.email}<input type="email" value={email} onChange={e => setEmail(e.target.value)} data-field="inviteEmail" /></label>
           <label className="ff">{t.role}
-            <select value={role} onChange={e => setRole(e.target.value as Role)} data-field="inviteRole">
+            <Select value={role} onChange={e => setRole(e.target.value as Role)} data-field="inviteRole">
               {roleChoices.map(r => <option key={r} value={r}>{a.roles[r]}</option>)}
-            </select>
+            </Select>
           </label>
           {session.role !== 'owner' && <small className="muted">{t.ownerOnly}</small>}
           <small className="muted">{t.inviteHelp}</small>

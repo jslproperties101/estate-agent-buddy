@@ -33,6 +33,7 @@ import { DraftBanner } from '../ui/DraftBanner';
 import { reviewContacts, undoInactiveConversion, UndoResult } from '../data/leadReview';
 import { BuyerRequirementsCard, RequirementsEditor } from './MatchUI';
 import { c11Strings } from '../ui/c011Strings';
+import { Select } from '../ui/Select';
 
 export const inRole = (c: Contact, role: 'vendor' | 'buyer') => c.roles.some(r => (role === 'vendor' ? VENDOR_ROLES : BUYER_ROLES).includes(r));
 
@@ -264,9 +265,9 @@ export function ContactForm({ lang, go, back, id, role, prefill }: { lang: Lang;
         </fieldset>
         {d.roles.includes('professional') && (
           <label className="ff">{s.f.profession}
-            <select value={d.profession ?? ''} onChange={e => setD(x => ({ ...x, profession: (e.target.value || undefined) as ExpertKey | undefined }))}>
+            <Select value={d.profession ?? ''} onChange={e => setD(x => ({ ...x, profession: (e.target.value || undefined) as ExpertKey | undefined }))}>
               <option value="">{t.c.notSet}</option>{EXPERTS.filter(x => x !== 'agent_ai').map(x => <option key={x} value={x}>{s.experts[x]}</option>)}
-            </select>
+            </Select>
           </label>
         )}
         {formVendor && <VendorStatusPicker lang={lang} value={d.vendorStatus} onChange={v => setD(x => ({ ...x, vendorStatus: v }))} />}
