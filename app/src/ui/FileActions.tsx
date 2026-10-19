@@ -4,7 +4,7 @@
 // cancelled, not possible here, or failed.
 import { useRef, useState } from 'react';
 import type { Lang } from '../i18n';
-import { saveFile, shareFile } from '../lib/pdfRender';
+import { saveFile, shareFile, openSaved } from '../lib/pdfRender';
 import { c11Strings } from './c011Strings';
 import { BusyLine } from './BusyLine';
 
@@ -14,7 +14,7 @@ export function FileActions({ lang, blob, fileName, title, mime = 'application/p
 }) {
   const f = c11Strings[lang].file;
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
-  const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null);
+  const [msg, setMsg] = useState<{ text: string; error: boolean; open?: { uri: string; mime: string } } | null>(null);
   const running = useRef(false);
   async function run(kind: 'save' | 'share') {
     if (running.current) return;
@@ -25,7 +25,8 @@ export function FileActions({ lang, blob, fileName, title, mime = 'application/p
     try {
       if (kind === 'save') {
         const r = await saveFile(held, fileName);
-        setMsg(r.ok ? { text: r.where ? f.saved(r.where) : f.savedWeb, error: false } : { text: r.reason === 'needApk' ? f.needApk : r.reason === 'noFile' ? f.noFile : f.failed, error: true });
+        // JoyChange003 Change 77: a short message, with an Open button when the phone can show the saved file.
+        setMsg(r.ok ? { text: r.where?.startsWith('Download/') ? (r.gallery ? f.savedGallery : f.savedDownloads) : r.where ? f.saved(r.where) : f.savedWeb, error: false, open: r.open } : { text: r.reason === 'needApk' ? f.needApk : r.reason === 'noFile' ? f.noFile : f.failed, error: true });
       } else {
         const r = await shareFile(held, fileName, title, mime);
         setMsg(r === 'shared' ? { text: f.shared, error: false } : r === 'cancelled' ? { text: f.cancelled, error: false }
@@ -41,7 +42,12 @@ export function FileActions({ lang, blob, fileName, title, mime = 'application/p
         <button type="button" className="btn primary" disabled={disabled || !!busy} onClick={() => void run('share')} data-testid={`${testPrefix}-share`}>{shareLabel}</button>
       </div>
       {busy && <BusyLine text={busy === 'save' ? f.saving : f.sharing} testId={`${testPrefix}-file-busy`} />}
-      {msg && <p className={msg.error ? 'warn-text small' : 'ok-text small'} role={msg.error ? 'alert' : 'status'} data-testid={`${testPrefix}-msg`}>{msg.text}</p>}
+      {msg && (
+        <div className="file-msg">
+          <p className={msg.error ? 'warn-text small' : 'ok-text small'} role={msg.error ? 'alert' : 'status'} data-testid={`${testPrefix}-msg`}>{msg.text}</p>
+          {msg.open && <button type="button" className="btn small primary" data-testid={`${testPrefix}-open`} onClick={() => { const o = msg.open!; void openSaved(o).then(ok => { if (!ok) setMsg({ text: f.openFail, error: true }); }); }}>{f.openFile}</button>}
+        </div>
+      )}
     </div>
   );
 }

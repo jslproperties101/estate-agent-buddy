@@ -5,12 +5,21 @@
 import { buildPdf } from '../lib/pdf';
 import { FORMATS, FormatId, MIME, OutputId, PosterContent, PosterFact } from './content';
 
-export type Theme = 'dark' | 'light';
+/** JoyChange003 Change 81: poster styles. "dark" (Black and Gold) and "light" (White and Gold) are the two older ones. */
+export type Theme = 'dark' | 'light' | 'navy' | 'burgundy' | 'charcoal' | 'cream' | 'mono' | 'sky';
+export const THEMES: Theme[] = ['dark', 'light', 'navy', 'burgundy', 'charcoal', 'cream', 'mono', 'sky'];
 const FAMILY = '"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
-const PALETTE = {
-  dark: { bg: '#08080A', panel: '#131316', ink: '#F7F4EC', muted: '#BEB7A6', gold: '#D4AF37', onGold: '#111111', line: '#4A4231', warn: '#F0B429' },
-  light: { bg: '#FFFFFF', panel: '#F6F1E3', ink: '#111111', muted: '#5B5546', gold: '#A87F1B', onGold: '#FFFFFF', line: '#D9CFB4', warn: '#8A5A00' },
-} as const;
+/** `gold` is the style's accent (silver, black or sky blue in the styles that have no gold); `rgb` is the background for the fade over the photo. */
+export const PALETTE: Record<Theme, Pal> = {
+  dark: { bg: '#08080A', panel: '#131316', ink: '#F7F4EC', muted: '#BEB7A6', gold: '#D4AF37', onGold: '#111111', line: '#4A4231', warn: '#F0B429', rgb: '8,8,10' },
+  light: { bg: '#FFFFFF', panel: '#F6F1E3', ink: '#111111', muted: '#5B5546', gold: '#A87F1B', onGold: '#FFFFFF', line: '#D9CFB4', warn: '#8A5A00', rgb: '255,255,255' },
+  navy: { bg: '#0B1A33', panel: '#13284A', ink: '#F7F4EC', muted: '#B9C2D3', gold: '#D4AF37', onGold: '#0B1A33', line: '#3A4A66', warn: '#F0B429', rgb: '11,26,51' },
+  burgundy: { bg: '#3B0A14', panel: '#561424', ink: '#F9F1EC', muted: '#D9B9BE', gold: '#D4AF37', onGold: '#3B0A14', line: '#7A3442', warn: '#F0B429', rgb: '59,10,20' },
+  charcoal: { bg: '#26282B', panel: '#33363A', ink: '#F2F2F2', muted: '#B5B8BC', gold: '#C9CCD1', onGold: '#1C1D1F', line: '#55595E', warn: '#F0B429', rgb: '38,40,43' },
+  cream: { bg: '#F7F0E1', panel: '#EFE4CC', ink: '#2A2418', muted: '#6B5E44', gold: '#A87F1B', onGold: '#FFFFFF', line: '#D9C9A3', warn: '#8A5A00', rgb: '247,240,225' },
+  mono: { bg: '#FFFFFF', panel: '#F2F2F2', ink: '#000000', muted: '#555555', gold: '#000000', onGold: '#FFFFFF', line: '#CCCCCC', warn: '#8A5A00', rgb: '255,255,255' },
+  sky: { bg: '#EAF5FD', panel: '#FFFFFF', ink: '#0F2A44', muted: '#4E6A85', gold: '#2F8FD8', onGold: '#FFFFFF', line: '#BFDDF3', warn: '#8A5A00', rgb: '234,245,253' },
+};
 type Ctx = CanvasRenderingContext2D;
 
 const font = (px: number, bold = false) => `${bold ? '700 ' : '400 '}${px}px ${FAMILY}`;
@@ -52,7 +61,7 @@ const factText = (f: PosterFact) => `${f.value}${f.unverified ? ' *' : ''}`;
 /** For the one-line chips of the post designs: the label without its bracketed unit, then the value ("Bedrooms 4", "Built-up 1,800 sq ft"). */
 const chipText = (f: PosterFact) => `${f.label.replace(/\s*[(（].*?[)）]/g, '').trim()} ${factText(f)}`;
 
-interface Pal { bg: string; panel: string; ink: string; muted: string; gold: string; onGold: string; line: string; warn: string }
+export interface Pal { bg: string; panel: string; ink: string; muted: string; gold: string; onGold: string; line: string; warn: string; rgb: string }
 
 function ribbon(ctx: Ctx, c: PosterContent, p: Pal, x: number, y: number, size: number) {
   if (!c.ribbon) return 0;
@@ -101,10 +110,23 @@ function foot(ctx: Ctx, c: PosterContent, p: Pal, x: number, yBottom: number, w:
 interface Section { h: number; paint: (y: number) => void }
 const sum = (xs: Section[]) => xs.reduce((n, x) => n + x.h, 0);
 
+/** Change 75: photos after the main one on the A4 flyer: at most this many, this many to a row. */
+export const STRIP_MAX = 8, STRIP_ROW = 4;
+/** Space between the last section of the A4 flyer and the gold line above its bottom bar. */
+export const FOOT_GAP = 36;
+/** Layout of the A4 photo strip for n photos across width w. */
+export function stripGrid(n: number, w: number) {
+  const cols = Math.min(STRIP_ROW, Math.max(1, n <= 4 ? n : Math.ceil(n / Math.ceil(n / STRIP_ROW)))), gap = 16;
+  const tw = (w - gap * (cols - 1)) / cols;
+  const th = Math.round(Math.min(190, tw * 0.75));
+  return { cols, rows: Math.ceil(n / cols), tw, th, gap };
+}
+
 function drawA4(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElement | undefined)[], W: number, H: number) {
   ctx.fillStyle = p.bg; ctx.fillRect(0, 0, W, H);
   const m = 70, cw = W - m * 2;
-  const thumbsImgs = imgs.slice(1, 4);
+  // JoyChange003 Change 75: the strip under the text takes every chosen photo after the main one (up to 8), 4 to a row.
+  const strip = imgs.slice(1, 1 + STRIP_MAX);
   // Bottom bar: contact lines, reference and the notes. Its height follows what is in it.
   ctx.font = font(20);
   const notes = [...(c.footnote ? [c.footnote] : []), c.disclaimer].flatMap(t => lines(ctx, t, cw, 2));
@@ -112,7 +134,7 @@ function drawA4(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElement | un
   const barH = 40 + Math.max(agentH, c.ref ? 50 : 0) + 26 + notes.length * 27 + 10;
   const bottom = H - barH;
   // Sections from the top of the text area, chosen so the picture keeps at least a good part of the page.
-  const build = (o: { thumbs: boolean; hl: number; facts: number }): Section[] => {
+  const build = (o: { thumbs: number; hl: number; facts: number }): Section[] => {
     const out: Section[] = [];
     ctx.font = font(66, true);
     const hl = lines(ctx, c.headline, cw, 2);
@@ -125,14 +147,19 @@ function drawA4(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElement | un
       out.push({ h: 34 + rows * rowH + 10, paint: y => { ctx.fillStyle = p.line; ctx.fillRect(m, y, cw, 2); factsGrid(ctx, { ...c, facts }, p, m, y + 52, cw, 3, 24, 32); } });
     }
     if (o.hl && c.highlights) { ctx.font = font(30); const ls = lines(ctx, c.highlights, cw, o.hl); out.push({ h: ls.length * 42 + 24, paint: y => { ctx.fillStyle = p.ink; ctx.font = font(30); ls.forEach((t, i) => ctx.fillText(t, m, y + 34 + i * 42)); } }); }
-    if (o.thumbs && thumbsImgs.length) out.push({ h: 214, paint: y => { const gap = 16, tw = (cw - gap * (thumbsImgs.length - 1)) / thumbsImgs.length; thumbsImgs.forEach((im, i) => cover(ctx, im, m + i * (tw + gap), y + 12, tw, 190, p.panel)); } });
+    const shown = strip.slice(0, o.thumbs * STRIP_ROW);
+    if (shown.length) {
+      const g = stripGrid(shown.length, cw);
+      out.push({ h: 12 + g.rows * (g.th + g.gap), paint: y => { shown.forEach((im, i) => cover(ctx, im, m + (i % g.cols) * (g.tw + g.gap), y + 12 + Math.floor(i / g.cols) * (g.th + g.gap), g.tw, g.th, p.panel)); } });
+    }
     return out;
   };
-  const options = [{ thumbs: true, hl: 3, facts: 9 }, { thumbs: false, hl: 3, facts: 9 }, { thumbs: false, hl: 2, facts: 6 }, { thumbs: false, hl: 0, facts: 6 }, { thumbs: false, hl: 0, facts: 3 }];
+  const options = [{ thumbs: 2, hl: 3, facts: 9 }, { thumbs: 1, hl: 3, facts: 9 }, { thumbs: 2, hl: 2, facts: 6 }, { thumbs: 1, hl: 2, facts: 6 }, { thumbs: 1, hl: 0, facts: 6 }, { thumbs: 0, hl: 2, facts: 6 }, { thumbs: 0, hl: 0, facts: 6 }, { thumbs: 0, hl: 0, facts: 3 }];
   const minHero = imgs[0] ? 420 : 300;
   let secs = build(options[0]);
-  for (const o of options) { secs = build(o); if (bottom - sum(secs) - 40 >= minHero) break; }
-  const heroH = Math.max(160, bottom - sum(secs) - 40);
+  // Change 75: a clear gap between the last section and the gold line of the bottom bar.
+  for (const o of options) { secs = build(o); if (bottom - sum(secs) - 40 - FOOT_GAP >= minHero) break; }
+  const heroH = Math.max(160, bottom - sum(secs) - 40 - FOOT_GAP);
   cover(ctx, imgs[0], 0, 0, W, heroH, p.panel);
   if (!imgs[0]) { ctx.fillStyle = p.gold; ctx.fillRect(0, heroH - 10, W, 10); }
   sampleBand(ctx, c, W, 34);
@@ -149,7 +176,7 @@ function drawA4(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElement | un
 
 function overlayBottom(ctx: Ctx, W: number, top: number, bottom: number, p: Pal, strength = 0.92) {
   const g = ctx.createLinearGradient(0, top, 0, bottom);
-  const base = p === PALETTE.dark ? '8,8,10' : '255,255,255';
+  const base = p.rgb;
   g.addColorStop(0, `rgba(${base},0)`); g.addColorStop(0.35, `rgba(${base},${strength * 0.7})`); g.addColorStop(1, `rgba(${base},${strength})`);
   ctx.fillStyle = g; ctx.fillRect(0, top, W, bottom - top);
 }
@@ -199,9 +226,9 @@ function drawPortrait(ctx: Ctx, c: PosterContent, p: Pal, imgs: (HTMLImageElemen
   ctx.font = font(52, true);
   const hl = lines(ctx, c.headline, cw, 2);
   y -= hl.length * 60 + 14; ctx.fillStyle = p.ink; ctx.font = font(52, true); hl.forEach((t, i) => ctx.fillText(t, m, y + 50 + i * 60));
-  // Pictures above the text: the main one, and up to two small ones when there is room.
+  // Pictures above the text: the main one, and (Change 75) up to four small ones in a row when there is room.
   const room = y - 20;
-  const small = imgs.slice(1, 3);
+  const small = imgs.slice(1, 5);
   const th = small.length && room >= 560 ? 180 : 0;
   const hero = Math.max(120, room - th);
   cover(ctx, imgs[0], 0, 0, W, hero, p.panel);

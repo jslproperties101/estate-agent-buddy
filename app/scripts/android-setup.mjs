@@ -165,6 +165,8 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // JoyChange003 Change 77: the app's own file plugin (saves to Downloads and the Gallery, opens a saved file).
+        registerPlugin(EabFilesPlugin.class);
         super.onCreate(savedInstanceState);
         // Change 015: solid black system navigation area; app content (web page and AdMob banner) directly above it.
         getWindow().getDecorView().setBackgroundColor(Color.BLACK);
@@ -213,5 +215,109 @@ public class MainActivity extends BridgeActivity {
 }
 `;
 });
+
+// JoyChange003 Change 77: a small plugin of the app's own, next to MainActivity. Downloads go where Android lists them:
+// every file in Download/Estate Agent Buddy (the Files app's Downloads), and pictures also in Pictures/Estate Agent Buddy (the
+// Gallery). Android 10 and newer: through MediaStore (no permission needed). Android 9 and older: written to the public
+// folder and scanned (needs the storage permission, already in the manifest up to Android 10). open() hands a saved file
+// to the app that shows it (Gallery, a PDF viewer).
+{
+  const pkg = /^package ([^;]+);/m.exec(readFileSync(mainActivity, 'utf8'))?.[1];
+  if (!pkg) throw new Error(`No package line in ${mainActivity}`);
+  writeFileSync(mainActivity.replace(/MainActivity\.java$/, 'EabFilesPlugin.java'), `package ${pkg};
+
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Intent;
+import android.media.MediaScannerConnection;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import androidx.core.content.FileProvider;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
+@CapacitorPlugin(name = "EabFiles")
+public class EabFilesPlugin extends Plugin {
+    private static final String FOLDER = "Estate Agent Buddy";
+
+    @PluginMethod
+    public void saveToPublic(PluginCall call) {
+        String name = call.getString("name");
+        String mime = call.getString("mime", "application/octet-stream");
+        String data = call.getString("data");
+        boolean image = Boolean.TRUE.equals(call.getBoolean("image", false));
+        if (name == null || data == null) { call.reject("name and data are needed"); return; }
+        try {
+            byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+            JSObject ret = new JSObject();
+            ret.put("download", write(bytes, name, mime, false).toString());
+            if (image) ret.put("gallery", write(bytes, name, mime, true).toString());
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "save failed" : e.getMessage());
+        }
+    }
+
+    private Uri write(byte[] bytes, String name, String mime, boolean gallery) throws IOException {
+        if (Build.VERSION.SDK_INT >= 29) {
+            ContentResolver r = getContext().getContentResolver();
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+            v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+            v.put(MediaStore.MediaColumns.RELATIVE_PATH, (gallery ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS) + "/" + FOLDER);
+            v.put(MediaStore.MediaColumns.IS_PENDING, 1);
+            Uri where = gallery ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) : MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+            Uri uri = r.insert(where, v);
+            if (uri == null) throw new IOException("could not create the file");
+            try (OutputStream o = r.openOutputStream(uri)) {
+                if (o == null) throw new IOException("could not open the file");
+                o.write(bytes);
+            } catch (IOException e) {
+                r.delete(uri, null, null);
+                throw e;
+            }
+            ContentValues done = new ContentValues();
+            done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            r.update(uri, done, null, null);
+            return uri;
+        }
+        File dir = new File(Environment.getExternalStoragePublicDirectory(gallery ? Environment.DIRECTORY_PICTURES : Environment.DIRECTORY_DOWNLOADS), FOLDER);
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("could not make the folder");
+        File f = new File(dir, name);
+        try (OutputStream o = new FileOutputStream(f)) { o.write(bytes); }
+        MediaScannerConnection.scanFile(getContext(), new String[] { f.getAbsolutePath() }, new String[] { mime }, null);
+        return FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+    }
+
+    @PluginMethod
+    public void open(PluginCall call) {
+        String uri = call.getString("uri");
+        String mime = call.getString("mime", "*/*");
+        if (uri == null) { call.reject("uri is needed"); return; }
+        try {
+            Intent view = new Intent(Intent.ACTION_VIEW);
+            view.setDataAndType(Uri.parse(uri), mime);
+            view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent chooser = Intent.createChooser(view, null);
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getActivity().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject(e.getMessage() == null ? "no app can open this file" : e.getMessage());
+        }
+    }
+}
+`);
+}
 
 console.log(`Android project configured: ${APP_NAME} (${APP_ID}${QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);

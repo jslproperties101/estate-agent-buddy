@@ -110,8 +110,9 @@ export const pdfFileName = (base: string) => `${(base || 'document').replace(/[^
 
 export type ShareResult = 'shared' | 'downloaded' | 'cancelled' | 'failed' | 'unsupported' | 'needApk';
 
-/** Where a saved file went (Android: the Documents folder on the phone; browser: the downloads). */
-export interface SaveResult { ok: boolean; where?: string; reason?: 'failed' | 'needApk' | 'noFile' }
+/** Where a saved file went (Android: Downloads, and the Gallery for pictures; older APKs: Documents; browser: the downloads).
+ *  `open` (Android only) is the saved copy that the Open button hands to the phone. */
+export interface SaveResult { ok: boolean; where?: string; reason?: 'failed' | 'needApk' | 'noFile'; open?: { uri: string; mime: string }; gallery?: boolean }
 
 /** Folder inside the phone's public Documents folder that saved files go to in the Android app. */
 export const SAVE_FOLDER = 'Estate Agent Buddy';
@@ -136,21 +137,53 @@ export function blobToBase64(blob: Blob): Promise<string> {
 type FsPlugin = {
   writeFile(o: { path: string; data: string; directory: string; recursive?: boolean }): Promise<{ uri: string }>;
 };
+/** JoyChange003 Change 77: the app's own file plugin (scripts/android-setup.mjs writes it into the APK). */
+type EabFilesPlugin = {
+  saveToPublic(o: { name: string; mime: string; data: string; image: boolean }): Promise<{ download: string; gallery?: string }>;
+  open(o: { uri: string; mime: string }): Promise<void>;
+};
+const IMAGE = /^image\/(png|jpe?g|webp)$/;
+/** The type of a file from its blob, else from its name. */
+export function mimeOf(blob: Blob, fileName: string): string {
+  if (blob.type) return blob.type;
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp'
+    : ext === 'csv' ? 'text/csv' : ext === 'json' ? 'application/json' : 'application/octet-stream';
+}
+/** Pictures also go to the Gallery; everything goes to Downloads. */
+export const goesToGallery = (mime: string) => IMAGE.test(mime);
 type SharePlugin = { share(o: { title?: string; dialogTitle?: string; files?: string[]; url?: string }): Promise<unknown>; canShare?: () => Promise<{ value: boolean }> };
 
 /** Saves a finished file where the person can find it again. Never throws. */
 export async function saveFile(blob: Blob | null | undefined, fileName: string): Promise<SaveResult> {
   if (!blob || !blob.size) return { ok: false, reason: 'noFile' };
   if (isNative()) {
+    const mime = mimeOf(blob, fileName);
+    // Change 77: Downloads (and the Gallery for pictures), where Android's own apps list them.
+    const files = plugin<EabFilesPlugin>('EabFiles');
+    if (files && !pluginMissing('EabFiles')) {
+      try {
+        const image = goesToGallery(mime);
+        const r = await files.saveToPublic({ name: fileName, mime, data: await blobToBase64(blob), image });
+        return { ok: true, where: `Download/${SAVE_FOLDER}`, gallery: image && !!r.gallery, open: { uri: r.gallery ?? r.download, mime } };
+      } catch { /* an older Android without permission: fall back to Documents below */ }
+    }
     const fs = plugin<FsPlugin>('Filesystem');
     if (!fs || pluginMissing('Filesystem')) return { ok: false, reason: 'needApk' };
     try {
       const path = `${SAVE_FOLDER}/${fileName}`;
-      await fs.writeFile({ path, data: await blobToBase64(blob), directory: 'DOCUMENTS', recursive: true });
-      return { ok: true, where: `Documents/${path}` };
+      const w = await fs.writeFile({ path, data: await blobToBase64(blob), directory: 'DOCUMENTS', recursive: true });
+      return { ok: true, where: `Documents/${path}`, open: files && !pluginMissing('EabFiles') && w?.uri ? { uri: w.uri, mime } : undefined };
     } catch { return { ok: false, reason: 'failed' }; }
   }
   return download(blob, fileName) ? { ok: true } : { ok: false, reason: 'failed' };
+}
+
+/** Change 77: hands a saved file to the app that shows it (Gallery, PDF viewer). False when the phone cannot. */
+export async function openSaved(o: { uri: string; mime: string }): Promise<boolean> {
+  const files = plugin<EabFilesPlugin>('EabFiles');
+  if (!files || pluginMissing('EabFiles')) return false;
+  try { await files.open(o); return true; } catch { return false; }
 }
 
 /** Opens the share sheet with the file attached (WhatsApp, Gmail…). In a browser that cannot share files the result is

@@ -9,7 +9,7 @@ import { VOICE_LANGS } from '../voice/recognizer';
 import { AgentChoice, defaultAgentChoice } from '../listing/buyerPdf';
 import { marketingStrings } from './strings';
 import { FORMATS, FORMAT_IDS, FormatId, OutputId, buildPosterContent, defaultMarketingSelection, marketingFields, marketingFileName } from './content';
-import { Theme, canWebp, drawPoster, exportPoster } from './render';
+import { Theme, THEMES, PALETTE, canWebp, drawPoster, exportPoster } from './render';
 import { FileActions } from '../ui/FileActions';
 import { BusyLine } from '../ui/BusyLine';
 import { c11Strings } from '../ui/c011Strings';
@@ -107,11 +107,22 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
           </select>
         </label>
         {!webp && format !== 'a4' && <small className="muted" data-testid="ms-webp-no">{t.webpNo}</small>}
-        <label className="ff">{t.theme}
-          <select value={theme} onChange={e => { setTheme(e.target.value as Theme); touch(); }} data-testid="ms-theme">
-            <option value="dark">{t.themes.dark}</option><option value="light">{t.themes.light}</option>
-          </select>
-        </label>
+        {/* JoyChange003 Change 81: the style picker is a gold-bordered black box of style tiles; each tile shows the style's colours. */}
+        <div className="ms-styles" role="radiogroup" aria-label={t.theme} data-testid="ms-theme" data-value={theme}>
+          <strong>{t.theme}</strong>
+          <div className="ms-style-grid">
+            {THEMES.map(id => {
+              const pal = PALETTE[id];
+              return (
+                <button key={id} type="button" role="radio" aria-checked={theme === id} className={`ms-style ${theme === id ? 'on' : ''}`} data-testid={`ms-style-${id}`}
+                  onClick={() => { setTheme(id); touch(); }}>
+                  <span className="ms-swatch" aria-hidden="true" style={{ background: pal.bg, borderColor: pal.line }}><i style={{ background: pal.gold }} /><b style={{ background: pal.ink }} /></span>
+                  <span className="ms-style-name">{t.themes[id]}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <label className="ff">{t.language}
           <select value={dLang} onChange={e => { setDLang(e.target.value as Lang); setSel(null); touch(); }} data-testid="ms-lang">
             {VOICE_LANGS.map(v => { const code = v.code.startsWith('ms') ? 'bm' : v.code.startsWith('zh') ? 'zh' : 'en'; return <option key={code} value={code}>{v.label}</option>; })}

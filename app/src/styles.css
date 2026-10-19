@@ -1355,3 +1355,40 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 /* Change 68 (JoyChange003): "Main" along the bottom of the main picture, centred and bigger (the Add Pictures list only). */
 .photo-list .pg-item .pg-main { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; min-height: 0; padding: 18px 8px 8px; justify-content: center; text-align: center; font-size: 22px; letter-spacing: .04em;
   background: linear-gradient(to top, rgba(0, 0, 0, .82), rgba(0, 0, 0, 0)); pointer-events: none; }
+
+/* JoyChange003 Change 81: poster style picker. Outer box: black with a gold border (darker gold); each style tile: a lighter
+   gold border; the chosen tile: a bright gold border and a gold glow. */
+.ms-styles { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: #08080A; border: 2px solid #A87F1B; }
+.ms-style-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ms-style { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 10px; border-radius: 12px; background: #131316; color: var(--ink);
+  border: 1px solid rgba(232, 201, 106, .45); text-align: left; font-weight: 600; }
+.ms-style.on { border: 2px solid #E8C96A; box-shadow: 0 0 0 2px rgba(212, 175, 55, .25); background: #1B1810; }
+.ms-swatch { position: relative; flex: none; width: 34px; height: 34px; border-radius: 8px; border: 1px solid; overflow: hidden; }
+.ms-swatch i { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; }
+.ms-swatch b { position: absolute; left: 6px; top: 7px; width: 18px; height: 4px; border-radius: 2px; }
+.ms-style-name { min-width: 0; font-size: 14px; line-height: 1.2; }
+
+/* Change 77: the saved-file message with its Open button. */
+.file-msg { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.file-msg p { margin: 0; flex: 1 1 160px; }
+
+/* JoyChange003 Change 79: Photo Studio grid, 2 photos to a row, the label below the picture (not on it). */
+.ps-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ps-cell { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+.ps-cell button { width: 100%; aspect-ratio: 4 / 3; padding: 0; border: 2px solid transparent; border-radius: 10px; overflow: hidden; background: #111; }
+.ps-cell button.on { border-color: var(--gold, #c9a227); }
+.ps-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ps-cell .chip-tag, .ps-under { align-self: center; text-align: center; }
+.ps-nav { display: flex; align-items: center; gap: 8px; }
+.ps-nav .btn { margin-right: auto; }
+/* Change 78: the picture stays pinned at the top while the controls below it scroll. */
+.ps-pin { position: sticky; top: 0; z-index: 3; display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; background: var(--bg, #08080A); }
+.ps-pin .ps-stage img { max-height: 42dvh; width: 100%; object-fit: contain; }
+.ps-stage[data-mode="adjust"] { touch-action: pan-y; }
+.ps-tools { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.ps-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 56px; padding: 4px 2px; border-radius: 12px;
+  border: 1px solid var(--line-2); background: var(--card-2); color: var(--ink); }
+.ps-tool small { font-size: 11px; line-height: 1.1; text-align: center; overflow-wrap: anywhere; }
+.ps-tool-ico { font-size: 20px; line-height: 1; }
+.ps-tool.on { border: 2px solid var(--gold, #c9a227); color: var(--gold-hi); background: #1B1810; }
+.ps-control { min-height: 64px; }

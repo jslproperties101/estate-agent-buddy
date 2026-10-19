@@ -30,14 +30,15 @@ test('MK1 formats: A4 is 210:297, the square is 1:1, the portrait post is 4:5; e
   assert.ok(FORMATS.a4.maxPhotos > FORMATS.portrait.maxPhotos && FORMATS.portrait.maxPhotos > FORMATS.square.maxPhotos - 1);
 });
 
-test('MK2 owner, commission, notes, handler, tenancy, exact street / unit / lot and map position are never offered or printed, even with everything ticked', () => {
+test('MK2 owner, commission, notes, handler, tenancy and map position are never offered or printed, even with everything ticked (JoyChange003 Change 76: the street and unit/lot are offered, never ticked at first)', () => {
   const keys = MARKETING_KEYS.map(k => String(k.key));
-  for (const n of [...NEVER_SHARED, 'street', 'unitNo', 'lotNo']) assert.ok(!keys.includes(n), `${n} must not be offered`);
+  for (const n of [...NEVER_SHARED, 'lotNo']) assert.ok(!keys.includes(n), `${n} must not be offered`);
+  for (const n of ['street', 'unitNo']) assert.equal(MARKETING_KEYS.find(k => k.key === n)?.on, false, `${n} is offered but not ticked at first`);
   const l = rec();
   const fields = marketingFields(l, 'en');
   const c = buildPosterContent({ lang: 'en', listing: l, fields, selected: Object.fromEntries(fields.map(f => [String(f.key), true])), agent: { fullName: 'Agent Lee', phone: '012-111 2222' }, agentChoice: { name: true, agency: false, regNo: false, phone: true, email: false }, showRef: true });
   const text = JSON.stringify(c);
-  for (const secret of ['SECRET', '999 8888', 'Jalan Rahsia', '2.8123', '101.7654']) assert.ok(!text.includes(secret), `${secret} leaked`);
+  for (const secret of ['SECRET', '999 8888', '2.8123', '101.7654']) assert.ok(!text.includes(secret), `${secret} leaked`);
   assert.deepEqual(c.agent, ['Agent Lee', '012-111 2222']);
 });
 
@@ -99,7 +100,7 @@ test('MK6 price: asking price for a sale, rent per month for a rental; both when
   assert.equal(both.ribbon, 'Sale or Rent');
 });
 
-test('MK7 location line is township, city, state as ticked; the street is never part of it; unticking removes it', () => {
+test('MK7 location line is township, city, state as ticked; the street is part of it only when ticked (Change 76); unticking removes it', () => {
   const c = make(rec());
   assert.equal(c.place, 'Bandar Baru Nilai, Nilai, Negeri Sembilan');
   const fields = marketingFields(rec(), 'en');

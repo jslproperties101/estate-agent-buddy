@@ -1,6 +1,10 @@
 // Photo Studio: improve a property photo (brightness, contrast, colour, clarity, turn, straighten, crop) and cover private
 // details by hand before sharing. Runs on the phone; nothing is uploaded and nothing is detected automatically.
 // "Save as new photo" keeps the original; "Replace the original" is a separate action that asks first.
+// JoyChange003 Change 79: the photos are first shown as a grid, 2 to a row, with the "Enhanced copy" label below each picture
+// (not on it). A tap opens that one photo to edit; swiping the picture moves to the next or previous photo.
+// Change 78: the adjustments are a row of icons; the selected icon drives ONE control under the picture, and the picture
+// stays pinned at the top of the screen so the effect is seen while the slider moves.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -16,6 +20,13 @@ import { cardTitle } from '../listing/model';
 interface PointerLike { clientX: number; clientY: number; pointerId: number; currentTarget: unknown }
 const PREVIEW = 900;
 const SAVE_SIDE = 1800;
+/** Change 78: the seven adjustments, in the order of the icon row. */
+export const TOOLS = ['brightness', 'contrast', 'colour', 'clarity', 'straighten', 'rotate', 'crop'] as const;
+export type Tool = typeof TOOLS[number];
+const TOOL_ICON: Record<Tool, string> = { brightness: '☀', contrast: '◐', colour: '🎨', clarity: '✦', straighten: '⦨', rotate: '↻', crop: '⛶' };
+/** A swipe: at least this far sideways, and more sideways than up or down. */
+export const SWIPE_PX = 60;
+export const isSwipe = (dx: number, dy: number) => Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5;
 
 export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; propertyId: string; photoId?: string }) {
   const { state, store } = useApp();
@@ -23,6 +34,10 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
   const l = state.properties.find(p => p.id === propertyId);
   const [sel, setSel] = useState<string | undefined>(photoId);
   const photo = l?.photos.find(p => p.id === sel) ?? l?.photos[0];
+  // Change 79: always the grid of photos first (a photo named by photoId is marked in it); a tap opens one photo to edit.
+  const [editing, setEditing] = useState(false);
+  const [tool, setTool] = useState<Tool>('brightness');
+  const swipe = useRef<{ x: number; y: number } | null>(null);
   const [edit, setEdit] = useState<PhotoEdit>(NO_EDIT);
   const [tab, setTab] = useState<'adjust' | 'mask'>('adjust');
   const [mode, setMode] = useState<MaskMode>('solid');
@@ -96,9 +111,10 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
     const r = area.current!.getBoundingClientRect();
     return { x: Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height)) };
   };
-  const down = (ev: PointerLike) => { if (tab !== 'mask' || view !== 'edited') return; (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId); start.current = norm(ev); setDrag(null); };
+  const down = (ev: PointerLike) => { if (tab !== 'mask') { swipe.current = { x: ev.clientX, y: ev.clientY }; return; } if (view !== 'edited') return; (ev.currentTarget as HTMLElement).setPointerCapture?.(ev.pointerId); start.current = norm(ev); setDrag(null); };
   const move = (ev: PointerLike) => { if (!start.current) return; const p = norm(ev); setDrag(rectFrom(start.current.x, start.current.y, p.x, p.y)); };
   const up = (ev: PointerLike) => {
+    if (swipe.current) { const d = { x: ev.clientX - swipe.current.x, y: ev.clientY - swipe.current.y }; swipe.current = null; if (isSwipe(d.x, d.y)) step(d.x < 0 ? 1 : -1); return; }
     if (!start.current) return;
     const p = norm(ev); const r = rectFrom(start.current.x, start.current.y, p.x, p.y);
     start.current = null; setDrag(null);
@@ -106,6 +122,16 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
   };
 
   const changed = hasChange(edit);
+  const list = l?.photos ?? [];
+  const at = photo ? list.findIndex(p => p.id === photo.id) : -1;
+  /** Change 79: the next (+1) or previous (-1) photo. Unsaved changes are kept: the person saves or resets first. */
+  function step(d: 1 | -1) {
+    if (at < 0 || list.length < 2) return;
+    if (hasChange(edit)) { setNote(t.swipeKeep); return; }
+    const next = list[(at + d + list.length) % list.length];
+    setSel(next.id); setMsg(undefined);
+  }
+  const openPhoto = (id: string) => { setSel(id); setMsg(undefined); setEditing(true); window.scrollTo?.(0, 0); };
   const kind = editKind(hasEnhance(edit), edit.masks.length > 0);
   const masksCount = edit.masks.length;
 
@@ -157,26 +183,41 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
       <p className="notice">{t.intro}</p>
       <p className="small muted">{[l.ref, cardTitle(l)].filter(Boolean).join(' · ')}</p>
       {!l.photos.length && <p className="muted" data-testid="ps-none">{t.none}</p>}
-      {l.photos.length > 0 && (
-        <div className="card stack-sm">
+      {l.photos.length > 0 && !editing && (
+        <div className="card stack-sm" data-testid="ps-grid-card">
           <strong>{t.choose}</strong>
-          <div className="photo-strip" data-testid="ps-photos">
+          <small className="muted">{t.gridHint}</small>
+          <div className="ps-grid" data-testid="ps-photos">
             {l.photos.map(p => (
-              <button key={p.id} className={p.id === photo?.id ? 'on' : ''} onClick={() => { setSel(p.id); setMsg(undefined); }} aria-label={p.name} data-testid="ps-photo" data-edit={p.edit ?? ''}>
-                <StoredImage fileId={p.fileId} url={p.url} alt={p.name} />
+              <div key={p.id} className="ps-cell">
+                <button type="button" className={p.id === photo?.id ? 'on' : ''} onClick={() => openPhoto(p.id)} aria-label={p.name} data-testid="ps-photo" data-edit={p.edit ?? ''}>
+                  <StoredImage fileId={p.fileId} url={p.url} alt={p.name} />
+                </button>
                 {p.edit && <small className="chip-tag" data-testid="ps-chip">{t.chip[p.edit]}</small>}
-              </button>
+              </div>
             ))}
           </div>
         </div>
       )}
-      {photo && failed && <p className="warn-text" role="alert" data-testid="ps-failed">{t.loadFail}</p>}
-      {photo && !failed && (
+      {editing && photo && failed && <p className="warn-text" role="alert" data-testid="ps-failed">{t.loadFail}</p>}
+      {editing && photo && !failed && (
         <>
-          <div className="ps-stage" ref={area} onPointerDown={down} onPointerMove={move} onPointerUp={up} data-testid="ps-stage" data-mode={tab}>
-            {preview ? <img src={preview} alt={photo.name} draggable={false} data-testid="ps-preview" /> : <div className="img-wait" />}
-            {drag && <div className="ps-drag" style={{ left: `${drag.x * 100}%`, top: `${drag.y * 100}%`, width: `${drag.w * 100}%`, height: `${drag.h * 100}%` }} />}
+          <div className="ps-nav">
+            <button type="button" className="btn small secondary" onClick={() => setEditing(false)} data-testid="ps-all">← {t.all}</button>
+            {list.length > 1 && <>
+              <button type="button" className="icon-btn" aria-label={t.prev} onClick={() => step(-1)} data-testid="ps-prev">‹</button>
+              <small className="muted" data-testid="ps-pos">{t.of(at + 1, list.length)}</small>
+              <button type="button" className="icon-btn" aria-label={t.next} onClick={() => step(1)} data-testid="ps-next">›</button>
+            </>}
           </div>
+          <div className="ps-pin">
+            <div className="ps-stage" ref={area} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => { swipe.current = null; }} data-testid="ps-stage" data-mode={tab}>
+              {preview ? <img src={preview} alt={photo.name} draggable={false} data-testid="ps-preview" /> : <div className="img-wait" />}
+              {drag && <div className="ps-drag" style={{ left: `${drag.x * 100}%`, top: `${drag.y * 100}%`, width: `${drag.w * 100}%`, height: `${drag.h * 100}%` }} />}
+            </div>
+            {photo.edit && <small className="chip-tag ps-under" data-testid="ps-chip-current">{t.chip[photo.edit]}</small>}
+          </div>
+          {list.length > 1 && tab === 'adjust' && <small className="muted" data-testid="ps-swipe-hint">{t.swipeHint}</small>}
           <div className="two" role="group" aria-label={t.compare}>
             <button className={`btn small ${view === 'edited' ? 'primary' : 'secondary'}`} onClick={() => setView('edited')} data-testid="ps-show-edited">{t.showEdited}</button>
             <button className={`btn small ${view === 'original' ? 'primary' : 'secondary'}`} onClick={() => setView('original')} data-testid="ps-show-original">{t.showOriginal}</button>
@@ -189,28 +230,41 @@ export function PhotoStudioScreen({ lang, propertyId, photoId }: { lang: Lang; p
 
           {tab === 'adjust' && (
             <div className="card stack-sm" data-testid="ps-adjust">
-              <div className="two">
-                <button className="btn small secondary" onClick={() => geo({ turns: ((edit.turns + 3) % 4) as PhotoEdit['turns'], crop: undefined })} data-testid="ps-rotate-left">↺ {t.rotateLeft}</button>
-                <button className="btn small secondary" onClick={() => geo({ turns: ((edit.turns + 1) % 4) as PhotoEdit['turns'], crop: undefined })} data-testid="ps-rotate-right">↻ {t.rotateRight}</button>
-              </div>
-              <label className="ff">{t.straighten} <small className="muted">{edit.straighten}°</small>
-                <input type="range" min={-10} max={10} step={0.5} value={edit.straighten} onChange={ev => geo({ straighten: Number(ev.target.value), crop: undefined })} data-testid="ps-straighten" aria-label={t.straighten} />
-              </label>
-              <div className="stack-sm"><small className="muted">{t.crop}</small>
-                <div className="two">
-                  <button className={`btn small ${!edit.crop ? 'primary' : 'secondary'}`} onClick={() => setCrop()} data-testid="ps-crop-none">{t.cropNone}</button>
-                  <button className="btn small secondary" onClick={() => setCrop(4 / 3)} data-testid="ps-crop-43">{t.crop43}</button>
-                  <button className="btn small secondary" onClick={() => setCrop(16 / 9)} data-testid="ps-crop-169">{t.crop169}</button>
-                  <button className="btn small secondary" onClick={() => setCrop(1)} data-testid="ps-crop-11">{t.crop11}</button>
-                </div>
-              </div>
               <label className="check"><input type="checkbox" checked={e.auto} onChange={ev => enh({ auto: ev.target.checked })} data-testid="ps-auto" /> <span>{t.autoEnhance}</span></label>
-              {slider('brightness', t.brightness)}
-              {slider('contrast', t.contrast)}
-              {slider('colour', t.colour)}
-              <label className="ff">{t.clarity} <small className="muted">{e.clarity}</small>
-                <input type="range" min={0} max={100} step={5} value={e.clarity} onChange={ev => enh({ clarity: Number(ev.target.value) })} data-testid="ps-clarity" aria-label={t.clarity} />
-              </label>
+              <div className="ps-tools" role="toolbar" aria-label={t.tools} data-testid="ps-tools">
+                {TOOLS.map(k => (
+                  <button key={k} type="button" className={`ps-tool ${tool === k ? 'on' : ''}`} aria-pressed={tool === k} onClick={() => setTool(k)} data-testid={`ps-tool-${k}`}>
+                    <span className="ps-tool-ico" aria-hidden="true">{TOOL_ICON[k]}</span><small>{t.tool[k]}</small>
+                  </button>
+                ))}
+              </div>
+              <div className="ps-control" data-testid="ps-control" data-tool={tool}>
+                {(tool === 'brightness' || tool === 'contrast' || tool === 'colour') && slider(tool, t[tool])}
+                {tool === 'clarity' && (
+                  <label className="ff">{t.clarity} <small className="muted">{e.clarity}</small>
+                    <input type="range" min={0} max={100} step={5} value={e.clarity} onChange={ev => enh({ clarity: Number(ev.target.value) })} data-testid="ps-clarity" aria-label={t.clarity} />
+                  </label>
+                )}
+                {tool === 'straighten' && (
+                  <label className="ff">{t.straighten} <small className="muted">{edit.straighten}°</small>
+                    <input type="range" min={-10} max={10} step={0.5} value={edit.straighten} onChange={ev => geo({ straighten: Number(ev.target.value), crop: undefined })} data-testid="ps-straighten" aria-label={t.straighten} />
+                  </label>
+                )}
+                {tool === 'rotate' && (
+                  <div className="two">
+                    <button className="btn small secondary" onClick={() => geo({ turns: ((edit.turns + 3) % 4) as PhotoEdit['turns'], crop: undefined })} data-testid="ps-rotate-left">↺ {t.rotateLeft}</button>
+                    <button className="btn small secondary" onClick={() => geo({ turns: ((edit.turns + 1) % 4) as PhotoEdit['turns'], crop: undefined })} data-testid="ps-rotate-right">↻ {t.rotateRight}</button>
+                  </div>
+                )}
+                {tool === 'crop' && (
+                  <div className="two">
+                    <button className={`btn small ${!edit.crop ? 'primary' : 'secondary'}`} onClick={() => setCrop()} data-testid="ps-crop-none">{t.cropNone}</button>
+                    <button className="btn small secondary" onClick={() => setCrop(4 / 3)} data-testid="ps-crop-43">{t.crop43}</button>
+                    <button className="btn small secondary" onClick={() => setCrop(16 / 9)} data-testid="ps-crop-169">{t.crop169}</button>
+                    <button className="btn small secondary" onClick={() => setCrop(1)} data-testid="ps-crop-11">{t.crop11}</button>
+                  </div>
+                )}
+              </div>
               <button className="btn small ghost" onClick={() => { setEdit(NO_EDIT); setNote(undefined); }} data-testid="ps-reset">{t.reset}</button>
             </div>
           )}

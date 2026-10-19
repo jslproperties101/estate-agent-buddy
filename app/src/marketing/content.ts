@@ -3,7 +3,8 @@
 //  - Only facts that are in the record are written. A ticked detail with no value is left off the design and reported to the agent.
 //  - The headline is the property's own advert title (editable by the agent). It is never made up.
 //  - A fact that is not "Confirmed" keeps a * on the design and a footnote says it is not yet verified.
-//  - Owner, vendor, commission, notes, tenancy, documents, exact street / unit / lot and exact map position are never offered.
+//  - Owner, vendor, commission, notes, tenancy, documents and exact map position are never offered. The street and unit/lot
+//    (Change 76) are offered but never ticked at first: they appear only when the agent ticks them.
 //  - A sample property's design says SAMPLE, so it can't pass as a real listing.
 import type { Lang } from '../i18n';
 import type { Profile } from '../data/types';
@@ -19,9 +20,9 @@ export interface FormatSpec {
 }
 /** Sizes: A4 is 210 × 297 mm drawn at 150 dpi (1240 × 1754). The two post sizes (1080 × 1080 square, 1080 × 1350 portrait 4:5) are common social-post sizes from a third-party guide and are NOT verified against any platform, so no screen text names a platform. */
 export const FORMATS: Record<FormatId, FormatSpec> = {
-  a4: { id: 'a4', w: 1240, h: 1754, outputs: ['pdf', 'png', 'jpg'], maxPhotos: 4 },
+  a4: { id: 'a4', w: 1240, h: 1754, outputs: ['pdf', 'png', 'jpg'], maxPhotos: 9 },
   square: { id: 'square', w: 1080, h: 1080, outputs: ['png', 'jpg', 'webp'], maxPhotos: 1 },
-  portrait: { id: 'portrait', w: 1080, h: 1350, outputs: ['png', 'jpg', 'webp'], maxPhotos: 3 },
+  portrait: { id: 'portrait', w: 1080, h: 1350, outputs: ['png', 'jpg', 'webp'], maxPhotos: 5 },
 };
 export const FORMAT_IDS: FormatId[] = ['a4', 'square', 'portrait'];
 export const MIME: Record<OutputId, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
@@ -29,13 +30,19 @@ export const MIME: Record<OutputId, string> = { pdf: 'application/pdf', png: 'im
 /** The details the agent can tick, in the order they are listed. `on` = ticked at first when the record has a value. */
 export const MARKETING_KEYS: { key: keyof Listing; on: boolean; price?: boolean }[] = [
   { key: 'askingPrice', on: true, price: true }, { key: 'monthlyRent', on: true, price: true },
-  { key: 'type', on: true }, { key: 'township', on: true }, { key: 'city', on: true }, { key: 'state', on: true },
+  { key: 'type', on: true },
+  // JoyChange003 Change 76: the address (unit/lot and street), off until the agent ticks it.
+  { key: 'unitNo', on: false }, { key: 'street', on: false },
+  { key: 'township', on: true }, { key: 'city', on: true }, { key: 'state', on: true },
   { key: 'bedrooms', on: true }, { key: 'bathrooms', on: true }, { key: 'parking', on: true },
-  { key: 'builtUpSqft', on: true }, { key: 'landSqft', on: true }, { key: 'tenure', on: true }, { key: 'furnishing', on: true },
+  { key: 'builtUpSqft', on: true }, { key: 'landSqft', on: true },
+  // Change 76: the size extras, off until ticked.
+  { key: 'floors', on: false }, { key: 'frontageFt', on: false }, { key: 'depthFt', on: false }, { key: 'ceilingFt', on: false }, { key: 'powerKva', on: false }, { key: 'loadingBays', on: false },
+  { key: 'tenure', on: true }, { key: 'furnishing', on: true },
   { key: 'condition', on: false }, { key: 'availability', on: false }, { key: 'titleType', on: false }, { key: 'lotType', on: false },
   { key: 'features', on: true },
 ];
-const LOCATION_KEYS = ['township', 'city', 'state'];
+const LOCATION_KEYS = ['unitNo', 'street', 'township', 'city', 'state'];
 
 export const marketingFields = (l: Listing, lang: Lang): BuyerField[] => {
   const all = buyerFields(l, lang);
@@ -52,7 +59,7 @@ export interface PosterContent {
   headline: string;
   /** "For sale" / "For rent" ribbon. */
   ribbon?: string;
-  /** Township, city, state (as ticked), never the street. */
+  /** Unit/lot, street (only when ticked), township, city, state, as ticked. */
   place?: string;
   prices: PosterFact[];
   facts: PosterFact[];

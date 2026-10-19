@@ -3418,6 +3418,7 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   await page.getByTestId('open-photo-studio').click();
   await page.getByTestId('photo-studio').waitFor();
   assert.match(await page.getByTestId('photo-studio').innerText(), /Your original photo is kept unless you choose to replace it/i);
+  await page.getByTestId('ps-photo').first().click();   // JoyChange003 Change 79: the grid first, a tap opens the editor
   assert.match(await page.getByTestId('ps-declutter').innerText(), /AI decluttering is not available/i);
   await page.getByTestId('ps-preview').waitFor();
   assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'nothing changed yet');
@@ -3432,6 +3433,7 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   assert.equal(await page.getByTestId('ps-mask-item').count(), 1);
   // turning the picture moves everything: masks are cleared and the agent is told
   await page.getByTestId('ps-tab-adjust').click();
+  await page.getByTestId('ps-tool-rotate').click();   // Change 78: one control at a time, chosen by its icon
   await page.getByTestId('ps-rotate-right').click();
   await page.getByTestId('ps-rotate-left').click();
   await page.getByTestId('ps-tab-mask').click();
@@ -3460,10 +3462,11 @@ test('U81 Photo Studio: a hand-drawn privacy mask covers the area for good in a 
   assert.ok(Math.abs(c.colours[1][1] - o.colours[1][1]) < 40, 'outside the mask the picture is the same');
   assert.equal(c.type, 'image/jpeg');
   assert.equal(c.exif, false, 'the copy carries no camera data block');
-  // the chip names it, the strip shows both
+  // the chip names it, the grid shows both
+  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'edit state was reset after saving');
+  await page.getByTestId('ps-all').click();
   assert.equal(await page.getByTestId('ps-photo').count(), 2);
   assert.match(await page.getByTestId('ps-chip').innerText(), /Privacy-masked copy/i);
-  assert.equal(await page.getByTestId('ps-save-new').isDisabled(), true, 'edit state was reset after saving');
   await page.context().close();
 });
 
@@ -3473,10 +3476,14 @@ test('U82 Photo Studio: improve a photo (brightness, straighten, crop, auto), co
   await page.getByTestId('open-photo-studio').click();
   await page.getByTestId('photo-studio').waitFor();
   assert.equal(await page.getByTestId('ps-photo').count(), 2);
+  await page.getByTestId('ps-photo').first().click();
   await page.getByTestId('ps-preview').waitFor();
   await page.getByTestId('ps-brightness').fill('60');
+  await page.getByTestId('ps-tool-clarity').click();
   await page.getByTestId('ps-clarity').fill('40');
+  await page.getByTestId('ps-tool-straighten').click();
   await page.getByTestId('ps-straighten').fill('2');
+  await page.getByTestId('ps-tool-crop').click();
   await page.getByTestId('ps-crop-169').click();
   assert.equal(await page.getByTestId('ps-save-new').isDisabled(), false);
   await page.getByTestId('ps-save-new').click();
@@ -3489,8 +3496,10 @@ test('U82 Photo Studio: improve a photo (brightness, straighten, crop, auto), co
   assert.ok(Math.abs(copy.w / copy.h - 16 / 9) < 0.05, `16:9 crop: ${copy.w}x${copy.h}`);
   assert.equal(rec.mainPhotoId, rec.photos[0].id, 'main photo unchanged');
   // Replace: Cancel changes nothing
+  await page.getByTestId('ps-all').click();
   await page.getByTestId('ps-photo').nth(2).click();
   await page.getByTestId('ps-auto').check();
+  await page.getByTestId('ps-tool-contrast').click();
   await page.getByTestId('ps-contrast').fill('30');
   await page.getByTestId('ps-replace').click();
   assert.match(await page.getByRole('alertdialog').innerText(), /original picture is no longer used and is deleted from this phone later/i);
@@ -3530,6 +3539,7 @@ test('U83 Photo Studio: a property without photos explains itself; Bahasa Malays
     await p.locator('nav.grid > button').filter({ hasText: /Subsale List|Senarai Subsale|二手房列表/i }).first().click();
     await p.getByText('Photo house').first().click();
     await p.getByTestId('open-photo-studio').click();
+    await p.getByTestId('ps-photo').first().click();
     await p.getByTestId('ps-tab-mask').click();
     assert.match(await p.getByTestId('ps-mask-warning').innerText(), warn);
     await shot(p, `83-${aria === '中文' ? 'zh' : 'bm'}-photo-studio`);
@@ -3601,7 +3611,7 @@ test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/We
   await page.getByTestId('ms-format-a4').check();
   assert.deepEqual(await page.getByTestId('ms-output').locator('option').allInnerTexts(), ['PDF', 'PNG', 'JPG']);
   await page.getByTestId('ms-output').selectOption('pdf');
-  await page.getByTestId('ms-theme').selectOption('light');
+  await page.getByTestId('ms-style-light').click();
   await page.getByTestId('ms-make').click();
   await page.waitForFunction(() => document.querySelector('[data-testid="ms-result"]')?.getAttribute('data-format') === 'a4');
   assert.match(await page.getByTestId('ms-made').innerText(), /A4 flyer · PDF · 1240 × 1754 px/i);
@@ -3622,7 +3632,7 @@ test('U84 Marketing Studio: one format at a time — square PNG, portrait JPG/We
   await page.context().close();
 });
 
-test('U85 Marketing Studio: missing price/photos do not break it or invent anything; unconfirmed facts are flagged; a sample property is marked SAMPLE; the exact address is never offered; Bahasa Malaysia and Chinese work', async () => {
+test('U85 Marketing Studio: missing price/photos do not break it or invent anything; unconfirmed facts are flagged; a sample property is marked SAMPLE; the address is offered only as an unticked choice (JoyChange003 Change 76); Bahasa Malaysia and Chinese work', async () => {
   const page = await phone();
   await bareProperty(page, 'Plain house');
   await page.getByTestId('open-marketing-studio').click();
@@ -3630,7 +3640,8 @@ test('U85 Marketing Studio: missing price/photos do not break it or invent anyth
   assert.match(await page.getByTestId('ms-no-photos').innerText(), /plain gold panel/i);
   assert.match(await page.getByTestId('ms-warn-price').innerText(), /No price shown/i);
   const text = await page.getByTestId('marketing-studio').innerText();
-  for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Street', 'Unit', 'Lot no', 'Current tenant']) assert.ok(!text.includes(never), `${never} must not be offered`);
+  for (const never of ['Owner name', 'Owner phone', 'Commission', 'Internal notes', 'Lot no', 'Current tenant']) assert.ok(!text.includes(never), `${never} must not be offered`);
+  for (const k of ['street', 'unitNo']) { const box = page.getByTestId(`mf-${k}`).locator('input'); if (await box.count()) assert.equal(await box.isChecked(), false, `${k} is never ticked at first`); }
   await page.getByTestId('ms-make').click();
   await page.getByTestId('ms-result').waitFor();           // no photo, no price: still a file
   assert.match(await page.getByTestId('ms-made').innerText(), /1080 × 1080/i);
@@ -3704,7 +3715,7 @@ test('U86 Marketing Studio: a full property (photos, facts, long headline, agent
   await page.getByTestId('marketing-studio').waitFor();
   await page.getByTestId('ms-showref').check();
   assert.match(await page.getByTestId('ms-warn-long').innerText(), /headline is long/i);
-  for (const [f, size, photos] of [['a4', [1240, 1754], 4], ['square', [1080, 1080], 1], ['portrait', [1080, 1350], 3]]) {
+  for (const [f, size, photos] of [['a4', [1240, 1754], 4], ['square', [1080, 1080], 1], ['portrait', [1080, 1350], 4]]) {   // JoyChange003 Change 75: up to 5 on the portrait post, so all 4 are ticked
     await page.getByTestId(`ms-format-${f}`).check();
     assert.equal(await page.getByTestId('ms-photo').locator('input:checked').count(), photos, `${f}: ${photos} photo(s) ticked at first`);
     await page.getByTestId('ms-output').selectOption('png');
@@ -3752,6 +3763,7 @@ test('U87 Layout in English, Bahasa Malaysia and 中文: property detail, advert
     await page.getByTestId('listing-details').waitFor();
     await check('property detail', 'detail');
     await page.getByTestId('open-photo-studio').click();
+    await page.getByTestId('ps-photo').first().click();
     await page.getByTestId('ps-preview').waitFor();
     await check('Photo Studio, improve', 'photo-adjust');
     await page.getByTestId('ps-tab-mask').click();
@@ -3880,6 +3892,7 @@ test('U90 a photo with a camera-data block (turned sideways, GPS position): larg
   const orig = await storedInfo(p2, rec.photos[0].fileId);
   assert.equal(orig.exif, true, 'documented behaviour: a small photo that does not shrink is kept exactly as it came');
   await p2.getByTestId('open-photo-studio').click();
+  await p2.getByTestId('ps-photo').first().click();
   await p2.getByTestId('ps-preview').waitFor();
   await p2.getByTestId('ps-tab-mask').click();
   await drag(p2, 'ps-stage', [0.1, 0.1], [0.5, 0.4]);
