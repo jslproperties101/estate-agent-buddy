@@ -79,7 +79,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   assert.equal(rp.status, 0, rp.stderr);
   const gp = readFileSync(join(prod, 'android/app/build.gradle'), 'utf8');
   assert.match(gp, /applicationId "com\.jslproperties\.estateagentbuddy"/);
-  assert.match(gp, /versionName "2\.2\.0-n5"/, 'JoyChange002 Change 25 added the push plugin, so the native version went up');
+  assert.match(gp, /versionName "2\.2\.0-n6"/, 'JoyChange002 JoyChange003 Batches E and F added the speech and file plugins, so the native version went up');
   assert.ok(existsSync(join(prod, 'android/app/google-services.json')), 'Change 25: Firebase config next to the app build file');
   assert.match(readFileSync(join(prod, 'android/app/src/main/AndroidManifest.xml'), 'utf8'), /windowSoftInputMode="adjustResize"/, 'Change 30: the page shrinks above the keyboard');
   const sp = readFileSync(join(prod, 'android/app/src/main/res/values/strings.xml'), 'utf8');
@@ -92,7 +92,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const gq = readFileSync(join(qa, 'android/app/build.gradle'), 'utf8');
   assert.match(gq, /applicationId "com\.jslproperties\.estateagentbuddy\.qa"/);
   assert.match(gq, /namespace "com\.jslproperties\.estateagentbuddy"/, 'the code package is unchanged');
-  assert.match(gq, /versionName "2\.2\.0-qa-n5"/, 'the native version stays readable by the update logic');
+  assert.match(gq, /versionName "2\.2\.0-qa-n6"/, 'the native version stays readable by the update logic');
   const sq = readFileSync(join(qa, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sq, /name="app_name">EAB QA</);
   assert.match(sq, /name="package_name">com\.jslproperties\.estateagentbuddy\.qa</);

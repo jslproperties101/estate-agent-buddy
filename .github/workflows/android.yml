@@ -160,27 +160,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.variant == 'prod'
         with: { name: site, path: site }
-      - name: Update list for the QA app (automatic updates for the QA APK only)
-        # JoyChange003: the installed QA app reads this list and downloads the newest QA screens and logic by itself.
-        # It lives on its own branch (beta-updates: the name has no "qa" so it never starts a build) and is rewritten from
-        # scratch each time, so the repository does not grow. The real app's list (GitHub Pages) is never touched.
-        if: matrix.variant == 'qa' && env.PUBLISH_APK == '1'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          SHORT=${GITHUB_SHA::7}
-          NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
-          VERSION=$(node -p "require('./package.json').version")
-          OUTD=$(mktemp -d)
-          (cd dist && zip -qr "$OUTD/bundle-${SHORT}.zip" .)
-          BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/beta-updates"
-          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/qa-${SHORT}/EstateAgentBuddy-QA-${SHORT}-debug.apk"
-          printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
-            "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > "$OUTD/latest.json"
-          cat "$OUTD/latest.json"
-          cd "$OUTD" && git init -q -b beta-updates && git config user.name "github-actions" && git config user.email "actions@users.noreply.github.com"
-          git add -A && git commit -q -m "QA update list for ${SHORT}"
-          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" beta-updates
       - name: Android project
         run: |
           npx cap add android
@@ -252,6 +231,28 @@ jobs:
           [ -f maps-check.txt ] && FILES="$FILES maps-check.txt"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" $FILES --prerelease --target "$GITHUB_SHA" --title "Estate Agent Buddy ${TAG}" --notes-file notes.md
+      - name: Update list for the QA app (automatic updates for the QA APK only)
+        # Runs AFTER the release is published, so the app never sees a download link whose APK does not exist yet (it gave a 404).
+        # JoyChange003: the installed QA app reads this list and downloads the newest QA screens and logic by itself.
+        # It lives on its own branch (beta-updates: the name has no "qa" so it never starts a build) and is rewritten from
+        # scratch each time, so the repository does not grow. The real app's list (GitHub Pages) is never touched.
+        if: matrix.variant == 'qa' && env.PUBLISH_APK == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          NATIVE=$(node -p "require('./package.json').nativeVersion || 1")
+          VERSION=$(node -p "require('./package.json').version")
+          OUTD=$(mktemp -d)
+          (cd dist && zip -qr "$OUTD/bundle-${SHORT}.zip" .)
+          BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/beta-updates"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/qa-${SHORT}/EstateAgentBuddy-QA-${SHORT}-debug.apk"
+          printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
+            "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > "$OUTD/latest.json"
+          cat "$OUTD/latest.json"
+          cd "$OUTD" && git init -q -b beta-updates && git config user.name "github-actions" && git config user.email "actions@users.noreply.github.com"
+          git add -A && git commit -q -m "QA update list for ${SHORT}"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" beta-updates
 
   website:
     # JoyChange002 Change 47: the laptop website (wide layout, no adverts, no phone-only parts), built against the TEST
