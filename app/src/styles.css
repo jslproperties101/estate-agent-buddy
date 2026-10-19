@@ -691,14 +691,14 @@ label.btn { position: relative; cursor: pointer; }
 .topbar.home .top-btn { width: 44px; min-width: 44px; }
 .top-badge { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--red-bg); color: #fff;
   font-size: 14px; font-weight: 800; line-height: 22px; text-align: center; }
-/* Change 44: on the main page the logo and wording fill the bar from top to bottom. The bar keeps its height (the logo is as
-   66px tall with -10px margins, so it counts as 46px in the row and uses the 10px padding above and below); the
-   wording grows with the screen width as far as the space left of the three buttons allows. */
-.topbar.home h1.brand { gap: 6px; }
-.topbar.home h1.brand img.logo-img { width: 66px; height: 66px; margin: -10px 0; }
-.topbar.home .wordmark { justify-content: center; }
-.topbar.home .wordmark span { font-size: clamp(13px, 4.5vw, 20px); white-space: nowrap; }
-.topbar.home .wordmark em { font-size: clamp(18px, 6.4vw, 30px); white-space: nowrap; }
+/* JoyChange003 Change 65 (replaces Change 44): the logo and wording are a strip at the top of the main page, about a tenth of the
+   screen tall, inside the scrolling page so it scrolls away. The bar above keeps only the bell, language and profile buttons. */
+.topbar.home .title-col { flex: 1; min-width: 0; }
+.brand-strip { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 10dvh; margin: 0 0 8px; font-family: 'Noto Serif', Georgia, serif; font-weight: 700; }
+.brand-strip img.logo-img { width: 66px; height: 66px; }
+.brand-strip .wordmark { justify-content: center; }
+.brand-strip .wordmark span { font-size: clamp(14px, 4.8vw, 22px); white-space: nowrap; }
+.brand-strip .wordmark em { font-size: clamp(20px, 7vw, 32px); white-space: nowrap; }
 .topbar .lang button { min-width: 34px; padding: 0 4px; }
 
 /* Contacts hub: Buyers and Vendors */
@@ -751,6 +751,15 @@ label.btn { position: relative; cursor: pointer; }
 .toast.error span { color: var(--red); font-weight: 700; }
 
 /* Notifications: sync status line and the sample News preview. */
+/* JoyChange003 Change 72: each notification is its own box, with a gap between boxes. */
+.notif-stack { display: flex; flex-direction: column; gap: 12px; }
+.notif-box { display: flex; flex-direction: column; gap: 8px; padding: 10px; margin-top: 12px; border: 1px solid var(--box-line); border-radius: 14px; background: var(--card-2); }
+.notif-box .link-row { margin-top: 0; }
+.notif-stack > .notif-box { margin-top: 0; }
+.notif-actions, .notif-snooze { display: flex; flex-wrap: wrap; gap: 8px; }
+.notif-actions .btn, .notif-snooze .btn { min-height: 44px; flex: 1 1 120px; }
+.notif-history { margin-top: 14px; }
+.notif-history summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--gold-hi); }
 .notif-sync { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid var(--line); }
 .notif-sync.failed-sync, .notif-sync.failed-phone { border-left-color: var(--bad, #d64545); }
 .notif-sync.synced { border-left-color: var(--ok, #2e9e5b); }

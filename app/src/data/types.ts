@@ -360,6 +360,8 @@ export interface Meta {
   shared?: Record<string, SharedInfo>;
   /** Change 010: position in the cloud's audit-history order up to which this phone has taken entries. */
   lastAuditSeq?: number;
+  /** JoyChange003 Change 72: notifications the person dismissed (kept as History) or snoozed with "Remind me later". This phone only. */
+  notifs?: { dismissed: Record<string, { at: number; title: string }>; snoozed: Record<string, number> };
 }
 
 // ---------- Change 010: Team Workspace and sharing ----------

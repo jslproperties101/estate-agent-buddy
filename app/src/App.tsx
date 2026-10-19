@@ -1,6 +1,6 @@
 // Estate Agent AI Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ProjectList, ProjectDetail, ProjectForm } from './projects/ProjectUI';
 import { projectStrings } from './projects/strings';
@@ -20,6 +20,7 @@ import { beginStartup, startupLang, StartupPhase, SPLASH_MS, splashStep } from '
 import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, todayCounts, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
+import { isShown, dismissMarks, snoozeMarks, restoreMarks, historyList, snoozeUntil, SNOOZE_CHOICES } from './lib/notifState';
 import { showNow, scheduleNative, idFor } from './lib/notify';
 import { fmtDateTime } from './lib/dates';
 import { cardTitle } from './listing/model';
@@ -365,7 +366,9 @@ function Shell() {
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
-  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue + inviteAlertCount(state);
+  // Change 72: an invitation that was dismissed or snoozed no longer counts on the bell.
+  const hiddenInvites = openInvites(state).filter(i => !isShown(state.meta, `invite:${i.id}`, Date.now())).length;
+  const notifCount = alerts.length + todayCounts(state.tasks, state.appointments, new Date()).tasksDue + inviteAlertCount(state) - hiddenInvites;
 
   return (
     <ToastContext.Provider value={showToast}>
@@ -375,9 +378,7 @@ function Shell() {
           {screen.name !== 'home' && <button className="icon-btn" onClick={back} aria-label={t.back}><IconBack /></button>}
           {/* ClaudeChanges001 change 2: no "Saved on This Phone" line under the title; a problem shows as a banner on the main page. */}
           <div className="title-col">
-            {screen.name === 'home'
-              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
-              : <h1>{title}</h1>}
+            {screen.name === 'home' ? null : <h1>{title}</h1>}
           </div>
           {screen.name === 'home' && <>
             <button className="icon-btn top-btn notif-btn" onClick={() => go({ name: 'notifications' })} aria-label={t.notifications} title={t.notifications} data-testid="top-notifications">
@@ -396,6 +397,8 @@ function Shell() {
         <UpdateBanner lang={lang} />
 
         <main className="content" data-screen={screen.name}>
+          {/* JoyChange003 Change 65: the logo and app name sit at the top of the main page (about a tenth of the screen) and scroll away with it. */}
+          {screen.name === 'home' && <h1 className="brand brand-strip" aria-label={t.appName} data-testid="brand-strip"><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>}
           <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
         </main>
 
@@ -651,122 +654,166 @@ function LangMenu({ lang, onPick }: { lang: Lang; onPick: (l: Lang) => void }) {
   );
 }
 
+/** JoyChange003 Change 72: one notification in its own box, with a clear Dismiss and "Remind me later" (pick when). */
+function NotifBox({ k, title, lang, children, actions = true }: { k: string; title: string; lang: Lang; children: ReactNode; actions?: boolean }) {
+  const { store } = useApp();
+  const n = strings[lang].notif;
+  const [pick, setPick] = useState(false);
+  const meta = () => store.getState().meta;
+  return (
+    <div className="notif-box" data-testid="notif-box" data-key={k}>
+      {children}
+      {actions && (
+        <div className="notif-actions">
+          <button type="button" className="btn small secondary" data-testid="notif-dismiss" onClick={() => store.setSingleton('meta', { notifs: dismissMarks(meta(), k, title, Date.now()) })}>{n.dismiss}</button>
+          <button type="button" className="btn small secondary" data-testid="notif-later" aria-expanded={pick} onClick={() => setPick(v => !v)}>{n.remindLater}</button>
+        </div>
+      )}
+      {actions && pick && (
+        <div className="notif-snooze" role="group" aria-label={n.snoozeTitle} data-testid="notif-snooze">
+          {SNOOZE_CHOICES.map(c => (
+            <button key={c} type="button" className="btn small" data-testid={`notif-snooze-${c}`} onClick={() => store.setSingleton('meta', { notifs: snoozeMarks(meta(), k, snoozeUntil(c, Date.now())) })}>{n.snooze[c]}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Notifications, in two clear sections. System Notifications: reminders and the cloud-sync status. News / Announcements:
  *  messages published by the owner. Publishing is not built yet, so that section is empty for now; the earlier sample
  *  News cards are kept under a clearly marked "sample, not live" preview rather than deleted. Push notifications to the
- *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet. */
+ *  phone are not claimed to work: that needs a backend and native delivery that are not set up or tested yet.
+ *  JoyChange003 Change 72: every notification is its own box with a gap between boxes, can be dismissed (kept in History) or
+ *  snoozed. Cloud-sync messages are in Settings only; only a FAILED sync shows here, a good sync never does. */
 function Notifications({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const t = strings[lang];
   const ss = saveStrings[lang];
   const sync = useSaveState();
   const now = Date.now();
-  const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30);
+  const show = (k: string) => isShown(state.meta, k, now);
+  const soon = upcomingReminders(state.tasks, state.appointments, now).filter(r => r.at - now <= 7 * 86_400_000).sort((a, b) => a.at - b.at).slice(0, 30).filter(r => show(`rem:${r.key}`));
   // Change 004: the main screen no longer pops up due reminders; the ones from the last 24 hours (to-dos not done,
   // appointments still scheduled) are listed here instead, so none is missed.
-  const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30);
+  const recent = upcomingReminders(state.tasks, state.appointments, now - 86_400_000).filter(r => r.at <= now).sort((a, b) => b.at - a.at).slice(0, 30).filter(r => show(`rem:${r.key}`));
   const adAttn = attention(state.properties.filter(p => !p.archived), ymd(new Date()));
   const perm = permission();
-  const waiting = state.meta.dirty.length;
   const signedIn = !!state.meta.syncSession;
-  const conflictCount0 = (state.meta.conflicts ?? []).length;
-  const syncLine = sync === 'failed-phone' ? ss.failedPhone
-    : !signedIn ? null
-      : sync === 'failed-sync' ? t.notif.syncFailed
-        : sync === 'conflict' ? ss.conflict(conflictCount0)
-        : sync === 'syncing' ? ss.syncing
-          : waiting > 0 ? t.notif.syncWaiting(waiting)
-            : state.meta.lastSync ? t.notif.syncOk(fmtDateTime(state.meta.lastSync, lang)) : null;
+  const syncLine = sync === 'failed-phone' ? ss.failedPhone : signedIn && sync === 'failed-sync' ? t.notif.syncFailed : null;
   const review = state.meta.leadReview && !state.meta.leadReview.reviewed ? reviewContacts(state.contacts, state.meta.leadReview.ids).length : 0;   // only buyers that still exist
   const conflictCount = (state.meta.conflicts ?? []).length + Object.keys(state.meta.recErrors ?? {}).length;
   const draftCount = store.allDrafts().length;
   const driveStale = !!state.meta.driveLast && (!state.meta.driveLastOkAt || Date.now() - state.meta.driveLastOkAt > STALE_MS);
   const followDays = state.settings.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS;
   const follow = followUpDue(state.contacts, now, followDays);
-  const systemEmpty = follow.length === 0 && soon.length === 0 && recent.length === 0 && adAttn.length === 0 && !syncLine && review === 0 && conflictCount === 0 && draftCount === 0 && !driveStale && inviteAlertCount(state) === 0;
+  const kReview = `review:${state.meta.leadReview?.at ?? 0}`, kConf = `conflicts:${conflictCount}`, kDraft = `drafts:${draftCount}`, kAd = `adverts:${adAttn.length}`;
+  const kFollow = `follow:${follow.map(x => x.contact.id).join(',')}`, kDrive = `drive:${state.meta.driveLastOkAt ?? 0}`;
+  const showReview = review > 0 && show(kReview), showConf = conflictCount > 0 && show(kConf), showDraft = draftCount > 0 && show(kDraft);
+  const showAd = adAttn.length > 0 && show(kAd), showFollow = follow.length > 0 && show(kFollow), showDrive = driveStale && show(kDrive);
+  const invites = openInvites(state).filter(i => show(`invite:${i.id}`));
+  const answers = unseenAnswers(state);
+  const history = historyList(state.meta);
+  const systemEmpty = !showFollow && soon.length === 0 && recent.length === 0 && !showAd && !syncLine && !showReview && !showConf && !showDraft && !showDrive && invites.length === 0 && answers.length === 0;
   const n = t.newsPage;
+  const remRow = (r: DueReminder) => {
+    const x = reminderText(r, state, lang);
+    return (
+      <NotifBox key={r.key} k={`rem:${r.key}`} title={x.title} lang={lang}>
+        <button className="link-row" onClick={() => go(r.kind === 'task' ? { name: 'taskForm', id: r.id } : { name: 'apptForm', id: r.id })}>
+          <strong>🔔 {x.title}</strong><small className="muted">{fmtDateTime(r.at, lang)} · {x.body}</small>
+        </button>
+      </NotifBox>
+    );
+  };
   return (
     <section className="stack" data-testid="notifications">
       <div className="card stack-sm" data-testid="notif-system">
         <div className="card-title">{t.notif.system}</div>
-        {review > 0 && (
-          <button className="link-row" data-testid="notif-lead-review" onClick={() => go({ name: 'contactsHome' })}>
-            <strong>{leadReviewStrings[lang].review}</strong><small className="muted">{leadReviewStrings[lang].notice(review)}</small>
-          </button>
+        {syncLine && <NotifBox k="syncfail" title={t.notif.syncTitle} lang={lang} actions={false}><div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div></NotifBox>}
+        {showReview && (
+          <NotifBox k={kReview} title={leadReviewStrings[lang].review} lang={lang}>
+            <button className="link-row" data-testid="notif-lead-review" onClick={() => go({ name: 'contactsHome' })}>
+              <strong>{leadReviewStrings[lang].review}</strong><small className="muted">{leadReviewStrings[lang].notice(review)}</small>
+            </button>
+          </NotifBox>
         )}
-        {conflictCount > 0 && (
-          <button className="link-row" data-testid="notif-conflicts" onClick={() => go({ name: 'syncReview' })}>
-            <strong>{syncStrings[lang].review}</strong><small className="muted">{syncStrings[lang].reviewHint(conflictCount)}</small>
-          </button>
+        {showConf && (
+          <NotifBox k={kConf} title={syncStrings[lang].review} lang={lang}>
+            <button className="link-row" data-testid="notif-conflicts" onClick={() => go({ name: 'syncReview' })}>
+              <strong>{syncStrings[lang].review}</strong><small className="muted">{syncStrings[lang].reviewHint(conflictCount)}</small>
+            </button>
+          </NotifBox>
         )}
-        {draftCount > 0 && (
-          <div className="stack-sm" data-testid="notif-drafts"><strong>{syncStrings[lang].drafts}</strong><small className="muted">{syncStrings[lang].draftsHint(draftCount)}</small><DraftsList lang={lang} go={go} /></div>
+        {showDraft && (
+          <NotifBox k={kDraft} title={syncStrings[lang].drafts} lang={lang}>
+            <div className="stack-sm" data-testid="notif-drafts"><strong>{syncStrings[lang].drafts}</strong><small className="muted">{syncStrings[lang].draftsHint(draftCount)}</small><DraftsList lang={lang} go={go} /></div>
+          </NotifBox>
         )}
-        {adAttn.length > 0 && (
-          <button className="link-row" data-testid="notif-adverts" onClick={() => go({ name: 'adSummary' })}>
-            <strong>📣 {adStrings[lang].attention} ({adAttn.length})</strong><small className="muted">{adStrings[lang].summaryTitle}</small>
-          </button>
+        {showAd && (
+          <NotifBox k={kAd} title={adStrings[lang].attention} lang={lang}>
+            <button className="link-row" data-testid="notif-adverts" onClick={() => go({ name: 'adSummary' })}>
+              <strong>📣 {adStrings[lang].attention} ({adAttn.length})</strong><small className="muted">{adStrings[lang].summaryTitle}</small>
+            </button>
+          </NotifBox>
         )}
-        {follow.length > 0 && (
-          <div className="stack-sm" data-testid="notif-followup">
-            <strong>{followStrings[lang].title}</strong>
-            <small className="muted">{followStrings[lang].notice(follow.length, followDays)}</small>
-            {follow.slice(0, 5).map(x => (
-              <button key={x.contact.id} className="link-row" data-testid="followup-row" onClick={() => go({ name: 'contactDetail', id: x.contact.id })}>
-                <strong>{x.contact.name}</strong><small className="muted">{x.contact.lastInteraction ? followStrings[lang].quiet(x.quietDays) : followStrings[lang].never}</small>
-              </button>
-            ))}
-          </div>
+        {showFollow && (
+          <NotifBox k={kFollow} title={followStrings[lang].title} lang={lang}>
+            <div className="stack-sm" data-testid="notif-followup">
+              <strong>{followStrings[lang].title}</strong>
+              <small className="muted">{followStrings[lang].notice(follow.length, followDays)}</small>
+              {follow.slice(0, 5).map(x => (
+                <button key={x.contact.id} className="link-row" data-testid="followup-row" onClick={() => go({ name: 'contactDetail', id: x.contact.id })}>
+                  <strong>{x.contact.name}</strong><small className="muted">{x.contact.lastInteraction ? followStrings[lang].quiet(x.quietDays) : followStrings[lang].never}</small>
+                </button>
+              ))}
+            </div>
+          </NotifBox>
         )}
-        {openInvites(state).map(i => (
-          <button key={i.id} className="link-row" data-testid="notif-invite" onClick={() => go({ name: 'team' })}>
-            <strong>{teamStrings[lang].invNotifFrom(personLabel(i.fromName, i.fromEmail))}</strong>
-            <small className="muted">{teamStrings[lang].invNotifHint}</small>
-          </button>
+        {invites.map(i => (
+          <NotifBox key={i.id} k={`invite:${i.id}`} title={teamStrings[lang].invNotifFrom(personLabel(i.fromName, i.fromEmail))} lang={lang}>
+            <button className="link-row" data-testid="notif-invite" onClick={() => go({ name: 'team' })}>
+              <strong>{teamStrings[lang].invNotifFrom(personLabel(i.fromName, i.fromEmail))}</strong>
+              <small className="muted">{teamStrings[lang].invNotifHint}</small>
+            </button>
+          </NotifBox>
         ))}
-        {unseenAnswers(state).map(a => (
-          <div key={a.id} className="link-row" data-testid="notif-invite-answer">
-            <strong>{(a.status === 'accepted' ? teamStrings[lang].invAnsAccepted : teamStrings[lang].invAnsDeclined)(personLabel(a.name, a.email))}</strong>
-            <button className="btn small secondary" data-testid="notif-invite-answer-ok" onClick={() => markAnswersSeen(store, [a.id])}>{teamStrings[lang].invGotIt}</button>
-          </div>
+        {answers.map(a => (
+          <NotifBox key={a.id} k={`answer:${a.id}`} title="" lang={lang} actions={false}>
+            <div className="link-row" data-testid="notif-invite-answer">
+              <strong>{(a.status === 'accepted' ? teamStrings[lang].invAnsAccepted : teamStrings[lang].invAnsDeclined)(personLabel(a.name, a.email))}</strong>
+              <button className="btn small secondary" data-testid="notif-invite-answer-ok" onClick={() => markAnswersSeen(store, [a.id])}>{teamStrings[lang].invGotIt}</button>
+            </div>
+          </NotifBox>
         ))}
-        {driveStale && (
-          <button className="link-row" data-testid="notif-drive" onClick={() => go({ name: 'settings' })}>
-            <strong>{backupStrings[lang].driveTitle}</strong>
-            <small className="muted">{state.meta.driveLastOkAt ? backupStrings[lang].driveStale(fmtDateTime(state.meta.driveLastOkAt, lang)) : backupStrings[lang].driveNever}</small>
-          </button>
+        {showDrive && (
+          <NotifBox k={kDrive} title={backupStrings[lang].driveTitle} lang={lang}>
+            <button className="link-row" data-testid="notif-drive" onClick={() => go({ name: 'settings' })}>
+              <strong>{backupStrings[lang].driveTitle}</strong>
+              <small className="muted">{state.meta.driveLastOkAt ? backupStrings[lang].driveStale(fmtDateTime(state.meta.driveLastOkAt, lang)) : backupStrings[lang].driveNever}</small>
+            </button>
+          </NotifBox>
         )}
         {systemEmpty && <small className="muted" data-testid="notif-empty-system">{t.notif.empty}</small>}
-        {syncLine && <div className={`notif-sync ${sync}`} data-testid="notif-sync" data-state={sync}><strong>{t.notif.syncTitle}</strong><small className="muted">{syncLine}</small></div>}
         {recent.length > 0 && <>
           <strong>{t.notif.recent}</strong>
-          <ul className="notif-list" data-testid="notif-recent">
-            {recent.map(r => {
-              const x = reminderText(r, state, lang);
-              return (
-                <li key={r.key}>
-                  <button className="link-row" onClick={() => go(r.kind === 'task' ? { name: 'taskForm', id: r.id } : { name: 'apptForm', id: r.id })}>
-                    <strong>🔔 {x.title}</strong><small className="muted">{fmtDateTime(r.at, lang)} · {x.body}</small>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="notif-stack" data-testid="notif-recent">{recent.map(remRow)}</div>
         </>}
-        {soon.length > 0 && (
-          <ul className="notif-list">
-            {soon.map(r => {
-              const x = reminderText(r, state, lang);
-              return (
-                <li key={r.key}>
-                  <button className="link-row" onClick={() => go(r.kind === 'task' ? { name: 'taskForm', id: r.id } : { name: 'apptForm', id: r.id })}>
-                    <strong>🔔 {x.title}</strong><small className="muted">{fmtDateTime(r.at, lang)} · {x.body}</small>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        {soon.length > 0 && <div className="notif-stack" data-testid="notif-soon">{soon.map(remRow)}</div>}
+        <details className="notif-history" data-testid="notif-history">
+          <summary>{t.notif.history} ({history.length})</summary>
+          {history.length === 0 ? <small className="muted" data-testid="notif-history-empty">{t.notif.historyEmpty}</small> : (
+            <div className="notif-stack">
+              <small className="muted">{t.notif.historyHint}</small>
+              {history.map(h => (
+                <div key={h.key} className="notif-box notif-hist-row" data-testid="notif-history-row">
+                  <strong>{h.title}</strong><small className="muted">{fmtDateTime(h.at, lang)}</small>
+                  <div className="notif-actions"><button type="button" className="btn small secondary" data-testid="notif-restore" onClick={() => store.setSingleton('meta', { notifs: restoreMarks(store.getState().meta, h.key) })}>{t.notif.restore}</button></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </details>
       </div>
       <div className="card stack-sm" data-testid="notif-news">
         <div className="card-title">{t.notif.newsTitle}</div>
