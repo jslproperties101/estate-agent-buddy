@@ -41,5 +41,5 @@
     "@capacitor/share": "^7.0.0",
     "@capacitor-community/admob": "^7.0.0"
   },
-  "nativeVersion": 5
+  "nativeVersion": 6
 }
