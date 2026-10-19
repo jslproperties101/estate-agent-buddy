@@ -143,7 +143,7 @@ test('X5 location chain: options belong to the level above; changing a level cle
   await pickOpt(page, 'opt-township', 'Bandar Baru Nilai');
   await page.getByTestId('opt-neighborhood').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   assert.equal(await page.getByTestId('opt-neighborhood').getByRole('option', { name: 'Laman Kemboja' }).count(), 0, 'not under another township');
-  await page.getByTestId('opt-neighborhood').locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
+  await page.getByTestId('opt-neighborhood').getByTestId('opt-popup-close').click();   // Change 82: the list is a pop-up with its own close button
   // Back to Kota Seriemas: it is offered again, with an X and without "Saved by you"
   await pickOpt(page, 'opt-township', 'Kota Seriemas');
   const nb = page.getByTestId('opt-neighborhood');

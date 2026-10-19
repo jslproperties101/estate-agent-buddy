@@ -73,7 +73,8 @@ test('K1 first login: asked once, Malaysia selected, searchable; the choice is s
   const cont = await page.getByTestId('country-continue').boundingBox(); const vp = page.viewportSize();
   assert.ok(cont && cont.y >= 0 && cont.y + cont.height <= vp.height, 'Continue is on the screen');
   const lst = await page.getByTestId('country-list').boundingBox();
-  assert.ok(lst.height <= vp.height * 0.3, `the country list is short (${Math.round(lst.height)}px of ${vp.height}px)`);
+  const cs = await page.getByTestId('country-list').evaluate(e => { const c = getComputedStyle(e); return `${c.maxHeight}|${c.minHeight}|${c.flex}|${c.overflowY}`; });
+  assert.ok(lst.height <= vp.height * 0.3, `the country list is short (${Math.round(lst.height)}px of ${vp.height}px; ${cs})`);
   const adTop = await page.evaluate(() => { const a = document.querySelector('[data-testid="bottom-ad"], .bottom-ad, .ad-slot'); return a ? a.getBoundingClientRect().top : null; });
   if (adTop !== null) assert.ok(cont.y + cont.height <= adTop + 1, 'Continue sits above the ad');
   await page.screenshot({ path: `${SHOTS}k1-country.png` });
