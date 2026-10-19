@@ -4372,7 +4372,7 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   // ClaudeChanges001 change 4: Land Use is a remembered list with Others.
   await page.locator('[data-testid="opt-landUse"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   assert.ok((await page.getByTestId('opt-landUse').getByRole('option').allInnerTexts()).includes('NIL'));
-  await page.locator('[data-testid="opt-landUse"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
+  await page.getByTestId('opt-landUse').getByTestId('opt-popup-close').click();   // Change 82: the list is a pop-up with its own close button
   await page.locator('[data-testid="opt-restriction"] :is(.opt-btn:not([data-locked]), .opt-field.locked .fx-edit)').click();
   const r = await page.getByTestId('opt-restriction').getByRole('option').allInnerTexts();
   assert.ok(r.includes('NON Bumiputera') && !r.some(x => /No restriction/i.test(x)), r.join(', '));
@@ -5108,6 +5108,7 @@ test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (
   await page.getByTestId('opt-rename-save').click();
   await waitStored(page, 'records', `all.some(v => v && v.street === 'Jalan Tahap Satu')`);
   assert.equal(await streets.getByRole('option', { name: 'Jalan Tahap Satu', exact: true }).count(), 1, 'renamed in the list');
+  await streets.getByTestId('opt-popup-close').click();
   // Change 27: filters come back after opening a property and pressing Back.
   await home(page); await tile(page, 'Property List');
   await page.getByRole('button', { name: /^Filters/ }).click();
