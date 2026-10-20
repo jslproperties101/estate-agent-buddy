@@ -1,0 +1,72 @@
+TEST CHECKLIST — Batches 1 to 5 (JoyChange006, 006 Part 2, 008, 007)
+App: EAB QA (the separate test app; it installs BESIDE your real app and uses the test database).
+Branch feature/qa-joychange006. Check the commit in Settings > About.
+Tick each line. Do every "3 languages" line in English, Bahasa Melayu and Chinese.
+For "large font": phone Settings > Display > Font size = largest, and Display size = largest.
+
+=====================================================
+BATCH 1 — LOOK FIXES (JoyChange006 A, B, C)
+=====================================================
+[ ] Property Calculator > No Property Selected: the property cards in the list do not overlap (price never sits on the next card's ID). 3 languages, large font.
+[ ] Subsale List in Bahasa Melayu with large font: the "UNTUK DIJUAL" and "Telah Ditempah" labels on a card do not touch.
+[ ] Look at 5 or more screens with large font in all 3 languages: no text on top of other text, nothing cut off.
+[ ] Calculator: the property button and the Client dropdown look the same (centred text, arrow on the right, lighter border, gold text).
+[ ] The empty property button says "No Property Selected" (no word "Choose").
+[ ] Open any dropdown list: a search bar is at the top.
+[ ] Client list: type part of a name, the list narrows. Type part of a phone number (e.g. 4 digits), the right person shows.
+[ ] Type nonsense: "No results" shows (3 languages).
+
+=====================================================
+BATCH 2 — KEYBOARD (JoyChange006 D)
+=====================================================
+Use your normal keyboard (SwiftKey).
+[ ] New Property: tap a box near the bottom of the page. The box moves to about one third from the top and the keyboard does not cover it.
+[ ] Tap a box near the top: it does not go under the title bar.
+[ ] Open a dropdown and tap its search bar: the pop-up moves to the top and the search bar is fully visible.
+[ ] First-login country screen (fresh install of the QA app): tap Search. Search and Continue are both visible above the keyboard.
+[ ] While typing, the advert at the bottom disappears; when the keyboard closes it comes back and the page looks normal.
+
+=====================================================
+BATCH 3 — SPLASH, NEW STATUS, CHECK-STATUS COLOURS (JoyChange006 Part 2 E, F, G)
+=====================================================
+[ ] Open the app with a stopwatch: the splash lasts 10 seconds.
+[ ] Top: "Estate Agent" over "AI Buddy", centred, bigger than the AI Assisted Command header, words only.
+[ ] Middle: the logo turns slowly (half the old speed). Bottom: a gold bar fills smoothly over the 10 seconds, no %.
+[ ] Messages in order: Starting up / Encrypting data (the longest) / Securing your connection / Loading users / Ready, with dots that go . .. ... and repeat.
+[ ] Same in Bahasa Melayu and Chinese (CHECK THE WORDING — it is Claude's draft, not yet confirmed by you).
+[ ] New / Edit Property > Availability: "Rented - Pending TA Signing" is just above "Rented". Save it, reopen: still selected.
+[ ] Subsale List > Filters > Status: the new status is there; it is hidden by default like Rented, and shows when ticked.
+[ ] Buyer Matching: a property with the new status is NOT offered to buyers.
+[ ] New Property > tap a "Check status" field (e.g. Tenure): in the pop-up, Confirmed is green, Owner Stated orange, Need to Check red (text only).
+[ ] Subsale List card: the "N to check" label is red.
+
+=====================================================
+BATCH 4 — LOCATION LISTS (JoyChange008)
+=====================================================
+[ ] New Property > State: Negeri Sembilan > City: only Negeri Sembilan towns (Nilai, Seremban…), never Shah Alam or Johor Bahru.
+[ ] The City list is long: the search bar finds a town quickly.
+[ ] City: Nilai > Township: only Nilai townships (Kota Seriemas, Putra Nilai…). A town without a list shows none; add one with "+ Add New".
+[ ] Fill State, City, Township, then change State: a question appears. Cancel keeps everything; Change clears City and Township.
+[ ] Add your own township, save a property with it, then on another property delete that township (X): the warning says saved properties keep their names. After deleting, the first property still shows the township name.
+[ ] Settings > About: "Place lists" credits line shows (3 languages).
+[ ] Old properties still show their places.
+
+=====================================================
+BATCH 5 — HOUSE SHOPPING (JoyChange007)
+=====================================================
+[ ] No blue information box at the top.
+[ ] The map fills the screen, with "Mark property here" and Pause / Stop under it, above the advert. You can scroll down to the other cards.
+[ ] Hybrid view only, no Map / Satellite / Hybrid buttons. The map starts very close (about 50-100 m across).
+[ ] Start tracking: the map is empty (no old markers).
+[ ] The box shows "Marked" (not GPS points).
+[ ] Mark property here: Banner type, Banner phone, For Sale / For Rent / Both, price(s), Comments. No property type.
+[ ] Save with something missing: it says what to fill in. "Both" shows both prices and needs both.
+[ ] After saving, the mark shows in the list under the map with Save as property, Move and Delete.
+[ ] Save as property: a property is added to the Subsale List (Needs check) with the price(s), and the owner phone for Owner / Maybe Owner banners.
+[ ] Stop (also with nothing marked): you stay on the screen; a card appears in Previous Journeys with the area name, date and time and "N marked" (no distance or time on the card).
+[ ] Open a card: only that journey's route and marks. Continue this journey: recording goes on in the SAME card, marks kept. Start new journey: an empty map and a new card.
+[ ] Delete a mark and delete a journey: each asks first.
+[ ] Drive about 1 km: the line follows the road (if the Google key allows the Roads API; otherwise the plain GPS line stays — tell Claude which).
+[ ] Two-finger rotate: NOT expected yet (needs the native Android map, a later batch).
+
+NOT IN THIS APK (later batches): native Android map and rotation; OpenStreetMap neighbourhoods and streets; locking a level until the one above is chosen (built, switched off — your decision); backend logging and Admin EAB screens (Supabase, parked).
