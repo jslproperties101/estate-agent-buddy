@@ -635,7 +635,7 @@ test('U12 Calendar: appointments linked to property and contact, statuses, and a
   await page.context().close();
 });
 
-test('U13 GPS Assistance: House Shopping records the real route, saves a found property; Map shows saved positions', async () => {
+test('U13 GPS Assistance: House Shopping (JoyChange007) records the route, the Mark form, Save as property, journey card; Map shows saved positions', async () => {
   const page = await phone({ maps: true, geo: { latitude: 2.8200, longitude: 101.8000, accuracy: 6 } });
   await tile(page, 'GPS Assistance');
   assert.ok(await page.getByTestId('card-house-shopping').isVisible());
@@ -654,15 +654,42 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   const dist = await page.getByTestId('trk-distance').innerText();
   assert.match(dist, /^\d+ m$/i);
   assert.ok(parseInt(dist) > 100, `travelled ${dist}`);
+  // JoyChange007: no information box; a Hybrid-only map (no Map / Satellite / Hybrid buttons); marked count, not GPS points.
+  assert.equal(await page.getByTestId('house-shopping').locator('.notice').count(), 0, 'no information box');
+  assert.equal(await page.getByTestId('map-types').count(), 0, 'no map type buttons');
+  assert.equal(await page.getByTestId('trk-marked').innerText(), '0');
+  assert.equal(await page.getByTestId('journey-places').count(), 0, 'no "places passed through" card');
+  // The Mark form: required fields are checked; Both shows both prices.
   await page.getByTestId('mark-here').click();
-  await page.getByTestId('mark-sheet').locator('input').first().fill('For sale sign, corner lot');
-  await page.getByTestId('save-found').click();
-  assert.match(await page.getByTestId('journey-marks').innerText(), /For sale sign, corner lot/i);
-  assert.match(await page.getByTestId('journey-places').innerText(), /Tmn Desa Nilai|Nilai/i, 'places passed through, from Google');
+  await page.getByTestId('mk-save').click();
+  assert.match(await page.getByTestId('mk-error').innerText(), /Banner type, Banner phone number, For Sale \/ For Rent/i);
+  await page.getByTestId('mk-banner-type').selectOption('owner');
+  await page.getByTestId('mk-phone').fill('012-345 6789');
+  await page.getByTestId('mk-purpose').selectOption('sale_or_rent');
+  assert.equal(await page.locator('[data-field="mk-sale"]').count() + await page.locator('[data-field="mk-rent"]').count(), 2, 'Both: two price fields');
+  await page.locator('[data-field="mk-sale"]').fill('650000');
+  await page.getByTestId('mk-save').click();
+  assert.match(await page.getByTestId('mk-error').innerText(), /Monthly rent/i, 'the rent is needed for Both');
+  await page.locator('[data-field="mk-rent"]').fill('2200');
+  await page.getByTestId('mk-comments').fill('For sale sign, corner lot');
+  await page.getByTestId('mk-save').click();
+  await page.getByTestId('mark-sheet').waitFor({ state: 'detached' });
+  assert.match(await page.getByTestId('journey-marks').innerText(), /Owner Banner · \+60 12-345 6789[\s\S]*Both · For Sale RM 650,000 · For Rent RM 2,200[\s\S]*For sale sign, corner lot/i);
+  assert.equal(await page.getByTestId('trk-marked').innerText(), '1');
+  // Save as property: one tap, pre-filled (Joe, 21 Oct 2026).
+  await page.getByTestId('mark-save-property').click();
+  await waitStored(page, 'records', "all.some(v => v && v.status === 'needs_check' && v.askingPrice === 650000 && v.monthlyRent === 2200)");
   await shot(page, '10b-house-shopping');
+  // Stop saves the journey and stays here; the card shows the area and the marked count.
   await page.getByTestId('trk-stop').click();
+  await page.getByTestId('trk-start').waitFor();
+  await page.getByTestId('journey-row').first().waitFor();
+  assert.match(await page.getByTestId('journey-row').first().innerText(), /Nilai[\s\S]*1 marked/i);
+  await page.getByTestId('journey-row').first().click();
   await page.waitForSelector('[data-testid="journey-detail"]');
   assert.match(await page.getByTestId('jd-distance').innerText(), /\d+ m/i);
+  assert.equal(await page.getByTestId('jd-continue').count(), 1, 'Continue this journey');
+  assert.equal(await page.getByTestId('jd-new').count(), 1, 'Start new journey');
   await waitStored(page, 'records', "all.some(v => v && v.status === 'saved' && Array.isArray(v.points) && v.points.length > 1)");   // the write lands a moment after the screen shows it
   // the saved journey and the found property are kept
   await page.reload(); await page.waitForSelector('nav.grid');
@@ -680,6 +707,59 @@ test('U13 GPS Assistance: House Shopping records the real route, saves a found p
   assert.equal(pins.filter(x => x === 'property').length, 1, 'only real saved positions are shown');
   assert.equal(pins.filter(x => x === 'me').length, 1, 'your GPS position is shown');
   await shot(page, '10c-property-map');
+  await page.context().close();
+});
+
+test('U13b JoyChange007: map and Mark button fill the screen; Continue keeps the same card and its marks; Start new makes a new card; a mark can be deleted', async () => {
+  const page = await phone({ maps: true, geo: { latitude: 2.8200, longitude: 101.8000, accuracy: 6 } });
+  await tile(page, 'GPS Assistance');
+  await page.getByTestId('card-house-shopping').click();
+  await page.getByTestId('trk-start').click();
+  await page.getByTestId('mark-here').waitFor();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="mark-here"]').disabled);
+  const vp = page.viewportSize();
+  const map = await page.getByTestId('hs-map').boundingBox();
+  assert.ok(map.height > vp.height * 0.4, `a big map (${Math.round(map.height)} px)`);
+  await page.waitForTimeout(1700);   // the advert's height is measured again after it appears
+  const btn = await page.getByTestId('trk-stop').boundingBox();
+  const adTop = await page.evaluate(() => document.querySelector('[data-testid="bottom-ad"]')?.getBoundingClientRect().top ?? innerHeight);
+  assert.ok(btn.y + btn.height <= adTop + 1, `Pause / Stop above the advert (${Math.round(btn.y + btn.height)} vs ${Math.round(adTop)})`);
+  assert.ok(adTop - (btn.y + btn.height) < 40, 'and the map fills the space down to them');
+  const mark = async () => {
+    await page.getByTestId('mark-here').click();
+    await page.getByTestId('mk-banner-type').selectOption('maybe_owner');
+    await page.getByTestId('mk-phone').fill('0161112222');
+    await page.getByTestId('mk-purpose').selectOption('sale');
+    await page.locator('[data-field="mk-sale"]').fill('400000');
+    await page.getByTestId('mk-save').click();
+    await page.getByTestId('mark-sheet').waitFor({ state: 'detached' });
+  };
+  await mark();
+  await page.getByTestId('trk-stop').click();
+  await page.getByTestId('journey-row').first().waitFor();
+  // Continue: the same card records again, keeping its mark.
+  await page.getByTestId('journey-row').first().click();
+  await page.getByTestId('jd-continue').click();
+  await page.getByTestId('trk-stop').waitFor();
+  assert.equal(await page.getByTestId('trk-marked').innerText(), '1', 'the mark is still on this journey');
+  await mark();
+  assert.equal(await page.getByTestId('trk-marked').innerText(), '2');
+  await page.getByTestId('trk-stop').click();
+  await page.getByTestId('trk-start').waitFor();
+  assert.equal(await page.getByTestId('journey-row').count(), 1, 'still one card');
+  assert.match(await page.getByTestId('journey-row').first().innerText(), /2 marked/);
+  // Start new: an empty map, saved as its own card.
+  await page.getByTestId('journey-row').first().click();
+  await page.getByTestId('jd-new').click();
+  await page.getByTestId('trk-stop').waitFor();
+  assert.equal(await page.getByTestId('trk-marked').innerText(), '0', 'a new journey starts empty');
+  await page.getByTestId('trk-stop').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="journey-row"]').length === 2);
+  // Delete one mark from the first journey (asks first).
+  await page.getByTestId('journey-row').filter({ hasText: '2 marked' }).click();
+  await page.getByTestId('mark-delete').first().click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
+  assert.equal(await page.getByTestId('mark-row').count(), 1);
   await page.context().close();
 });
 
@@ -1660,7 +1740,7 @@ test('U37 property form: sections start closed, open and close, Save floats on s
   await page.context().close();
 });
 
-test('U38 GPS: My Location gets a fresh position every time (even when live updates stop); tap-to-select banner and House Shopping spots, changeable later', async () => {
+test('U38 GPS: My Location gets a fresh position every time (even when live updates stop); tap-to-select banner spots; House Shopping marks movable later', async () => {
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
     permissions: ['geolocation'], geolocation: { latitude: 2.8200, longitude: 101.8000, accuracy: 8 } });
   await ctx.addInitScript(FAKE_MAPS);
@@ -1694,19 +1774,21 @@ test('U38 GPS: My Location gets a fresh position every time (even when live upda
   await page.getByTestId('banner-save').click();
   assert.match(await page.getByTestId('banner-card').first().getByTestId('banner-pos').innerText(), /2\.81220, 101\.81220/i);
   assert.equal(await page.getByTestId('banner-card').first().getByTestId('banner-up').count(), 1, 'moved, not duplicated');
-  // House Shopping: mark a spot by tapping the map, then move the mark.
+  // House Shopping (JoyChange007): the mark is saved where you stand; it can be moved to the right spot later.
   await home(page); await tile(page, 'GPS Assistance'); await page.getByTestId('card-house-shopping').click();
   await page.getByTestId('trk-start').click();
+  await ctx.setGeolocation({ latitude: 2.8201, longitude: 101.8001, accuracy: 8 });   // the tracker's own first reading
   await page.getByTestId('mark-here').click();
-  await page.getByTestId('mark-map').waitFor();
-  await page.evaluate(() => window.__mapClick(2.8133, 101.8133));
-  await page.waitForFunction(() => document.querySelector('[data-testid="mark-map-pos"]')?.textContent.includes('2.81330, 101.81330'));
-  await page.getByRole('button', { name: 'Mark the spot only' }).click();
+  await page.getByTestId('mk-banner-type').selectOption('agent');
+  await page.getByTestId('mk-phone').fill('0123456789');
+  await page.getByTestId('mk-purpose').selectOption('rent');
+  await page.locator('[data-field="mk-rent"]').fill('1800');
+  await page.getByTestId('mk-save').click();
   await page.getByTestId('move-mark').first().click();
   await page.getByTestId('move-map').waitFor();
   await page.evaluate(() => window.__mapClick(2.8144, 101.8144));
   await page.getByTestId('move-mark-save').click();
-  assert.match(await page.getByTestId('journey-marks').innerText(), /2\.81440, 101\.81440/i);
+  await waitStored(page, 'records', "all.some(v => v && Array.isArray(v.marks) && v.marks.some(m => Math.abs(m.lat - 2.8144) < 1e-6 && m.bannerType === 'agent'))");
   await ctx.close();
 });
 

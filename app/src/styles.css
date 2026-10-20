@@ -86,7 +86,7 @@ small, .small { font-size: 14px; }
   padding: 14px max(14px, env(safe-area-inset-right, 0px)) 16px max(14px, env(safe-area-inset-left, 0px)); min-width: 0; }
 /* Change 74 (JoyChange003): menu and list screens start their first content about 10% of the screen height below the title bar.
    Forms, photo viewers, maps, the home screen and the AI command page keep their own spacing. */
-.content:is([data-screen="notifications"], [data-screen="contactsHome"], [data-screen="opportunities"], [data-screen="listing"], [data-screen="contacts"], [data-screen="activity"], [data-screen="todo"], [data-screen="calendar"], [data-screen="gps"], [data-screen="houseShopping"], [data-screen="banners"], [data-screen="finance"], [data-screen="projects"], [data-screen="adTracker"], [data-screen="adSummary"], [data-screen="profile"], [data-screen="settings"], [data-screen="recentlyDeleted"], [data-screen="history"], [data-screen="expert"], [data-screen="cobroke"], [data-screen="creativeMedia"], [data-screen="buyerHistory"], [data-screen="team"], [data-screen="manageSharing"], [data-screen="exports"], [data-screen="trackSales"]) { padding-top: calc(14px + 10dvh); }
+.content:is([data-screen="notifications"], [data-screen="contactsHome"], [data-screen="opportunities"], [data-screen="listing"], [data-screen="contacts"], [data-screen="activity"], [data-screen="todo"], [data-screen="calendar"], [data-screen="gps"], [data-screen="banners"], [data-screen="finance"], [data-screen="projects"], [data-screen="adTracker"], [data-screen="adSummary"], [data-screen="profile"], [data-screen="settings"], [data-screen="recentlyDeleted"], [data-screen="history"], [data-screen="expert"], [data-screen="cobroke"], [data-screen="creativeMedia"], [data-screen="buyerHistory"], [data-screen="team"], [data-screen="manageSharing"], [data-screen="exports"], [data-screen="trackSales"]) { padding-top: calc(14px + 10dvh); }
 /* A page with the floating Save keeps room so its last field can scroll clear of the Save bar. */
 .content:has(.save-bar.floating) { padding-bottom: 110px; }
 /* Changes 66 / 71 (JoyChange003): with the keyboard open the page has spare room under its last field, and lists keep scrolling. */
@@ -1530,3 +1530,6 @@ html.kb-open .opt-pop::after { display: none; }
 .opt-list.verify-colors .opt-item[data-value="confirmed"] { color: var(--ok); }
 .opt-list.verify-colors .opt-item[data-value="owner"] { color: var(--orange); }
 .opt-list.verify-colors .opt-item[data-value="check"], .opt-list.verify-colors .opt-item[data-value="unknown"] { color: var(--red); }
+
+/* JoyChange007 2.2: House Shopping's map and Mark button fill the screen, so it has no extra gap above (Change 74 list). */
+.hs-fill .btn.big { min-height: 56px; }

@@ -152,7 +152,12 @@ export interface Task extends Base {
 // ---------- GPS House Shopping ----------
 export interface TrackPoint { lat: number; lng: number; acc: number; t: number }
 export interface JourneyPlace { name: string; lat: number; lng: number; at: number }
-export interface JourneyMark { id: string; lat: number; lng: number; at: number; propertyId?: string; note?: string }
+/** JoyChange007: what the agent saw at a marked spot. `note` holds the comments. Older marks have none of the banner fields. */
+export type BannerKind = 'agent' | 'owner' | 'maybe_owner';
+export interface JourneyMark {
+  id: string; lat: number; lng: number; at: number; propertyId?: string; note?: string;
+  bannerType?: BannerKind; bannerPhone?: string; purpose?: 'sale' | 'rent' | 'sale_or_rent'; salePrice?: number; rentPrice?: number;
+}
 export interface Journey extends Base {
   title?: string;
   startedAt: number;
@@ -164,6 +169,12 @@ export interface Journey extends Base {
   places: JourneyPlace[];
   marks: JourneyMark[];
   status: 'recording' | 'paused' | 'saved';
+  /** JoyChange007: the neighbourhood (or township / town) shown on the journey card, found once when the journey stops. */
+  area?: string;
+  /** JoyChange007: the route following the roads (Google Roads API, sent in batches of up to 100 thinned points). */
+  snapped?: { lat: number; lng: number }[];
+  /** How many of the thinned points have been sent for snapping so far. */
+  snapDone?: number;
 }
 
 // ---------- banners (My Banner Location) ----------

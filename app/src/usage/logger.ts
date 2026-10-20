@@ -110,7 +110,8 @@ export class UsageLogger {
 
   // ---------- the event kinds the app uses ----------
   /** One call to a Google Maps Platform API, e.g. google('geocoding.reverse', true). */
-  google(name: string, ok: boolean, screen?: string) { this.track({ kind: 'google', name, ok, screen }); }
+  /** JoyChange007: `n` = points sent, `value` = estimated cost in micro-US$ (for the Admin EAB API usage view). */
+  google(name: string, ok: boolean, screen?: string, n?: number, value?: number) { this.track({ kind: 'google', name, ok, screen, n, value }); }
   feature(name: string, screen?: string) { this.track({ kind: 'feature', name, screen }); }
   ai(name: string, ok: boolean, value?: number) { this.track({ kind: 'ai', name, ok, value }); }
   /** A screen was opened. */
