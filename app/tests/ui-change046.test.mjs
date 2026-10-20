@@ -63,24 +63,23 @@ async function stored(page, key) {
 }
 async function waitFor(f, timeout = 10000) { const end = Date.now() + timeout; while (!(await f())) { if (Date.now() > end) throw new Error('timed out'); await new Promise(r => setTimeout(r, 50)); } }
 
-test('K1 first login: asked once, Malaysia selected, searchable; the choice is saved on the account and kept', async () => {
+test('K1 first login: asked once, one box with Malaysia selected, searchable list; the choice is saved on the account and kept', async () => {
   const account = { id: 'u-k1', email: 'k1@x.com', metadata: { full_name: 'Test' } };
   const { page, calls, errors, ctx } = await phone(account);
   await page.getByTestId('country-choice').waitFor();
-  assert.equal(await page.locator('[data-country="Malaysia"]').getAttribute('aria-checked'), 'true', 'Malaysia is selected by default');
+  // JoyChange005-Main Part2 Change B (MainForAdmin-B): ONE box with Malaysia chosen; tapping it opens the list with a search bar.
+  assert.equal(await page.getByTestId('country-select').inputValue(), 'Malaysia', 'Malaysia is selected by default');
   assert.equal(await page.getByTestId('start-choice').count(), 0, 'the sample-data choice waits for the country');
-  // Change 88 (JoyChange003): the list is short and the Continue button is fully visible (not under the ad or off the screen).
   const cont = await page.getByTestId('country-continue').boundingBox(); const vp = page.viewportSize();
   assert.ok(cont && cont.y >= 0 && cont.y + cont.height <= vp.height, 'Continue is on the screen');
-  const lst = await page.getByTestId('country-list').boundingBox();
-  const cs = await page.getByTestId('country-list').evaluate(e => { const c = getComputedStyle(e); return `${c.maxHeight}|${c.minHeight}|${c.flex}|${c.overflowY}`; });
-  assert.ok(lst.height <= vp.height * 0.3, `the country list is short (${Math.round(lst.height)}px of ${vp.height}px; ${cs})`);
   const adTop = await page.evaluate(() => { const a = document.querySelector('[data-testid="bottom-ad"], .bottom-ad, .ad-slot'); return a ? a.getBoundingClientRect().top : null; });
   if (adTop !== null) assert.ok(cont.y + cont.height <= adTop + 1, 'Continue sits above the ad');
   await page.screenshot({ path: `${SHOTS}k1-country.png` });
-  await page.getByTestId('country-search').fill('singa');
-  assert.equal(await page.locator('.country-row').count(), 1);
-  await page.locator('[data-country="Singapore"]').click();
+  await page.getByTestId('country-select-tap').click();
+  await page.getByTestId('pick-search').fill('singa');
+  assert.equal(await page.getByTestId('pick-option').count(), 1);
+  await page.getByTestId('pick-option').first().click();
+  assert.equal(await page.getByTestId('country-select').inputValue(), 'Singapore');
   await page.getByTestId('country-continue').click();
   await page.getByTestId('country-choice').waitFor({ state: 'detached' });
   await waitFor(() => calls.length === 1);
@@ -132,9 +131,9 @@ test('K4 Bahasa Malaysia and Chinese show country names in that language, and th
   }, { b });
   await page.reload(); await page.waitForSelector('nav.grid');
   await page.getByTestId('country-choice').waitFor();
-  const label = await page.locator('[data-country="Malaysia"]').innerText();
+  const label = await page.locator('[data-testid="country-select"] option[value="Malaysia"]').innerText();
   assert.match(label, /Malaysia/);
-  assert.match(await page.locator('[data-country="Singapore"]').innerText(), /Singapura/, 'Bahasa Malaysia name');
+  assert.match(await page.locator('[data-testid="country-select"] option[value="Singapore"]').innerText(), /Singapura/, 'Bahasa Malaysia name');
   assert.match(await page.getByTestId('country-choice').innerText(), /Di negara mana anda bekerja/i);
   await ctx.close();
 });

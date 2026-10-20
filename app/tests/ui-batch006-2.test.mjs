@@ -98,7 +98,7 @@ test('K6-3 the pick-list pop-up moves to the top while typing in its search bar;
   assert.equal(await page.getByTestId('pick-none').isVisible(), true, '"No results" visible above the keyboard');
 });
 
-test('K6-4 first-login country screen: with the keyboard open, the search box and Continue both stay on screen', async () => {
+test('K6-4 first-login country screen: the search bar is fully visible with the keyboard open; Continue stays on screen', async () => {
   const account = { id: 'u-k6', email: 'k6@x.com', metadata: { full_name: 'Test' } };
   const ctx = await browser.newContext({ viewport: { width: 384, height: FULL }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   await ctx.route(`${SB}/**`, async route => {
@@ -122,14 +122,16 @@ test('K6-4 first-login country screen: with the keyboard open, the search box an
   }, { SB, account });
   await page.reload(); await page.waitForSelector('nav.grid');
   await page.getByTestId('country-choice').waitFor();
-  await page.getByTestId('country-search').focus();
+  // MainForAdmin-B: the country is one box now (no inline list); its search bar sits in the pop-up at the top of the screen.
+  await page.getByTestId('country-select-tap').click();
+  await page.getByTestId('pick-search').focus();
   await keyboardUp(page);
   const p = await focusedAt(page);
   assert.ok(p.top >= 0 && p.bottom <= p.h, `search fully visible (${Math.round(p.top)}–${Math.round(p.bottom)} of ${p.h})`);
+  await page.getByTestId('pick-search').fill('singa');
+  await page.getByTestId('pick-option').first().click();
+  await keyboardDown(page);
   const c = await page.getByTestId('country-continue').boundingBox();
-  assert.ok(c && c.y >= 0 && c.y + c.height <= WITH_KB + 1, `Continue on screen above the keyboard (${c && Math.round(c.y + c.height)} of ${WITH_KB})`);
-  await page.getByTestId('country-search').fill('singa');
-  const c2 = await page.getByTestId('country-continue').boundingBox();
-  assert.ok(c2.y + c2.height <= WITH_KB + 1, 'Continue still on screen after typing');
+  assert.ok(c && c.y >= 0 && c.y + c.height <= FULL + 1, 'Continue on screen');
   await ctx.close();
 });

@@ -34,7 +34,12 @@ import { loadSampleInto } from '../data/sample';
 import { DevEntry } from '../usage/DevDashboard';
 import { Select } from '../ui/Select';
 
-export const REG_TYPES = ['REN', 'PEA', 'REA'] as const;
+// MainForAdmin-B (JoyChange005-Main Part6 Change I): REN, REA, PEA, EA and a firm / agency licence. Optional; sent to the
+// company's database (security/account.ts) so Admin EAB can show it and tick it as verified by hand.
+import { c00bStrings } from '../security/strings';
+import { rpc } from '../team/api';
+import { deviceId } from '../security/loginLog';
+export const REG_TYPES = ['REN', 'REA', 'PEA', 'EA', 'FIRM'] as const;
 
 export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
@@ -52,7 +57,7 @@ export function ProfileScreen({ lang, go }: { lang: Lang; go: Go }) {
         <div className="nc-photo"><StoredImage fileId={p.photoFileId} /></div>
         <div className="nc-body">
           <strong className="nc-name">{p.fullName || '—'}</strong>
-          {p.regNo && <span>{t.regLabel(p.regType || 'REN')}: {p.regNo}</span>}
+          {p.regNo && <span>{t.regLabel(p.regType === 'FIRM' ? c00bStrings[lang].firm : p.regType || 'REN')}: {p.regNo}</span>}
           {p.agency && <span>{p.agency}</span>}
           {p.phone && <span>📞 {p.phone}</span>}
           {p.email && <span>✉ {p.email}</span>}
@@ -136,7 +141,7 @@ export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
       <div className="card stack-sm">
         <small className="muted"><span className="req" aria-hidden="true">*</span> {t.required}</small>
         <label className="ff"><Req lang={lang} k="fullName" missing={missing} /><input data-field="fullName" aria-required="true" aria-invalid={tried && missing.includes('fullName')} value={p.fullName ?? ''} onChange={e => set('fullName', e.target.value)} /></label>
-        <OptionSelect lang={lang} label={`${t.f.regType} *`} listKey="regType" builtIns={REG_TYPES.map(v => ({ value: v }))} value={p.regType} savedValue={state.profile.regType} onChange={v => set('regType', v)} testId="opt-regType" />
+        <OptionSelect lang={lang} label={`${t.f.regType} *`} listKey="regType" builtIns={REG_TYPES.map(v => ({ value: v, label: v === 'FIRM' ? c00bStrings[lang].firm : v }))} value={p.regType} savedValue={state.profile.regType} onChange={v => set('regType', v)} testId="opt-regType" />
         <label className="ff"><Req lang={lang} k="regNo" missing={missing} /><input data-field="regNo" aria-required="true" aria-invalid={tried && missing.includes('regNo')} value={p.regNo ?? ''} onChange={e => set('regNo', e.target.value)} /></label>
         <label className="ff"><Req lang={lang} k="agency" missing={missing} /><input data-field="agency" aria-required="true" aria-invalid={tried && missing.includes('agency')} value={p.agency ?? ''} onChange={e => set('agency', e.target.value)} /></label>
         <label className="ff"><Req lang={lang} k="phone" missing={missing} /><input data-field="phone" type="tel" inputMode="tel" aria-required="true" aria-invalid={tried && missing.includes('phone')} value={p.phone ?? ''} onChange={e => set('phone', e.target.value)} onBlur={() => setP(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
@@ -181,7 +186,7 @@ export function NameCardSend({ lang }: { lang: Lang }) {
     ? (contact?.phone ? { name: contact.name, tel: contact.phone } : null)
     : (phoneDigits(toTel).length >= 9 ? { name: toName.trim() || toTel, tel: toTel } : null);
   const missing = missingProfile(p);
-  const text = shareText(p, choice, { greeting: t.greeting, regLabel: t.regLabel, agency: t.inc.agency, phone: t.inc.phone, email: t.inc.email, closing: t.closing });
+  const text = shareText(p, choice, { greeting: t.greeting, regLabel: (r: string) => t.regLabel(r === 'FIRM' ? c00bStrings[lang].firm : r), agency: t.inc.agency, phone: t.inc.phone, email: t.inc.email, closing: t.closing });
   const files = shareFiles(p, choice);
   const remember = () => store.setSingleton('profile', { shareDefaults: choice });
   const toggle = (k: keyof ShareChoice) => setChoice(x => ({ ...x, [k]: !x[k] }));
@@ -245,6 +250,36 @@ export function NameCardSend({ lang }: { lang: Lang }) {
   );
 }
 
+/** MainForAdmin-B (JoyChange005-Main Part2 Change C): the agent turns news, tips and offers on or off later. Shown once
+ *  the company's database has answered for this account. Security, account and Terms notices are sent to everyone anyway. */
+function MarketingSetting({ lang }: { lang: Lang }) {
+  const { state, store } = useApp();
+  const toast = useToast();
+  const s = state.meta.syncSession;
+  const acc = state.meta.account;
+  if (!s || acc?.userId !== s.userId) return null;
+  const pending = state.settings.marketingPending;
+  const on = pending?.user === s.userId ? pending.on : !!acc.marketing;
+  const x = c00bStrings[lang];
+  return (
+    <div className="card stack-sm" data-testid="marketing-setting">
+      <label className="check">
+        <input type="checkbox" checked={on} data-testid="marketing-toggle" onChange={async e => {
+          const v = e.target.checked;
+          store.setSingleton('settings', { marketingPending: { on: v, user: s.userId } });
+          try {
+            await rpc(store, config(store.getState().settings), 'eab_set_marketing', { p_on: v, p_device_id: deviceId() });
+            store.setSingleton('settings', { marketingPending: undefined });
+            store.setSingleton('meta', { account: { ...acc, marketing: v } });
+          } catch { /* sent after the next sync */ }
+          toast(x.marketingSaved);
+        }} />
+        <span>{x.marketingSetting}</span>
+      </label>
+    </div>
+  );
+}
+
 export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const t = profileStrings[lang];
@@ -264,6 +299,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <button className="btn primary" data-testid="open-bug-report" onClick={() => go({ name: 'bugReport', from: 'settings' })}>{bugStrings[lang].open}</button>
       </div>
       <DevEntry go={() => go({ name: 'devDashboard' })} />
+      <MarketingSetting lang={lang} />
       <BackupCard lang={lang} />
       <div className="card stack-sm" data-testid="followup-setting">
         <div className="card-title">{followStrings[lang].settingTitle}</div>

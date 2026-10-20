@@ -1533,3 +1533,11 @@ html.kb-open .opt-pop::after { display: none; }
 
 /* JoyChange007 2.2: House Shopping's map and Mark button fill the screen, so it has no extra gap above (Change 74 list). */
 .hs-fill .btn.big { min-height: 56px; }
+
+/* MainForAdmin-B: the Terms link sits inside the sentence; the Terms viewer scrolls on top of the first-login screen. */
+.country-choice .check .link-btn { display: inline; min-height: 0; text-decoration: underline; }
+.country-choice .check input[type="checkbox"] { width: 22px; height: 22px; flex: none; margin-top: 2px; }
+.terms-sheet { max-height: calc(100dvh - 32px); }
+.terms-sheet p { margin: 0; }
+/* MainForAdmin-B: a pick list opened from the first-login screen (z-index 60) must sit above it. */
+.sel-scrim { z-index: 70; }

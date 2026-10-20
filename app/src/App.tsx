@@ -17,6 +17,8 @@ import { cc001Strings } from './ui/cc001Strings';
 import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
 import { beginStartup, startupLang, StartupPhase, SPLASH_MS, FORCE_OPEN_MS, splashStep, splashDots } from './startup/startup';
+import { checkAccount } from './security/account';
+import { logLogin } from './security/loginLog';
 import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
@@ -58,7 +60,7 @@ import { diagStrings } from './voice/diagStrings';
 import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
-import { CountryChoice, useCountryChoice } from './ui/CountryChoice';
+import { CountryChoice, useCountryChoice, useTermsChoice } from './ui/CountryChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
   IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMarket, IconCreative, IconMatch,
@@ -241,6 +243,7 @@ function Gate() {
   return <Shell />;
 }
 
+let openedLogged = false;
 /** Keeps the cloud copy up to date while signed in: on opening, every minute when something changed, and when the
  *  connection comes back. Problems are shown in Settings; a refused or switched-off account goes back to sign-in. */
 function useAutoSync() {
@@ -256,9 +259,16 @@ function useAutoSync() {
       if (!force && !s.meta.dirty.length && pendingFileCount(store) === 0 && s.meta.lastSync && Date.now() - s.meta.lastSync < 5 * 60_000) return;
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
       busy.current = true;
-      try { await runSync(store, cfg); }
+      try {
+        await runSync(store, cfg);
+        // MainForAdmin-B: after every sync, the company's word on this account (suspended / forced sign-out), and the
+        // licence, Terms answers and sign-in log that are waiting.
+        if (store.getState().meta.syncSession) await checkAccount(store, cfg);
+      }
       finally { busy.current = false; }
     };
+    // MainForAdmin-B: every app opening while signed in is noted (with GPS only if location was allowed before).
+    if (!openedLogged) { openedLogged = true; if (Date.now() - (store.getState().meta.syncSession?.signedInAt ?? 0) > 60_000) void logLogin('app_open'); }
     void run(true);
     setNextAutoSync(Date.now() + 60_000);
     const t = setInterval(() => { setNextAutoSync(Date.now() + 60_000); void run(); }, 60_000);
@@ -391,6 +401,7 @@ function Shell() {
   }, [state.tasks, state.appointments, state.properties, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const country = useCountryChoice();
+  const terms = useTermsChoice();
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
@@ -434,7 +445,11 @@ function Shell() {
         </main>
 
         {/* JoyChange002 Change 46: the country is asked first, once; then the sample-data choice. */}
-        {country.ask ? <CountryChoice lang={lang} onChoose={country.choose} /> : needsStartChoice(state) && <StartChoice lang={lang} />}
+        {/* MainForAdmin-B: the same first-login screen also asks for the Terms (and the optional news tick) when this account
+            has not accepted the current version yet. */}
+        {country.ask || terms.ask
+          ? <CountryChoice lang={lang} onChoose={country.choose} askCountry={country.ask} askTerms={terms.ask} onAccept={m => void terms.accept(m)} initial={state.settings.country} />
+          : needsStartChoice(state) && <StartChoice lang={lang} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
         <BottomAd lang={lang} />

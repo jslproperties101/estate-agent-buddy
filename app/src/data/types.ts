@@ -278,6 +278,12 @@ export interface Profile {
 
 export interface Settings {
   lang: Lang;
+  /** MainForAdmin-B (JoyChange005-Main Part2 Change C): the Terms version this account accepted on this phone, and an
+   *  answer still waiting to reach the database (made offline). */
+  termsAccepted?: { version: string; user: string; at: number };
+  termsPending?: { version: string; marketing: boolean; user: string; at: number };
+  /** A marketing on / off choice made in Settings that has not reached the database yet. */
+  marketingPending?: { on: boolean; user: string };
   layout: 'grid' | 'large';
   /** Typed in on the phone instead of at build time. Never committed to the code. */
   mapsApiKey?: string;
@@ -335,7 +341,17 @@ export interface Meta {
     country?: string;
     /** Team workspace and role, from the database (eab_my_membership). */
     workspaceId?: string; workspaceName?: string; role?: 'owner' | 'admin' | 'team_leader' | 'agent' | 'limited';
+    /** MainForAdmin-B: when this sign-in happened on this phone (a forced sign-out applies to sign-ins before it). */
+    signedInAt?: number;
   };
+  /** MainForAdmin-B: why the agent was signed out by the company (suspended / banned / closed / forced), with the support
+   *  contact to show on the sign-in screen. Cleared by the next good sign-in. */
+  accountBlock?: { status: 'suspended' | 'banned' | 'closed' | 'forced'; reason?: string; supportEmail?: string; address?: string; at: number };
+  /** MainForAdmin-B: the account as the company's database last reported it (eab_my_account). */
+  account?: { userId: string; terms?: { version: string; at: string } | null; marketing?: boolean | null; licence?: { type?: string | null; number?: string | null; verified?: boolean } | null;
+    companyName?: string; supportEmail?: string | null; address?: string | null; checkedAt: number };
+  /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */
+  licenceSent?: string;
   /** The last automatic sync problem, shown in Settings (cleared after a good sync). */
   syncError?: string;
   /** The person chose to use the app on this phone only, without signing in (only when sign-in is not set up). */

@@ -12,6 +12,9 @@ import { authStrings } from './strings';
 import { IconLogo } from '../icons';
 import { ConnectionRecovery } from './ConnectionRecovery';
 import { isReturnLink, closedTabMeansCancelled } from './returnState';
+import { currentLock, failedSignIn, signedInOk } from '../security/lockout';
+import { logLogin } from '../security/loginLog';
+import { c00bStrings } from '../security/strings';
 
 type Phase = 'idle' | 'opening' | 'waiting' | 'exchanging';
 
@@ -33,12 +36,22 @@ export function useGoogleReturn(onDone: (error: string | null) => void, onStart?
       cleanWebAddress();
       if (r.kind === 'signed-in') {
         const drive = takeDriveIntent();
-        store.setSingleton('meta', { syncSession: r.session, offlineOnly: false, syncError: undefined });
+        // MainForAdmin-B: the time of this sign-in (a forced sign-out applies to earlier ones); the lockout count is cleared.
+        store.setSingleton('meta', { syncSession: { ...r.session, signedInAt: Date.now() }, offlineOnly: false, syncError: undefined, accountBlock: undefined });
+        signedInOk();
+        void logLogin('sign_in');
         // Google's token for Drive lasts about an hour; it is kept on this phone only, and only when the person asked to connect Drive.
         if (drive && r.providerToken) store.setSingleton('meta', { drive: { token: r.providerToken, expiresAt: Date.now() + 55 * 60_000, connectedAt: Date.now() } });
         done.current(null);
       }
-      else { takeDriveIntent(); done.current(r.code); }
+      else {
+        takeDriveIntent();
+        // MainForAdmin-B: a failed sign-in counts on this phone (30, then one hour); the log is sent after the next sign-in.
+        const locked = failedSignIn();
+        void logLogin('sign_in_failed', r.code);
+        if (locked) void logLogin('locked_out');
+        done.current(r.code);
+      }
     };
     if (!isNative() && /[?&#](code|error)=/.test(window.location.href)) void finish(window.location.href);
     let l: { remove: () => unknown } | null = null;
@@ -74,6 +87,12 @@ export function LoginScreen({ lang }: { lang: Lang }) {
   }
 
   const ready = configured(cfg);
+  // MainForAdmin-B: too many failed sign-ins on this phone, and an account the company suspended / banned / closed.
+  const [, tick] = useState(0);
+  useEffect(() => { const x = setInterval(() => tick(n => n + 1), 30_000); return () => clearInterval(x); }, []);
+  const lock = currentLock();
+  const xb = c00bStrings[lang];
+  const block = state.meta.accountBlock;
   return (
     <div className="shell login" data-testid="login">
       <section className="login-card stack">
@@ -86,11 +105,18 @@ export function LoginScreen({ lang }: { lang: Lang }) {
           <div className="notice warn" role="status">{a.fileMode}</div>
         ) : (
           <>
-            <button className="btn google-btn big" onClick={() => void go()} disabled={phase !== 'idle'} data-testid="google-sign-in">
+            {lock.locked && <p className="notice warn" role="alert" data-testid="login-locked">{xb.locked(lock.minutesLeft)}</p>}
+            <button className="btn google-btn big" onClick={() => void go()} disabled={phase !== 'idle' || lock.locked} data-testid="google-sign-in">
               <GoogleG /> {phase === 'opening' ? a.opening : phase === 'exchanging' ? a.signingIn : phase === 'waiting' ? a.opening : a.google}
             </button>
             {phase === 'waiting' && <small className="muted" role="status">{a.waiting}</small>}
           </>
+        )}
+        {block && (
+          <div className="notice warn" role="alert" data-testid="login-blocked" data-status={block.status}>
+            <strong>{xb.blockedTitle[block.status]}</strong><br />{xb.blockedBody[block.status]}
+            {block.status !== 'forced' && <><br />{xb.contact(block.supportEmail, block.address)}</>}
+          </div>
         )}
         {err && <p className="error" role="alert" data-testid="login-error">{a.err[err] ?? `${a.err.other} (${err})`}</p>}
         {/* Always reachable without signing in: the way back when a typed Supabase URL or key stops sign-in working. */}
