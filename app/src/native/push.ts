@@ -10,6 +10,7 @@ import type { Store } from '../data/store';
 import type { SyncConfig } from '../data/sync';
 import { configured, fresh, supabaseHeaders } from '../data/sync';
 import { APP_ID, isNative, platform, plugin, pluginMissing } from './native';
+import { usage } from '../usage/logger';
 
 type FetchFn = typeof fetch;
 interface PushPlugin {
@@ -78,9 +79,9 @@ export async function startPush(store: Store, cfg: SyncConfig, lang: () => strin
     // Android 8+: invitations get their own notification channel (shown with sound, on the lock screen).
     await p.createChannel?.({ id: 'invites', name: 'Team Workspace invitations', importance: 4, visibility: 1 }).catch(() => undefined);
     await p.addListener('registration', (t: { value: string }) => { void registerToken(store, cfg, t.value, lang()); });
-    await p.addListener('registrationError', () => { /* no Google Play services or no internet: try again next opening */ started = false; });
-    await p.addListener('pushNotificationReceived', () => onMessage());
-    await p.addListener('pushNotificationActionPerformed', () => onMessage());
+    await p.addListener('registrationError', () => { /* no Google Play services or no internet: try again next opening */ started = false; usage.error('push.registration'); });
+    await p.addListener('pushNotificationReceived', () => { usage.push('push.received'); onMessage(); });
+    await p.addListener('pushNotificationActionPerformed', () => { usage.push('push.opened'); onMessage(); });
     await p.register();
     return 'on';
   } catch { started = false; return 'off'; }

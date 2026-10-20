@@ -66,6 +66,9 @@ export class Store {
   /** Change 19/20: told when this phone's person creates a new record or adds a file (names only: the usage log). */
   onCreate?: (collection: string) => void;
   onFileAdded?: () => void;
+  /** Stage C: told when a record is edited or deleted by this phone's person (collection name only). */
+  onEdit?: (collection: string) => void;
+  onDelete?: (collection: string) => void;
   /** True from a failed write until the next write succeeds (shown as "not saved" in the status line). */
   writeFailed = false;
   private cloudBusy = false;
@@ -152,6 +155,7 @@ export class Store {
     this.write(() => this.backend.put(recKey(c, next.id), next));
     if (i < 0) this.write(() => this.backend.removeLocal(`del:${key}`));
     if (i < 0 && !keepTime && !next.sample) { try { this.onCreate?.(c); } catch { /* the usage log never disturbs a save */ } }
+    else if (i >= 0 && !keepTime && !next.sample) { try { this.onEdit?.(c); } catch { /* the usage log never disturbs a save */ } }
     // Change 010: the audit entry is written after the record itself, so a save is never held up by its history.
     if (!keepTime && !next.sample) this.recordAudit(key, i >= 0 ? list[i] as unknown as Record<string, unknown> : undefined, next as unknown as Record<string, unknown>, source);
     if (!keepTime) this.markDirty(key);
@@ -167,6 +171,7 @@ export class Store {
     const key = `${c}:${id}`;
     if (!fromSync) this.checkWrite(key, old as unknown as Record<string, unknown>, null, true);
     if (!old.sample) {
+      if (!fromSync) { try { this.onDelete?.(c); } catch { /* the usage log never disturbs a delete */ } }
       this.keepRevision(key, old as unknown as Record<string, unknown>, source, undefined, true);
       if (!fromSync) this.recordAudit(key, old as unknown as Record<string, unknown>, null, source);
       const at = Date.now();

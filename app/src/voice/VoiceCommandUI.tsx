@@ -39,6 +39,7 @@ import { PropertyThumb } from '../ui/PropertyPicker';
 import { SpeechBox } from '../ui/SpeechBox';
 import { IconLogo } from '../icons';
 import { titled3 } from '../lib/titleCase';
+import { usage } from '../usage/logger';
 
 export const voiceCommandStrings = titled3( {
   en: {
@@ -141,6 +142,7 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
     store.setSingleton('meta', { recentCmds: pushRecent(store.getState().meta.recentCmds, tx) });
     setDone(''); setUndo(null); setWa(null); setClosed({}); setMade(null);
     const r = interpretAll(tx, ctx, data);
+    usage.command('command.assistant', r.steps.some(s => s.kind !== 'unknown'));   // Stage C: understood or not, never the words
     const openers = r.steps.filter((s): s is Extract<Step, { kind: 'openList' }> => s.kind === 'openList');
     setList(openers.length ? openers[openers.length - 1].list : null);
     const rest = r.steps.filter(s => s.kind !== 'openList');

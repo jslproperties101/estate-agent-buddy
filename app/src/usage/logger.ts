@@ -15,8 +15,9 @@ import { configured } from '../data/sync';
 import type { Store } from '../data/store';
 import { rpc } from '../team/api';
 
-export type UsageKind = 'google' | 'session' | 'screen' | 'feature' | 'ai' | 'sync' | 'error' | 'metric';
-const KINDS: readonly UsageKind[] = ['google', 'session', 'screen', 'feature', 'ai', 'sync', 'error', 'metric'];
+// Stage C: command = AI Assisted Command, marketing = Marketing Studio, language = EN/BM/ZH in use, push = delivered / opened.
+export type UsageKind = 'google' | 'session' | 'screen' | 'feature' | 'ai' | 'sync' | 'error' | 'metric' | 'command' | 'marketing' | 'language' | 'push';
+const KINDS: readonly UsageKind[] = ['google', 'session', 'screen', 'feature', 'ai', 'sync', 'error', 'metric', 'command', 'marketing', 'language', 'push'];
 
 /** What goes to the database (the person is added there, from the sign-in). */
 export interface UsageEvent {
@@ -49,7 +50,10 @@ export function deviceText(s: unknown): string {
   return t.length >= 2 && t !== 'K' ? t : '';
 }
 
-export interface UsageInit { appVersion: string; platform: 'android' | 'ios' | 'web'; device?: string; fetchFn?: typeof fetch }
+/** The words the database accepts (the same ones the login log uses). */
+export type UsagePlatform = 'android' | 'ios' | 'web' | 'tablet' | 'desktop';
+export const asUsagePlatform = (p: string): UsagePlatform => (['android', 'ios', 'web', 'tablet', 'desktop'] as const).find(x => x === p) ?? 'web';
+export interface UsageInit { appVersion: string; platform: UsagePlatform; device?: string; fetchFn?: typeof fetch }
 
 export class UsageLogger {
   private store?: Store;
@@ -67,6 +71,7 @@ export class UsageLogger {
   private hiddenAt = 0;
   private errorTimes: number[] = [];
   private lastSyncOkAt = 0;
+  private lastLanguage = '';
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private started = false;
   /** Counts of what was sent or dropped, for the developer's own checks. */
@@ -139,7 +144,21 @@ export class UsageLogger {
     this.errorTimes.push(now);
     this.track({ kind: 'error', name, ok: false, screen });
   }
-  metric(name: string, value: number) { this.track({ kind: 'metric', name, value }); }
+  metric(name: string, value: number, screen?: string) { this.track({ kind: 'metric', name, value, screen }); }
+  /** Stage C. An AI Assisted Command was typed or spoken: `ok` = the app understood it. Only the result, never the words. */
+  command(name: string, ok: boolean, screen?: string) { this.track({ kind: 'command', name, ok, screen }); }
+  /** Stage C. Marketing Studio: poster.created / poster.saved / poster.shared. */
+  marketing(name: string, ok = true, screen?: string) { this.track({ kind: 'marketing', name, ok, screen }); }
+  /** Stage C. Which language the app is shown in: lang.en / lang.ms / lang.zh. At most once per language per opening of the app. */
+  language(code: string) {
+    const name = `lang.${codeOf(code, 8)}`;
+    if (name === 'lang.' || name === this.lastLanguage) return;
+    if (this.track({ kind: 'language', name })) this.lastLanguage = name;
+  }
+  /** Stage C. A push message arrived (push.received) or was tapped (push.opened). Nothing about its content. */
+  push(name: 'push.received' | 'push.opened') { this.track({ kind: 'push', name }); }
+  /** Stage C. How long a screen took to appear. Only slow ones (over 800 ms) are noted. */
+  slowScreen(screen: string, ms: number) { if (ms >= 800 && ms < 600_000) this.track({ kind: 'metric', name: 'screen.slow_ms', screen, value: Math.round(ms) }); }
 
   // ---------- time in the app ----------
   /** Called every few seconds: counts the time only while the app is in front AND the person touched it recently. */
@@ -218,7 +237,7 @@ export class UsageLogger {
 
   /** Waiting events (for tests and the developer's own checks). */
   pending(): UsageEvent[] { return this.queue.map(({ u: _u, ...e }) => e); }
-  clear() { this.queue = []; this.activeMs = 0; this.errorTimes = []; this.lastSyncOkAt = 0; this.screenCode = ''; this.overlayCode = ''; this.nextTryAt = 0; this.failures = 0; }
+  clear() { this.queue = []; this.lastLanguage = ''; this.activeMs = 0; this.errorTimes = []; this.lastSyncOkAt = 0; this.screenCode = ''; this.overlayCode = ''; this.nextTryAt = 0; this.failures = 0; }
 
   // ---------- running in the app ----------
   /** Starts the timers and listeners. Returns a function that stops them. */
@@ -227,6 +246,7 @@ export class UsageLogger {
     this.started = true;
     void this.restore().then(() => {
       this.track({ kind: 'session', name: 'session.start' });
+      this.startupMetric(win);
       void this.reportMetrics();
     });
     this.lastTick = Date.now(); this.lastInteraction = Date.now();
@@ -255,6 +275,14 @@ export class UsageLogger {
       win.removeEventListener('error', onErr); win.removeEventListener('unhandledrejection', onRej);
       this.closeActive(); void this.persistNow(); void this.flush(true);
     };
+  }
+
+  /** Stage C: milliseconds from the page starting to the app being ready (once per opening). */
+  private startupMetric(win: Window) {
+    try {
+      const ms = Math.round(win.performance?.now?.() ?? 0);
+      if (ms > 0 && ms < 600_000) this.metric('startup.ms', ms);
+    } catch { /* not available */ }
   }
 
   /** Sizes only: how much the app keeps on the phone, and how many changes are waiting to be sent. */

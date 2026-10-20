@@ -15,6 +15,7 @@ import { c048Strings } from '../voice/c048Strings';
 import { VENDOR_ROLES, BUYER_ROLES, type Contact } from '../data/types';
 import { can } from '../team/access';
 import { monthText } from '../lib/dates';
+import { usage } from '../usage/logger';
 
 export type VoiceMode = 'list' | 'record' | 'central';
 
@@ -106,6 +107,7 @@ export function PropertyVoice({ lang, mode, listing, onCreate, onFind, onApply, 
     setMessage(''); setResult(null);
     if (otherCommand?.(cmdText)) return;
     const r = parseCommand(cmdText, mode === 'record' ? listing : undefined, places);
+    usage.command(mode === 'record' ? 'command.listing' : 'command.list', r.kind !== 'unknown');   // Stage C: understood or not, never the words
     if (r.kind === 'find') {
       if (!onFind) { setMessage(v.unknown); return; }
       setMessage(v.found(onFind(r)));

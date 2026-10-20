@@ -7,10 +7,13 @@ import type { Lang } from '../i18n';
 import { saveFile, shareFile, openSaved } from '../lib/pdfRender';
 import { c11Strings } from './c011Strings';
 import { BusyLine } from './BusyLine';
+import { usage } from '../usage/logger';
 
-export function FileActions({ lang, blob, fileName, title, mime = 'application/pdf', downloadLabel, shareLabel, disabled, testPrefix = 'pdf', onBusy }: {
+export function FileActions({ lang, blob, fileName, title, mime = 'application/pdf', downloadLabel, shareLabel, disabled, testPrefix = 'pdf', onBusy, logKind }: {
   lang: Lang; blob: Blob | null | undefined; fileName: string; title: string; mime?: string; downloadLabel: string; shareLabel: string;
   disabled?: boolean; testPrefix?: string; onBusy?: (busy: boolean) => void;
+  /** Stage C: 'marketing' also notes the result in the Marketing Studio log (poster.saved / poster.shared). */
+  logKind?: 'marketing';
 }) {
   const f = c11Strings[lang].file;
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
@@ -25,10 +28,12 @@ export function FileActions({ lang, blob, fileName, title, mime = 'application/p
     try {
       if (kind === 'save') {
         const r = await saveFile(held, fileName);
+        usage.feature(`${testPrefix}.save`); if (logKind === 'marketing') usage.marketing('poster.saved', r.ok);
         // JoyChange003 Change 77: a short message, with an Open button when the phone can show the saved file.
         setMsg(r.ok ? { text: r.place === 'gallery' ? f.savedGallery : r.place === 'downloads' ? f.savedDownloads : r.where ? f.saved(r.where) : f.savedWeb, error: false, open: r.open } : { text: r.reason === 'needApk' ? f.needApk : r.reason === 'noFile' ? f.noFile : f.failed, error: true });
       } else {
         const r = await shareFile(held, fileName, title, mime);
+        usage.feature(`${testPrefix}.share`); if (logKind === 'marketing') usage.marketing('poster.shared', r === 'shared');
         setMsg(r === 'shared' ? { text: f.shared, error: false } : r === 'cancelled' ? { text: f.cancelled, error: false }
           : r === 'unsupported' ? { text: f.unsupported, error: true } : r === 'needApk' ? { text: f.needApk, error: true } : { text: f.failed, error: true });
       }

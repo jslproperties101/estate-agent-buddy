@@ -1,0 +1,29 @@
+TEST CHECKLIST — MainForAdmin-C (logging)
+Written 21 Oct 2026. Status: built; unit tests passed (581); database tests on a local copy 5/5.
+NOT yet applied to EAB-QA-Test. NOT yet tested on a phone. Needs a new QA APK (ask Claude to build it).
+This list is mostly for CLAUDE to check in the test database after you use the app. You only have to USE the app.
+
+STEP 0 (once): paste supabase/migrations/20261021120000_mainforadmin_c_logging.sql in the EAB-QA-Test SQL editor and run it.
+Then run supabase/tests/mainforadmin_c_test.sql: it should say "TEST RESULT: 5 passed, 0 failed".
+
+USE THE APP (signed in with your test account), about 10 minutes:
+[ ] Open the app and use it in English. Then change the language to Bahasa Melayu, then Chinese, then back.
+[ ] Create one contact or property, edit it, then delete it.
+[ ] Use the AI Assisted Command: type one command it understands and one nonsense sentence.
+[ ] Open Marketing Studio for a property, make a poster, then Save it and Share it.
+[ ] Make a PDF and Save or Share it.
+[ ] Turn the phone to flight mode, change something, turn flight mode off (a sync should fail, then work).
+[ ] Wait 2 minutes with the app open, then close the app.
+
+TELL CLAUDE "check the logs". Claude should see, for your account in the test database:
+[ ] kind command: two rows (one understood, one not). No words from your sentence anywhere.
+[ ] kind marketing: poster.created, poster.saved, poster.shared.
+[ ] kind language: lang.en, lang.ms, lang.zh.
+[ ] kind feature: contacts/properties .create, .edit, .delete; pdf.save or pdf.share; ms.save, ms.share.
+[ ] kind metric: startup.ms, plus screen.slow_ms only if some screen was slow.
+[ ] kind sync: sync.run and (during flight mode) sync.fail.network.
+[ ] platform on every row is android (or tablet on a tablet).
+[ ] kind push: only if push is set up (not yet); expect nothing.
+
+NOT IN THIS APK: Crashlytics (native crashes), push "sent" counts, Market News / Projects feed / announcements / force update /
+maintenance (stage D).

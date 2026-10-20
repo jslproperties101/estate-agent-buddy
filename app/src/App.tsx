@@ -70,9 +70,10 @@ import { c11Strings } from './ui/c011Strings';
 import { BuyerHistoryScreen } from './agenda/BuyerHistoryUI';
 import { BuyerMatchingScreen, BuyerMatchesScreen } from './contacts/BuyerMatchingUI';
 import { CreativeMediaScreen } from './marketing/CreativeMediaUI';
-import { nativeLook, hideSplash, platform } from './native/native';
+import { nativeLook, hideSplash } from './native/native';
+import { platformOf } from './security/loginLog';
 import { BUILD } from './native/updates';
-import { usage, detectDevice } from './usage/logger';
+import { usage, detectDevice, asUsagePlatform } from './usage/logger';
 import { DevDashboard } from './usage/DevDashboard';
 import { UpdateBanner } from './native/UpdateUI';
 import { LoginScreen } from './auth/LoginScreen';
@@ -295,13 +296,15 @@ function Shell() {
   // Changes 19 and 20: the usage log (what it records, and what it never does, is written at the top of usage/logger.ts).
   const userId = state.meta.syncSession?.userId;
   useEffect(() => {
-    const base = { appVersion: BUILD.version, platform: platform() };
+    const base = { appVersion: BUILD.version, platform: asUsagePlatform(platformOf(typeof navigator === 'undefined' ? '' : navigator.userAgent)) };
     usage.attach(store, base);
     void detectDevice().then(device => usage.attach(store, { ...base, device }));
     store.onCreate = c => usage.feature(`${c}.create`);
     store.onFileAdded = () => usage.feature('file.add');
+    store.onEdit = c => usage.feature(`${c}.edit`);
+    store.onDelete = c => usage.feature(`${c}.delete`);
     const stop = usage.start();
-    return () => { stop(); store.onCreate = undefined; store.onFileAdded = undefined; };
+    return () => { stop(); store.onCreate = undefined; store.onFileAdded = undefined; store.onEdit = undefined; store.onDelete = undefined; };
   }, [store, userId]);
   // Old deleted records, their removed pictures and forgotten drafts are cleared after 30 days.
   useEffect(() => { void store.purgeOld(); }, [store]);
@@ -403,6 +406,14 @@ function Shell() {
   const country = useCountryChoice();
   const terms = useTermsChoice();
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
+  // Stage C: the language in use, and how long a screen took to appear (only slow ones are noted).
+  useEffect(() => { usage.language(lang); }, [lang, userId]);
+  useEffect(() => {
+    if (typeof requestAnimationFrame === 'undefined' || typeof performance === 'undefined') return;
+    const t0 = performance.now(); let r2 = 0;
+    const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => usage.slowScreen(screen.name, performance.now() - t0)); });
+    return () => { cancelAnimationFrame(r1); if (r2) cancelAnimationFrame(r2); };
+  }, [screen.name]);
   const title = screenTitle(screen, lang, state);
   // Bell badge: reminders due today that are not yet done.
   // Change 72: the red number counts only notifications that need attention now and were not dismissed or snoozed

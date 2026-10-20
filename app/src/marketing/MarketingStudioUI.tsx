@@ -15,6 +15,7 @@ import { BusyLine } from '../ui/BusyLine';
 import { c11Strings } from '../ui/c011Strings';
 import { loadImage } from '../lib/photoStudio';
 import { Select } from '../ui/Select';
+import { usage } from '../usage/logger';
 
 type Made = { blob: Blob; url: string; format: FormatId; output: OutputId; w: number; h: number; fileName: string };
 
@@ -78,7 +79,8 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
       const url = URL.createObjectURL(previewBlob); urls.current.push(url);
       setMade({ blob, url, format, output: out, w: canvas.width, h: canvas.height, fileName: marketingFileName(l.ref, t.fileBase, format, out) });
       setStale(false);
-    } catch { setFailed(true); setMade(null); } finally { making.current = false; setBusy(false); }
+      usage.marketing('poster.created', true);
+    } catch { usage.marketing('poster.created', false); setFailed(true); setMade(null); } finally { making.current = false; setBusy(false); }
   }
 
   if (!l) return <section className="stack"><p className="warn-text" data-testid="ms-gone">{t.noProperty}</p></section>;
@@ -203,7 +205,7 @@ export function MarketingStudioScreen({ lang, propertyId }: { lang: Lang; proper
           <small data-testid="ms-made">{t.made(t.formats[made.format], t.outputs[made.output], made.w, made.h, Math.max(1, Math.round(made.blob.size / 1024)))}</small>
           {stale && <p className="warn-text" role="status" data-testid="ms-stale">{t.stale}</p>}
           <img src={made.url} alt={made.fileName} className="ms-preview" data-testid="ms-preview" />
-          <FileActions lang={lang} blob={made.blob} fileName={made.fileName} title={t.title} mime={made.blob.type || undefined} downloadLabel={t.download} shareLabel={t.share} testPrefix="ms" />
+          <FileActions lang={lang} blob={made.blob} fileName={made.fileName} title={t.title} mime={made.blob.type || undefined} downloadLabel={t.download} shareLabel={t.share} testPrefix="ms" logKind="marketing" />
         </div>
       )}
     </section>

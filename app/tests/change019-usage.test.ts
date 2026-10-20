@@ -277,9 +277,10 @@ test('U17 a sync run is noted (count moved, or failure) without disturbing the s
   const bad = await runSync(a.store, cfg, cloud.fetch);
   assert.equal(bad.ok, false);
   const s = usage.pending().filter(e => e.kind === 'sync');
-  assert.equal(s.length, 2);
+  assert.equal(s.length, 3, 'the run, the failed run, and (Stage C) the reason for the failure');
   assert.deepEqual([s[0].ok, s[0].value && s[0].value > 0], [true, true]);
   assert.equal(s[1].ok, false);
+  assert.ok(s[2].name.startsWith('sync.fail.') && s[2].ok === false, 'Stage C: why it failed, by code only');
   usage.clear();
 });
 

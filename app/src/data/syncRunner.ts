@@ -11,6 +11,7 @@ export async function runSync(store: Store, cfg: SyncConfig, fetchFn: typeof fet
   catch (e) {
     const code = e instanceof SyncError ? e.code : 'network';
     usage.sync('sync.run', false);
+    usage.sync(`sync.fail.${code}`, false);   // Stage C: why it failed, by code only (never the message)
     if (code === 'auth' || code === 'no-access') store.setSingleton('meta', { syncSession: undefined, syncError: code === 'auth' ? 'expired' : code });
     else store.setSingleton('meta', { syncError: code });
     return { ok: false, code };
