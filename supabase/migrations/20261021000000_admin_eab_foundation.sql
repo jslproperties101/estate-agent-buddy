@@ -480,3 +480,12 @@ grant execute on function public.eab_admin_me(), public.eab_admin_signed_in(text
 -- FIRST OWNER (run once by hand in the SQL editor, with Joe's Google email; not part of this migration):
 --   insert into public.eab_admins (user_id, email, role)
 --     select id, email, 'owner' from auth.users where lower(email) = lower('JOE-EMAIL@gmail.com');
+
+-- fixed search path for the small helpers (Supabase security advisor)
+alter function public.eab_admin_row_text(text, jsonb) set search_path = pg_catalog, public;
+alter function public.eab_admin_no_change() set search_path = pg_catalog, public;
+alter function public.eab_admin_name(auth.users) set search_path = pg_catalog, public;
+
+-- NOTE (21 Oct 2026): applied to EAB-QA-Test in parts (a2_block_cascades, a1_a3_allowlist, a4_logs, a5_functions,
+-- permissions, search_path) because the database tool refused one large request. Same content as this file.
+-- Tests: supabase/tests/admin_eab_foundation_test.sql (30 passed) + delete/tamper block (5 passed).
