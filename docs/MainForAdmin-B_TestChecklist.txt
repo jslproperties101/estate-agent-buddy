@@ -1,0 +1,50 @@
+TEST CHECKLIST — MainForAdmin-B (accounts and security)
+Written 21 Oct 2026. Status: built; automated tests passed (575 unit + 199 screen); database tests on EAB-QA-Test 32/32.
+NOT yet tested on a phone. App: EAB QA, build 6eb4ff0 (Settings > About). Uses the TEST database only.
+Includes everything from the Batches 1-5 checklist (JoyChange006-008-007_TestChecklist.txt).
+
+=====================================================
+1. FIRST-LOGIN SCREEN (country + Terms)
+=====================================================
+[ ] Sign in with Google. A screen asks for the Terms (and the country, if this account never chose one).
+[ ] Country: ONE box with Malaysia already chosen. Tap it: a list opens on top with a search bar; search "singa" finds Singapore.
+[ ] Two tickboxes, both EMPTY at the start: "I have read and agree to the Terms and Conditions" and the news / offers line.
+[ ] The news line names "JSL Global Trading".
+[ ] Tap Continue without the Terms tick: the message "You need to accept the Terms and Conditions to continue." The Continue button looks the same before and after.
+[ ] Tap "Terms and Conditions": the full Terms open (17 sections, section 6 Location, marked as DRAFT for the lawyer). Close.
+[ ] Tick the Terms (news optional) > Continue: the app opens. Sign out and in again: NOT asked again.
+[ ] Bahasa Melayu and Chinese: same screen in that language.
+
+=====================================================
+2. NEWS ON / OFF
+=====================================================
+[ ] Agent Profile > Settings: "News, tips and offers" switch shows your first-login answer; switching it says "Saved."
+
+=====================================================
+3. LICENCE
+=====================================================
+[ ] Agent Profile > edit: Registration type offers REN, REA, PEA, EA and Firm licence.
+[ ] Save a number (e.g. REN 12345). (Claude can confirm it reached the test database.)
+[ ] Install the QA app on a second phone / reinstall and sign in: the licence fills in by itself.
+
+=====================================================
+4. SUSPEND / BAN / FORCE SIGN-OUT  (needs Claude or Admin EAB to change the status on the TEST database)
+=====================================================
+[ ] Claude suspends your test account (reason "Test"). Open the app or wait for the next sync: you are signed out; the sign-in screen says the account is suspended, your data on the phone was not deleted, and "contact support (contact details coming soon)".
+[ ] Claude re-activates the account: you can sign in again; your data is still there.
+[ ] Claude forces a sign-out: next open / sync signs you out with "You were signed out". Signing in again works and is NOT signed out again.
+
+=====================================================
+5. FAILED SIGN-INS
+=====================================================
+[ ] Cancelling Google's sign-in page does NOT count as a failure.
+[ ] (Hard to test by hand: 30 failures lock the button for one hour with the minutes shown. Covered by automated tests.)
+
+=====================================================
+6. LOGIN LOG (Claude checks the test database afterwards)
+=====================================================
+[ ] Sign in, close the app, open it again. Then tell Claude: the test database should show a "sign_in" and an "app_open" for your account, with your phone model and app version.
+[ ] If you allowed location before (e.g. used House Shopping), the position is included; if not, no location is asked for and none is stored.
+
+NOT IN THIS APK: Market News / Projects feed / announcements / force update / maintenance (stage D); detailed usage logs (stage C);
+real support email and address (to be set in Admin EAB); final Terms after the lawyer's review.
