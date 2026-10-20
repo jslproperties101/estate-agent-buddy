@@ -14,6 +14,7 @@ import type { Lang } from '../i18n';
 import { c11Strings } from '../ui/c011Strings';
 import { BANNER_H, nativeAdsAvailable, setBannerVisible, startBanner, testAdsOnly } from './admob';
 import { isWebsite } from '../native/native';
+import { isKeyboardShown, subscribeKeyboard } from '../ui/keyboardAlign';
 
 // ---------- full-screen views ----------
 let immersiveCount = 0;
@@ -45,7 +46,10 @@ export const BottomAd = memo(function BottomAd(props: { lang: Lang; cover?: bool
 });
 const BottomAdBar = memo(function BottomAdBar({ lang, cover }: { lang: Lang; cover?: boolean }) {
   const t = c11Strings[lang].ad;
-  const hidden = useSyncExternalStore(subscribe, isImmersive);
+  // JoyChange006 Change D: hidden while the keyboard is open too, so the space above the keyboard is all for the page.
+  const immersive = useSyncExternalStore(subscribe, isImmersive);
+  const typing = useSyncExternalStore(subscribeKeyboard, isKeyboardShown);
+  const hidden = immersive || typing;
   const [native, setNative] = useState<'starting' | 'on' | 'off'>(() => (nativeAdsAvailable() ? 'starting' : 'off'));
   const [height, setHeight] = useState(BANNER_H);
 

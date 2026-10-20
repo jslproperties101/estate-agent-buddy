@@ -1512,3 +1512,10 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
    side of the same photo: when those badges are there, each side gets at most half the width. */
 .sc-txs ~ .sc-status { max-width: calc(50% - 6px); }
 .sc-grid .sc-txs ~ .sc-status { max-width: calc(50% - 4px); }
+
+/* JoyChange006 Change D: while the keyboard is open, pop-ups sit at the top of the visible screen (so the field being typed in
+   is near the top, not in the middle), and a pop-up that scrolls gets spare room at its end so its lower fields can be lifted
+   to about 30% from the top. Sticky buttons (such as Continue on the country screen) stay at the bottom of what is visible. */
+html.kb-open :is(.scrim, .sheet-scrim) { align-items: flex-start; padding-top: 8px; padding-bottom: 8px; }
+html.kb-open :is(.dialog, .sheet)::after { content: ""; display: block; flex: none; height: var(--kb-room, 0px); }
+html.kb-open .opt-pop::after { display: none; }
