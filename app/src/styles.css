@@ -656,30 +656,34 @@ label.btn { position: relative; cursor: pointer; }
 .pb-msg { margin-top: -2px; }
 
 /* Startup cover: the logo spins while the phone's storage opens, with one truthful line under it. The cover goes away
-   as soon as the app is ready (a 120 ms fade, never a fixed wait). */
+   as soon as the app is ready (a 120 ms fade, never a fixed wait), or after 10 seconds regardless (JoyChange006 Change E). */
 .intro { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; gap: 18px; align-items: center; justify-content: center;
   padding: 24px; text-align: center; background: var(--bg); }
 .intro.leaving { animation: intro-out .12s ease-in forwards; pointer-events: none; }
+/* JoyChange006 Part 2 Change E: "Estate Agent" / "AI Buddy", centred, words only, bigger than the header's own wordmark. */
+.intro-brand { display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-family: 'Noto Serif', Georgia, serif; font-weight: 700; }
+.intro-brand span { font-size: clamp(20px, 7vw, 30px); color: var(--ink); }
+.intro-brand em { font-style: normal; font-size: clamp(30px, 10.5vw, 46px); background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .intro-msg { margin: 0; max-width: 300px; color: var(--muted); font-size: 14px; }
 .intro-msg.slow, .intro-msg.failed { color: var(--ink); }
 .intro-stage { perspective: 700px; }
 .intro .logo-img { display: block; border-radius: 22%; filter: drop-shadow(0 0 24px rgba(212,175,55,.35));
-  animation: intro-spin 1s linear 5 both; will-change: transform; }
-/* Change 42: the logo turns once a second around its vertical axis, five turns for the five seconds. */
+  animation: intro-spin 2s linear 5 both; will-change: transform; }
+/* JoyChange006 Part 2 Change E: half the earlier speed (one turn per 2 s instead of 1 s), five turns across the 10 seconds. */
 @keyframes intro-spin {
   from { transform: rotateY(0deg); }
   to { transform: rotateY(360deg); }
 }
-/* A purely visual progress bar that fills evenly over the five seconds. */
+/* A purely visual progress bar that fills evenly over the ten seconds, no percentage number. */
 .intro-bar { width: min(260px, 70vw); height: 8px; border-radius: 4px; background: var(--card-2); border: 1px solid var(--line-2); overflow: hidden; }
-.intro-bar span { display: block; height: 100%; width: 100%; transform-origin: left center; background: var(--gold-grad); animation: intro-fill 5s linear both; }
+.intro-bar span { display: block; height: 100%; width: 100%; transform-origin: left center; background: var(--gold-grad); animation: intro-fill 10s linear both; }
 @keyframes intro-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .intro-ad { position: absolute; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0px); }
 .intro-msg { min-height: 2.6em; }
 @keyframes intro-out { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) {
   .intro .logo-img { animation: intro-fade .3s ease-out both; }
-  .intro-bar span { animation: intro-fill 5s linear both; }
+  .intro-bar span { animation: intro-fill 10s linear both; }
 }
 @keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
 
@@ -1076,7 +1080,7 @@ html { background: #000; }
 .sc-large .lc-tenure { font-size: 15px; }
 .sc-counts { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; font-weight: 700; line-height: 1.3; }
 .sc-large .sc-counts { font-size: 14px; }
-.sc-check { color: var(--amber, #E0A43A); }
+.sc-check { color: var(--red); }   /* JoyChange006 Part 2 Change G: same red as every other Need-to-check mark */
 .sc-missing { color: var(--red, #E5574B); }
 .sc-hint { margin-top: auto; padding-top: 4px; align-self: center; text-align: center; font-size: 12px; color: var(--muted); }
 .sc-large .sc-hint { font-size: 13px; }
@@ -1519,3 +1523,10 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 html.kb-open :is(.scrim, .sheet-scrim) { align-items: flex-start; padding-top: 8px; padding-bottom: 8px; }
 html.kb-open :is(.dialog, .sheet)::after { content: ""; display: block; flex: none; height: var(--kb-room, 0px); }
 html.kb-open .opt-pop::after { display: none; }
+
+/* JoyChange006 Part 2 Change G: in the Check status pop-up (Select.tsx's opt-list for a verify field), each option's own
+   text is coloured the same as the field already shows for that status (vp-confirmed/vp-owner/vp-check above). Text only,
+   no dot or side bar. */
+.opt-list.verify-colors .opt-item[data-value="confirmed"] { color: var(--ok); }
+.opt-list.verify-colors .opt-item[data-value="owner"] { color: var(--orange); }
+.opt-list.verify-colors .opt-item[data-value="check"], .opt-list.verify-colors .opt-item[data-value="unknown"] { color: var(--red); }

@@ -83,7 +83,7 @@ test('X1 section 1 "Basic Info and Availability": ID, Availability, Property Typ
   const ys = [await y('[data-testid="ref-preview"]'), await y('[data-field="availability"]'), await y('[data-testid="opt-type"]'), await y('[data-field="purpose"]'), await y('[data-field="arrangement"]')];
   assert.ok(ys.every((v, i) => i === 0 || v > ys[i - 1]), `order ID, Availability, Type, Sale or Rent, Arrangement ${JSON.stringify(ys)}`);
   const avail = await page.locator('[data-field="availability"] option').evaluateAll(os => os.map(o => o.textContent));
-  assert.deepEqual(avail, ['Not Set', 'Available Now', 'Available From', 'Booked - Pending Loan', 'Booked - Pending SPA', 'Booked - SPA Signed', 'Booked - Other Agent (Pending SPA)', 'Booked - Pending Consent', 'Sold', 'Rented', 'Withdrawn']);   // Change 40
+  assert.deepEqual(avail, ['Not Set', 'Available Now', 'Available From', 'Booked - Pending Loan', 'Booked - Pending SPA', 'Booked - SPA Signed', 'Booked - Other Agent (Pending SPA)', 'Booked - Pending Consent', 'Sold', 'Rented - Pending TA Signing', 'Rented', 'Withdrawn']);   // Change 40, JoyChange006 Part 2 Change F
   assert.equal(await page.locator('[data-verify="availability"]').count(), 0, 'Availability has no check status');
   const arr = await page.locator('[data-field="arrangement"] option').evaluateAll(os => os.map(o => o.textContent));
   assert.deepEqual(arr, ['Not Set', 'Co-broke', 'Direct']);

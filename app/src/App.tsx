@@ -16,7 +16,7 @@ import { DealScreen, TrackSalesScreen } from './deals/DealUI';
 import { cc001Strings } from './ui/cc001Strings';
 import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
-import { beginStartup, startupLang, StartupPhase, SPLASH_MS, splashStep } from './startup/startup';
+import { beginStartup, startupLang, StartupPhase, SPLASH_MS, FORCE_OPEN_MS, splashStep, splashDots } from './startup/startup';
 import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, DueReminder } from './domain/workflow';
 import { permission } from './lib/notify';
@@ -156,6 +156,11 @@ export default function App() {
   // (Automated browser tests, which report navigator.webdriver, skip the wait unless the address has ?splash=full; a phone never does.)
   const [minDone, setMinDone] = useState(() => typeof navigator !== 'undefined' && (navigator as { webdriver?: boolean }).webdriver === true && !/splash=full/.test(typeof location === 'undefined' ? '' : location.search));
   useEffect(() => { if (minDone) return; const x = setTimeout(() => setMinDone(true), SPLASH_MS); return () => clearTimeout(x); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // JoyChange006 Change E (Joe's choice): if the app is still not ready FORCE_OPEN_MS after start-up began, the cover is
+  // removed anyway rather than waiting indefinitely. This runs on the real clock, never skipped by the webdriver bypass above,
+  // so a genuinely stuck phone is never left behind a cover with no way out.
+  const [forceOpen, setForceOpen] = useState(false);
+  useEffect(() => { const x = setTimeout(() => setForceOpen(true), FORCE_OPEN_MS); return () => clearTimeout(x); }, []);
   const lang = startupLang(typeof navigator === 'undefined' ? undefined : navigator.languages);
   useEffect(() => beginStartup(() => openBackend().then(Store.open), (p, value) => {
     setPhase(p);
@@ -164,13 +169,30 @@ export default function App() {
   // The Android splash (a still logo) is hidden as soon as the app can draw, so the spinning logo follows straight on.
   useEffect(() => { void hideSplash(); }, []);
   useEffect(() => { if (store) void nativeLook(); }, [store]);
+  const readyToLeave = (phase === 'ready' && minDone) || (forceOpen && phase !== 'ready');
   // After the short fade-out the cover is removed from the page altogether.
-  useEffect(() => { if (phase !== 'ready' || !minDone) return; const x = setTimeout(() => setGone(true), FADE_MS); return () => clearTimeout(x); }, [phase, minDone]);
+  useEffect(() => { if (!readyToLeave) return; const x = setTimeout(() => setGone(true), FADE_MS); return () => clearTimeout(x); }, [readyToLeave]);
+  const stillOpening = gone && !store;
   return (
     <>
       {store && <StoreContext.Provider value={store}><Gate /></StoreContext.Provider>}
+      {stillOpening && <StillOpeningScreen phase={phase} lang={lang} onRetry={() => setAttempt(n => n + 1)} />}
       {!gone && <StartupLogo phase={phase} done={minDone} lang={store?.getState().settings.lang ?? lang} onRetry={() => setAttempt(n => n + 1)} />}
     </>
+  );
+}
+
+/** JoyChange006 Change E: shown only in the rare case where the cover was removed at FORCE_OPEN_MS before the phone's
+ *  storage actually opened (a very slow phone or network). Plain words and Try again; no logo or bar (those belong to the
+ *  10-second cover, which has already finished its job). */
+function StillOpeningScreen({ phase, lang, onRetry }: { phase: StartupPhase; lang: Lang; onRetry: () => void }) {
+  const s = startupStrings[lang];
+  const text = phase === 'failed' ? s.failed : s.slow;
+  return (
+    <div className="content stack" data-testid="still-opening" style={{ justifyContent: 'center', alignItems: 'center', minHeight: '100dvh', textAlign: 'center' }}>
+      <p className="muted" role={phase === 'failed' ? 'alert' : 'status'}>{text}</p>
+      <button type="button" className="btn primary" data-testid="still-opening-retry" onClick={onRetry}>{s.retry}</button>
+    </div>
   );
 }
 
@@ -181,17 +203,23 @@ export const FADE_MS = 120;
  *  the phone for reduced motion get a short fade instead of the spin. */
 function StartupLogo({ phase, done, lang, onRetry }: { phase: StartupPhase; done: boolean; lang: Lang; onRetry: () => void }) {
   const s = startupStrings[lang];
-  // Change 42: six visual lines, one every SPLASH_STEP_MS. A real problem (slow or failed storage) still replaces them.
-  const [step, setStep] = useState(0);
+  const t = strings[lang];
+  // JoyChange006 Part 2 Change E: five visual lines over the full 10 seconds, each with its own animated "...".
+  // A real problem (slow or failed storage) still replaces them with a truthful message (unchanged from JoyChange002 Change 42).
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const t0 = Date.now();
-    const x = setInterval(() => setStep(splashStep(Date.now() - t0)), 100);
+    const x = setInterval(() => setElapsed(Date.now() - t0), 100);
     return () => clearInterval(x);
   }, []);
-  const text = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : s.steps[step] ?? s.opening;
+  const step = splashStep(elapsed);
+  const real = phase === 'failed' ? s.failed : phase === 'slow' ? s.slow : undefined;
+  const text = real ?? `${s.steps[step] ?? s.opening}${'.'.repeat(splashDots(elapsed))}`;
   const leaving = phase === 'ready' && done;
   return (
     <div className={`intro${leaving ? ' leaving' : ''}`} data-testid="startup-logo" data-phase={phase} data-step={step}>
+      {/* JoyChange006 Change E: "Estate Agent" / "AI Buddy", centred, words only (the rotating icon below carries the mark). */}
+      <div className="intro-brand" aria-hidden="true"><span>{t.appNameA}</span><em>{t.appNameB}</em></div>
       <div className="intro-stage" aria-hidden="true"><IconLogo size={168} big splash /></div>
       <div className="intro-bar" aria-hidden="true" data-testid="startup-bar"><span /></div>
       {!leaving && <p className={`intro-msg ${phase}`} role={phase === 'failed' ? 'alert' : 'status'} data-testid="startup-msg">{text}</p>}

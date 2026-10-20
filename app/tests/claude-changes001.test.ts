@@ -42,7 +42,8 @@ test('CC3 change 3: Commission (RM) for a flat fee, Commission (%) for a percent
 
 test('CC10 change 10: one Availability list writes both stored fields, and every record shows one choice', () => {
   // JoyChange002 Change 40: plain Booked became five Booked stages.
-  assert.deepEqual([...AVAIL_CHOICES], ['available_now', 'available_from', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'sold', 'rented', 'withdrawn']);
+  // JoyChange006 Part 2 Change F: 'rented_pending_ta' sits between Sold and Rented.
+  assert.deepEqual([...AVAIL_CHOICES], ['available_now', 'available_from', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'sold', 'rented_pending_ta', 'rented', 'withdrawn']);
   for (const ch of AVAIL_CHOICES) assert.equal(availChoice({ ...availPatch(ch, '2026-12') }), ch, `${ch} round-trips`);
   assert.equal(availPatch('available_from', '2026-12').availableFrom, '2026-12');
   assert.equal(availPatch('sold', '2026-12').availableFrom, undefined, 'only Available From keeps the month');

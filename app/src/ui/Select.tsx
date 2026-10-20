@@ -73,6 +73,9 @@ export function Select({ className, style, ...props }: SelectProps) {
   }, [isOpen]);
   const lang = pageLang();
   const shown = open ? open.opts.filter(o => matchesText(o.label, q)) : [];
+  // JoyChange006 Part 2 Change G: the Check status pop-up (data-verify on the field) colours each option word the same
+  // as the field already shows for that status (styles.css .vp-* / .vc-*); text colour only, no dot or side bar.
+  const verifyPop = 'data-verify' in props;
 
   return (
     <span className={`sel-wrap${props.disabled ? ' disabled' : ''}`} style={style}>
@@ -90,7 +93,7 @@ export function Select({ className, style, ...props }: SelectProps) {
               <button type="button" className="fx-btn opt-pop-close" data-testid="pick-popup-close" aria-label={strings[pageLang()].c.close} title={strings[pageLang()].c.close} onClick={close}><IconClose size={15} /></button>
             </div>
             <PickSearch lang={lang} value={q} onChange={setQ} label={open.title || undefined} testId="pick-search" />
-            <div className="opt-list" role="listbox" aria-labelledby={`${id}-t`} ref={list}>
+            <div className={`opt-list${verifyPop ? ' verify-colors' : ''}`} role="listbox" aria-labelledby={`${id}-t`} ref={list}>
               {shown.map(o => (
                 <button key={`${o.i}-${o.value}`} type="button" role="option" aria-selected={o.value === open.value} disabled={o.disabled} className="opt-item"
                   data-testid="pick-option" data-value={o.value} onClick={() => pick(o.value)}>{o.label}</button>

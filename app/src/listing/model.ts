@@ -8,7 +8,10 @@ import type { Deal, CoBroke } from '../deals/model';
 
 export type Tenure = 'freehold' | 'leasehold';
 export type LotType = 'intermediate' | 'corner' | 'end' | 'single';
-export type Status = 'available' | 'in_progress' | 'sold' | 'rented' | 'off_market' | 'needs_check';
+// JoyChange006 Part 2 Change F: 'rented_pending_ta' is a Rented property whose Tenancy Agreement is not signed yet (the
+// rental equivalent of a Booked - Pending SPA sale). It does not count as available; it is treated like Rented and Sold
+// (hidden by default, Change 41) until it is actually signed and becomes plain 'rented'.
+export type Status = 'available' | 'in_progress' | 'sold' | 'rented_pending_ta' | 'rented' | 'off_market' | 'needs_check';
 export type Negotiable = 'yes' | 'no';
 export type Category = 'residential' | 'commercial' | 'industrial' | 'agricultural' | 'development';
 export type Purpose = 'sale' | 'rent' | 'sale_or_rent';
@@ -37,7 +40,7 @@ export const TYPE_CATEGORY: Record<string, Category> = {
 };
 export const TENURES: Tenure[] = ['freehold', 'leasehold'];
 export const LOT_TYPES: LotType[] = ['intermediate', 'corner', 'end', 'single'];
-export const STATUSES: Status[] = ['available', 'in_progress', 'sold', 'rented', 'off_market', 'needs_check'];
+export const STATUSES: Status[] = ['available', 'in_progress', 'sold', 'rented_pending_ta', 'rented', 'off_market', 'needs_check'];
 /** JoyChange002 Change 40: which stage a Booked property is at. Booked stays status 'in_progress' (so deals, matching,
  *  filters and sync are unchanged); the stage is kept beside it. A property marked plain "Booked" before Change 40 has
  *  no stage and keeps showing "Booked" until one of the five is picked. */
@@ -45,7 +48,7 @@ export type BookedStage = 'pending_loan' | 'pending_spa' | 'spa_signed' | 'other
 export const BOOKED_STAGES: BookedStage[] = ['pending_loan', 'pending_spa', 'spa_signed', 'other_agent', 'pending_consent'];
 /** Change 41: one key per status a property can show, each Booked stage separately and old plain Booked on its own. */
 export type StatusKey = Exclude<Status, 'in_progress'> | `booked_${BookedStage}` | 'booked';
-export const STATUS_KEYS: StatusKey[] = ['available', ...BOOKED_STAGES.map(b => `booked_${b}` as const), 'booked', 'sold', 'rented', 'off_market', 'needs_check'];
+export const STATUS_KEYS: StatusKey[] = ['available', ...BOOKED_STAGES.map(b => `booked_${b}` as const), 'booked', 'sold', 'rented_pending_ta', 'rented', 'off_market', 'needs_check'];
 export function statusKey(l: Pick<Listing, 'status' | 'bookedStage'>): StatusKey | undefined {
   if (!l.status) return undefined;
   if (l.status === 'in_progress') return l.bookedStage && BOOKED_STAGES.includes(l.bookedStage) ? `booked_${l.bookedStage}` : 'booked';
@@ -446,7 +449,7 @@ export interface Filters {
 }
 
 /** Change 41: the Subsale List hides Sold, Rented and Withdrawn until they are ticked. */
-export const HIDDEN_BY_DEFAULT: StatusKey[] = ['sold', 'rented', 'off_market'];
+export const HIDDEN_BY_DEFAULT: StatusKey[] = ['sold', 'rented_pending_ta', 'rented', 'off_market'];
 export const DEFAULT_STATUSES: StatusKey[] = STATUS_KEYS.filter(k => !HIDDEN_BY_DEFAULT.includes(k));
 export const BED_CHOICES = [1, 2, 3, 4, 5];
 export const BATH_CHOICES = [1, 2, 3, 4];

@@ -1723,7 +1723,7 @@ test('U39 startup: readiness-driven, not a timer: the app opens as soon as the p
   await ctx.close();
 });
 
-test('U39b JoyChange002 Change 42: the start-up screen lasts the full five seconds, spins the logo, fills a bar, shows six lines in order and carries the bottom advert', async () => {
+test('U39b JoyChange006 Part 2 Change E: the start-up screen lasts the full ten seconds, shows the centred wordmark, spins the logo at half speed, fills a bar, shows five lines with animated dots in order, and carries the bottom advert', async () => {
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 } });
   const page = await ctx.newPage();
   const t0 = Date.now();
@@ -1732,17 +1732,21 @@ test('U39b JoyChange002 Change 42: the start-up screen lasts the full five secon
   assert.equal(await page.getByTestId('startup-bar').count(), 1, 'a progress bar');
   assert.equal(await page.locator('.intro [data-testid="bottom-ad"]').count(), 1, 'the bottom advert is on the start-up screen');
   assert.match(await page.locator('.intro .logo-img').evaluate(i => getComputedStyle(i).animationName), /intro-spin/);
+  assert.match(await page.locator('.intro .logo-img').evaluate(i => getComputedStyle(i).animationDuration), /^2s$/, 'half the earlier 1 s-per-turn speed');
+  const brand = page.locator('.intro-brand');
+  assert.equal(await brand.locator('span').innerText(), 'Estate Agent');
+  assert.equal(await brand.locator('em').innerText(), 'AI Buddy');
   const seen = [];
-  const end = Date.now() + 6500;
+  const end = Date.now() + 11500;
   while (Date.now() < end && await page.getByTestId('startup-logo').count()) {
-    const m = await page.getByTestId('startup-msg').innerText({ timeout: 300 }).catch(() => '');
+    const m = (await page.getByTestId('startup-msg').innerText({ timeout: 300 }).catch(() => '')).replace(/\.+$/, '');
     if (m && seen[seen.length - 1] !== m) seen.push(m);
     await page.waitForTimeout(100);
   }
   await page.getByTestId('startup-logo').waitFor({ state: 'detached', timeout: 3000 });
   const took = Date.now() - t0;
-  assert.ok(took >= 4800 && took < 7000, `about five seconds (${took} ms)`);
-  assert.deepEqual(seen, ['Initializing app', 'Analyzing', 'Checking encrypted data checksum', 'Checksum verified', 'Security checks', 'Security check pass']);
+  assert.ok(took >= 9800 && took < 12000, `about ten seconds (${took} ms)`);
+  assert.deepEqual(seen, ['Starting up', 'Encrypting data', 'Securing your connection', 'Loading users', 'Ready']);
   await ctx.close();
 });
 
@@ -1757,7 +1761,7 @@ test('U40 startup: slow storage says so after about five seconds, and Try again 
   const t0 = Date.now();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Initializing app/i);   // Change 42: the first of the six start-up lines
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Starting up/i);   // Change E: the first of the five start-up lines
   assert.equal(await page.getByTestId('startup-logo').getAttribute('data-phase'), 'opening');
   await page.locator('[data-testid="startup-logo"][data-phase="slow"]').waitFor({ timeout: 8000 });
   const took = Date.now() - t0;
@@ -1796,7 +1800,7 @@ test('U42 startup message follows the phone language (Bahasa Malaysia)', async (
   const page = await ctx.newPage();
   await page.goto(base);
   await page.getByTestId('startup-msg').waitFor();
-  assert.match(await page.getByTestId('startup-msg').innerText(), /Memulakan aplikasi/i);
+  assert.match(await page.getByTestId('startup-msg').innerText(), /Memulakan/i);
   await ctx.close();
 });
 

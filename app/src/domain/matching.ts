@@ -23,8 +23,9 @@ export const isEmptyRequirement = (r: BuyerRequirement) =>
   !r.purpose && !r.types?.length && !r.areas?.length && r.budgetMin === undefined && r.budgetMax === undefined &&
   r.bedroomsMin === undefined && r.landMinSqft === undefined && r.builtUpMinSqft === undefined && !r.tenure && !r.adjoiningUnits;
 
-/** Sold, rented and withdrawn properties are not offered to anyone. */
-export const offerable = (p: Listing) => !['sold', 'rented', 'off_market'].includes(p.status ?? '');
+/** Sold, rented (including Rented - Pending TA Signing, JoyChange006 Part 2 Change F: Joe's choice, it is taken, not
+ *  available) and withdrawn properties are not offered to anyone. */
+export const offerable = (p: Listing) => !['sold', 'rented_pending_ta', 'rented', 'off_market'].includes(p.status ?? '');
 
 export function matchRequirement(r: BuyerRequirement, p: Listing): MatchResult {
   const out: Criterion[] = [];

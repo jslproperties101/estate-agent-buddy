@@ -9,14 +9,28 @@ export type StartupPhase = 'opening' | 'slow' | 'failed' | 'ready';
  *  waiting after that: the storage may still finish, and the person can press "Try again". */
 export const SLOW_MS = 5000;
 
-/** JoyChange002 Change 42: the start-up screen is always shown for this long, every time the app opens (no skipping). It is
- *  visual only: the app itself is ready as soon as the storage opens, and the screen simply stays until the time is up. */
-export const SPLASH_MS = 5000;
-/** The six start-up lines are spread evenly over SPLASH_MS (about 0.83 s each). */
-export const SPLASH_STEPS = 6;
-export const SPLASH_STEP_MS = SPLASH_MS / SPLASH_STEPS;
-/** Which of the six lines (0-5) is showing after `elapsedMs` of the start-up screen. */
-export const splashStep = (elapsedMs: number) => Math.max(0, Math.min(SPLASH_STEPS - 1, Math.floor(elapsedMs / SPLASH_STEP_MS)));
+/** JoyChange002 Change 42, timing redone by JoyChange006 Part 2 Change E: the start-up screen is always shown for this long,
+ *  every time the app opens (no skipping). It is visual only: the app itself is ready as soon as the storage opens, and the
+ *  screen simply stays until the time is up. JoyChange006 Change E (Joe, 20 Oct 2026): if the app genuinely is not ready by
+ *  then (a very slow phone or network), the cover is removed anyway at FORCE_OPEN_MS rather than waiting indefinitely. */
+export const SPLASH_MS = 10000;
+/** If the app is still not ready this long after start-up began, the cover is removed anyway (Joe's choice: open the app
+ *  rather than keep it covered). Equal to SPLASH_MS: the cover never outlasts its own 10 seconds. */
+export const FORCE_OPEN_MS = SPLASH_MS;
+/** The five start-up lines, and the time (ms from the start of the splash) at which each one ends. Change E's own table:
+ *  Starting up 0-1.5s, Encrypting data 1.5-5.5s (the longest, on purpose), Securing your connection 5.5-7.5s,
+ *  Loading users 7.5-9s, Ready 9-10s. */
+export const SPLASH_BREAKS = [1500, 5500, 7500, 9000, 10000] as const;
+/** Which of the five lines (0-4) is showing after `elapsedMs` of the start-up screen. */
+export const splashStep = (elapsedMs: number) => {
+  const e = Math.max(0, elapsedMs);
+  const i = SPLASH_BREAKS.findIndex(end => e < end);
+  return i === -1 ? SPLASH_BREAKS.length - 1 : i;
+};
+/** How many dots (1, 2 or 3) the animated "..." shows after `elapsedMs`, each held for `stepMs` before moving to the next. */
+export function splashDots(elapsedMs: number, stepMs = 400): number {
+  return (Math.floor(Math.max(0, elapsedMs) / stepMs) % 3) + 1;
+}
 
 /** Runs `open` once. `on` is told 'opening' first, 'slow' if it takes longer than slowMs, and finally 'ready' (with the
  *  result) or 'failed'. There is no minimum time: if `open` finishes at once, 'ready' follows at once.

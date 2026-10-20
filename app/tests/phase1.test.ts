@@ -6,7 +6,7 @@ import { MemoryBackend, Backend } from '../src/data/backend';
 import { Store } from '../src/data/store';
 import { syncNow } from '../src/data/sync';
 import { saveStateOf, saveStateFromStore } from '../src/data/savestate';
-import { beginStartup, startupLang, StartupPhase, SLOW_MS, SPLASH_MS, SPLASH_STEPS, splashStep } from '../src/startup/startup';
+import { beginStartup, startupLang, StartupPhase, SLOW_MS, SPLASH_MS, FORCE_OPEN_MS, SPLASH_BREAKS, splashStep, splashDots } from '../src/startup/startup';
 import { startupStrings } from '../src/startup/strings';
 import { TOAST_OK_MS, TOAST_ERROR_MS } from '../src/ui/toast';
 import { convertInactive, inactiveContacts, reviewContacts } from '../src/data/leadReview';
@@ -73,16 +73,24 @@ test('P5 startup: a cancelled startup reports nothing more; the limit is about f
 });
 
 // ---------- A. save and sync status ----------
-test('P5b Change 42: the start-up screen lasts five seconds with six lines spread evenly, in every language', () => {
-  assert.equal(SPLASH_MS, 5000);
-  assert.equal(SPLASH_STEPS, 6);
-  assert.deepEqual([0, 800, 833, 1700, 2500, 3300, 4166, 4999, 9000].map(splashStep), [0, 0, 0, 2, 3, 3, 4, 5, 5]);
+test('P5b JoyChange006 Part 2 Change E: the start-up screen lasts ten seconds with five lines spread per the agreed table, in every language', () => {
+  assert.equal(SPLASH_MS, 10000);
+  assert.equal(FORCE_OPEN_MS, SPLASH_MS, 'the cover is forced open at the same 10 s mark, never later (Joe: open the app anyway)');
+  assert.deepEqual(SPLASH_BREAKS, [1500, 5500, 7500, 9000, 10000]);
+  assert.deepEqual([0, 1000, 1499, 1500, 3000, 5499, 5500, 7000, 7499, 7500, 8900, 8999, 9000, 9999, 20000].map(splashStep),
+    [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]);
   assert.equal(splashStep(-5), 0);
+  // "Encrypting data" (step 1, 1.5-5.5s) is deliberately the longest, on purpose (Joe's own choice).
+  assert.ok(SPLASH_BREAKS[1] - SPLASH_BREAKS[0] > SPLASH_BREAKS[2] - SPLASH_BREAKS[1]);
   for (const l of ['en', 'bm', 'zh'] as const) {
-    assert.equal(startupStrings[l].steps.length, 6, `${l}: six lines`);
-    assert.ok(startupStrings[l].steps.every(x => x.trim().length > 0));
+    assert.equal(startupStrings[l].steps.length, 5, `${l}: five lines`);
+    assert.ok(startupStrings[l].steps.every(x => x.trim().length > 0 && !x.includes('.')), `${l}: no baked-in dots (they animate separately)`);
   }
-  assert.deepEqual(startupStrings.en.steps, ['Initializing app', 'Analyzing', 'Checking encrypted data checksum', 'Checksum verified', 'Security checks', 'Security check pass']);
+  assert.deepEqual(startupStrings.en.steps, ['Starting up', 'Encrypting data', 'Securing your connection', 'Loading users', 'Ready']);
+});
+
+test('P5c the animated dots cycle 1, 2, 3 and repeat, evenly timed', () => {
+  assert.deepEqual([0, 399, 400, 799, 800, 1199, 1200, 1999].map(e => splashDots(e)), [1, 1, 2, 2, 3, 3, 1, 2]);
 });
 
 test('P6 success messages stay two seconds; errors stay longer', () => {

@@ -42,8 +42,9 @@ test('J40-1 five Booked stages, then Sold; each round-trips and asks for booking
 });
 
 test('J41-1 status keys list each Booked stage and old Booked separately; Sold, Rented and Withdrawn are hidden by default', () => {
-  assert.deepEqual(STATUS_KEYS, ['available', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'booked', 'sold', 'rented', 'off_market', 'needs_check']);
-  assert.deepEqual(HIDDEN_BY_DEFAULT, ['sold', 'rented', 'off_market']);
+  // JoyChange006 Part 2 Change F: 'rented_pending_ta' sits between Sold and Rented, and is hidden by default like Rented.
+  assert.deepEqual(STATUS_KEYS, ['available', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'booked', 'sold', 'rented_pending_ta', 'rented', 'off_market', 'needs_check']);
+  assert.deepEqual(HIDDEN_BY_DEFAULT, ['sold', 'rented_pending_ta', 'rented', 'off_market']);
   assert.ok(!DEFAULT_STATUSES.some(k => HIDDEN_BY_DEFAULT.includes(k)));
   assert.equal(statusKey({ status: 'in_progress', bookedStage: 'pending_spa' }), 'booked_pending_spa');
   assert.equal(statusKey({ status: 'in_progress' }), 'booked');

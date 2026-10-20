@@ -9,7 +9,9 @@ import { BOOKED_STAGES } from './model';
 /** The one Availability list (Change 10), in the agreed order. */
 // JoyChange002 Change 40: plain "Booked" is replaced by five Booked stages, then Sold. A property already marked plain
 // Booked keeps showing it (the 'booked' choice below), but it is no longer offered when the status is changed.
-export const AVAIL_CHOICES = ['available_now', 'available_from', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'sold', 'rented', 'withdrawn'] as const;
+// JoyChange006 Part 2 Change F: 'rented_pending_ta' (Rented - Pending TA Signing) sits just before 'rented', the rental
+// equivalent of the Booked stages above it; it does not count as available.
+export const AVAIL_CHOICES = ['available_now', 'available_from', 'booked_pending_loan', 'booked_pending_spa', 'booked_spa_signed', 'booked_other_agent', 'booked_pending_consent', 'sold', 'rented_pending_ta', 'rented', 'withdrawn'] as const;
 export type AvailChoice = (typeof AVAIL_CHOICES)[number] | 'booked';
 export const isBookedChoice = (c?: string) => !!c && (c === 'booked' || c.startsWith('booked_'));
 
@@ -19,6 +21,7 @@ export function availChoice(l: Pick<Listing, 'status' | 'availability'> & { book
   switch (l.status) {
     case 'in_progress': return l.bookedStage && BOOKED_STAGES.includes(l.bookedStage) ? `booked_${l.bookedStage}` as AvailChoice : 'booked';
     case 'sold': return 'sold';
+    case 'rented_pending_ta': return 'rented_pending_ta';
     case 'rented': return 'rented';
     case 'off_market': return 'withdrawn';
   }
@@ -40,6 +43,7 @@ function basePatch(choice: AvailChoice | undefined, keepFrom?: string): { status
     case 'available_from': return { status: 'available', availability: 'from_date', availableFrom: keepFrom };
     case 'booked': return { status: 'in_progress', availability: 'not_available', availableFrom: undefined };
     case 'sold': return { status: 'sold', availability: 'not_available', availableFrom: undefined };
+    case 'rented_pending_ta': return { status: 'rented_pending_ta', availability: 'tenanted', availableFrom: undefined };
     case 'rented': return { status: 'rented', availability: 'tenanted', availableFrom: undefined };
     case 'withdrawn': return { status: 'off_market', availability: 'not_available', availableFrom: undefined };
     default: return { status: undefined, availability: undefined, availableFrom: undefined };

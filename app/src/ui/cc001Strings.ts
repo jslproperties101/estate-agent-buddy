@@ -19,7 +19,7 @@ const en = {
   idLabel: 'ID',
   avail: {
     label: 'Availability',
-    available_now: 'Available Now', available_from: 'Available From', booked: 'Booked', sold: 'Sold', rented: 'Rented', withdrawn: 'Withdrawn',
+    available_now: 'Available Now', available_from: 'Available From', booked: 'Booked', sold: 'Sold', rented_pending_ta: 'Rented - Pending TA Signing', rented: 'Rented', withdrawn: 'Withdrawn',
     // Change 40 (Title Case is applied like the other choices)
     booked_pending_loan: 'Booked - Pending Loan', booked_pending_spa: 'Booked - Pending SPA', booked_spa_signed: 'Booked - SPA Signed', booked_other_agent: 'Booked - Other Agent (Pending SPA)', booked_pending_consent: 'Booked - Pending Consent',
     fromMonth: 'Available From (Month)',
@@ -97,7 +97,7 @@ const bm: CC001 = {
   idLabel: 'ID',
   avail: {
     label: 'Ketersediaan',
-    available_now: 'Ada Sekarang', available_from: 'Ada Mulai', booked: 'Telah Ditempah', sold: 'Dijual', rented: 'Disewa', withdrawn: 'Ditarik Balik',
+    available_now: 'Ada Sekarang', available_from: 'Ada Mulai', booked: 'Telah Ditempah', sold: 'Dijual', rented_pending_ta: 'Disewa - Menunggu Tandatangan Perjanjian Penyewaan (TA)', rented: 'Disewa', withdrawn: 'Ditarik Balik',
     booked_pending_loan: 'Ditempah - Menunggu Pinjaman', booked_pending_spa: 'Ditempah - Menunggu SPA', booked_spa_signed: 'Ditempah - SPA Ditandatangani', booked_other_agent: 'Ditempah - Ejen Lain (Menunggu SPA)', booked_pending_consent: 'Ditempah - Menunggu Kebenaran',
     fromMonth: 'Ada Mulai (Bulan)',
   },
@@ -165,7 +165,7 @@ const zh: CC001 = {
   idLabel: 'ID',
   avail: {
     label: '可用性',
-    available_now: '现可入住', available_from: '可入住日期', booked: '已预订', sold: '已售', rented: '已出租', withdrawn: '已撤回',
+    available_now: '现可入住', available_from: '可入住日期', booked: '已预订', sold: '已售', rented_pending_ta: '已出租 - 待签租约 (TA)', rented: '已出租', withdrawn: '已撤回',
     booked_pending_loan: '已预订 - 等待贷款', booked_pending_spa: '已预订 - 等待买卖合约 (SPA)', booked_spa_signed: '已预订 - 已签买卖合约 (SPA)', booked_other_agent: '已预订 - 其他经纪 (等待 SPA)', booked_pending_consent: '已预订 - 等待转让同意',
     fromMonth: '可入住日期（月份）',
   },
