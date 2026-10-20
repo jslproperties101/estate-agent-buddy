@@ -22,13 +22,16 @@ import { c036Strings } from './c036Strings';
 import { IconPencil, IconClose } from '../icons';
 import { useToast } from './toast';
 import { isForeign } from '../team/access';
-import { countBelow, propertiesUsing, optionsAfterDelete, optionsAfterRename, renamedIn, clearedIn } from '../listing/optionEdit';
+import { propertiesUsing, optionsAfterDelete, optionsAfterRename, renamedIn, chainOf } from '../listing/optionEdit';
+import { c008Strings } from './c008Strings';
 
 export interface Choice { value: string; label?: string }
 
-export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate }: {
+export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, allowEmpty = true, emptyLabel, testId, hint, normalise, validate, lockedBy }: {
   lang: Lang; label: string; listKey: string; builtIns: Choice[]; value?: string; onChange: (v: string | undefined) => void;
   allowEmpty?: boolean; emptyLabel?: string; testId?: string; hint?: string;
+  /** JoyChange008: the name of the level above that must be chosen first; the field cannot be opened until then. */
+  lockedBy?: string;
   /** A Field Help "?" shown after the label. */
   /** Applied to a typed value before it is checked and saved (for example upper case for prefixes). */
   normalise?: (v: string) => string;
@@ -49,7 +52,9 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [renameErr, setRenameErr] = useState<string | null>(null);
-  const [ask, setAsk] = useState<null | { kind: 'simple' | 'below' | 'props'; value: string; n: number }>(null);
+  // JoyChange008: a place in the address chain gets one warning (008 wording); any other list a simple confirmation.
+  const [ask, setAsk] = useState<null | { kind: 'simple' | 'place'; value: string }>(null);
+  const x8 = c008Strings[lang];
   const customs = [...(state.options[listKey] ?? [])].sort((a, b) => b.used - a.used)
     .filter(o => !builtIns.some(b => b.value.toLowerCase() === o.value.toLowerCase()));
   const searchable = true;   // ClaudeChanges001 change 9: every list can be searched
@@ -83,15 +88,11 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
     setRenaming(null);
     toast(x36.renamed(props.length));
   }
-  function askDelete(v: string) {
-    const below = countBelow(store.getState().options, listKey, v);
-    const n = affected(v).length;
-    setAsk(below ? { kind: 'below', value: v, n: below } : n ? { kind: 'props', value: v, n } : { kind: 'simple', value: v, n: 0 });
-  }
+  function askDelete(v: string) { setAsk({ kind: chainOf(listKey) ? 'place' : 'simple', value: v }); }
+  /** Removes the entry and the places the agent added under it. JoyChange008: properties already saved keep their place
+   *  names (the name is stored on the property itself), so no listing loses any of its address. */
   function doDelete(v: string) {
-    const props = affected(v);
     store.setSingleton('options', optionsAfterDelete(store.getState().options, listKey, v));
-    for (const p of props) store.upsert('properties', clearedIn(p, listKey));
     if (value === v) onChange(undefined);
     setAsk(null);
   }
@@ -110,11 +111,13 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
     <div className="ff opt" data-testid={testId}>
       <span><span id={`${id}-l`}>{label}</span></span>
       <div className="opt-field">
-        <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}>
+        <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-l ${id}-v`} onClick={() => setOpen(o => !o)}
+          disabled={!!lockedBy} data-locked={lockedBy ? 'yes' : undefined}>
           <span id={`${id}-v`} className={value ? '' : 'muted'}>{labelOf(value)}</span><span aria-hidden="true" className="opt-caret">▾</span>
         </button>
       </div>
       {hint && <small className="muted">{hint}</small>}
+      {lockedBy && <small className="muted" data-testid={testId ? `${testId}-locked` : undefined}>{x8.locked(lockedBy)}</small>}
       {open && (
         <div className="scrim opt-scrim" role="presentation" data-testid="opt-popup" onClick={e => { if (e.target === e.currentTarget) close(); }}
           onKeyDown={e => { if (e.key === 'Escape') close(); }}>
@@ -178,16 +181,10 @@ export function OptionSelect({ lang, label, listKey, builtIns, value, onChange, 
       )}
       {ask?.kind === 'simple' && <Confirm lang={lang} title={x36.simpleQ(ask.value)} body={x36.simpleBody} okLabel={x36.del}
         onCancel={() => setAsk(null)} onOk={() => doDelete(ask.value)} />}
-      {ask?.kind === 'below' && (
-        <ChoiceDialog lang={lang} title={x36.belowQ(ask.value)} body={x36.belowBody(ask.n)} testId="opt-ask-below" cancelLabel={x36.cancel} onCancel={() => setAsk(null)} choices={[
-          { label: x36.del, danger: true, testId: 'opt-below-delete', onPick: () => { const n = affected(ask.value).length; if (n) setAsk({ kind: 'props', value: ask.value, n }); else doDelete(ask.value); } },
-          { label: x36.editInstead, testId: 'opt-below-edit', onPick: () => startRename(ask.value) },
-        ]} />
-      )}
-      {ask?.kind === 'props' && (
-        <ChoiceDialog lang={lang} title={x36.propsQ(ask.n)} body={x36.propsBody(ask.n)} testId="opt-ask-props" cancelLabel={x36.cancel} onCancel={() => setAsk(null)} choices={[
-          { label: x36.continueDel, danger: true, testId: 'opt-props-delete', onPick: () => doDelete(ask.value) },
-          { label: x36.rename, testId: 'opt-props-rename', onPick: () => startRename(ask.value) },
+      {ask?.kind === 'place' && (
+        <ChoiceDialog lang={lang} title={x8.deleteQ(ask.value)} body={x8.deleteBody} testId="opt-ask-place" cancelLabel={x8.cancel} onCancel={() => setAsk(null)} choices={[
+          { label: x8.deleteOk, danger: true, testId: 'opt-place-delete', onPick: () => doDelete(ask.value) },
+          { label: x8.renameInstead, testId: 'opt-place-rename', onPick: () => startRename(ask.value) },
         ]} />
       )}
     </div>

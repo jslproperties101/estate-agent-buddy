@@ -3,6 +3,9 @@
 // spelling, spacing, capital letters or abbreviation (Tmn / Taman, Jln / Jalan) is treated as the saved value,
 // and nothing new is saved without the agent's confirmation.
 
+import { MY_OFFICIAL_TOWNS } from './myPlacesData';
+export { MY_PLACES_SOURCE } from './myPlacesData';
+
 export const DEFAULT_COUNTRY = 'Malaysia';
 
 // JoyChange002 Change 46: every country can be chosen (the first-login pick and the Country level of the address chain).
@@ -76,8 +79,29 @@ export function chainFor(place: string): { township?: string; city?: string; sta
   const st = MY_STATES.find(x => x.toLowerCase() === low);
   return st ? { state: st } : {};
 }
-export const citiesFor = (state?: string) => (state && MY_CITIES[state]) || allBuiltInCities();
-export const townshipsFor = (city?: string) => (city && MY_TOWNSHIPS[city]) || allBuiltInTownships();
+// JoyChange008 (parent-child lists): a level shows ONLY the places under the place chosen above it. Before this, a state or
+// city without a short list of its own fell back to every city / township in Malaysia, which is why the lists looked
+// unrelated. Now: no parent chosen, or a parent the app has no list for (another country, a typed place) = an empty
+// built-in list; the agent adds what is missing with "+ Add New", remembered under that parent.
+/** City / Town choices for a Malaysian state: the official postcode list (myPlacesData.ts) plus the app's earlier
+ *  short list for that state (so towns agents already used stay offered), A to Z, each name once. */
+export function citiesFor(state?: string): string[] {
+  if (!state) return [];
+  const key = MY_STATES.find(x => x.toLowerCase() === state.trim().toLowerCase());
+  if (!key) return [];
+  const seen = new Map<string, string>();
+  for (const c of [...(MY_OFFICIAL_TOWNS[key] ?? []), ...(MY_CITIES[key] ?? [])]) if (!seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+/** Townships the app knows under one City / Town (none for most towns: agents add their own). */
+export const townshipsFor = (city?: string): string[] => {
+  if (!city) return [];
+  const key = Object.keys(MY_TOWNSHIPS).find(x => x.toLowerCase() === city.trim().toLowerCase());
+  return key ? [...MY_TOWNSHIPS[key]] : [];
+};
+/** Every City / Town in Malaysia (official list plus the earlier short list), for matching a name Google gives back.
+ *  Not used by voice commands, which keep the short list (some official town names are also everyday words). */
+export const allMalaysiaTowns = (): string[] => [...new Set(MY_STATES.flatMap(s => citiesFor(s)))];
 
 const ABBREVIATIONS: [RegExp, string][] = [
   [/\bjln\b/g, 'jalan'], [/\btmn\b/g, 'taman'], [/\bbdr\b/g, 'bandar'], [/\bbndr\b/g, 'bandar'],

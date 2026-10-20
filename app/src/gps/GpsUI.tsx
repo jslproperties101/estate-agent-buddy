@@ -27,7 +27,7 @@ import { OptionSelect } from '../ui/OptionSelect';
 import { Confirm, Empty, StoredImage } from '../ui/common';
 import { useToast } from '../ui/toast';
 import { defaultPrefix, makeRef, nextNumber } from '../domain/refs';
-import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, DEFAULT_COUNTRY } from '../domain/places';
+import { checkField, COUNTRIES, MY_STATES, allMalaysiaTowns, allBuiltInTownships, DEFAULT_COUNTRY } from '../domain/places';
 import { IconGps, IconCobroke } from '../icons';
 import { BannerDot } from './BannersUI';
 import { activeBanners } from '../domain/banners';
@@ -290,7 +290,7 @@ function MarkSheet({ lang, at, acc, maps, onClose, onMark }: {
           const pick = (v: string | undefined, list: string, b: readonly string[]) => { const x = checkField(v, saved(list, b)); return x.status === 'ok' ? x.value : undefined; };
           p.country = pick(r.parts.country, 'country', COUNTRIES) ?? DEFAULT_COUNTRY;
           p.state = pick(r.parts.state, 'state', MY_STATES);
-          p.city = pick(r.parts.city, 'city', allBuiltInCities());
+          p.city = pick(r.parts.city, 'city', allMalaysiaTowns());   // JoyChange008: the full City / Town list
           p.township = pick(r.parts.township, 'township', allBuiltInTownships());
           p.street = r.parts.street;
           p.placeId = r.placeId;

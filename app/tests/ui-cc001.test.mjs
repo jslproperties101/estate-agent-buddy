@@ -154,8 +154,9 @@ test('X5 location chain: options belong to the level above; changing a level cle
   assert.equal(await nb.locator('input[type="search"]').count(), 1, 'every list has a search box');
   await nb.getByRole('option', { name: 'Laman Kemboja', exact: true }).click();
   await pickOpt(page, 'opt-street', 'Kemboja 1/3');
-  // Changing the township clears Neighbourhood and Street
+  // Changing the township clears Neighbourhood and Street (JoyChange008: after a question first)
   await pickOpt(page, 'opt-township', 'Bandar Baru Nilai');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Change' }).click();
   assert.match(await optText(page, 'opt-neighborhood'), /Not Set/i);
   assert.match(await optText(page, 'opt-street'), /Not Set/i);
   // Street with no neighbourhood: remembered under the township

@@ -1,5 +1,7 @@
 // The update notice at the top of the app and the About card in Settings (see native/updates.ts).
 import { useCallback, useEffect, useState } from 'react';
+import { c008Strings } from '../ui/c008Strings';
+import { MY_PLACES_SOURCE } from '../domain/places';
 import { Lang, strings } from '../i18n';
 import { BUILD, UpdateState, checkForUpdate, restartIntoUpdate, appReady, installedNativeVersion } from './updates';
 import { isNative, openInBrowser, plugin } from './native';
@@ -58,6 +60,8 @@ export function AboutCard({ lang }: { lang: Lang }) {
       {st.kind === 'apk-needed' && <button className="btn primary" onClick={() => void openInBrowser(st.latest.apk)}>{u.download}</button>}
       {st.kind === 'web-reload' && <button className="btn primary" onClick={() => window.location.reload()}>{u.reload}</button>}
       <details><summary className="small">{u.howTitle}</summary><small className="muted">{u.how}</small></details>
+      {/* JoyChange008: credits for the place lists (licence attribution). */}
+      <small className="muted" data-testid="about-credits"><strong>{c008Strings[lang].creditsTitle}:</strong> {c008Strings[lang].credits(MY_PLACES_SOURCE)}</small>
     </div>
   );
 }

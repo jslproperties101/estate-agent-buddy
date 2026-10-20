@@ -4386,7 +4386,7 @@ test('U103 Change 009 searchable dropdowns: type to filter State / City / Townsh
   const city = page.getByTestId('opt-city');
   await city.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
   await city.getByTestId('opt-city-search').fill('kla');
-  assert.deepEqual(await city.getByRole('option').allInnerTexts(), ['Klang', 'Port Klang']);
+  assert.deepEqual(await city.getByRole('option').allInnerTexts(), ['Klang', 'Pelabuhan Klang', 'Port Klang']);   // JoyChange008: official list + earlier short list, A to Z
   await city.getByRole('option', { name: 'Klang', exact: true }).click();
   const town = page.getByTestId('opt-township');
   await town.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click();
@@ -5092,7 +5092,7 @@ test('U122 JoyChange002 Change 32: Large Cards swipe through photos with tappabl
   await page.context().close();
 });
 
-test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (35); a saved dropdown is locked until its pencil (36); X on an address entry warns about what is under it and the properties using it; rename keeps everything; Back restores filters (27)', async () => {
+test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (35); a saved dropdown is locked until its pencil (36); X on an address entry warns (JoyChange008 wording) and saved properties keep their names; rename keeps everything; Back restores filters (27)', async () => {
   const page = await phone();
   await c15Property(page, { street: 'Jalan Tahap 1', purpose: 'sale', status: 'in_progress' });
   // Change 40: the card shows the Booked stage.
@@ -5125,16 +5125,18 @@ test('U123 JoyChange002 Batch C: Booked stage on the card (40); status colours (
   await st.getByTestId('opt-popup-close').click();
   assert.equal(await st.locator('.opt-pop').count(), 0, 'the close button shuts the pop-up');
   assert.match(await st.locator('.opt-btn').innerText(), /Jalan Tahap 1/i, 'closing keeps the value');
-  // The city above the street: X on its remembered entry explains what goes with it, and Edit renames instead.
   await page.getByTestId('save-property').click(); await page.getByTestId('listing-details').waitFor();
-  await home(page); await tile(page, 'Property List'); await newProperty(page);
-  const lv = async id => { const b = page.getByTestId(id); if (!(await b.locator('.opt-list').count())) await b.locator('.opt-btn:not([data-locked]), .opt-field.locked .fx-edit').click(); return b; };
-  // c15Property leaves the address chain at Street only (state etc. blank), so the street list sits under the country.
-  const streets = await lv('opt-street');
+  // X on a place the agent added: the JoyChange008 warning (places added under it go; saved properties keep their names),
+  // with Rename instead. The saved property's street is filled, so its Street stays open.
+  await home(page); await tile(page, 'Property List');
+  await page.getByTestId('listing-card').filter({ hasText: 'Jalan Tahap 1' }).locator('.sc-card').click(); await page.getByTestId('listing-details').waitFor();
+  await page.locator('.rec-actions').getByRole('button', { name: 'Edit', exact: true }).click(); await expandForm(page);
+  const streets = page.getByTestId('opt-street');
+  await streets.locator('.opt-btn').click(); await streets.getByTestId('opt-popup').waitFor();
   await streets.getByRole('button', { name: 'Remove Jalan Tahap 1' }).click();
-  await page.getByTestId('opt-ask-props').waitFor();
-  assert.match(await page.getByTestId('opt-ask-props').innerText(), /1 property uses this[\s\S]*Continue delete[\s\S]*Rename[\s\S]*Cancel/i);
-  await page.getByTestId('opt-props-rename').click();
+  await page.getByTestId('opt-ask-place').waitFor();
+  assert.match(await page.getByTestId('opt-ask-place').innerText(), /also removes the places you added under it[\s\S]*Properties you already saved keep their place names[\s\S]*Delete[\s\S]*Rename instead[\s\S]*Cancel/i);
+  await page.getByTestId('opt-place-rename').click();
   await page.getByTestId('opt-rename').locator('input').fill('Jalan Tahap Satu');
   await page.getByTestId('opt-rename-save').click();
   await waitStored(page, 'records', `all.some(v => v && v.street === 'Jalan Tahap Satu')`);

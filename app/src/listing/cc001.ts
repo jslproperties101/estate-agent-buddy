@@ -56,6 +56,15 @@ export const ARRANGEMENT_CHOICES = ['cobroke', 'direct'] as const;
 // ---------- Change 5: the location chain ----------
 export const LOCATION_LEVELS = ['country', 'state', 'city', 'township', 'neighborhood', 'street'] as const;
 export type LocationLevel = (typeof LOCATION_LEVELS)[number];
+/** JoyChange008 (Joe kept Township as its own level, 21 Oct 2026): the level each one belongs to, which must be chosen before
+ *  it can be. Country and State have none (Malaysia is the default country, so State is always open). Township, Neighbourhood and Street all hang under the City / Town
+ *  (Township is optional, as in Change 5: a blank level is skipped). */
+/** JoyChange008 suggestion 3.2 (locking a level until its parent is chosen) is built but OFF until Joe confirms it: many
+ *  agents enter only a street, which locking would block. Lists are parent-only either way. */
+export const LOCK_UNTIL_PARENT = false;
+export const LOC_PARENT: Record<LocationLevel, LocationLevel | undefined> = {
+  country: undefined, state: undefined, city: 'state', township: 'city', neighborhood: 'city', street: 'city',
+};
 
 /** The filled levels above one level, from the top (blank levels are skipped). */
 export function parentPath(l: Partial<Pick<Listing, LocationLevel>>, level: LocationLevel): string[] {

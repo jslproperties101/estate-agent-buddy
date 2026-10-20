@@ -50,7 +50,8 @@ import { teamStrings } from '../team/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { ChoiceDialog } from '../ui/common';
 import { cc001Strings } from '../ui/cc001Strings';
-import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, isBookedChoice, ARRANGEMENT_CHOICES, LocationLevel, locationListKey, clearBelow } from './cc001';
+import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, isBookedChoice, ARRANGEMENT_CHOICES, LocationLevel, LOCATION_LEVELS, LOC_PARENT, LOCK_UNTIL_PARENT, locationListKey, clearBelow } from './cc001';
+import { c008Strings } from '../ui/c008Strings';
 import { PhotoViewer } from '../ui/PhotoViewer';
 import { PhotoReorder } from './PhotoReorder';
 import { ContactPick } from '../ui/ContactPick';
@@ -120,6 +121,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
   const [raw, setRaw] = useState<Record<string, string>>({});
   const [newField, setNewField] = useState<string | null>(null);
   const [picker, setPicker] = useState(false);
+  // JoyChange008: a new choice at one level that would clear filled places below it waits for the agent to agree.
+  const [clearAsk, setClearAsk] = useState<null | { k: LocationLevel; v: string | undefined; below: LocationLevel[] }>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [refErr, setRefErr] = useState<string | null>(null);
   const [refOpen, setRefOpen] = useState(false);
@@ -226,20 +229,32 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
       </PickList>
     </label>
   ));
-  const Opt = ({ k, listKey, builtIns, labels, onPick }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void }) => withVp(k as string, (
-    <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`}
+  const Opt = ({ k, listKey, builtIns, labels, onPick, lockedBy }: { k: keyof Listing; listKey: string; builtIns: readonly string[]; labels?: Record<string, string>; onPick?: (v: string | undefined) => void; lockedBy?: string }) => withVp(k as string, (
+    <OptionSelect key={k} lang={lang} label={s.l[k as string]} listKey={listKey} testId={`opt-${String(k)}`} lockedBy={lockedBy}
       builtIns={builtIns.map(v => ({ value: v, label: labels?.[v] ?? v }))} value={d[k] as string | undefined} savedValue={initial?.[k] as string | undefined}
       onChange={v => (onPick ? onPick(v) : set(k, v as never))} />
   ));
   /** Change 5: one level of the location chain. Its remembered options are the ones saved under the level above; choosing
    *  a different value clears every level below it. */
-  const Loc = (k: LocationLevel, builtIns: readonly string[], labels?: Record<string, string>) => Opt({
-    k, listKey: locationListKey(d, k), builtIns, labels,
-    onPick: v => setD(prev => {
-      if ((prev[k] ?? undefined) === (v ?? undefined)) return prev;
-      return { ...prev, ...clearBelow(k), [k]: v, filledFrom: { ...(prev.filledFrom ?? {}), [k]: 'typed' } };
-    }),
+  // JoyChange008: each level only offers places under the level above it (domain/places.ts, cc001.ts). Locking an empty
+  // level until its parent is chosen is ready behind LOCK_UNTIL_PARENT (off until Joe confirms). Choosing something new at one level asks
+  // first when filled places below it would be cleared.
+  const applyLoc = (k: LocationLevel, v: string | undefined) => setD(prev => {
+    if ((prev[k] ?? undefined) === (v ?? undefined)) return prev;
+    return { ...prev, ...clearBelow(k), [k]: v, filledFrom: { ...(prev.filledFrom ?? {}), [k]: 'typed' } };
   });
+  const Loc = (k: LocationLevel, builtIns: readonly string[], labels?: Record<string, string>) => {
+    const parent = LOC_PARENT[k];
+    const lockedBy = LOCK_UNTIL_PARENT && parent && !(d[parent] ?? '').trim() && !(d[k] ?? '').trim() ? s.l[parent] : undefined;
+    return Opt({
+      k, listKey: locationListKey(d, k), builtIns, labels, lockedBy,
+      onPick: v => {
+        if ((d[k] ?? undefined) === (v ?? undefined)) return;
+        const below = LOCATION_LEVELS.slice(LOCATION_LEVELS.indexOf(k) + 1).filter(x => (d[x] ?? '').trim());
+        if (below.length) setClearAsk({ k, v, below }); else applyLoc(k, v);
+      },
+    });
+  };
   const pair = (...els: (JSX.Element | null | false)[]) => {
     const xs = els.filter(Boolean) as JSX.Element[];
     if (!xs.length) return null;
@@ -876,6 +891,8 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
             go({ name: 'listing' });
           }} />
       )}
+      {clearAsk && <Confirm lang={lang} danger={false} title={c008Strings[lang].clearQ(s.l[clearAsk.k])} body={c008Strings[lang].clearBody(clearAsk.below.map(x => s.l[x]).join(', '))}
+        okLabel={c008Strings[lang].clearOk} onCancel={() => setClearAsk(null)} onOk={() => { applyLoc(clearAsk.k, clearAsk.v); setClearAsk(null); }} />}
       {askUnchecked && <Confirm lang={lang} title={s.reviewQ} body={s.reviewBody(unchecked.length)} danger={false} okLabel={s.reviewSave}
         onCancel={() => { setAskUnchecked(false); afterSave.current = null; soldByRef.current = undefined; setOpen(o => new Set([...o, ...SECTION_IDS.filter(x => (SECTION_KEYS[x] ?? []).some(k => unchecked.includes(k)))])); }}
         onOk={() => { setAskUnchecked(false); save(true); }} />}

@@ -12,7 +12,7 @@ import { MapView, MapsNotice, useGoogleMaps } from './MapView';
 import { reverseGeocode, geocodeAddress, searchPlaces, GeocodeResult, Suggestion } from './google';
 import { c1017Strings } from '../ui/c1017Strings';
 import { usage } from '../usage/logger';
-import { checkField, COUNTRIES, MY_STATES, allBuiltInCities, allBuiltInTownships, FieldCheck } from '../domain/places';
+import { checkField, COUNTRIES, MY_STATES, allMalaysiaTowns, allBuiltInTownships, FieldCheck } from '../domain/places';
 import { listingStrings } from '../listing/strings';
 import type { Listing } from '../listing/model';
 import { Select } from '../ui/Select';
@@ -21,7 +21,7 @@ type FieldKey = 'country' | 'state' | 'city' | 'township' | 'street';
 const FIELDS: { key: FieldKey; list?: string; builtIns: () => readonly string[] }[] = [
   { key: 'country', list: 'country', builtIns: () => COUNTRIES },
   { key: 'state', list: 'state', builtIns: () => MY_STATES },
-  { key: 'city', list: 'city', builtIns: allBuiltInCities },
+  { key: 'city', list: 'city', builtIns: allMalaysiaTowns },   // JoyChange008: the full City / Town list
   { key: 'township', list: 'township', builtIns: allBuiltInTownships },
   { key: 'street', builtIns: () => [] },
 ];
