@@ -335,7 +335,11 @@ begin
                    when u.banned_until is not null and u.banned_until > now() then 'banned'
                    else coalesce(s.status, 'active') end,
     'status_reason', s.reason, 'force_logout_after', s.force_logout_after,
+    -- 'licence' stays ONE line of text, as Admin EAB (AdminBatch001) shows and exports it; the parts are in 'licence_detail'.
     'licence', case when l.number is null then null
+                    else concat_ws(' ', nullif(case l.type when 'FIRM' then 'Firm licence' else l.type end, ''), l.number)
+                         || case when l.verified then ' (verified)' else ' (not verified)' end end,
+    'licence_detail', case when l.number is null then null
                     else jsonb_build_object('type', l.type, 'number', l.number, 'verified', l.verified, 'verified_at', l.verified_at) end,
     'terms', (select jsonb_build_object('version', t.terms_version, 'at', t.at) from public.eab_terms_acceptance t
                where t.user_id = u.id and t.kind = 'terms' and t.accepted order by t.seq desc limit 1),

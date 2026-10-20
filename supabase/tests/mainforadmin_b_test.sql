@@ -88,7 +88,7 @@ begin
   j := public.eab_admin_verify_licence(a, true, 'Checked on the Board website');
   if (j->>'verified')::boolean then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [21 verify]'; end if;
   j := public.eab_admin_agent(a);
-  if j->>'status' = 'suspended' and j->'licence'->>'number' = 'REN 01234' and j->'terms'->>'version' = '1.0' and j->'last_login'->>'event' = 'sign_in'
+  if j->>'status' = 'suspended' and j->>'licence' = 'REN REN 01234 (verified)' and j->'licence_detail'->>'number' = 'REN 01234' and j->'terms'->>'version' = '1.0' and j->'last_login'->>'event' = 'sign_in'
   then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [22 agent view ' || left(j::text, 300) || ']'; end if;
   j := public.eab_admin_login_log(a, 50);
   if jsonb_array_length(j) >= 2 then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [23 login log rows]'; end if;
