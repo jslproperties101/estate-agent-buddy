@@ -8,11 +8,12 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { IconClose } from '../icons';
 import { strings, type Lang } from '../i18n';
+import { PickSearch, NoResults, matchesText } from './pickSearch';
 
 /** The app's language from the page (set by App), for the close button's words. */
 const pageLang = (): Lang => { const l = (typeof document !== 'undefined' ? document.documentElement.lang : '').toLowerCase(); return l.startsWith('ms') ? 'bm' : l.startsWith('zh') ? 'zh' : 'en'; };
 
-interface Opt { value: string; label: string; disabled: boolean }
+interface Opt { value: string; label: string; disabled: boolean; i: number }
 
 /** Sets a <select> the way a person choosing in it would, so React and any listener see a normal change. */
 export function chooseIn(el: HTMLSelectElement, value: string) {
@@ -42,16 +43,19 @@ export type SelectProps = EabProps & { children?: unknown };
 export function Select({ className, style, ...props }: SelectProps) {
   const ref = useRef<HTMLSelectElement | null>(null);
   const [open, setOpen] = useState<{ title: string; opts: Opt[]; value: string } | null>(null);
+  // JoyChange006 Change C: every pick list has a search bar; typing narrows the list at once.
+  const [q, setQ] = useState('');
   const id = useId();
   const setRef = (el: HTMLSelectElement | null) => { ref.current = el; };
   const show = () => {
     const el = ref.current;
     if (!el || el.disabled || props.multiple) return;
-    const opts = [...el.options].map(o => ({ value: o.value, label: o.label || o.text, disabled: o.disabled }));
+    const opts = [...el.options].map((o, i) => ({ value: o.value, label: o.label || o.text, disabled: o.disabled, i }));
+    setQ('');
     setOpen({ title: titleOf(el), opts, value: el.value });
   };
-  const close = () => { setOpen(null); ref.current?.focus({ preventScroll: true }); };
-  const pick = (v: string) => { const el = ref.current; setOpen(null); if (el) { chooseIn(el, v); el.focus({ preventScroll: true }); } };
+  const close = () => { setOpen(null); setQ(''); ref.current?.focus({ preventScroll: true }); };
+  const pick = (v: string) => { const el = ref.current; setOpen(null); setQ(''); if (el) { chooseIn(el, v); el.focus({ preventScroll: true }); } };
   const onKeyDown = (e: EabEvent<EabFormEl> & { altKey?: boolean; defaultPrevented?: boolean }) => {
     props.onKeyDown?.(e);
     if (e.defaultPrevented) return;
@@ -59,7 +63,16 @@ export function Select({ className, style, ...props }: SelectProps) {
   };
   // The chosen entry is in view when the list opens.
   const list = useRef<HTMLDivElement | null>(null);
-  useEffect(() => { if (open) list.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [open]);
+  // Focus goes to the chosen entry once, when the list opens (not on every keystroke in the search box).
+  const isOpen = open !== null;
+  useEffect(() => {
+    if (!isOpen) return;
+    const cur = list.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    cur?.focus({ preventScroll: true });
+    cur?.scrollIntoView({ block: 'nearest' });
+  }, [isOpen]);
+  const lang = pageLang();
+  const shown = open ? open.opts.filter(o => matchesText(o.label, q)) : [];
 
   return (
     <span className={`sel-wrap${props.disabled ? ' disabled' : ''}`} style={style}>
@@ -76,11 +89,13 @@ export function Select({ className, style, ...props }: SelectProps) {
               <strong id={`${id}-t`}>{open.title}</strong>
               <button type="button" className="fx-btn opt-pop-close" data-testid="pick-popup-close" aria-label={strings[pageLang()].c.close} title={strings[pageLang()].c.close} onClick={close}><IconClose size={15} /></button>
             </div>
+            <PickSearch lang={lang} value={q} onChange={setQ} label={open.title || undefined} testId="pick-search" />
             <div className="opt-list" role="listbox" aria-labelledby={`${id}-t`} ref={list}>
-              {open.opts.map((o, i) => (
-                <button key={`${i}-${o.value}`} type="button" role="option" aria-selected={o.value === open.value} disabled={o.disabled} className="opt-item"
-                  data-testid="pick-option" data-value={o.value} autoFocus={o.value === open.value} onClick={() => pick(o.value)}>{o.label}</button>
+              {shown.map(o => (
+                <button key={`${o.i}-${o.value}`} type="button" role="option" aria-selected={o.value === open.value} disabled={o.disabled} className="opt-item"
+                  data-testid="pick-option" data-value={o.value} onClick={() => pick(o.value)}>{o.label}</button>
               ))}
+              {!shown.length && <NoResults lang={lang} testId="pick-none" />}
             </div>
           </div>
         </div>,

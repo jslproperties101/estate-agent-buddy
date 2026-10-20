@@ -9,6 +9,8 @@ import type { Contact } from '../data/types';
 import { PropertyThumb } from '../ui/PropertyPicker';
 import type { Ranked } from './match';
 import { c048Strings } from './c048Strings';
+import { PickSearch, NoResults, matchesText, joy006Strings } from '../ui/pickSearch';
+import { searchProperties } from '../calculator/saved';
 
 export const NEW = 'new';
 
@@ -31,21 +33,26 @@ function NewRow({ text }: { text: string }) {
 export function PropertyMatchPicker({ lang, ranked, value, onChange }: { lang: Lang; ranked: Ranked<Listing>[]; value: string; onChange: (v: string) => void }) {
   const t = c048Strings[lang];
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');   // JoyChange006 Change C: search bar in every pick list
   const chosen = ranked.find(r => r.item.id === value)?.item;
   const top = ranked[0]?.score ? ranked[0].item.id : undefined;
-  const pick = (v: string) => { onChange(v); setOpen(false); };
+  const pick = (v: string) => { onChange(v); setOpen(false); setQ(''); };
+  const found = q.trim() ? new Set(searchProperties(ranked.map(r => r.item), q, Infinity).map(l => l.id)) : null;
+  const shownRanked = found ? ranked.filter(r => found.has(r.item.id)) : ranked;
   return (
     <div className="ff pp mp" data-testid="match-property">
       <span>{t.property}</span>
-      <button type="button" className="pp-current" aria-haspopup="listbox" aria-expanded={open} data-value={value} data-testid="match-property-current" onClick={() => setOpen(o => !o)}>
+      <button type="button" className="pp-current" aria-haspopup="listbox" aria-expanded={open} data-value={value} data-testid="match-property-current" onClick={() => { setOpen(o => !o); setQ(''); }}>
         {chosen ? <PropRow l={chosen} lang={lang} best={chosen.id === top} /> : <NewRow text={t.newProperty} />}
         <span className="pp-caret" aria-hidden="true">▾</span>
       </button>
       <small className="muted">{chosen ? t.chooseProperty : t.noMatchProperty}</small>
+      {open && <PickSearch lang={lang} value={q} onChange={setQ} label={t.property} testId="mp-search" />}
       {open && (
         <div className="pp-list" role="listbox" aria-label={t.property} data-testid="match-property-list">
           <button type="button" role="option" aria-selected={value === NEW} className="pp-opt" data-testid="mp-new" onClick={() => pick(NEW)}><NewRow text={t.newProperty} /></button>
-          {ranked.map(r => (
+          {found && !shownRanked.length && <NoResults lang={lang} testId="mp-none-found" />}
+          {shownRanked.map(r => (
             <button key={r.item.id} type="button" role="option" aria-selected={r.item.id === value} className="pp-opt" data-id={r.item.id} data-score={Math.round(r.score)}
               data-testid="mp-option" onClick={() => pick(r.item.id)}>
               <PropRow l={r.item} lang={lang} best={r.item.id === top} />
@@ -60,11 +67,13 @@ export function PropertyMatchPicker({ lang, ranked, value, onChange }: { lang: L
 export function ContactMatchPicker({ lang, ranked, all, value, onChange }: { lang: Lang; ranked: Ranked<Contact>[]; all: Contact[]; value: string; onChange: (v: string) => void }) {
   const t = c048Strings[lang];
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');   // JoyChange006 Change C: the agent finds a person by name or phone number
   // Matches first (best first), then every other buyer and vendor, so any saved contact can be chosen.
   const ids = new Set(ranked.map(r => r.item.id));
   const list = [...ranked.map(r => r.item), ...all.filter(c => !ids.has(c.id)).sort((a, b) => a.name.localeCompare(b.name))];
   const chosen = list.find(c => c.id === value);
-  const pick = (v: string) => { onChange(v); setOpen(false); };
+  const pick = (v: string) => { onChange(v); setOpen(false); setQ(''); };
+  const shownList = list.filter(c => matchesText(`${c.name} ${c.phone ?? ''}`, q));
   const row = (c: Contact) => (
     <span className="pp-row-inner"><span className="pp-text">
       <strong>{c.name}{c.id === ranked[0]?.item.id ? <span className="mp-best"> · {t.best}</span> : null}</strong>
@@ -74,15 +83,17 @@ export function ContactMatchPicker({ lang, ranked, all, value, onChange }: { lan
   return (
     <div className="ff pp mp" data-testid="match-contact">
       <span>{t.contact}</span>
-      <button type="button" className="pp-current" aria-haspopup="listbox" aria-expanded={open} data-value={value} data-testid="match-contact-current" onClick={() => setOpen(o => !o)}>
+      <button type="button" className="pp-current" aria-haspopup="listbox" aria-expanded={open} data-value={value} data-testid="match-contact-current" onClick={() => { setOpen(o => !o); setQ(''); }}>
         {chosen ? row(chosen) : <NewRow text={t.newContact} />}
         <span className="pp-caret" aria-hidden="true">▾</span>
       </button>
       <small className="muted">{chosen ? t.chooseContact : t.noMatchContact}</small>
+      {open && <PickSearch lang={lang} value={q} onChange={setQ} label={t.contact} placeholder={joy006Strings[lang].searchNamePhone} testId="mc-search" />}
       {open && (
         <div className="pp-list" role="listbox" aria-label={t.contact} data-testid="match-contact-list">
           <button type="button" role="option" aria-selected={value === NEW} className="pp-opt" data-testid="mc-new" onClick={() => pick(NEW)}><NewRow text={t.newContact} /></button>
-          {list.map(c => <button key={c.id} type="button" role="option" aria-selected={c.id === value} className="pp-opt" data-id={c.id} data-testid="mc-option" onClick={() => pick(c.id)}>{row(c)}</button>)}
+          {q.trim() && !shownList.length && <NoResults lang={lang} testId="mc-none-found" />}
+          {shownList.map(c => <button key={c.id} type="button" role="option" aria-selected={c.id === value} className="pp-opt" data-id={c.id} data-testid="mc-option" onClick={() => pick(c.id)}>{row(c)}</button>)}
         </div>
       )}
     </div>

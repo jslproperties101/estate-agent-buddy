@@ -121,14 +121,16 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
         <strong>{cx.prop.label}</strong>
         {prop ? (
           <div className="stack-sm">
-            <p className="small" data-testid="calc-from">{cx.prop.chosen([prop.ref, cardTitle(prop)].filter(Boolean).join(' · '))}</p>
+            <p className="small sr-only" data-testid="calc-from">{cx.prop.chosen([prop.ref, cardTitle(prop)].filter(Boolean).join(' · '))}</p>
             <small className="muted">{cx.prop.filled}</small>
-            <div className="two">
-              <button type="button" className="btn small secondary" onClick={() => setPicking(true)} data-testid="calc-change-property">{cx.prop.pick}</button>
-              <button type="button" className="btn small ghost" onClick={() => { setPropId(undefined); }} data-testid="calc-clear-property">{cx.prop.clear}</button>
-            </div>
+            <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={picking} onClick={() => setPicking(true)} data-testid="calc-change-property">
+              <span>{[prop.ref, cardTitle(prop)].filter(Boolean).join(' · ')}</span><span aria-hidden="true" className="opt-caret">▾</span>
+            </button>
+            <button type="button" className="btn small ghost" onClick={() => { setPropId(undefined); }} data-testid="calc-clear-property">{cx.prop.clear}</button>
           </div>
-        ) : <button type="button" className="btn small secondary" onClick={() => setPicking(true)} data-testid="calc-pick-property">{cx.prop.none} · {cx.prop.pick}</button>}
+        ) : <button type="button" className="opt-btn" aria-haspopup="listbox" aria-expanded={picking} onClick={() => setPicking(true)} data-testid="calc-pick-property">
+          <span>{cx.prop.none}</span><span aria-hidden="true" className="opt-caret">▾</span>
+        </button>}
         {picking && (
           <div className="stack-sm" data-testid="calc-picker">
             <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={cx.prop.search} aria-label={cx.prop.search} data-testid="calc-search" autoFocus />

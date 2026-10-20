@@ -1466,3 +1466,49 @@ html.website button:disabled, html.website [aria-disabled="true"] { cursor: not-
 .vp .sel-wrap { flex: 1 1 auto; width: 100%; }
 .share-row .sel-wrap { max-width: 100%; }
 .sel-scrim .opt-item:disabled { opacity: .45; }
+
+/* ============================================================================================================
+   JoyChange006 Batch 1 (Changes A, B, C)
+   ============================================================================================================ */
+
+/* Change A: a card in a scrolling list is as tall as its text. These cards have a minimum height, which switches off
+   the browser's rule "never shrink below your content", so in a short list they were squeezed and the price line of one
+   card ran over the next card's listing ID. flex-shrink: 0 keeps every card at its full height; the list scrolls instead. */
+:is(.opt-list, .pick-list, .pp-list, .country-list, .wa-list, .pdf-pages, .cmd-list-rows) > * { flex-shrink: 0; }
+.pp-opt, .pick-item { height: auto; }
+.pp-text, .pp-addr, .pp-ref, .opt-item { min-width: 0; overflow-wrap: anywhere; }
+
+/* Change B: ONE look for every dropdown button in the app (the look of the Property Calculator "No Property Selected"
+   button): text centred across the whole button, a down arrow at the far right, a lighter border, the empty words and the
+   chosen name both in gold. The buttons that open a list (.opt-btn, .pp-current) and the wrapped native lists
+   (.sel-wrap > select, which the app's own pop-up opens) all take it from here. To change the look, change these lines. */
+:root { --dd-line: #A89E86; --dd-bg: var(--card-2); --dd-inner: inset 0 0 0 1px rgba(168, 158, 134, .4); }
+.opt-btn, .pp-current, .sel-wrap > select {
+  border: 1px solid var(--dd-line); box-shadow: var(--dd-inner); border-radius: 12px; background-color: var(--dd-bg);
+  color: var(--gold-hi); text-align: center; font-weight: 400;
+}
+.opt-btn, .pp-current { position: relative; justify-content: center; padding-left: 40px; padding-right: 40px; overflow-wrap: anywhere; }
+.opt-btn > span:not(.opt-caret), .opt-btn .muted, .pp-current .muted, .pp-current .pp-addr { color: var(--gold-hi); }
+.opt-btn .opt-caret, .pp-current .pp-caret { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); margin: 0; }
+.pp-current .pp-row-inner { width: auto; max-width: 100%; justify-content: center; text-align: center; }
+.pp-current .pp-text { align-items: center; }
+.sel-wrap > select { padding: 0 40px; text-align: center; text-align-last: center; -moz-text-align-last: center;
+  /* the same small triangle as the ▾ on the other dropdown buttons */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M0 0h12L6 7z' fill='%23F6E3A1'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; }
+/* A finger leaves "hover" stuck on after a tap, so a dropdown only brightens its border; its inner line does not change. */
+:is(.opt-btn, .pp-current, .sel-wrap > select):hover:not(:disabled):not(:focus) { box-shadow: var(--dd-inner); border-color: #C4BAA0; }
+:is(.opt-btn, .pp-current, .sel-wrap > select):disabled { color: var(--field-disabled-ink); }
+/* The coloured borders that show a check-status (confirmed / owner stated / need to check) stay as they were. */
+.vp-confirmed .sel-wrap > select { border-color: var(--ok); }
+.vp-owner .sel-wrap > select { border-color: var(--orange); }
+.vp-check .sel-wrap > select, .vp-unknown .sel-wrap > select { border-color: var(--red); }
+
+/* Change C: the search box on top of a pick list stays in view while the list scrolls. */
+.pick-search { padding: 0 0 6px; }
+.pick-search input { min-height: 44px; }
+
+/* Change A: a long status ("Telah Ditempah" and the like) never runs under the "For sale / For rent" badges on the other
+   side of the same photo: when those badges are there, each side gets at most half the width. */
+.sc-txs ~ .sc-status { max-width: calc(50% - 6px); }
+.sc-grid .sc-txs ~ .sc-status { max-width: calc(50% - 4px); }

@@ -30,7 +30,7 @@ const en = {
     restored: 'Restored to the Subsale List.',
   },
   picker: {
-    none: 'No property', choose: 'Choose a property', noPhoto: 'No photo', listLabel: 'Properties', close: 'Close', noRef: 'No listing ID',
+    none: 'No property', choose: 'No Property Selected', search: 'Search properties', noPhoto: 'No photo', listLabel: 'Properties', close: 'Close', noRef: 'No listing ID',
   },
   history: {
     button: 'Buyer’s History',
@@ -116,7 +116,7 @@ const bm: C11Strings = {
     restored: 'Dipulihkan ke Senarai Subsale.',
   },
   picker: {
-    none: 'Tiada hartanah', choose: 'Pilih hartanah', noPhoto: 'Tiada foto', listLabel: 'Hartanah', close: 'Tutup', noRef: 'Tiada ID senarai',
+    none: 'Tiada hartanah', choose: 'Tiada Hartanah Dipilih', search: 'Cari hartanah', noPhoto: 'Tiada foto', listLabel: 'Hartanah', close: 'Tutup', noRef: 'Tiada ID senarai',
   },
   history: {
     button: 'Sejarah Pembeli',
@@ -201,7 +201,7 @@ const zh: C11Strings = {
     restored: '已恢复到二手房列表。',
   },
   picker: {
-    none: '不选房产', choose: '选择房产', noPhoto: '无照片', listLabel: '房产', close: '关闭', noRef: '无房源编号',
+    none: '不选房产', choose: '未选择房产', search: '搜索房产', noPhoto: '无照片', listLabel: '房产', close: '关闭', noRef: '无房源编号',
   },
   history: {
     button: '买家记录',
