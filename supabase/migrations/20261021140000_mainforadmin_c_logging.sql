@@ -3,7 +3,7 @@
 --   * platform may now also be tablet or desktop (the same words the login log uses)
 --   * usage detail is KEPT (Joe, 21 Oct 2026: 7 years). Before this, eab_usage_cleanup deleted detail older than 365 days.
 --     It now only refreshes the daily totals and deletes nothing. After 7 years Admin EAB lists what is due; Joe approves.
--- Safe to run twice. Rollback: supabase/rollback/20261021120000_mainforadmin_c_rollback.sql
+-- Safe to run twice. Rollback: supabase/rollback/20261021140000_mainforadmin_c_rollback.sql
 begin;
 
 do $$

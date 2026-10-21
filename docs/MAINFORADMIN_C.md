@@ -1,7 +1,7 @@
 # MainForAdmin-C — Logging (Stage C)
 
-Branch `joychange006`. Database: `supabase/migrations/20261021120000_mainforadmin_c_logging.sql`, rollback
-`supabase/rollback/20261021120000_mainforadmin_c_rollback.sql`, tests `supabase/tests/mainforadmin_c_test.sql` (5 checks).
+Branch `joychange006`. Database: `supabase/migrations/20261021140000_mainforadmin_c_logging.sql`, rollback
+`supabase/rollback/20261021140000_mainforadmin_c_rollback.sql`, tests `supabase/tests/mainforadmin_c_test.sql` (5 checks).
 Builds on the usage log from Changes 19/20 (`app/src/usage/logger.ts`, table `eab_usage_events`).
 
 ## Status

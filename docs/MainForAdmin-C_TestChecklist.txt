@@ -3,7 +3,7 @@ Written 21 Oct 2026. Status: built; unit tests passed (581); database tests on a
 NOT yet applied to EAB-QA-Test. NOT yet tested on a phone. Needs a new QA APK (ask Claude to build it).
 This list is mostly for CLAUDE to check in the test database after you use the app. You only have to USE the app.
 
-STEP 0 (once): paste supabase/migrations/20261021120000_mainforadmin_c_logging.sql in the EAB-QA-Test SQL editor and run it.
+STEP 0 (once): paste supabase/migrations/20261021140000_mainforadmin_c_logging.sql in the EAB-QA-Test SQL editor and run it.
 Then run supabase/tests/mainforadmin_c_test.sql: it should say "TEST RESULT: 5 passed, 0 failed".
 
 USE THE APP (signed in with your test account), about 10 minutes:

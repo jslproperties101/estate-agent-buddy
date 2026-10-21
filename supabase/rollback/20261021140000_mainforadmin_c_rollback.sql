@@ -1,4 +1,4 @@
--- Undoes 20261021120000_mainforadmin_c_logging.sql. Rows of the new kinds (command, marketing, language, push) and the
+-- Undoes 20261021140000_mainforadmin_c_logging.sql. Rows of the new kinds (command, marketing, language, push) and the
 -- new platforms stay in the table; the old rules are put back as NOT VALID, so they apply to new rows only.
 begin;
 alter table public.eab_usage_events drop constraint if exists eab_usage_events_kind_check;

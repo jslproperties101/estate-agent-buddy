@@ -1,4 +1,4 @@
--- Tests for 20261021120000_mainforadmin_c_logging.sql. One block that ends by raising 'TEST RESULT ...', so EVERY change
+-- Tests for 20261021140000_mainforadmin_c_logging.sql. One block that ends by raising 'TEST RESULT ...', so EVERY change
 -- is rolled back. Needs at least 1 user in auth.users. Good = "TEST RESULT: n passed, 0 failed".
 do $test$
 declare
