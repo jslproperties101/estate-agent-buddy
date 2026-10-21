@@ -1,0 +1,52 @@
+HANDOVER FOR THE ADMIN EAB DEVELOPER (repo jslproperties101/admin-eab)
+From: Joe Matthew / main app "Estate Agent AI Buddy" (repo jslproperties101/estate-agent-buddy)
+Date: 21 Oct 2026. Main-app commit 2943d53 on branch feature/qa-joychange006 (QA build).
+Nothing in the admin-eab repo was changed by the main app work. Everything below is what the Admin app can now USE.
+
+1. WHAT TO APPLY ON THE TEST DATABASE (EAB-QA-Test, project talksazsqsgjriamwxdp), IN THIS ORDER
+   Paste each file in the Supabase SQL editor. Production (vcimagencluybldngjzb) is NOT to be touched yet.
+   a) supabase/migrations/20261021210000_push_broadcast_counts.sql   (push sent / delivered / opened counts)
+   b) supabase/migrations/20261021220000_confidential_cloud_files.sql (confidential documents; main app only, no admin screen)
+   Both are safe to run twice. Rollbacks are in supabase/rollback/. Database tests: supabase/tests/push_broadcast_test.sql
+   (33 checks) and confidential_files_test.sql (23 checks); each ends with "TEST RESULT: n passed, 0 failed".
+   Earlier migrations (foundation, B, AdminBatch002, AdminBatch003, C, D) must already be applied.
+
+2. DEPLOY THE SENDER
+   supabase functions deploy send-push   (project EAB-QA-Test). The secret FCM_SERVICE_ACCOUNT must already be set; the
+   invitation pushes use the same one. Without it the function answers 503.
+
+3. WHAT ADMIN EAB CAN NOW DO (push alerts for posts: Market News, Projects, announcements)
+   - A post published with "send alert" ON is queued once by a database trigger. Never pushed twice.
+   - Send it: POST /functions/v1/send-push  with the admin's own sign-in token and body
+        {"kind":"feed","item_id":"<post id>"}      one post
+        {"kind":"feed"}                             every queued post (suggest a "Send waiting alerts" button)
+     Answer: {"items":[{"item_id","targeted","sent","failed","no_phone"}]}, or {"item_id","skipped":...} when already sent,
+     withdrawn, alert off or not yet due. 403 = signed-in person is not Owner/Admin. 503 = Firebase not set up.
+     The database writes "push_broadcast_started" to the admin audit log.
+   - Show counts: rpc eab_admin_push_report(p_item uuid) for one post, rpc eab_admin_push_list() for every post with an alert.
+     Fields: item_id, status (queued / sending / done), queued_at, started_at, finished_at, targeted, sent, failed, no_phone,
+     delivered, opened (list also has kind, title_en). Readable by Owner, Admin, Compliance, Viewer.
+   - eab_admin_feed_list is unchanged.
+   - Wording to use on screen: "Delivered" is a LOWER BOUND. Android shows a push by itself when the app is closed and does
+     not tell the app, so such a push counts as delivered only if the agent taps it. Do not label it exact delivery.
+
+4. OTHER MAIN-APP CHANGES THAT TOUCH ADMIN DATA
+   - Rented - Pending TA Signing (010-02): the stored status code is still rented_pending_ta. The phone shows it as its own
+     stage but it earns no commission until plain Rented. Admin counts by status code: no change needed, but do not add it
+     into rental totals if you want to match the phone.
+   - Confidential documents (010-05): main app only. Admin EAB reads through its own server functions and is NOT affected.
+     Title, owner correspondence and rental/sales documents are now in the cloud bucket (owner always; a Team Workspace
+     partner only when the owner ticks "Include confidential documents"). If Admin EAB ever lists agent files, that is a
+     data-protection point to check with Joe first.
+   - Shared Documents tray (010-04): phone only, nothing in the database.
+   - New audit events in the Team Workspace history: confidential_on, confidential_off (action "permission").
+
+5. KNOWN LIMITS
+   - Tapping an alert opens the app, not the post itself.
+   - Android only; iPhone does not register push yet.
+   - A send that stops half-way can be restarted after 15 minutes; a half-run that recorded nothing sends again to everyone.
+   - Push records are kept 7 years: an agent or post with push records cannot be deleted from the database.
+   - Not yet phone-tested; not on production.
+
+6. WHERE TO READ MORE (main repo, docs/)
+   JOYCHANGE010_03_PUSH.md, JOYCHANGE010_05_CONFIDENTIAL.md, JOYCHANGE010_MAIN.md, MAINFORADMIN_B/C/D.md.

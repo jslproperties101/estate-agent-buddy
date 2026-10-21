@@ -1,0 +1,43 @@
+JOYCHANGE010-03 / 04 / 05 - PHONE TEST CHECKLIST (QA build qa-2943d53, test database EAB-QA-Test)
+Before you start: the two database scripts (push counts, then confidential documents) are pasted in EAB-QA-Test and send-push is deployed.
+Use two Android phones signed in as two different agents who are in one Team Workspace (call them Agent A and Agent B).
+
+A. 010-02 Rented - Pending TA Signing (quick)
+ [ ] A1 Track My Sales shows "Rented - Pending TA Signing" as its own stage, just before Rented.
+ [ ] A2 It adds nothing to the commission totals and shows no deadlines.
+ [ ] A3 Tapping it opens the rental details.
+
+B. 010-03 Push alerts with counts
+ [ ] B1 In Admin EAB publish a Market News post with "send alert" ON, then press send (or call send-push kind feed).
+ [ ] B2 Agent phone (app closed) gets a notification in the "Market News and announcements" channel, in the phone's language.
+ [ ] B3 Tap it: the app opens and the megaphone shows the post as unread.
+ [ ] B4 Phone with the app OPEN also reports "received".
+ [ ] B5 Admin EAB counts show targeted / sent / failed / no phone / delivered / opened, and opened goes up after the tap.
+ [ ] B6 Sending the same post again is skipped (no second push).
+ [ ] B7 A suspended agent does not receive it.
+
+C. 010-04 Share into the app and Shared Documents
+ [ ] C1 In WhatsApp open a photo or PDF, tap Share: "Estate Agent AI Buddy Document Upload" is in the list with the app icon.
+ [ ] C2 Share 3 files at once: all arrive; the Shared Documents screen opens by itself with "3 files arrived".
+ [ ] C3 Subsale / Property List: "Shared Documents" button shows the number waiting.
+ [ ] C4 Open a file from the tray; Delete asks first.
+ [ ] C5 Move to property: pick a property (search works), see the guessed folder (a file named "geran" guesses Title), change it, Move.
+ [ ] C6 The file is now in that property's Documents, in the chosen folder, and leaves the tray.
+ [ ] C7 On a property page choose "Move to folder" on a document (Floor plans -> Title -> Other): saves at once.
+ [ ] C8 A share too big (over 50 MB) or a video is refused politely.
+ [ ] C9 Malay and Chinese phone language: the share-list name is translated.
+
+D. 010-05 Confidential documents in the cloud
+ [ ] D1 Agent A adds a Title document to a property. Sign in as A on a second phone (or the laptop website): the file opens there.
+ [ ] D2 Share the property with Agent B (view). Without the tick, B sees the property, photos and floor plan, but the Title shows
+        "Confidential - not shared with you" (not an error, not in Sync problems).
+ [ ] D3 Manage Sharing: under the shared property the box "Include confidential documents" is OFF by default.
+ [ ] D4 A ticks it: at B's next sync the Title downloads and opens.
+ [ ] D5 A unticks it: B can no longer open/download it.
+ [ ] D6 Share All: the single box "Include confidential documents of every property shared through Share All" works the same.
+ [ ] D7 A moves a document from Floor plans to Title: B (without the tick) loses access straight away; moving back restores it.
+ [ ] D8 Stop sharing / end Team Workspace: B loses everything.
+ [ ] D9 Team Workspace history shows "confidential on / off" lines.
+ [ ] D10 Property form note under the confidential folders reads correctly (English, Malay, Chinese).
+
+Report each failed line with a screenshot and the line number.

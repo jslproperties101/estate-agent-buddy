@@ -1,0 +1,41 @@
+HANDOVER - MAIN APP "Estate Agent AI Buddy", JoyChange010 (21 Oct 2026)
+Owner: Joe Matthew. QA build branch: feature/qa-joychange006, commit 2943d53. Work branch: joychange006.
+
+WHAT WAS BUILT (details in docs/JOYCHANGE010_MAIN.md)
+ 010-01 First-login Country box always shown with the Terms screen.
+ 010-02 Track My Sales: "Rented - Pending TA Signing" shown as its own stage, NOT in totals.
+ 010-03 Push alerts for Admin EAB posts, with sent / delivered / opened counts. (docs/JOYCHANGE010_03_PUSH.md)
+ 010-04 Share from WhatsApp or any app into "Estate Agent AI Buddy Document Upload"; Shared Documents tray; move to a property
+        and folder; move documents between folders. In-app only. (docs/JOYCHANGE010_04_SHARE.md)
+ 010-05 Confidential documents also go to the cloud; "Include confidential documents" tick per share, OFF by default,
+        enforced by the database. (docs/JOYCHANGE010_05_CONFIDENTIAL.md)
+
+TEST STATUS (honest)
+ Automated: unit 603 pass, lint pass, screen tests 186/186, database tests on a local PostgreSQL copy all pass
+ (foundation 34, B 32, AdminBatch002 21, AdminBatch003 34, C 5, D 26, push 33, confidential 23), sender 13/13 with fakes.
+ NOT done: nothing applied to EAB-QA-Test yet, send-push not deployed, nothing tested on a real phone, nothing on production.
+ The Android share list, WhatsApp hand-off, real push delivery and the Java share plugin can only be proven on a phone
+ (the Java was compiled against stand-in classes only).
+
+ORDER TO TEST ON EAB-QA-Test
+ 1. Paste supabase/migrations/20261021210000_push_broadcast_counts.sql.
+ 2. Paste supabase/migrations/20261021220000_confidential_cloud_files.sql. MUST be before anyone installs the new APK:
+    an app with 010-05 on a database without it would upload confidential files that a shared partner could read.
+ 3. Deploy send-push (needs the FCM_SERVICE_ACCOUNT secret).
+ 4. Install the QA APK (GitHub Releases, tag qa-2943d53) on an Android phone; follow the Dropbox test checklist.
+
+OPEN DECISIONS FOR JOE
+ - Team leaders in a shared workspace do NOT see confidential files today (only owner, assigned agent, workspace owner/admin,
+   and a partner with the tick). Change if wanted.
+ - Lawyer review of Terms and Privacy Notice: confidential documents are now stored in the cloud (Supabase).
+ - iPhone share and push: not built (needs Share Extension / iOS push).
+ - Files waiting in Shared Documents are on that phone only (not synced or backed up) until moved into a property.
+
+ROLLBACK
+ Database: supabase/rollback/20261021210000_push_broadcast_counts_rollback.sql (deletes all push counts) and
+ supabase/rollback/20261021220000_confidential_cloud_files_rollback.sql (partners can again download every file of a visible
+ property). App: install the previous QA build.
+
+HOW BUILDS WORK
+ Pushing to feature/qa-joychange006 builds the isolated QA APK and attaches it to a GitHub Release "qa-<commit>".
+ The local work branch joychange006 is a shallow copy; the 6 JoyChange010 commits were replayed on top of the QA branch.
