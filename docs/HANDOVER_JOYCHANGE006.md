@@ -34,7 +34,7 @@ Read this first in a new session. Then read the files it points to. Do not trust
 - Stage C (logging: feature/AI/Marketing logs, performance, crash reporting tool not chosen, sync failures, push delivered/opened).
 - Stage D (pushed content: feeds, Market News, Projects, announcements, force update, maintenance).
 - Follow-ups: native Android map + rotate; OSM neighbourhoods/streets; check journeys sync to cloud; BM/ZH wording to be confirmed by a native speaker; real support email/address (set in Admin EAB); lawyer review of Terms 1.1-draft; Privacy Notice; production DB catch-up.
-- Open question for Joe: should status `rented_pending_ta` count as a rental deal in Track My Sales?
+- Answered 21 Oct 2026 (JoyChange010-02): `rented_pending_ta` is listed in Track My Sales as its own stage but is not counted in the totals until it becomes plain Rented.
 
 ## Joe's rules (also in the project instructions)
 Name each batch and ask which model (ask again if it does not suit); short plain words; questions as clickable options (max 4); ask which app if unclear; never delete files without his explicit confirmation; never suggest stopping; all user text in EN/BM/ZH; record new change requests; after each batch give a test list and ask before putting it in Dropbox `/Estate Agent AI Buddy/` (Dropbox cannot edit in place, so new file each time).

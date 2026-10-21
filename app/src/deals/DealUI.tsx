@@ -255,7 +255,7 @@ export function DealLinks({ lang, l, go }: { lang: Lang; l: Listing; go: Go }) {
     if (l.deal?.soldBy !== 'others') out.push(btn('sale', x.openSale));
     if (l.deal?.soldBy !== 'me') out.push(btn('others', x.openOthers));
   }
-  if (l.status === 'rented' || l.deal?.rental) out.push(btn('rental', x.openRental));
+  if (l.status === 'rented' || l.status === 'rented_pending_ta' || l.deal?.rental) out.push(btn('rental', x.openRental));
   if (!out.length) return null;
   return <div className="card stack-sm" data-testid="deal-links"><div className="two-wrap">{out}</div></div>;
 }
@@ -271,7 +271,7 @@ export function TrackSalesScreen({ lang, go }: { lang: Lang; go: Go }) {
   const sum = totals(props, today);
   const due = upcoming(props, 60, today);
   const byId = new Map(props.map(p => [p.id, p]));
-  const kindFor = (st: Stage): DealKind => (st === 'rented' ? 'rental' : st === 'others' ? 'others' : st === 'booked' || st === 'cancelled' ? 'booking' : 'sale');
+  const kindFor = (st: Stage): DealKind => (st === 'rented' || st === 'rentpending' ? 'rental' : st === 'others' ? 'others' : st === 'booked' || st === 'cancelled' ? 'booking' : 'sale');
   return (
     <section className="stack" data-testid="track-sales">
       <div className="card stack-sm" data-testid="sales-totals">

@@ -210,8 +210,10 @@ export const ymdLocal = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() +
 const isDate = (s?: string): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 // ---------- Track My Sales ----------
-export type Stage = 'booked' | 'spa' | 'completed' | 'sold' | 'rented' | 'others' | 'cancelled';
-export const STAGES: Stage[] = ['booked', 'sold', 'spa', 'completed', 'rented', 'others', 'cancelled'];
+// JoyChange010-02: 'rentpending' = Rented - Pending TA Signing. Listed in Track My Sales, but no commission is counted and no
+// deadline is shown until the Tenancy Agreement is signed and the property becomes plain 'rented'.
+export type Stage = 'booked' | 'spa' | 'completed' | 'sold' | 'rentpending' | 'rented' | 'others' | 'cancelled';
+export const STAGES: Stage[] = ['booked', 'sold', 'spa', 'completed', 'rentpending', 'rented', 'others', 'cancelled'];
 
 /** Where a property's deal stands, from what was recorded (undefined: no deal). */
 export function stageOf(l: Pick<Listing, 'status' | 'deal'>, today = ymdLocal(new Date())): Stage | undefined {
@@ -219,6 +221,7 @@ export function stageOf(l: Pick<Listing, 'status' | 'deal'>, today = ymdLocal(ne
   const sale = dealValues(l, 'sale');
   const outcome = strVal(b.outcome);
   if (l.status === 'rented') return 'rented';
+  if (l.status === 'rented_pending_ta') return 'rentpending';
   if (l.status === 'sold') {
     if (l.deal?.soldBy === 'others') return 'others';
     const done = strVal(sale.completionDate);
@@ -233,7 +236,7 @@ export function stageOf(l: Pick<Listing, 'status' | 'deal'>, today = ymdLocal(ne
 
 /** What one deal is worth to the agent: received (with its date) or still pending. */
 export function commissionOf(l: Listing, stage: Stage): { received?: number; receivedOn?: string; pending?: number } {
-  if (stage === 'others' || stage === 'cancelled') return {};
+  if (stage === 'others' || stage === 'cancelled' || stage === 'rentpending') return {};
   if (stage === 'rented') {
     const r = dealValues(l, 'rental');
     const amount = numVal(r.commission) ?? rentCommissionRm(l);
@@ -290,7 +293,7 @@ export interface Deadline { key: string; date: string; propertyId: string; what:
  *  a finished sale keeps only its completion date. */
 export function dealDates(l: Listing, today = new Date()): Deadline[] {
   const st = stageOf(l, ymdLocal(today));
-  if (!st || st === 'others' || st === 'cancelled') return [];
+  if (!st || st === 'others' || st === 'cancelled' || st === 'rentpending') return [];
   const out: Deadline[] = [];
   const add = (what: Deadline['what'], date: string | undefined, n = 0) => { if (isDate(date)) out.push({ key: `${what}${n ? `-${n}` : ''}`, date, propertyId: l.id, what }); };
   const b = dealValues(l, 'booking');
