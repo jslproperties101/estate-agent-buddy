@@ -5,7 +5,7 @@ Status words: Planned / In progress / Implemented / Automated tests passed / CI 
 
 | No. | Change | Status |
 |---|---|---|
-| 010-01 | First-login screen: the Country box (saved country or Malaysia chosen; tap opens the searchable list) is shown whenever the Terms/consent screen appears, even if the account already has a country. Joe's answer: "Always show it when this consent screen appears". Reported from the phone test of build 6f4bd59 (screenshot: heading "Where Do You Work?" with only the two tick boxes). | Implemented; automated tests running; not on a phone |
+| 010-01 | First-login screen: the Country box (saved country or Malaysia chosen; tap opens the searchable list) is shown whenever the Terms/consent screen appears, even if the account already has a country. Joe's answer: "Always show it when this consent screen appears". Reported from the phone test of build 6f4bd59 (screenshot: heading "Where Do You Work?" with only the two tick boxes). | Automated tests passed (179 screen tests, 21 Oct); not on a phone |
 
 ## 010-01 detail
 - File: `app/src/App.tsx` (screen shown when `country.ask || terms.ask`; the country box now follows `country.ask || terms.ask`; the country is saved only if it changed or was being asked).
