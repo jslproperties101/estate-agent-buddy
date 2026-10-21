@@ -95,7 +95,9 @@ test('MB2 a forced sign-out applies to a sign-in made before it, not after it', 
 test('MB3 Terms not accepted yet: the tickboxes; Continue explains without the tick; the Terms open with the company name; the answer is saved', async () => {
   const { page, calls, ctx } = await phone({ account: active({ terms: null, marketing: null }) });
   await page.getByTestId('country-choice').waitFor({ timeout: 15000 });
-  assert.equal(await page.getByTestId('country-select').count(), 0, 'the country was chosen before: only the Terms are asked');
+  // Change 010-01: the country box is shown whenever this screen appears, with the saved country already chosen.
+  assert.equal(await page.getByTestId('country-select').count(), 1, 'the country box is on the Terms screen even when a country was saved');
+  assert.match(await page.getByTestId('country-select').innerText(), /Malaysia/);
   assert.equal(await page.getByTestId('terms-agree').isChecked(), false, 'both boxes start unticked');
   assert.equal(await page.getByTestId('marketing-agree').isChecked(), false);
   assert.match(await page.getByTestId('country-choice').innerText(), /special offers from JSL Global Trading/);

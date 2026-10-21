@@ -456,10 +456,11 @@ function Shell() {
         </main>
 
         {/* JoyChange002 Change 46: the country is asked first, once; then the sample-data choice. */}
+        {/* Change 010-01: whenever this consent screen appears, the country box is shown too (the saved country, or Malaysia, chosen). */}
         {/* MainForAdmin-B: the same first-login screen also asks for the Terms (and the optional news tick) when this account
             has not accepted the current version yet. */}
         {country.ask || terms.ask
-          ? <CountryChoice lang={lang} onChoose={country.choose} askCountry={country.ask} askTerms={terms.ask} onAccept={m => void terms.accept(m)} initial={state.settings.country} />
+          ? <CountryChoice lang={lang} onChoose={c => { if (country.ask || c !== state.settings.country) country.choose(c); }} askCountry={country.ask || terms.ask} askTerms={terms.ask} onAccept={m => void terms.accept(m)} initial={state.settings.country} />
           : needsStartChoice(state) && <StartChoice lang={lang} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
