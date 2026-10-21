@@ -8,7 +8,7 @@
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
-import { readFileSync, writeFileSync, existsSync, readdirSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, copyFileSync, mkdirSync } from 'node:fs';
 
 const cfg = JSON.parse(readFileSync('capacitor.config.json', 'utf8'));
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -70,8 +70,38 @@ edit(`${A}/AndroidManifest.xml`, s => {
             </intent-filter>
         $2`);
   }
+  // JoyChange010-04: the app in the phone's share list as "Estate Agent AI Buddy Document Upload" (its own label, the app's
+  // icon). An alias of MainActivity, so a share opens the running app (singleTask) and EabSharePlugin receives the files.
+  // Pictures and documents only (PDF, Word, Excel ...): no videos, no plain text.
+  if (!s.includes('EabShareTarget')) {
+    s = s.replace(/<\/application>/, `    <activity-alias
+            android:name=".EabShareTarget"
+            android:targetActivity=".MainActivity"
+            android:label="@string/eab_share_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/*" />
+            </intent-filter>
+        </activity-alias>
+    </application>`);
+  }
   return s;
 });
+
+// JoyChange010-04: the share-list label in the phone's language (English, Malay, Chinese).
+for (const [dir, label] of [['values', 'Estate Agent AI Buddy Document Upload'], ['values-ms', 'Muat Naik Dokumen Estate Agent AI Buddy'], ['values-zh', 'Estate Agent AI Buddy 文件上传']]) {
+  mkdirSync(`${A}/res/${dir}`, { recursive: true });
+  writeFileSync(`${A}/res/${dir}/eab_share.xml`, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="eab_share_label">${label}</string>\n</resources>\n`);
+}
 
 // 1b. JoyChange002 Change 25: Firebase Cloud Messaging. The Capacitor template applies the Google services Gradle plugin
 //     when android/app/google-services.json exists; the one file holds both the real and the QA app.
@@ -169,6 +199,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(EabFilesPlugin.class);
         // JoyChange003 Change 55: the app's own speech plugin (one warm recogniser, every event reported, clean restarts).
         registerPlugin(EabSpeechPlugin.class);
+        // JoyChange010-04: files shared into the app from WhatsApp or another app (Shared Documents tray).
+        registerPlugin(EabSharePlugin.class);
         super.onCreate(savedInstanceState);
         // Change 015: solid black system navigation area; app content (web page and AdMob banner) directly above it.
         getWindow().getDecorView().setBackgroundColor(Color.BLACK);
@@ -318,6 +350,141 @@ public class EabFilesPlugin extends Plugin {
         } catch (Exception e) {
             call.reject(e.getMessage() == null ? "no app can open this file" : e.getMessage());
         }
+    }
+}
+`);
+}
+
+// JoyChange010-04: the app's own share receiver, next to MainActivity. A share (one file or several) reaches MainActivity
+// through the EabShareTarget alias. Each file is copied, on a background thread, from the sending app into the app's private
+// cache (cache/eab-shared), at most 20 files and 50 MB each (bigger ones are reported by name, not copied). Only content://
+// addresses are accepted (never file:// paths). The intent is cleared once read, so turning the phone or reopening the app
+// never adds the same files twice. take() hands the list to the app and empties it; remove() deletes copies the app has read.
+{
+  const pkg = /^package ([^;]+);/m.exec(readFileSync(mainActivity, 'utf8'))?.[1];
+  if (!pkg) throw new Error(`No package line in ${mainActivity}`);
+  writeFileSync(mainActivity.replace(/MainActivity\.java$/, 'EabSharePlugin.java'), `package ${pkg};
+
+import android.content.ContentResolver;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@CapacitorPlugin(name = "EabShare")
+public class EabSharePlugin extends Plugin {
+    private static final long MAX_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_FILES = 20;
+    private final List<JSObject> pending = new ArrayList<>();
+
+    @Override
+    public void load() { receive(getActivity().getIntent()); }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        receive(intent);
+    }
+
+    private void receive(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        if (!Intent.ACTION_SEND.equals(action) && !Intent.ACTION_SEND_MULTIPLE.equals(action)) return;
+        final List<Uri> uris = new ArrayList<>();
+        try {
+            if (Intent.ACTION_SEND.equals(action)) {
+                Uri u = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (u != null) uris.add(u);
+            } else {
+                ArrayList<Uri> l = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+                if (l != null) uris.addAll(l);
+            }
+        } catch (Exception e) { /* a malformed share: nothing to take */ }
+        final String type = intent.getType();
+        // read once: a rotation or a later reopen must not add the same files again
+        getActivity().setIntent(new Intent(Intent.ACTION_MAIN));
+        if (uris.isEmpty()) return;
+        new Thread(() -> {
+            int n = 0;
+            for (Uri u : uris) {
+                if (n >= MAX_FILES) break;
+                JSObject f = copy(u, type);
+                if (f == null) continue;
+                synchronized (pending) { pending.add(f); }
+                n++;
+            }
+            if (n > 0) notifyListeners("shared", new JSObject(), true);
+        }).start();
+    }
+
+    private JSObject copy(Uri u, String fallbackType) {
+        if (u == null || !"content".equals(u.getScheme())) return null;
+        ContentResolver cr = getContext().getContentResolver();
+        String name = null; long size = -1;
+        try (Cursor c = cr.query(u, new String[] { OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE }, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int ni = c.getColumnIndex(OpenableColumns.DISPLAY_NAME), si = c.getColumnIndex(OpenableColumns.SIZE);
+                if (ni >= 0) name = c.getString(ni);
+                if (si >= 0 && !c.isNull(si)) size = c.getLong(si);
+            }
+        } catch (Exception e) { /* the name stays unknown */ }
+        String mime = cr.getType(u);
+        if (mime == null) mime = fallbackType;
+        JSObject f = new JSObject();
+        f.put("name", name == null ? "" : name);
+        if (mime != null) f.put("mime", mime);
+        if (size > MAX_BYTES) { f.put("tooBig", true); return f; }
+        File dir = new File(getContext().getCacheDir(), "eab-shared");
+        if (!dir.exists() && !dir.mkdirs()) return null;
+        File out = new File(dir, UUID.randomUUID().toString());
+        long total = 0;
+        try (InputStream in = cr.openInputStream(u); OutputStream o = new FileOutputStream(out)) {
+            if (in == null) return null;
+            byte[] buf = new byte[65536]; int r;
+            while ((r = in.read(buf)) > 0) {
+                total += r;
+                if (total > MAX_BYTES) { o.close(); out.delete(); f.put("tooBig", true); return f; }
+                o.write(buf, 0, r);
+            }
+        } catch (Exception e) { out.delete(); return null; }
+        f.put("size", total);
+        f.put("path", out.getAbsolutePath());
+        return f;
+    }
+
+    @PluginMethod
+    public void take(PluginCall call) {
+        JSArray files = new JSArray();
+        synchronized (pending) { for (JSObject f : pending) files.put(f); pending.clear(); }
+        JSObject r = new JSObject();
+        r.put("files", files);
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void remove(PluginCall call) {
+        try {
+            File dir = new File(getContext().getCacheDir(), "eab-shared").getCanonicalFile();
+            JSArray paths = call.getArray("paths");
+            if (paths != null) for (int i = 0; i < paths.length(); i++) {
+                File f = new File(paths.getString(i)).getCanonicalFile();
+                if (dir.equals(f.getParentFile())) f.delete();   // only the app's own share copies
+            }
+        } catch (Exception e) { /* leftovers are emptied by Android with the cache */ }
+        call.resolve();
     }
 }
 `);

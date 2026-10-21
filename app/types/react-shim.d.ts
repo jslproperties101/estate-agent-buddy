@@ -45,7 +45,7 @@ declare namespace JSX {
 }
 // @capacitor/core is installed only for the Android/iOS build; type-check against the same small surface the app uses.
 declare module '@capacitor/core' {
-  export const Capacitor: { isNativePlatform(): boolean; getPlatform(): string; isPluginAvailable(name: string): boolean };
+  export const Capacitor: { isNativePlatform(): boolean; getPlatform(): string; isPluginAvailable(name: string): boolean; convertFileSrc(path: string): string };
   export function registerPlugin<T = any>(name: string): T;
 }
 

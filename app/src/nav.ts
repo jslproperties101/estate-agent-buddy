@@ -32,6 +32,8 @@ export type Screen =
   // JoyChange002: the Project feature (new developments)
   | { name: 'projects' }
   | { name: 'marketNews' }
+  // JoyChange010-04: files shared into the app, waiting to be moved into a property
+  | { name: 'sharedDocs' }
   | { name: 'projectDetail'; id: string }
   | { name: 'projectForm'; id?: string }
   | { name: 'dealForm'; id?: string; propertyId?: string }

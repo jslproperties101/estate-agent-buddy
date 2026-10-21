@@ -18,8 +18,11 @@ import {
   Listing, Filters, applyFilters, activeCount, TYPES, TENURES, LOT_TYPES, CATEGORIES, STATUS_KEYS, DEFAULT_STATUSES, HIDDEN_BY_DEFAULT,
   BED_CHOICES, BATH_CHOICES, statusKey, StatusKey, rentPrices,
   rm, rmShort, sqft, landText, yearsRemaining, cardTitle, mainPhoto, commissionRm, rentCommissionRm, forRent, forSale, fieldsFor,
-  CONFIDENTIAL_DOCS, DOC_CATEGORIES, hasPosition, phoneDigits, usablePhone, Doc, orderedPhotos, unitLot, restrictionValue,
+  CONFIDENTIAL_DOCS, DOC_CATEGORIES, hasPosition, phoneDigits, usablePhone, Doc, DocCategory, orderedPhotos, unitLot, restrictionValue,
 } from './model';
+import { Select as PickList } from '../ui/Select';
+import { shareStrings } from '../share/strings';
+import { sharedTray, moveDocToFolder } from '../share/inbox';
 import { shownState, VerifyState } from './verify';
 import { Change } from './commands';
 import { adStrings } from '../adverts/strings';
@@ -32,7 +35,7 @@ import { marketingStrings } from '../marketing/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { PropertyBuyersCard } from '../contacts/MatchUI';
 import { buyerStrings } from './buyerPdf';
-import { useApp, useStore } from '../data/useStore';
+import { useApp } from '../data/useStore';
 import { Go, FormSection } from '../nav';
 import { SectionCard, StoredImage, Confirm } from '../ui/common';
 import { deleteListing } from './deleteListing';
@@ -184,6 +187,10 @@ export function PropertyListing({ lang, go, initial }: { lang: Lang; go: Go; ini
   return (
     <section className="stack listing" data-testid="listing">
       <button className="btn primary add-property" onClick={() => go({ name: 'listingForm' })}><span aria-hidden="true">＋</span> {s.add}</button>
+      {/* JoyChange010-04: the Shared Documents folder (files shared into the app from WhatsApp or another app). */}
+      <button type="button" className="btn secondary shared-docs-btn" data-testid="open-shared-docs" onClick={() => go({ name: 'sharedDocs' })}>
+        <span aria-hidden="true">📥</span> {shareStrings[lang].title}{sharedTray(state).length ? ` · ${sharedTray(state).length}` : ''}
+      </button>
       <div className="lc-toolbar">
         <input aria-label={s.f.location} placeholder={s.search} value={f.location ?? ''} onChange={e => set({ location: e.target.value || undefined })} />
         <button className="btn secondary" aria-expanded={open} onClick={() => setOpen(o => !o)}>{s.filters}{n ? ` · ${n}` : ''}</button>
@@ -549,7 +556,7 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
         <div className="doc-sum">
           {DOC_CATEGORIES.map(cat => <div key={cat}><span>{s.docCat[cat]}{CONFIDENTIAL_DOCS.includes(cat) ? ' 🔒' : ''}</span><strong>{docs.filter(d => d.category === cat).length}</strong></div>)}
         </div>
-        {docs.map(d => <DocRow key={d.id} d={d} s={s} lang={lang} />)}
+        {docs.map(d => <DocRow key={d.id} d={d} s={s} lang={lang} propertyId={l.id} />)}
       </SectionCard>
 
       <PropertyBuyersCard lang={lang} p={l} go={go} />
@@ -566,13 +573,33 @@ export function ListingDetails({ lang, id, go }: { lang: Lang; id: string; go: G
   );
 }
 
-function DocRow({ d, s, lang }: { d: Doc; s: ListingStrings; lang: Lang }) {
-  const store = useStore();
+function DocRow({ d, s, lang, propertyId }: { d: Doc; s: ListingStrings; lang: Lang; propertyId: string }) {
+  const { state, store } = useApp();
+  const toast = useToast();
+  const t = shareStrings[lang];
+  const mayEdit = !d.dealKey && can(state, 'edit', 'properties', propertyId) && !state.properties.find(x => x.id === propertyId)?.archived;
+  // JoyChange010-04: move the document to another folder straight from the property page (saved at once).
+  async function moveTo(to: DocCategory) {
+    const now = store.getState();
+    const p = now.properties.find(x => x.id === propertyId);
+    if (!p || p.archived || !can(now, 'edit', 'properties', p.id)) { toast(teamStrings[lang].notAllowed, 'error'); return; }
+    const removed: string[] = [];
+    const documents = await moveDocToFolder(store, p.documents ?? [], d.id, to, (_added, gone) => { if (gone) removed.push(gone); });
+    store.upsert('properties', { ...p, documents });
+    for (const f of removed) store.removeFile(f);
+    await store.flush();   // the message means it is saved on the phone
+    toast(t.folderChanged(s.docCat[to]));
+  }
   return (
     <div className="doc-row"><span>{d.name}</span>
       {d.fileId
         ? <button className="btn small secondary" onClick={() => void store.fileUrl(d.fileId!).then(u => { if (u) window.open(u, '_blank'); })}>{s.open1}</button>
         : <small className="muted">{s.sample}</small>}
+      {mayEdit && (
+        <PickList aria-label={t.moveToFolder} data-testid="doc-move" className="doc-move" value={d.category} onChange={e => void moveTo(e.target.value as DocCategory)}>
+          {DOC_CATEGORIES.map(c => <option key={c} value={c}>{s.docCat[c]}{CONFIDENTIAL_DOCS.includes(c) ? ' 🔒' : ''}</option>)}
+        </PickList>
+      )}
       <FileBadge lang={lang} fileId={d.fileId} />
     </div>
   );
