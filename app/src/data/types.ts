@@ -431,6 +431,8 @@ export interface TeamState {
   sharesGiven: { workspaceId: string; collection: CollectionName; recordId: string; level: ShareLevel }[];
   shareAllGiven: { scope: ShareScope; level: ShareLevel }[];
   shareAllReceived: { scope: ShareScope; level: ShareLevel; ownerId: string }[];
+  /** JoyChange010-05: my "Include confidential documents" switches that are on: for Share All, and per property ("workspace:id"). */
+  confidential?: { all: boolean; records: string[] };
   deleteRequests: DeleteRequest[];
   /** When this was read from the cloud (ms). */
   at: number;

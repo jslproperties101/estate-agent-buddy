@@ -8,6 +8,8 @@ export interface ShareStrings {
   moved: (folder: string, property: string) => string; noProperty: string; notAllowed: string; gone: string;
   arrived: (n: number) => string; tooBig: (names: string) => string; full: (n: number) => string; unreadable: (n: number) => string;
   added: (when: string) => string; moveToFolder: string; folderChanged: (folder: string) => string; trayNote: string;
+  /** JoyChange010-05 */
+  notSharedConfidential: string; includeConfidential: string; includeConfidentialHelp: string; includeConfidentialAll: string; confidentialSaved: (on: boolean) => string;
 }
 
 const en: ShareStrings = {
@@ -22,6 +24,11 @@ const en: ShareStrings = {
   unreadable: n => (n === 1 ? '1 file could not be read.' : `${n} files could not be read.`),
   added: w => `Added ${w}`, moveToFolder: 'Move to folder', folderChanged: f => `Moved to ${f}.`,
   trayNote: 'Files here are on this phone only until you move them into a property.',
+  notSharedConfidential: 'Confidential — not shared with you',
+  includeConfidential: 'Include confidential documents 🔒',
+  includeConfidentialHelp: 'Title documents, owner correspondence and rental or sales documents. Off: they see the property, photos and other documents only.',
+  includeConfidentialAll: 'Include confidential documents of every property shared through Share All 🔒',
+  confidentialSaved: on => (on ? 'Confidential documents now shared.' : 'Confidential documents no longer shared.'),
 };
 
 const bm: ShareStrings = {
@@ -36,6 +43,11 @@ const bm: ShareStrings = {
   unreadable: n => `${n} fail tidak dapat dibaca.`,
   added: w => `Ditambah ${w}`, moveToFolder: 'Pindah ke folder', folderChanged: f => `Dipindah ke ${f}.`,
   trayNote: 'Fail di sini hanya berada di telefon ini sehingga anda memindahkannya ke dalam hartanah.',
+  notSharedConfidential: 'Sulit — tidak dikongsi dengan anda',
+  includeConfidential: 'Sertakan dokumen sulit 🔒',
+  includeConfidentialHelp: 'Dokumen hakmilik, surat-menyurat pemilik dan dokumen sewa atau jual. Tutup: mereka hanya melihat hartanah, foto dan dokumen lain.',
+  includeConfidentialAll: 'Sertakan dokumen sulit setiap hartanah yang dikongsi melalui Kongsi Semua 🔒',
+  confidentialSaved: on => (on ? 'Dokumen sulit kini dikongsi.' : 'Dokumen sulit tidak lagi dikongsi.'),
 };
 
 const zh: ShareStrings = {
@@ -50,6 +62,11 @@ const zh: ShareStrings = {
   unreadable: n => `${n} 个文件无法读取。`,
   added: w => `添加于 ${w}`, moveToFolder: '移到文件夹', folderChanged: f => `已移到 ${f}。`,
   trayNote: '这里的文件只保存在这部手机上，直到您把它们移入房产。',
+  notSharedConfidential: '机密 — 未与您共享',
+  includeConfidential: '包括机密文件 🔒',
+  includeConfidentialHelp: '地契文件、屋主往来信息和租赁或买卖文件。关闭时：对方只能看到房产、照片和其他文件。',
+  includeConfidentialAll: '包括通过“全部共享”共享的每个房产的机密文件 🔒',
+  confidentialSaved: on => (on ? '机密文件现已共享。' : '机密文件已不再共享。'),
 };
 
 export const shareStrings: Record<Lang, ShareStrings> = { en, bm, zh };

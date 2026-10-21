@@ -141,23 +141,21 @@ test('J10-04d deleting from the tray removes the file from the phone', async () 
   assert.equal(removeShared(s, f.id), false);
 });
 
-test('J10-04e moving a document between folders keeps the file; into a confidential folder an uploaded file gets a private copy', async () => {
+test('J10-04e moving a document between folders keeps the same file (JoyChange010-05: the database decides who reads it by folder)', async () => {
   const s = await fresh();
   const local = await s.putFile(blob('plan'));
   const docs = [{ id: 'd1', category: 'floorplan' as const, name: 'plan.pdf', fileId: local, added: 1 }, { id: 'd2', category: 'other' as const, name: 'x.pdf', fileId: 'f2', added: 2 }];
   let moved = await moveDocToFolder(s, docs, 'd1', 'brochure');
   assert.equal(moved.find(d => d.id === 'd1')!.category, 'brochure');
-  assert.equal(moved.find(d => d.id === 'd1')!.fileId, local, 'same file, never left the phone');
-  // the file was already uploaded to the shared team bucket: moving it into Title documents makes a private copy
   s.setFileEntry({ ...s.fileEntry(local)!, status: 'uploaded' });
-  const changes: [string | undefined, string | undefined][] = [];
+  const changes: unknown[] = [];
   moved = await moveDocToFolder(s, moved, 'd1', 'title', (a, g) => changes.push([a, g]));
   const d1 = moved.find(d => d.id === 'd1')!;
-  assert.equal(d1.category, 'title');
-  assert.notEqual(d1.fileId, local);
-  assert.deepEqual(changes, [[d1.fileId, local]]);
+  assert.deepEqual({ cat: d1.category, file: d1.fileId }, { cat: 'title', file: local }, 'same file, no copy');
+  assert.deepEqual(changes, [], 'nothing added or removed');
   s.upsert('properties', { ...s.getState().properties.find(x => x.id === 'p1')!, documents: moved });
-  assert.ok(!cloudFileRefs(s.getState()).some(r => r.fileId === d1.fileId), 'the new copy never goes to the team bucket');
+  const ref = cloudFileRefs(s.getState()).find(r => r.fileId === local)!;
+  assert.ok(ref && ref.confidential, 'goes to the cloud, marked confidential');
   assert.equal(await moveDocToFolder(s, moved, 'd1', 'title'), moved, 'same folder: nothing changes');
 });
 

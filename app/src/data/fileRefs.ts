@@ -3,13 +3,12 @@
 // cloud.
 //
 // Confidential documents (title, owner correspondence, rental/sales and transaction papers — CONFIDENTIAL_DOCS) are
-// marked `confidential`. Owner decision (16 Oct 2026):
-//  - they ARE in the owner's own backups: the backup file, the readable Google Drive folders and the Drive restore
-//    points (the owner's own Google account), so the owner can recover everything;
-//  - they are NEVER put in the shared Supabase file bucket. In that bucket a file is readable by anyone who may read its
-//    record (supabase/tests/file-access-test.sh), so sharing a property with a team member would hand over its title
-//    deed. Keeping them out of the bucket means sharing a record never exposes its confidential documents, and ending a
-//    share or a Team Workspace leaves nothing of them behind with the other agent.
+// marked `confidential`. JoyChange010-05 (Joe, 21 Oct 2026; replaces the owner decision of 16 Oct 2026):
+//  - they go to the cloud like every other file, so the agent has them on every phone and the laptop website, and they
+//    stay in the owner's own backups (backup file, Google Drive folders and restore points);
+//  - the DATABASE decides who may download them (supabase/migrations/20261021220000_confidential_cloud_files.sql): the
+//    owner (and the agent it is assigned to, and the workspace owner / admin) always; a Team Workspace partner only when
+//    the owner switched on "Include confidential documents" for that share. Off by default.
 import type { AppState, CollectionName } from './types';
 import { CONFIDENTIAL_DOCS } from '../listing/model';
 
@@ -22,7 +21,7 @@ export interface FileRef {
   mime?: string;
   /** Document category, for documents. */
   category?: string;
-  /** True for confidential documents: in the owner's own backups and Drive, never in the shared cloud file bucket. */
+  /** True for confidential documents: in the cloud, but a partner may download them only when the owner allowed it. */
   confidential?: boolean;
 }
 
@@ -42,5 +41,6 @@ export function fileRefs(state: Pick<AppState, 'properties' | 'banners'>): FileR
   return out;
 }
 
-/** Files that may go to the shared cloud file bucket: everything except confidential documents (owner-only). */
-export const cloudFileRefs = (state: Pick<AppState, 'properties' | 'banners'>): FileRef[] => fileRefs(state).filter(r => !r.confidential);
+/** Files that go to the cloud file bucket: all of them (JoyChange010-05). Who may read a confidential one is decided by
+ *  the database. Kept as its own name so the sync code reads the same. */
+export const cloudFileRefs = (state: Pick<AppState, 'properties' | 'banners'>): FileRef[] => fileRefs(state);

@@ -2,6 +2,7 @@
 // the Personal / Team Workspace switch, and the small sharing labels on records. Every action is decided by the cloud
 // (functions in supabase/proposed/20261016000000_change010_*.sql) and re-checked with the access policy at the moment
 // it is pressed; these screens never assume a permission still holds.
+import { shareStrings } from '../share/strings';
 import { useEffect, useMemo, useState } from 'react';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
@@ -17,7 +18,7 @@ import { recordTitle } from '../sync/SyncUI';
 import type { CollectionName, ShareLevel, ShareScope, AppState } from '../data/types';
 import { SHARE_SCOPES } from '../data/types';
 import {
-  refreshTeam, sendInvite, cancelInvite, acceptInvite, declineInvite, leaveTeam, removeMember, setShares, setShareAll,
+  refreshTeam, sendInvite, cancelInvite, acceptInvite, declineInvite, leaveTeam, removeMember, setShares, setShareAll, setConfidential,
   decideDelete, inviteLink, tokenFrom, teamErrorOf, TeamError,
 } from './api';
 import { partnerOf, myId, personLabel, isTeamOwner, inTeam, myShareOf, creatorNames, otherCreators, creatorLabel, creatorKeyOf, scopesOf, sharedInfo, creatorOf, levelOf, labelForUser, can } from './access';
@@ -304,6 +305,8 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [askAll, setAskAll] = useState<{ scope: ShareScope; level: ShareLevel } | null>(null);
+  // JoyChange010-05: the tick shows at once; it goes back if saving fails.
+  const [confNow, setConfNow] = useState<Record<string, boolean>>({});
 
   const rows: Row[] = useMemo(() => {
     const out: Row[] = [];
@@ -346,6 +349,18 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
     } catch (e) { setMsg(t.err[teamErrorOf(e).code] ?? t.err.other); }
     setBusy(false);
   };
+  // JoyChange010-05: "Include confidential documents" (off by default), saved at once.
+  const sx = shareStrings[lang];
+  const myWs = state.meta.syncSession?.workspaceId;
+  const confOn = (id: string | null) => confNow[id ?? '*'] ?? (id === null ? !!team.confidential?.all : !!team.confidential?.records.includes(`${myWs}:${id}`));
+  const applyConfidential = async (id: string | null, on: boolean) => {
+    const key = id ?? '*';
+    setConfNow(c => ({ ...c, [key]: on })); setBusy(true); setMsg('');
+    try { await setConfidential(store, cfg, id, on); setMsg(sx.confidentialSaved(on)); toast(sx.confidentialSaved(on)); }
+    catch (e) { setMsg(t.err[teamErrorOf(e).code] ?? t.err.other); }
+    setConfNow(c => { const n = { ...c }; delete n[key]; return n; });   // the saved state (or the old one after a failure) shows
+    setBusy(false);
+  };
   const applyAll = async (scope: ShareScope, lv: ShareLevel | null) => {
     setBusy(true); setMsg('');
     try { await setShareAll(store, cfg, scope, lv); setMsg(t.savedN(1)); toast(t.savedN(1)); }
@@ -377,6 +392,11 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
               </Select>
             </label>
           ))}
+          {allLevel('properties') && team.confidential && (
+            <label className="check" data-testid="confidential-all">
+              <input type="checkbox" checked={confOn(null)} disabled={busy} onChange={e => void applyConfidential(null, e.target.checked)} /> {sx.includeConfidentialAll}
+            </label>
+          )}
           <small className="muted">{t.calculatorPrivate}</small>
         </div>
 
@@ -394,12 +414,19 @@ export function ManageSharingScreen({ lang, focus }: { lang: Lang; focus?: strin
                     <Select aria-label={`${r.title}: ${t.recipient}`} value={level(r) ?? ''} onChange={e => setChanges(c => ({ ...c, [k]: (e.target.value || null) as ShareLevel | null }))}>
                       <option value="">{t.notShared}</option><option value="view">{t.viewOnly}</option><option value="edit">{t.viewEdit}</option>
                     </Select>
+                    {/* JoyChange010-05: only for a property that is shared now (saved, or through Share All) */}
+                    {r.collection === 'properties' && team.confidential && (r.selected || r.viaAll) && (
+                      <label className="check small" data-testid="confidential-one">
+                        <input type="checkbox" checked={confOn(r.id) || confOn(null)} disabled={busy || confOn(null)} onChange={e => void applyConfidential(r.id, e.target.checked)} /> {sx.includeConfidential}
+                      </label>
+                    )}
                   </li>
                 );
               })}
             </ul>
           )}
           <button className="btn primary" disabled={busy} data-testid="save-sharing" onClick={() => void saveAll()}>{busy ? t.saving : t.save}{pending.length ? ` (${pending.length})` : ''}</button>
+          <small className="muted">{shareStrings[lang].includeConfidentialHelp}</small>
           <small className="muted">{t.noOnward}</small>
         </div>
       </>}

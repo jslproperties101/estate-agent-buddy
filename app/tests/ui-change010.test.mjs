@@ -194,6 +194,31 @@ test('C3 Manage Sharing (gear): search, View Only for one listing, Share All wit
   await a.ctx.close(); await b.ctx.close();
 });
 
+test('C3b JoyChange010-05: a shared property gets "Include confidential documents", off until the owner ticks it; not shown for unshared ones', async () => {
+  const cloud = new FakeTeamCloud();
+  const { a, b } = await joined(cloud);
+  await openTeam(a.page);
+  await a.page.getByTestId('team-members').getByTestId('open-manage-sharing').click();
+  await a.page.getByTestId('manage-sharing').waitFor();
+  await a.page.locator('[data-field="findRecord"]').fill('Aina 1');
+  assert.equal(await a.page.getByTestId('confidential-one').count(), 0, 'not shared yet: no switch');
+  await a.page.getByTestId('share-row').locator('select').selectOption('view');
+  await a.page.getByTestId('save-sharing').click();
+  await a.page.getByTestId('sharing-msg').waitFor();
+  const box = a.page.getByTestId('confidential-one').locator('input');
+  await box.waitFor();
+  assert.equal(await box.isChecked(), false, 'off by default');
+  assert.match(await a.page.getByTestId('confidential-one').innerText(), /Include confidential documents/);
+  await box.check();
+  await a.page.getByText('Confidential documents now shared.').first().waitFor();
+  assert.ok(cloud.confidential.has('team-1|u-aina@x.com|ws-aina@x.com|pa1'));
+  assert.equal(await box.isChecked(), true);
+  await box.uncheck();
+  await a.page.getByText('Confidential documents no longer shared.').first().waitFor();
+  assert.equal(cloud.confidential.size, 0);
+  await a.ctx.close(); await b.ctx.close();
+});
+
 test('C4 the recipient (Change 16: one list): the shared card shows who created it, own cards say "You", "Created by" filters; View Only has no Edit or Delete', async () => {
   const cloud = new FakeTeamCloud();
   const { a, b } = await joined(cloud);
