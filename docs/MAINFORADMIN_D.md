@@ -7,7 +7,7 @@ Changes F, G, L, M, N; JoyChange005-Main Part1 (Admin-pushed Projects).
 
 ## Status
 - Database: tested on a local PostgreSQL 16 copy: 26/26; rollback, re-apply and apply-twice rehearsed; foundation 34/34,
-  B 32/32, AdminBatch002 21/21, AdminBatch003 34/34, C 5/5 still pass together. **NOT yet applied to EAB-QA-Test.**
+  B 32/32, AdminBatch002 21/21, AdminBatch003 34/34, C 5/5 still pass together. Applied to EAB-QA-Test by Joe on 21 Oct 2026: 26/26.
   **Not applied to production.**
 - App: built; unit tests (8 new) and screen tests (4 new) pass. **Not tested on a phone.**
 - Admin EAB screens to write posts, groups, order and codes: **not built** (teammate's repo). The functions below are ready.

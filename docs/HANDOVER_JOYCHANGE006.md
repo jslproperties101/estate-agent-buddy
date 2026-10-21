@@ -23,7 +23,7 @@ Read this first in a new session. Then read the files it points to. Do not trust
 ## Database state
 - **EAB-QA-Test** (`talksazsqsgjriamwxdp`): stage A and stage B applied by Joe by hand. Stage B tests 32/32.
 - Licence-text patch and Stage C: pasted by Joe on 21 Oct (Stage C test 5/5 on EAB-QA-Test).
-- Stage D (`20261021200000_mainforadmin_d_feed.sql`): NOT yet confirmed on EAB-QA-Test; ask Joe (test should say 26 passed).
+- Stage D (`20261021200000_mainforadmin_d_feed.sql`): applied to EAB-QA-Test by Joe on 21 Oct, test 26/26.
 - Teammate's AdminBatch002 file says it was applied to EAB-QA-Test; AdminBatch003 (`20261021130000_admin_batch_003_cases.sql`) not confirmed.
 - Stage C migration was renamed to `20261021140000_…` because it shared the number 20261021120000 with AdminBatch002.
 - Local DB helper must stub `storage.buckets/objects`, make `auth.uid()` read `request.jwt.claims`, and seed one workspace + record (the teammate's tests need a user with records).
