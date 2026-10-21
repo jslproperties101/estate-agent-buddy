@@ -6,6 +6,7 @@ export const Capacitor = {
   isNativePlatform: () => false,
   getPlatform: () => 'web',
   isPluginAvailable: (_name: string) => false,
+  convertFileSrc: (path: string) => path,
 };
 export function registerPlugin<T = any>(_name: string): T {
   return new Proxy({}, { get: () => async () => { throw new Error('native-unavailable'); } }) as T;

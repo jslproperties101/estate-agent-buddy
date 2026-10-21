@@ -352,6 +352,9 @@ export interface Meta {
     companyName?: string; supportEmail?: string | null; address?: string | null; checkedAt: number };
   /** MainForAdmin-D: the last feed the database gave this account (Market News, pushed Projects, announcements). */
   feed?: { userId: string; lang: string; items: import('../feed/feed').FeedItem[]; at: number };
+  /** JoyChange010-04: files shared into the app from WhatsApp or another app, waiting in the Shared Documents tray
+   *  (this phone only; moved into a property's document folder by the agent). */
+  sharedInbox?: import('../share/inbox').SharedFile[];
   /** MainForAdmin-D: read / acknowledged / closed marks made on this phone and not yet sent. */
   feedMarks?: { id: string; what: 'opened' | 'acknowledged' | 'dismissed'; at: string; userId: string }[];
   /** MainForAdmin-D: force update and maintenance mode as last heard from the company's database. */

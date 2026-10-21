@@ -49,6 +49,8 @@ import { can, isForeign, myId } from '../team/access';
 import { teamStrings } from '../team/strings';
 import { FakeBadge } from '../adverts/AdTrackerUI';
 import { ChoiceDialog } from '../ui/common';
+import { shareStrings } from '../share/strings';
+import { moveDocToFolder } from '../share/inbox';
 import { cc001Strings } from '../ui/cc001Strings';
 import { AVAIL_CHOICES, AvailChoice, availChoice, availPatch, isBookedChoice, ARRANGEMENT_CHOICES, LocationLevel, LOCATION_LEVELS, LOC_PARENT, LOCK_UNTIL_PARENT, locationListKey, clearBelow } from './cc001';
 import { c008Strings } from '../ui/c008Strings';
@@ -858,6 +860,14 @@ export function ListingForm({ lang, id, prefill, section, go, back }: {
               {CONFIDENTIAL_DOCS.includes(cat) && <small className="sens">{s.confidential}</small>}
               {list.map(x => (
                 <div key={x.id} className="doc-row"><span>{x.name}</span>
+                  {/* JoyChange010-04: move the document to another folder (saved with the form). */}
+                  {!x.dealKey && (
+                    <PickList aria-label={shareStrings[lang].moveToFolder} data-testid="doc-move" className="doc-move" value={x.category}
+                      onChange={e => { const to = e.target.value as DocCategory; void moveDocToFolder(store, d.documents ?? [], x.id, to, (added, gone) => { if (added) addedFiles.current.push(added); if (gone) removedFiles.current.push(gone); })
+                        .then(documents => setD(prev => ({ ...prev, documents }))); }}>
+                      {DOC_CATEGORIES.map(c => <option key={c} value={c}>{s.docCat[c]}{CONFIDENTIAL_DOCS.includes(c) ? ' 🔒' : ''}</option>)}
+                    </PickList>
+                  )}
                   <button className="btn small secondary danger-text" onClick={() => { if (x.fileId) removedFiles.current.push(x.fileId); setD(prev => ({ ...prev, documents: (prev.documents ?? []).filter(y => y.id !== x.id) })); }}>{s.remove}</button>
                 </div>
               ))}

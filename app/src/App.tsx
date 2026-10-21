@@ -95,6 +95,9 @@ import { leadReviewStrings } from './data/leadReviewStrings';
 import { followStrings } from './contacts/followStrings';
 import { followUpDue, DEFAULT_FOLLOW_UP_DAYS } from './domain/followup';
 import { InvitePopup } from './team/InvitePopup';
+import { SharedDocsScreen } from './share/SharedDocsUI';
+import { shareStrings } from './share/strings';
+import { startShareReceiver } from './native/share';
 import { TeamSharingCard, teamBadgeCount } from './team/TeamEntry';
 import { markAnswersSeen, openInvites, unseenAnswers } from './team/invitations';
 import { personLabel } from './team/access';
@@ -413,6 +416,19 @@ function Shell() {
     void scheduleNative([...list, ...ads]);
   }, [state.tasks, state.appointments, state.properties, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // JoyChange010-04: files shared into the app from WhatsApp or another app go to the Shared Documents tray, which opens.
+  const shareRef = useRef({ go, showToast, lang });
+  shareRef.current = { go, showToast, lang };
+  useEffect(() => {
+    void startShareReceiver(store, r => {
+      const { go: g, showToast: say, lang: l } = shareRef.current; const t = shareStrings[l];
+      if (r.added) { say(t.arrived(r.added)); g({ name: 'sharedDocs' }); }
+      if (r.tooBig.length) say(t.tooBig(r.tooBig.join(', ')), 'error');
+      if (r.full) say(t.full(r.full), 'error');
+      if (r.unreadable) say(t.unreadable(r.unreadable), 'error');
+    });
+  }, [store]);
+
   const country = useCountryChoice();
   const terms = useTermsChoice();
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
@@ -532,6 +548,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'finance': return financeStrings[lang].title;
     case 'projects': return projectStrings[lang].title;
     case 'marketNews': return feedStrings[lang].marketTitle;
+    case 'sharedDocs': return shareStrings[lang].title;
     case 'projectDetail': return projectStrings[lang].title;
     case 'projectForm': return s.id ? projectStrings[lang].editTitle : projectStrings[lang].newTitle;
     case 'dealForm': return s.id ? financeStrings[lang].editDeal : financeStrings[lang].newDeal;
@@ -612,6 +629,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
     case 'projects': return <ProjectList lang={lang} go={go} />;
     case 'marketNews': return <MarketNewsScreen lang={lang} />;
+    case 'sharedDocs': return <SharedDocsScreen lang={lang} />;
     case 'projectDetail': return <ProjectDetail lang={lang} id={s.id} go={go} />;
     case 'projectForm': return <ProjectForm lang={lang} id={s.id} go={go} back={back} />;
     case 'dealForm': return <DealForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} />;
