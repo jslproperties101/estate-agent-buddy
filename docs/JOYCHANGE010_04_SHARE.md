@@ -18,9 +18,8 @@ Joe confirmed: everything happens inside the app (no Dropbox).
   correspondence, Rental or sales documents, Other documents. 🔒 marks the confidential folders.
 
 ## Rules kept
-- Confidential folders never reach the shared team cloud bucket. A document that was already uploaded from an open folder
-  and is moved INTO a confidential one gets a fresh private copy; the old copy is marked removed, so the next sync switches
-  its team-cloud row off.
+- Confidential folders: since 010-05 every file goes to the cloud and the database decides from the folder who may read it,
+  so moving a document only changes its folder (the earlier "private copy" step was removed).
 - Only properties the agent may edit are offered (own ones, and shared ones with edit rights); archived ones are not.
   Permission is checked again at the moment of moving.
 - Booking / Sale / Rental page files (`dealKey`) keep their place (no folder pick list on them).

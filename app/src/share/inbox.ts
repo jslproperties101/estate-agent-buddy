@@ -5,12 +5,11 @@
 //  - From the tray the agent moves a file to one of their properties, into one of its document folders. It then becomes
 //    an ordinary document of that property (synced, backed up, kept in the record's history like any other).
 //  - Inside a property, a document can be moved to another folder (Floor plans → Title documents → Other documents ...).
-// Confidential folders (title, owner correspondence, rental or sales documents) never reach the shared team cloud bucket
-// (data/fileRefs.ts). A file moved INTO one of them gets a fresh private copy, and the old copy is marked removed, so the
-// next sync switches off any shared-cloud copy it already had (data/filesync.ts clean-up).
+// Confidential folders (title, owner correspondence, rental or sales documents): the database decides from the folder
+// who may download a file (JoyChange010-05), so moving a document between folders changes who can read it at once.
 import type { Store } from '../data/store';
 import type { AppState } from '../data/types';
-import { CONFIDENTIAL_DOCS, DOC_CATEGORIES, type Doc, type DocCategory, type Listing } from '../listing/model';
+import { DOC_CATEGORIES, type Doc, type DocCategory, type Listing } from '../listing/model';
 import { can } from '../team/access';
 
 export interface SharedFile { id: string; fileId: string; name: string; mime?: string; bytes: number; added: number }
@@ -88,21 +87,13 @@ export async function moveSharedToProperty(store: Store, id: string, propertyId:
   return 'moved';
 }
 
-/** Moves one document of a form (or a saved property) to another folder. Pure for the list; the file side (private
- *  copy for confidential folders) is reported through onFiles so a form can undo it on Cancel. */
-export async function moveDocToFolder(store: Store, docs: Doc[], docId: string, to: DocCategory,
-  onFiles: (added: string | undefined, removed: string | undefined) => void = () => undefined): Promise<Doc[]> {
+/** Moves one document of a form (or a saved property) to another folder. The file itself stays the same: since
+ *  JoyChange010-05 confidential documents go to the cloud too, and the database decides who may read them by folder.
+ *  `onFiles` is kept for callers that track added / removed files (nothing is added or removed now). */
+export async function moveDocToFolder(_store: Store, docs: Doc[], docId: string, to: DocCategory,
+  _onFiles: (added: string | undefined, removed: string | undefined) => void = () => undefined): Promise<Doc[]> {
   const d = docs.find(x => x.id === docId);
   if (!d || d.category === to || !DOC_CATEGORIES.includes(to)) return docs;
-  let fileId = d.fileId;
-  if (fileId && CONFIDENTIAL_DOCS.includes(to) && !CONFIDENTIAL_DOCS.includes(d.category)) {
-    const e = store.fileEntry(fileId);
-    if (e && e.status !== 'local') {
-      const blob = await store.getFile(fileId);
-      if (blob) { const copy = await store.putFile(blob); onFiles(copy, fileId); fileId = copy; }
-    }
-  }
-  // moved to the end of the new folder, keeping its name and the date it was added
-  return [...docs.filter(x => x.id !== docId), { ...d, category: to, fileId }];
+  // moved to the end of the new folder, keeping its name, file and the date it was added
+  return [...docs.filter(x => x.id !== docId), { ...d, category: to }];
 }
-

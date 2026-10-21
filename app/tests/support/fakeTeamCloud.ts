@@ -22,6 +22,8 @@ export class FakeTeamCloud {
   invites: { id: string; teamId: string; by: string; email: string | null; token: string; status: string; expiresAt: number; answeredBy?: string; answeredAt?: number }[] = [];
   shares = new Map<string, Level>();           // `${teamId}|${ws}|${collection}|${id}` (recipient = the other member)
   shareAll = new Map<string, Level>();         // `${teamId}|${ownerId}|${scope}`
+  /** JoyChange010-05: "Include confidential documents" switches, `${teamId}|${ownerId}|all` or `${teamId}|${ownerId}|${ws}|${id}`. */
+  confidential = new Set<string>();
   deleteRequests: { id: string; teamId: string; ws: string; collection: string; recordId: string; ownerId: string; requesterId: string; status: string }[] = [];
   audit: Rec[] = [];
   auditSeq = 0;
@@ -218,6 +220,21 @@ export class FakeTeamCloud {
         if (b.p_level) this.shareAll.set(k, b.p_level as Level); else this.shareAll.delete(k);
         if (before !== (b.p_level ?? null)) this.logAudit(me, 'permission', { collection: b.p_scope, owner_id: me.id, detail: { event: !before ? 'granted' : !b.p_level ? 'revoked' : 'changed', from: before, to: b.p_level ?? null, via: 'share_all', scope: b.p_scope } });
         return this.json(null);
+      }
+      case 'eab_share_confidential_set': {
+        if (!t || !this.partnerOf(me.id)) return this.err(403, 'no active Team Workspace with another agent');
+        if ((b.p_ws === null) !== (b.p_id === null)) return this.err(400, 'workspace and property both needed');
+        if (b.p_ws !== null && (b.p_ws !== me.ws || !this.rows.get(`${me.ws}|properties|${b.p_id}`))) return this.err(403, 'only your own properties');
+        const k = b.p_ws === null ? `${t.id}|${me.id}|all` : `${t.id}|${me.id}|${b.p_ws}|${b.p_id}`;
+        const was = this.confidential.has(k);
+        if (b.p_on) this.confidential.add(k); else this.confidential.delete(k);
+        if (was !== !!b.p_on) this.logAudit(me, 'permission', { workspace_id: b.p_ws ?? null, collection: 'properties', record_id: b.p_id ?? null, owner_id: me.id, detail: { event: b.p_on ? 'confidential_on' : 'confidential_off', via: b.p_ws === null ? 'share_all' : 'selected' } });
+        return this.json(!!b.p_on);
+      }
+      case 'eab_share_confidential_list': {
+        if (!t) return this.json({ all: false, records: [] });
+        const mine = [...this.confidential].filter(k => k.startsWith(`${t.id}|${me.id}|`)).map(k => k.split('|').slice(2));
+        return this.json({ all: mine.some(x => x[0] === 'all'), records: mine.filter(x => x.length === 2).map(([ws, id]) => ({ workspace_id: ws, record_id: id })) });
       }
       case 'eab_shared_index': {
         const partner = this.partnerOf(me.id);

@@ -43,7 +43,7 @@ export function teamErrorOf(e: unknown): TeamError {
 /** Change 19/20: which team and sharing actions are noted in the usage log (the action only, never who or what). */
 const FEATURE_OF: Record<string, string> = {
   eab_team_invite: 'team.invite', eab_team_accept: 'team.accept', eab_team_decline: 'team.decline', eab_team_leave: 'team.leave',
-  eab_team_remove: 'team.remove', eab_share_set: 'share.set', eab_share_all_set: 'share.all', eab_request_delete: 'delete.request', eab_decide_delete: 'delete.decide',
+  eab_team_remove: 'team.remove', eab_share_set: 'share.set', eab_share_all_set: 'share.all', eab_share_confidential_set: 'share.confidential', eab_request_delete: 'delete.request', eab_decide_delete: 'delete.decide',
 };
 
 /** Calls one database function as the signed-in person (refreshing the sign-in first when needed). */
@@ -93,6 +93,13 @@ export function teamFromStatus(j: StatusJson, at = Date.now()): TeamState {
 export async function refreshTeam(store: Store, cfg: SyncConfig, fetchFn: FetchFn = fetch): Promise<TeamState> {
   const j = await rpc<StatusJson>(store, cfg, 'eab_team_status', {}, fetchFn);
   const team = teamFromStatus(j);
+  // JoyChange010-05: which "Include confidential documents" switches I turned on (a database without them: none).
+  if (team.id) {
+    try {
+      const c = await rpc<{ all?: boolean; records?: { workspace_id: string; record_id: string }[] } | null>(store, cfg, 'eab_share_confidential_list', {}, fetchFn);
+      team.confidential = { all: !!c?.all, records: (c?.records ?? []).map(r => `${r.workspace_id}:${r.record_id}`) };
+    } catch { /* older database: the switch is not shown */ }
+  }
   store.setSingleton('meta', { team });
   return team;
 }
@@ -158,6 +165,15 @@ export async function setShares(store: Store, cfg: SyncConfig, items: ShareItem[
   }
   await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
   return out;
+}
+/** JoyChange010-05: "Include confidential documents" for one of my properties (propertyId) or for every property shared
+ *  through Share All (propertyId null). Off by default; the database checks that the property is mine. */
+export async function setConfidential(store: Store, cfg: SyncConfig, propertyId: string | null, on: boolean, fetchFn: FetchFn = fetch): Promise<boolean> {
+  const ws = store.getState().meta.syncSession?.workspaceId;
+  if (propertyId && !ws) throw new TeamError('not-signed-in');
+  const r = await rpc<boolean>(store, cfg, 'eab_share_confidential_set', { p_ws: propertyId ? ws : null, p_id: propertyId, p_on: on }, fetchFn);
+  await refreshTeam(store, cfg, fetchFn).catch(() => undefined);
+  return r;
 }
 export async function setShareAll(store: Store, cfg: SyncConfig, scope: ShareScope, level: ShareLevel | null, fetchFn: FetchFn = fetch) {
   await rpc(store, cfg, 'eab_share_all_set', { p_scope: scope, p_level: level }, fetchFn);

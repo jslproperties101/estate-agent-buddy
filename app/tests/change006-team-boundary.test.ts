@@ -8,14 +8,14 @@ import assert from 'node:assert/strict';
 import { syncNow } from '../src/data/sync';
 import { recordFileSummary } from '../src/data/filesync';
 import { sha256Hex } from '../src/data/hash';
-import { sendInvite, acceptInvite, refreshTeam, setShares, leaveTeam } from '../src/team/api';
+import { sendInvite, acceptInvite, refreshTeam, setShares, leaveTeam, setConfidential } from '../src/team/api';
 import type { Listing } from '../src/listing/model';
 import { FakeCloud, cfg as cfg2, phone } from './support/fakeCloud';
 import { FakeTeamCloud, cfg, agentPhone } from './support/fakeTeamCloud';
 
 const blob = (s: string, type = 'image/jpeg') => new Blob([s], { type });
 
-test('TB1 a confidential document is never uploaded to the shared bucket, however often the owner syncs; the phone keeps it; ordinary files still go', async () => {
+test('TB1 JoyChange010-05: confidential documents are uploaded like every other file (the database decides who may read them); the phone keeps its copy', async () => {
   const cloud = new FakeCloud();
   const a = await phone(cloud, 'o@x.c');
   const photo = await a.store.putFile(blob('PHOTO-1'));
@@ -28,15 +28,15 @@ test('TB1 a confidential document is never uploaded to the shared bucket, howeve
   assert.ok([...cloud.objects.keys()].some(k => k.endsWith(photoSha)), 'the ordinary photo is in the cloud');
   for (const [id, text] of [[deed, '%PDF-title-deed'], [ic, 'IC-SCAN-OWNER']]) {
     const sha = await sha256Hex(blob(text));
-    assert.ok(![...cloud.objects.keys()].some(k => k.endsWith(sha)), 'no confidential object in the bucket');
-    assert.ok(!cloud.files.has(id), 'no file row anyone could follow');
+    assert.ok([...cloud.objects.keys()].some(k => k.endsWith(sha)), 'the confidential document is in the cloud');
+    assert.ok([...cloud.files.keys()].some(k => k.includes(id)), 'with its file row');
     assert.equal(await (await a.store.getFile(id))!.text(), text, 'the phone keeps its copy');
   }
   const sum = recordFileSummary(a.store, 'properties', 'p1');
-  assert.equal(sum.ownerOnly, 2); assert.equal(sum.uploaded, 1); assert.equal(sum.waiting, 0, 'never shown as waiting to upload');
+  assert.equal(sum.ownerOnly, 0); assert.equal(sum.uploaded, 3); assert.equal(sum.waiting, 0);
 });
 
-test('TB2 sharing a property (View and Edit) never gives the other agent its confidential documents; revoking and leaving remove the shared record', async () => {
+test('TB2 sharing a property without "Include confidential documents" never gives the other agent its title deed (padlock, not an error); the switch is the owner\'s; revoking and leaving remove the shared record', async () => {
   const cloud = new FakeTeamCloud();
   const a = await agentPhone(cloud, 'aina@x.com', 'Aina');
   const b = await agentPhone(cloud, 'badrul@x.com', 'Badrul');
@@ -52,8 +52,17 @@ test('TB2 sharing a property (View and Edit) never gives the other agent its con
   await syncNow(b.store, cfg, bFetch); await syncNow(b.store, cfg, bFetch);
   assert.ok(b.store.getState().properties.some(p => p.id === 'p1'), 'B has the shared record');
   assert.equal(await b.store.hasFile(deed), false, 'but not its title deed');
-  assert.ok(!seen.some(u => u.includes(deed)), 'B\'s phone never even asks for it');
-  assert.equal(recordFileSummary(b.store, 'properties', 'p1').ownerOnly, 1, 'B sees it is the owner\'s confidential document');
+  // the database does not list the file for B (JoyChange010-05): a padlock, never a "missing" problem
+  assert.deepEqual({ s: b.store.fileEntry(deed)?.status, why: b.store.fileEntry(deed)?.lastError }, { s: 'denied', why: 'confidential' });
+  // the switch: only the owner turns it on, it is listed for the share screen, and it is in the history
+  await assert.rejects(setConfidential(b.store, cfg, 'p1', true, bFetch));
+  assert.equal(await setConfidential(a.store, cfg, 'p1', true, cloud.fetch), true);
+  assert.deepEqual(a.store.getState().meta.team?.confidential, { all: false, records: [`${a.store.getState().meta.syncSession!.workspaceId}:p1`] });
+  assert.ok(cloud.audit.some(e => (e.detail as { event?: string })?.event === 'confidential_on'));
+  await setConfidential(a.store, cfg, null, true, cloud.fetch);
+  assert.equal(a.store.getState().meta.team?.confidential?.all, true);
+  await setConfidential(a.store, cfg, 'p1', false, cloud.fetch); await setConfidential(a.store, cfg, null, false, cloud.fetch);
+  assert.deepEqual(a.store.getState().meta.team?.confidential, { all: false, records: [] });
   // revoked
   await setShares(a.store, cfg, [{ collection: 'properties', id: 'p1', level: null }], cloud.fetch);
   await syncNow(b.store, cfg, bFetch);

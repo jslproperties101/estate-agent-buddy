@@ -472,10 +472,10 @@ test('FX1 advert screenshots are part of the record: in the backup file, the res
   assert.ok(i.ok && i.manifest!.files.some(f => f.id === adShot));
 });
 
-test('FX2 confidential documents: never offered to the shared team bucket; in the owner\'s backup file, Drive folders and restore points, and restorable', async () => {
+test('FX2 confidential documents: in the cloud (JoyChange010-05) and in the owner\'s backup file, Drive folders and restore points, and restorable', async () => {
   const { s, title, brochure } = await agentPhone();
   const cloud = cloudFileRefs(s.getState()).map(r => r.fileId);
-  assert.ok(!cloud.includes(title), 'title deed not for the cloud');
+  assert.ok(cloud.includes(title), 'JoyChange010-05: the title deed goes to the cloud too (the database decides who reads it)');
   assert.ok(cloud.includes(brochure));
   assert.ok(fileRefs(s.getState()).find(r => r.fileId === title)!.confidential);
   const b = await createBackup(s, T0);

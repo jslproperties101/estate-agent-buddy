@@ -1,6 +1,7 @@
 // Data-safety screens: the state of one record, the sync review (conflicts and refused records), a record's history,
 // recently deleted records, unsaved drafts, and the status of pictures and documents.
 // Nothing on these screens deletes anything without an explicit choice, and every choice keeps the other version in History.
+import { shareStrings } from '../share/strings';
 import { useEffect, useMemo, useState } from 'react';
 import type { Lang } from '../i18n';
 import type { Go, Screen } from '../nav';
@@ -76,6 +77,8 @@ export function FileBadge({ lang, fileId }: { lang: Lang; fileId?: string }) {
   const e = store.fileEntry(fileId);
   if (!e || e.status === 'uploaded') return null;
   const y = syncStrings[lang];
+  // JoyChange010-05: a confidential document the owner has not shared with me: a padlock, not a problem.
+  if (e.status === 'denied' && e.lastError === 'confidential') return <span className="file-badge denied" data-testid="file-badge" data-state="confidential">🔒 {shareStrings[lang].notSharedConfidential}</span>;
   return (
     <span className={`file-badge ${e.status}`} data-testid="file-badge" data-state={e.status}>
       {y.fileState[e.status]}
@@ -170,7 +173,7 @@ export function SyncReviewScreen({ lang, go }: { lang: Lang; go: Go }) {
   const y = syncStrings[lang];
   const conflicts = state.meta.conflicts ?? [];
   const errors = Object.entries(state.meta.recErrors ?? {});
-  const problems = store.allFileEntries().filter(e => (e.status === 'failed' || e.status === 'denied' || e.status === 'missing') && fileRefs(state).some(r => r.fileId === e.id));
+  const problems = store.allFileEntries().filter(e => (e.status === 'failed' || e.status === 'denied' || e.status === 'missing') && !(e.status === 'denied' && e.lastError === 'confidential') && fileRefs(state).some(r => r.fileId === e.id));
   return (
     <section className="stack" data-testid="sync-review">
       <p className="notice">{y.help}</p>

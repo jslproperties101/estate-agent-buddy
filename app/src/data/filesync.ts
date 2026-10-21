@@ -115,6 +115,10 @@ async function download(store: Store, cfg: SyncConfig, session: Session, ws: str
   for (const ref of refs) {
     const e = store.fileEntry(ref.fileId) ?? { id: ref.fileId, status: 'pending' as const, bytes: 0, addedAt: now };
     const row = rows.get(ref.fileId);
+    // JoyChange010-05: a confidential document of a property someone shared with me, without "Include confidential
+    // documents": the database does not show it to me. Not an error; it is asked for again at every sync, so it arrives
+    // as soon as the owner switches it on.
+    if (!row && ref.confidential && store.getState().meta.shared?.[`${ref.collection}:${ref.recordId}`]) { note(store, e, { status: 'denied', lastError: 'confidential' }); continue; }
     if (!row || row.deleted) { note(store, e, { status: 'missing', lastError: row ? 'deleted' : 'not-in-cloud' }); continue; }
     if (row.status !== 'uploaded') { note(store, e, { status: 'pending', lastError: 'not-uploaded-yet' }); continue; }
     try {
@@ -136,8 +140,7 @@ export async function syncFiles(store: Store, cfg: SyncConfig, session: Session,
   const now = (opts.now ?? Date.now)();
   const prepare = opts.prepare ?? defaultPrepare;
   const res: FileSyncResult = { uploaded: 0, downloaded: 0, failed: 0 };
-  // Confidential documents never go to the shared bucket (owner decision: only the owner's own backups and Drive; see
-  // data/fileRefs.ts), so no team member can download them whatever is shared.
+  // JoyChange010-05: every file goes to the cloud, confidential ones too; the database decides who may read them.
   const refs = cloudFileRefs(store.getState()).filter(r => !opts.only || opts.only(r));
   const toDownload: FileRef[] = [];
 
@@ -188,7 +191,6 @@ export function recordFileSummary(store: Store, collection: string, recordId: st
   for (const r of fileRefs(store.getState())) {
     if (r.collection !== collection || r.recordId !== recordId) continue;
     out.total++;
-    if (r.confidential) { out.ownerOnly++; continue; }
     const e = store.fileEntry(r.fileId);
     if (!e) out.waiting++;
     else if (e.status === 'uploaded') out.uploaded++;

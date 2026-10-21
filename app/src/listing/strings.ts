@@ -82,7 +82,7 @@ const en = {
   photosNote: 'Photos are made smaller on this phone and kept in the app’s storage.',
   addFiles: 'Add files',
   docsNote: 'Kept in the app’s storage on this phone. Nothing is uploaded or sent to any AI service.',
-  confidential: 'Confidential: included in your own backups and your Google Drive; never shared with your team or sent to AI.',
+  confidential: 'Confidential: on all your own devices and in your backups. Teammates get them only if you tick “Include confidential documents” when sharing. Never sent to AI.',
   open1: 'Open',
   l: {
     bannerStatus: 'Banner placed?',
@@ -293,7 +293,7 @@ const bm: ListingStrings = {
   photosNote: 'Foto dikecilkan dalam telefon ini dan disimpan dalam storan aplikasi.',
   addFiles: 'Tambah fail',
   docsNote: 'Disimpan dalam storan aplikasi dalam telefon ini. Tiada yang dimuat naik atau dihantar kepada perkhidmatan AI.',
-  confidential: 'Sulit: disertakan dalam sandaran dan Google Drive anda sendiri; tidak dikongsi dengan pasukan atau dihantar kepada AI.',
+  confidential: 'Sulit: ada pada semua peranti anda dan dalam sandaran anda. Rakan pasukan hanya mendapatnya jika anda tandakan “Sertakan dokumen sulit” semasa berkongsi. Tidak dihantar kepada AI.',
   open1: 'Buka',
   l: {
     bannerStatus: 'Banner dipasang?',
@@ -502,7 +502,7 @@ const zh: ListingStrings = {
   photosNote: '照片会在手机上压缩并保存在应用的存储中。',
   addFiles: '添加文件',
   docsNote: '保存在此手机的应用存储中。不会上传或发送给任何 AI 服务。',
-  confidential: '机密：包含在您自己的备份和 Google Drive 中；不会与团队共享，也不会发送给 AI。',
+  confidential: '机密：在您自己的所有设备和备份中。只有在共享时勾选“包括机密文件”，团队成员才能获得。绝不发送给 AI。',
   open1: '打开',
   l: {
     bannerStatus: '已挂横幅？',

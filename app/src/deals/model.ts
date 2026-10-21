@@ -1,7 +1,7 @@
 // ClaudeChanges001 change 11 (owner, 17 Oct 2026): Booking, Sale and Rental details for a property, Track My Sales and
 // the deal reminders. Everything is kept on the property record (Listing.deal), so it syncs, backs up and has history like
 // any other detail; no new table and no database change. Files go into the property's documents as "transaction"
-// documents (confidential: in the owner's own backups only, never in the shared team bucket).
+// documents (confidential: in the cloud, but a teammate gets them only with "Include confidential documents", JoyChange010-05).
 import type { Lang } from '../i18n';
 import type { Listing } from '../listing/model';
 import { commissionRm, rentCommissionRm } from '../listing/model';
