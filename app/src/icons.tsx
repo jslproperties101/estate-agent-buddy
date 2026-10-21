@@ -31,6 +31,8 @@ export const IconSubsale = svg('M3 11l8-6 8 6M5 10v9h8M17 14h5M19.5 11.5L22 14l-
 /** Project: a new development, two towers with a crane. */
 export const IconProject = svg('M4 21V9h6v12M10 21V5h6v16M3 21h18M16 3h5M19 3v5M7 12h0M7 15h0M13 8h0M13 11h0M13 14h0');
 /** Market Intelligence: a bar chart with a magnifier. */
+/** MainForAdmin-D: Market News and Intelligence, a megaphone. */
+export const IconMegaphone = svg('M3 10v4h3l6 4V6L6 10zM16 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12');
 export const IconMarket = svg('M4 20V13M9 20V9M14 20v-5M3 20h12M18 14a3 3 0 100-6 3 3 0 000 6zM20.2 12.2L22 14');
 /** Co-broke: two hands meeting over a house. */
 export const IconCobroke = svg('M12 3l6 4.5V11H6V7.5zM3 15l4-2 3 2h4a1.5 1.5 0 010 3h-3M21 15l-4-2M3 15v5h3l5 1 7-3 3-3');

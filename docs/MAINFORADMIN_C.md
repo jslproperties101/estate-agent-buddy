@@ -21,7 +21,7 @@ Builds on the usage log from Changes 19/20 (`app/src/usage/logger.ts`, table `ea
 | K1 every feature event | `feature` `<collection>.create` (existing), **`.edit`, `.delete`** (new), `pdf.save/share`, `ms.save/share`, team/share actions (existing) |
 | K2 AI Assisted Command (separate log) | kind **`command`**: `command.assistant`, `command.listing`, `command.list`; `ok` = understood |
 | K3 Marketing Studio (separate log) | kind **`marketing`**: `poster.created`, `poster.saved`, `poster.shared`; `ok` = worked |
-| K4 language | kind **`language`**: `lang.en` / `lang.ms` / `lang.zh` once per opening and after a change |
+| K4 language | kind **`language`**: `lang.en` / `lang.bm` / `lang.zh` once per opening and after a change |
 | K5 performance | `metric` `startup.ms` (once per opening); `metric` `screen.slow_ms` with the screen (only 800 ms or slower). Crash-free rate = sessions vs `error` events |
 | K6 crash/error | `error` `js.error`, `js.rejection` (existing), `push.registration` (new). Crashlytics later |
 | K7 sync failures | `sync` `sync.run` ok/not ok (existing) + **`sync.fail.<reason>`** (network, auth, no-access, server, ...) |

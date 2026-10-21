@@ -219,7 +219,7 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   // ClaudeChanges001 change 12: card 1 is Calendar & To-Do (asks which), card 2 is Track My Sales.
   // JoyChange002 Change 43: Project is card 1; Calendar & To-Do, Subsale List and AI Assisted Command are the gold bottom row.
   assert.deepEqual(names, ['Project', 'Track My Sales', 'Opportunities', 'Creative Media', 'Contacts', 'Inquiries & Viewings', 'GPS Assistance',
-    'Agent Financial', 'Property Calculator', 'Buyer Matching', 'Ask Expert', 'Market Intelligence',
+    'Agent Financial', 'Property Calculator', 'Buyer Matching', 'Ask Expert', 'Market News and Intelligence',
     'Calendar & To\u2011Do', 'Subsale List', 'AI Assisted Command']);
   assert.equal(await page.locator('nav.grid > button[data-key="property"]').getAttribute('data-tile'), '14', 'Subsale List is card 14');
   assert.equal(await page.locator('nav.grid > button[data-key="creative"]').getAttribute('data-tile'), '4', 'Creative Media is card 4');
@@ -258,8 +258,9 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   await page.getByTestId('top-notifications').click();
   await page.getByTestId('notifications').waitFor();
   await home(page);
-  await tile(page, 'Market Intelligence');
-  assert.match(await page.getByTestId('soon-market').innerText(), /lawful and reliable source[\s\S]*Nothing here is live/i, 'Market Intelligence is honest: no feed is pretended');
+  // MainForAdmin-D: Market News and Intelligence shows only what the company publishes; nothing is pretended.
+  await tile(page, 'Market News and Intelligence');
+  assert.match(await page.getByTestId('news-empty').innerText(), /No news yet/i);
   await home(page);
   await tile(page, 'Contacts');
   assert.deepEqual(await page.locator('.hub-card strong').allInnerTexts(), ['Buyers', 'Vendors']);
@@ -1075,14 +1076,14 @@ test('U24 RM money boxes: separators while typing, plain number saved, paste und
   await page.context().close();
 });
 
-test('U25 Market Intelligence still says it is not built yet; Project is built (JoyChange002) and opens its list', async () => {
+test('U25 Market News and Intelligence shows no made-up posts; Project is built (JoyChange002) and opens its list', async () => {
   const page = await phone();
   await tile(page, 'Project');
   await page.getByTestId('projects').waitFor();
   assert.match(await page.getByTestId('projects-empty').innerText(), /No projects yet/i);
   await home(page);
-  await tile(page, 'Market Intelligence');
-  assert.match(await page.getByTestId('soon-market').innerText(), /Nothing here is live/i);
+  await tile(page, 'Market News and Intelligence');
+  assert.match(await page.getByTestId('news-empty').innerText(), /No news yet/i);
   await home(page);
   assert.equal(await page.getByTestId('top-cobroke').count(), 0);
   // Owner 15 Oct: Co-broke Opportunities opens from the Opportunities card.

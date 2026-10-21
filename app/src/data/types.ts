@@ -350,6 +350,14 @@ export interface Meta {
   /** MainForAdmin-B: the account as the company's database last reported it (eab_my_account). */
   account?: { userId: string; terms?: { version: string; at: string } | null; marketing?: boolean | null; licence?: { type?: string | null; number?: string | null; verified?: boolean } | null;
     companyName?: string; supportEmail?: string | null; address?: string | null; checkedAt: number };
+  /** MainForAdmin-D: the last feed the database gave this account (Market News, pushed Projects, announcements). */
+  feed?: { userId: string; lang: string; items: import('../feed/feed').FeedItem[]; at: number };
+  /** MainForAdmin-D: read / acknowledged / closed marks made on this phone and not yet sent. */
+  feedMarks?: { id: string; what: 'opened' | 'acknowledged' | 'dismissed'; at: string; userId: string }[];
+  /** MainForAdmin-D: force update and maintenance mode as last heard from the company's database. */
+  publicSettings?: import('../feed/feed').PublicSettings;
+  /** MainForAdmin-D: the minimum version whose soft "please update" notice was closed on this phone. */
+  softUpdateClosed?: string;
   /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */
   licenceSent?: string;
   /** The last automatic sync problem, shown in Settings (cleared after a good sync). */

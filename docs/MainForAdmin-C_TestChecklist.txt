@@ -18,7 +18,7 @@ USE THE APP (signed in with your test account), about 10 minutes:
 TELL CLAUDE "check the logs". Claude should see, for your account in the test database:
 [ ] kind command: two rows (one understood, one not). No words from your sentence anywhere.
 [ ] kind marketing: poster.created, poster.saved, poster.shared.
-[ ] kind language: lang.en, lang.ms, lang.zh.
+[ ] kind language: lang.en, lang.bm, lang.zh.
 [ ] kind feature: contacts/properties .create, .edit, .delete; pdf.save or pdf.share; ms.save, ms.share.
 [ ] kind metric: startup.ms, plus screen.slow_ms only if some screen was slow.
 [ ] kind sync: sync.run and (during flight mode) sync.fail.network.

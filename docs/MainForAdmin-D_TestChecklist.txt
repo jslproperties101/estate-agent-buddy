@@ -1,0 +1,46 @@
+TEST CHECKLIST — MainForAdmin-D (content pushed from Admin EAB) + change 010-01
+Written 21 Oct 2026. Status: built; automated tests passed. NOT yet on EAB-QA-Test. NOT yet tested on a phone.
+Needs: (1) the Stage D SQL pasted in EAB-QA-Test, (2) a new QA APK, (3) some test posts. Admin EAB cannot write posts
+yet, so Claude can add test posts for you on the TEST database, or give you SQL to paste.
+
+=====================================================
+0. CHANGE 010-01 (first-login screen)
+=====================================================
+[ ] When the Terms screen appears, the Country box is there too, with your country (or Malaysia) already chosen.
+[ ] Tap it: the list opens with a search bar.
+
+=====================================================
+1. MARKET NEWS AND INTELLIGENCE
+=====================================================
+[ ] Home: the card is now called "Market News and Intelligence" with a megaphone icon (BM: Berita dan Risikan Pasaran;
+    中文: 市场新闻与情报).
+[ ] With no posts: opening it says "No news yet".
+[ ] With 2 test posts: a red number 2 on the card. Open the screen: both show "New".
+[ ] Tap a post: it opens (text, picture, "Open website", "Open PDF" if set). Go back: the number is now 1.
+[ ] Switch to BM / 中文: a post with a BM / Chinese title shows it; one without shows English.
+[ ] Flight mode: the posts still show; opening one still lowers the number (sent when back online).
+
+=====================================================
+2. PROJECTS
+=====================================================
+[ ] Projects: "Add New Project" is first; below it the text about asking your team leader, and the Invitation code box.
+[ ] Type a wrong code > Add: "This code was not found…".
+[ ] Type the test code Claude gives you > Add: "N projects added" and the projects appear (name, developer, place, price).
+[ ] Claude withdraws one test project: within about 5 minutes (or after closing and reopening the app) it is gone from the list (not archived).
+[ ] Your own projects (Add New Project) still work as before.
+
+=====================================================
+3. ANNOUNCEMENTS
+=====================================================
+[ ] Pop-up announcement: appears over the home screen; only "OK, got it" closes it; it does not come back.
+[ ] Banner announcement: at the top of the home screen; the ✕ closes it; it does not come back.
+
+=====================================================
+4. FORCE UPDATE AND MAINTENANCE (Claude switches these on the TEST database)
+=====================================================
+[ ] Soft update: a yellow notice "A newer version…" with Later; Later hides it; the app works.
+[ ] Hard update: the app is blocked with "Update needed" and "Update now" (opens the link set).
+[ ] Maintenance on: the app (and the sign-in screen) shows "Under maintenance" with the message and the back time.
+[ ] Maintenance off: tap "Check again": the app opens normally. Your data is still there.
+
+NOT IN THIS APK: push alerts for new posts (needs Firebase); Admin EAB screens to write posts (teammate).

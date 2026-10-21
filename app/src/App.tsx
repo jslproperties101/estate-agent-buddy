@@ -18,6 +18,10 @@ import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
 import { beginStartup, startupLang, StartupPhase, SPLASH_MS, FORCE_OPEN_MS, splashStep, splashDots } from './startup/startup';
 import { checkAccount } from './security/account';
+import { refreshFeed, maintenanceActive, updateVerdict } from './feed/feed';
+import { MarketNewsScreen, AnnouncementBanners, AnnouncementPopup, BlockingNotice, SoftUpdateBanner, usePublicSettings, useUnreadNews } from './feed/FeedUI';
+import { feedStrings } from './feed/strings';
+import { BUILD as BUILD_INFO } from './native/updates';
 import { logLogin } from './security/loginLog';
 import { startupStrings } from './startup/strings';
 import { dueReminders, upcomingReminders, DueReminder } from './domain/workflow';
@@ -63,7 +67,7 @@ import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import { CountryChoice, useCountryChoice, useTermsChoice } from './ui/CountryChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMarket, IconCreative, IconMatch,
+  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMegaphone, IconCreative, IconMatch,
 } from './icons';
 import { BottomAd } from './adverts/AdBar';
 import { c11Strings } from './ui/c011Strings';
@@ -141,7 +145,7 @@ export const TILES: { key: string; icon: () => JSX.Element; target: Screen }[] =
   { key: 'calculator', icon: () => <IconCalc />, target: { name: 'calculator' } },
   { key: 'matching', icon: () => <IconMatch />, target: { name: 'buyerMatching' } },
   { key: 'expert', icon: () => <IconExpert />, target: { name: 'expert' } },
-  { key: 'market', icon: () => <IconMarket />, target: { name: 'comingSoon', key: 'market' } },
+  { key: 'market', icon: () => <IconMegaphone />, target: { name: 'marketNews' } },   // MainForAdmin-D: Market News and Intelligence
   { key: 'agenda', icon: () => <IconAgenda />, target: { name: 'calendar' } },
   { key: 'property', icon: () => <IconHome />, target: { name: 'listing' } },
   { key: 'voice', icon: () => <IconRobot size={56} />, target: { name: 'voice' } },
@@ -237,6 +241,10 @@ function StartupLogo({ phase, done, lang, onRetry }: { phase: StartupPhase; done
 function Gate() {
   const { state } = useApp();
   const lang: Lang = state.settings.lang ?? 'en';
+  // MainForAdmin-D: maintenance mode and a required update stop the app, signed in or not (the data on the phone is kept).
+  usePublicSettings();
+  const ps = state.meta.publicSettings;
+  if (ps && (maintenanceActive(ps) || updateVerdict(ps, BUILD_INFO.version) === 'hard')) return <BlockingNotice lang={lang} />;
   if (configured(config(state.settings)) && !state.meta.syncSession) return <LoginScreen lang={lang} />;
   // Signed in to a different team than the one whose records are on this phone: show none of them, send none of them.
   if (holdsOtherWorkspaceData(state, state.meta.syncSession?.workspaceId)) return <OtherWorkspaceScreen lang={lang} />;
@@ -265,6 +273,8 @@ function useAutoSync() {
         // MainForAdmin-B: after every sync, the company's word on this account (suspended / forced sign-out), and the
         // licence, Terms answers and sign-in log that are waiting.
         if (store.getState().meta.syncSession) await checkAccount(store, cfg);
+        // MainForAdmin-D: news, pushed projects and announcements for this agent, in the app's language.
+        if (store.getState().meta.syncSession) await refreshFeed(store, cfg, store.getState().settings.lang ?? 'en');
       }
       finally { busy.current = false; }
     };
@@ -450,6 +460,7 @@ function Shell() {
         </header>
         {!store.persistent && <div className="proto-bar" role="alert">{t.storage.notPersistent}</div>}
         <UpdateBanner lang={lang} />
+        <SoftUpdateBanner lang={lang} />
 
         <main className="content" data-screen={screen.name}>
           <ScreenEntry.Provider value={entry}><ScreenView key={entry} screen={screen} lang={lang} go={go} back={back} /></ScreenEntry.Provider>
@@ -461,7 +472,7 @@ function Shell() {
             has not accepted the current version yet. */}
         {country.ask || terms.ask
           ? <CountryChoice lang={lang} onChoose={c => { if (country.ask || c !== state.settings.country) country.choose(c); }} askCountry={country.ask || terms.ask} askTerms={terms.ask} onAccept={m => void terms.accept(m)} initial={state.settings.country} />
-          : needsStartChoice(state) && <StartChoice lang={lang} />}
+          : needsStartChoice(state) ? <StartChoice lang={lang} /> : <AnnouncementPopup lang={lang} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
         <BottomAd lang={lang} />
@@ -520,6 +531,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'banners': return gs.banners;
     case 'finance': return financeStrings[lang].title;
     case 'projects': return projectStrings[lang].title;
+    case 'marketNews': return feedStrings[lang].marketTitle;
     case 'projectDetail': return projectStrings[lang].title;
     case 'projectForm': return s.id ? projectStrings[lang].editTitle : projectStrings[lang].newTitle;
     case 'dealForm': return s.id ? financeStrings[lang].editDeal : financeStrings[lang].newDeal;
@@ -599,6 +611,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'banners': return <BannerScreen key={s.propertyId ?? ''} lang={lang} go={go} propertyId={s.propertyId} />;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
     case 'projects': return <ProjectList lang={lang} go={go} />;
+    case 'marketNews': return <MarketNewsScreen lang={lang} />;
     case 'projectDetail': return <ProjectDetail lang={lang} id={s.id} go={go} />;
     case 'projectForm': return <ProjectForm lang={lang} id={s.id} go={go} back={back} />;
     case 'dealForm': return <DealForm key={s.id ?? 'new'} lang={lang} back={back} id={s.id} propertyId={s.propertyId} />;
@@ -655,16 +668,19 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const x1 = cc001Strings[lang];
   const [askAgenda, setAskAgenda] = useState(false);
   const tileLabel = (key: string) => t.tiles[key];
+  const unreadNews = useUnreadNews();
   return (
     <section className="stack home">
       {/* ClaudeChanges001 change 2: below the header line, above the cards, only when something did not sync. */}
       <SyncBanner lang={lang} onReview={() => go({ name: 'syncReview' })} />
+      <AnnouncementBanners lang={lang} />
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
         {TILES.map((tile, i) => (
           <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
             aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
+            {tile.key === 'market' && unreadNews > 0 && <span className="tile-badge" data-testid="market-badge" aria-label={feedStrings[lang].unread(unreadNews)}>{unreadNews > 99 ? '99+' : unreadNews}</span>}
             {tile.key === 'opportunities' && teamBadgeCount(state) > 0 && <span className="tile-badge" data-testid="opportunities-badge" aria-label={teamStrings[lang].newInvites(teamBadgeCount(state))}>{teamBadgeCount(state)}</span>}
           </button>
         ))}

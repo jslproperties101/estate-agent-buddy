@@ -1541,3 +1541,24 @@ html.kb-open .opt-pop::after { display: none; }
 .terms-sheet p { margin: 0; }
 /* MainForAdmin-B: a pick list opened from the first-login screen (z-index 60) must sit above it. */
 .sel-scrim { z-index: 70; }
+
+/* MainForAdmin-D: Market News and Intelligence, pushed projects, announcements, force update, maintenance. */
+.section-title { font-size: 17px; margin: 6px 0 0; color: var(--gold, #E8C46A); }
+.row-input { display: flex; gap: 8px; align-items: stretch; }
+.row-input input { flex: 1; min-width: 0; letter-spacing: 1px; }
+.feed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.feed-card { display: flex; flex-direction: column; gap: 8px; }
+.feed-card.unread { border-color: var(--gold-lo, #8A6A2A); }
+.feed-head { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.feed-head:focus-visible { outline: 2px solid var(--gold-lo, #8A6A2A); outline-offset: 2px; border-radius: 8px; }
+.feed-img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; background: #111; }
+.feed-body { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.feed-body.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.new-badge { background: var(--red-bg); color: #fff; }
+.project-card.pushed { display: flex; flex-direction: column; gap: 8px; }
+.announce { display: flex; flex-direction: column; gap: 6px; }
+.announce-scrim { z-index: 65; }
+.soft-update { display: flex; flex-direction: column; gap: 8px; margin: 6px 12px 0; }
+.block-screen { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px 20px; text-align: center; background: var(--bg); }
+.block-screen h1 { margin: 0; }
+.block-screen p { max-width: 520px; margin: 0; white-space: pre-wrap; }

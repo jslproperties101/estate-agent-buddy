@@ -1,5 +1,6 @@
 // JoyChange002 — the Project screens: the list of new developments, one project's page (unit types, prices, bookings)
 // and its form. Bookings are added and changed on the project page; nothing is saved until Save.
+import { PushedProjects } from '../feed/FeedUI';
 import { useMemo, useState } from 'react';
 import type { Lang } from '../i18n';
 import { strings } from '../i18n';
@@ -44,6 +45,8 @@ export function ProjectList({ lang, go }: { lang: Lang; go: Go }) {
   return (
     <section className="stack" data-testid="projects">
       <button className="btn primary add-property" data-testid="project-add" onClick={() => go({ name: 'projectForm' })}><span aria-hidden="true">＋</span> {t.add}</button>
+      {/* MainForAdmin-D (JoyChange005-Main Part1): the invitation code and the projects pushed from Admin EAB. */}
+      <PushedProjects lang={lang} />
       {state.projects.length > 0 && <input aria-label={t.search} placeholder={t.search} value={q} onChange={e => setQ(e.target.value)} data-testid="project-search" />}
       {state.projects.length === 0 && <p className="muted empty" data-testid="projects-empty">{t.empty}</p>}
       {state.projects.length > 0 && list.length === 0 && <p className="muted">{t.none}</p>}
