@@ -9,6 +9,14 @@
 //  - "invite": only the person who sent that invitation, while it is still waiting, and only for an email invitation;
 //  - "answer": only the person who answered it.
 // Each invitation is pushed at most once per kind (table eab_push_sent), however often this is called.
+//
+// JoyChange010-03: push alerts for Admin EAB posts (Market News, Projects, announcements with "send alert" on):
+//   POST /functions/v1/send-push   { "kind": "feed", "item_id": "<uuid>" }   one post
+//   POST /functions/v1/send-push   { "kind": "feed" }                        every post waiting to be sent
+// Called by Admin EAB with the ADMIN'S sign-in. The post is claimed with that sign-in (eab_push_feed_claim: Owner or
+// Admin only, written to the admin audit log, at most once per post). Each agent who may see the post gets it on every
+// registered phone, in the phone's language; the result per agent (sent / failed / no phone) is recorded for the
+// sent / delivered / opened counts (eab_admin_push_report). Answer: { "items": [ { item_id, targeted, sent, failed, no_phone } ] }.
 // Secrets (Supabase → Edge Functions → Secrets):
 //   FCM_SERVICE_ACCOUNT   the whole Firebase service-account JSON (Firebase console → Project settings → Service accounts
 //                         → Generate new private key). Required; without it the function answers 503 "not set up".
@@ -32,6 +40,12 @@ const admin = (path: string, init: RequestInit = {}) => fetch(`${URL_}/rest/v1/$
   ...init, headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, 'content-type': 'application/json', ...(init.headers ?? {}) },
 });
 const q = encodeURIComponent;
+const ANON = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+// A database function run with the CALLER'S sign-in (so the database checks the caller's role itself).
+const asCaller = (auth: string, fn: string, body: unknown) => fetch(`${URL_}/rest/v1/rpc/${fn}`, {
+  method: 'POST', headers: { apikey: ANON, authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify(body),
+});
+const asService = (fn: string, body: unknown) => admin(`rpc/${fn}`, { method: 'POST', body: JSON.stringify(body) });
 
 // ---------- Firebase: a short-lived access token from the service account ----------
 const b64url = (b: ArrayBuffer | Uint8Array | string) => {
@@ -74,9 +88,10 @@ Deno.serve(async req => {
   const caller = await me.json() as { id: string; email?: string; user_metadata?: { full_name?: string; name?: string } };
   const callerName = caller.user_metadata?.full_name || caller.user_metadata?.name || caller.email || '';
 
-  let body: { kind?: string; invite_id?: string };
+  let body: { kind?: string; invite_id?: string; item_id?: string };
   try { body = await req.json(); } catch { return json({ error: 'bad request' }, 400); }
   const kind = body.kind;
+  if (kind === 'feed') return sendFeed(sa, auth, body.item_id);
   const id = body.invite_id && /^[0-9a-f-]{36}$/i.test(body.invite_id) ? body.invite_id : undefined;
   if (kind !== 'invite' && kind !== 'answer') return json({ error: 'bad request' }, 400);
 
@@ -123,3 +138,61 @@ Deno.serve(async req => {
   }
   return json({ sent });
 });
+
+// ---------- JoyChange010-03: push alerts for Admin EAB posts ----------
+type Recipient = { user_id: string; token: string | null; lang: string; title: string; body: string };
+type Outcome = { user_id: string; status: 'sent' | 'failed' | 'no_phone'; error?: string };
+
+async function sendFeed(sa: { project_id: string; client_email: string; private_key: string; token_uri?: string }, auth: string, itemId?: string): Promise<Response> {
+  const uuid = /^[0-9a-f-]{36}$/i;
+  let ids: string[];
+  if (itemId !== undefined) {
+    if (!uuid.test(itemId)) return json({ error: 'bad request' }, 400);
+    ids = [itemId];
+  } else {
+    const r = await asCaller(auth, 'eab_push_feed_queued', {});
+    if (r.status === 401 || r.status === 403) return json({ error: 'not allowed' }, 403);
+    if (!r.ok) return json({ error: 'not allowed' }, 403);   // the database refuses anyone who is not Owner or Admin
+    ids = ((await r.json()) as string[] | null) ?? [];
+  }
+  const items: unknown[] = [];
+  for (const id of ids) {
+    const c = await asCaller(auth, 'eab_push_feed_claim', { p_item: id, p_device: 'send-push' });
+    if (!c.ok) return json({ error: 'not allowed', items }, 403);
+    if ((await c.json()) !== true) { items.push({ item_id: id, skipped: 'already sent, withdrawn, alert off or not yet due' }); continue; }
+    const rr = await asService('eab_push_feed_recipients', { p_item: id });
+    if (!rr.ok) { items.push({ item_id: id, error: 'could not list recipients' }); continue; }   // claim expires after 15 minutes: try again then
+    const rows = await rr.json() as Recipient[];
+    const access = rows.some(x => x.token) ? await googleToken(sa) : '';
+    const byUser = new Map<string, Recipient[]>();
+    for (const x of rows) byUser.set(x.user_id, [...(byUser.get(x.user_id) ?? []), x]);
+    const outcomes: Outcome[] = [];
+    const users = [...byUser.entries()];
+    for (let i = 0; i < users.length; i += 20) {   // 20 agents at a time
+      outcomes.push(...await Promise.all(users.slice(i, i + 20).map(([user, phones]) => sendToAgent(sa, access, id, user, phones))));
+    }
+    const f = await asService('eab_push_feed_finish', { p_item: id, p_results: outcomes });
+    items.push({ item_id: id, ...(f.ok ? await f.json() : { error: 'could not save the result' }) });
+  }
+  return json({ items });
+}
+
+async function sendToAgent(sa: { project_id: string }, access: string, itemId: string, user: string, phones: Recipient[]): Promise<Outcome> {
+  const live = phones.filter(p => p.token);
+  if (!live.length) return { user_id: user, status: 'no_phone' };
+  let ok = false; let error: string | undefined;
+  for (const p of live) {
+    const r = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+      method: 'POST', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ message: {
+        token: p.token, notification: { title: p.title, ...(p.body ? { body: p.body } : {}) }, data: { kind: 'feed', item_id: itemId },
+        android: { priority: 'high', notification: { channel_id: 'news' } },
+      } }),
+    });
+    if (r.ok) { ok = true; continue; }
+    const err = await r.text();
+    error = (/"status":\s*"([A-Z_]+)"/.exec(err)?.[1] ?? `http_${r.status}`).toLowerCase();
+    if (r.status === 404 || /UNREGISTERED/.test(err)) await admin(`eab_push_tokens?token=eq.${q(p.token!)}`, { method: 'DELETE' });
+  }
+  return ok ? { user_id: user, status: 'sent' } : { user_id: user, status: 'failed', error };
+}

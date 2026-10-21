@@ -65,6 +65,33 @@ export async function sendPush(store: Store, cfg: SyncConfig, kind: 'invite' | '
   } catch { /* push is a bonus: the invitation is still shown when the other app looks */ }
 }
 
+// JoyChange010-03: a push alert for an Admin EAB post carries data { kind: 'feed', item_id }. The phone tells the server
+// it arrived (only seen while the app is open) or was tapped, for the sent / delivered / opened counts in Admin EAB.
+// Best effort: a report that fails (offline) is kept for this opening of the app and tried again with the next one.
+type AckWhat = 'received' | 'opened';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+let pendingAcks: { item: string; what: AckWhat }[] = [];
+/** The post id of a feed push, from a received notification or a tapped one (the action wraps it in `notification`). */
+export function feedItemOf(x: unknown): string | undefined {
+  const o = x as { data?: Record<string, unknown>; notification?: { data?: Record<string, unknown> } } | undefined;
+  const d = o?.data ?? o?.notification?.data;
+  return d && d.kind === 'feed' && typeof d.item_id === 'string' && UUID.test(d.item_id) ? d.item_id : undefined;
+}
+/** Reports one feed push (and any earlier reports that failed). Never throws. */
+export async function ackFeedPush(store: Store, cfg: SyncConfig, item: string | undefined, what: AckWhat, fetchFn: FetchFn = fetch): Promise<void> {
+  if (item && !pendingAcks.some(a => a.item === item && a.what === what)) pendingAcks.push({ item, what });
+  const todo = pendingAcks; pendingAcks = [];
+  for (const a of todo) {
+    let ok = false;
+    try { ok = await rpc(cfg, store, 'eab_push_ack', { p_item: a.item, p_what: a.what }, fetchFn); } catch { ok = false; }
+    if (!ok) pendingAcks.push(a);
+  }
+  if (pendingAcks.length > 20) pendingAcks = pendingAcks.slice(-20);
+}
+/** For tests. */
+export const pendingFeedAcks = () => pendingAcks.slice();
+export const clearFeedAcks = () => { pendingAcks = []; };
+
 let started = false;
 /** Starts push on this phone once per opening of the app. `onMessage` runs when a message arrives or is tapped. */
 export async function startPush(store: Store, cfg: SyncConfig, lang: () => string, onMessage: () => void): Promise<'on' | 'off' | 'refused'> {
@@ -78,10 +105,12 @@ export async function startPush(store: Store, cfg: SyncConfig, lang: () => strin
     if (perm.receive !== 'granted') { started = false; return 'refused'; }
     // Android 8+: invitations get their own notification channel (shown with sound, on the lock screen).
     await p.createChannel?.({ id: 'invites', name: 'Team Workspace invitations', importance: 4, visibility: 1 }).catch(() => undefined);
+    // JoyChange010-03: alerts for company posts (Market News, Projects, announcements).
+    await p.createChannel?.({ id: 'news', name: 'Market News and announcements', importance: 4, visibility: 1 }).catch(() => undefined);
     await p.addListener('registration', (t: { value: string }) => { void registerToken(store, cfg, t.value, lang()); });
     await p.addListener('registrationError', () => { /* no Google Play services or no internet: try again next opening */ started = false; usage.error('push.registration'); });
-    await p.addListener('pushNotificationReceived', () => { usage.push('push.received'); onMessage(); });
-    await p.addListener('pushNotificationActionPerformed', () => { usage.push('push.opened'); onMessage(); });
+    await p.addListener('pushNotificationReceived', (n: unknown) => { usage.push('push.received'); void ackFeedPush(store, cfg, feedItemOf(n), 'received'); onMessage(); });
+    await p.addListener('pushNotificationActionPerformed', (n: unknown) => { usage.push('push.opened'); void ackFeedPush(store, cfg, feedItemOf(n), 'opened'); onMessage(); });
     await p.register();
     return 'on';
   } catch { started = false; return 'off'; }
