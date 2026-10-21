@@ -68,7 +68,7 @@ async function phone({ account, signedInAt, settings = {}, profile, local = {}, 
     if (profile) await put('records', 's:profile', profile);
     db.close();
   }, { SB, user, settings, profile, signedInAt: signedInAt ?? Date.now() - 3_600_000 });
-  await page.reload(); await page.waitForSelector('nav.grid, [data-testid="login"]');
+  await page.reload(); await page.waitForSelector('nav.grid, [data-testid="login"], [data-testid="maintenance"], [data-testid="update-required"]');
   return { page, ctx, calls, errors };
 }
 async function waitFor(f, timeout = 10000) { const end = Date.now() + timeout; while (!(await f())) { if (Date.now() > end) throw new Error('timed out'); await new Promise(r => setTimeout(r, 50)); } }
