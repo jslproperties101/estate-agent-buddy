@@ -1,0 +1,11 @@
+MainForAdmin-F test checklist (QA APK from feature/qa-mainforadmin-f) - 23 Oct 2026
+Needs: EAB-QA-Test database with AdminBatch008 applied (it is), Admin EAB 0.8.0 APK.
+
+[ ] 1. Sign in on the QA app. Agent Profile -> Edit: under Contact number there is a line saying the number is also sent to your company (only Owner, Admin and Compliance can see it).
+[ ] 2. Enter your number (e.g. 012-345 6789), Save. Pull to sync or close and reopen the app.
+[ ] 3. In Admin EAB (Owner/Admin/Compliance): Broadcasts -> new WhatsApp broadcast -> Preview. Your agent shows with the number 0123456789.
+[ ] 4. Change the number in the main app, sync. Preview again in Admin EAB: the new number shows.
+[ ] 5. Clear the number in the main app (Save may ask for it - if it cannot be saved empty, skip). Admin EAB shows no number for that agent.
+[ ] 6. Sign in to Admin EAB as Sales Manager or Viewer: no phone numbers are shown anywhere.
+[ ] 7. Airplane mode: change the number, Save. App works normally. Turn data back on, sync: Admin EAB shows the new number.
+[ ] 8. Switch language to BM and Chinese: the note under the phone box is translated.

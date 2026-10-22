@@ -365,6 +365,8 @@ export interface Meta {
   softUpdateClosed?: string;
   /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */
   licenceSent?: string;
+  /** MainForAdmin-F: the Contact number last sent to the database ("user|number"), so it is sent only when it changed. */
+  phoneSent?: string;
   /** The last automatic sync problem, shown in Settings (cleared after a good sync). */
   syncError?: string;
   /** The person chose to use the app on this phone only, without signing in (only when sign-in is not set up). */

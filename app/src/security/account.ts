@@ -2,7 +2,8 @@
 // about its own account at app opening and after every sync (eab_my_account), and:
 //  - suspended / banned / closed: signs out and the sign-in screen shows the reason and the support contact;
 //  - forced sign-out: signs out when this phone's sign-in happened before the time the admin chose;
-//  - sends the licence (when it changed), a Terms answer or a marketing choice made offline, and the queued sign-in log.
+//  - sends the licence (when it changed), a Terms answer or a marketing choice made offline, and the queued sign-in log;
+//  - MainForAdmin-F: sends the agent's own Contact number when it changed (for Admin EAB WhatsApp broadcasts).
 // A database without these functions (an older project) is treated as "nothing to report": the app keeps working.
 // The phone's own records are never deleted by any of this.
 import type { Store } from '../data/store';
@@ -21,6 +22,14 @@ export interface MyAccount {
 export const LICENCE_TYPES = ['REN', 'REA', 'PEA', 'EA', 'FIRM'] as const;
 export const licenceKey = (type: string | undefined, number: string | undefined, user: string) =>
   `${(LICENCE_TYPES as readonly string[]).includes((type ?? '').toUpperCase()) ? (type ?? '').toUpperCase() : ''}|${(number ?? '').trim()}|${user}`;
+
+/** MainForAdmin-F: the agent's own Contact number as the company's database keeps it (spaces, dashes, brackets and dots
+ *  removed; same rule as eab_set_my_phone). Undefined = not a phone number, so nothing is sent. Empty = no number. */
+export function phoneForServer(phone: string | undefined): string | undefined {
+  const p = (phone ?? '').replace(/[\s().-]/g, '');
+  if (!p) return '';
+  return /^\+?[0-9]{8,15}$/.test(p) ? p : undefined;
+}
 
 /** What the app should do with the account the database reported. Pure, for tests. */
 export function verdict(a: MyAccount, signedInAt: number | undefined): 'ok' | 'blocked' | 'forced' {
@@ -82,6 +91,18 @@ async function sendWaiting(store: Store, cfg: SyncConfig, a: MyAccount) {
         await rpc(store, cfg, 'eab_set_my_licence', { p_type: type || null, p_number: number || null });
         store.setSingleton('meta', { licenceSent: key });
       } catch { /* tried again after the next sync */ }
+    }
+  }
+  // MainForAdmin-F (Joe, 22 Oct 2026): the agent's own Contact number from Agent Profile goes to the company, so Admin EAB
+  // can send WhatsApp messages. Sent only when it changed; Owner / Admin / Compliance see it in broadcast lists only.
+  const ph = phoneForServer(p.phone);
+  if (ph !== undefined && `${s.userId}|${ph}` !== st.meta.phoneSent && !(ph === '' && st.meta.phoneSent === undefined)) {
+    try {
+      await rpc(store, cfg, 'eab_set_my_phone', { p_phone: ph || null });
+      store.setSingleton('meta', { phoneSent: `${s.userId}|${ph}` });
+    } catch (e) {
+      // an older database without the function, or a number it refuses: do not ask again until the number changes
+      if (e instanceof TeamError && e.code !== 'network') store.setSingleton('meta', { phoneSent: `${s.userId}|${ph}` });
     }
   }
   const tp = st.settings.termsPending;

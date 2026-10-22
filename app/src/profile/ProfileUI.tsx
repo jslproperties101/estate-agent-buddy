@@ -146,6 +146,7 @@ export function ProfileEdit({ lang, back }: { lang: Lang; back: () => void }) {
         <label className="ff"><Req lang={lang} k="agency" missing={missing} /><input data-field="agency" aria-required="true" aria-invalid={tried && missing.includes('agency')} value={p.agency ?? ''} onChange={e => set('agency', e.target.value)} /></label>
         <label className="ff"><Req lang={lang} k="phone" missing={missing} /><input data-field="phone" type="tel" inputMode="tel" aria-required="true" aria-invalid={tried && missing.includes('phone')} value={p.phone ?? ''} onChange={e => set('phone', e.target.value)} onBlur={() => setP(x => ({ ...x, phone: normalisePhone(x.phone) }))} /></label>
         {tried && missing.includes('phone') && p.phone && <small className="error">{t.phoneShort}</small>}
+        {state.meta.syncSession && <small className="muted" data-testid="phone-company">{t.phoneCompany}</small>}
         <label className="ff">{t.f.email}<input data-field="email" type="email" value={p.email ?? ''} onChange={e => set('email', e.target.value)} /></label>
         {missing.length > 0 && <small className="muted" data-testid="profile-missing">{t.missingList(missing.map(k => t.f[k]).join(', '))}</small>}
       </div>
