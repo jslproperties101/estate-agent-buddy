@@ -1,0 +1,41 @@
+BATCH I - BUDDY GAMES 2 (in the app) - PHONE TEST CHECKLIST
+Built: 22 Oct 2026 with Opus 5.5 - branch feature/qa-games-2 - QA APK ("EAB QA", release tag qa-<commit>)
+Home -> Games tile -> the 4 new games are at the bottom of the list.
+
+GAMES LIST
+1. The list shows 7 games: Buddy Walk, Price It Right, Property Rules Quiz, Buddy Walk: Streets, Viewing Rush, Open House Tour, Match the Buyer.
+2. The old Buddy Walk (your listings gallery) still works as before.
+
+BUDDY WALK: STREETS (3D)
+1. Opens full screen, the advert at the bottom disappears. Start walking.
+2. Left thumb walks, right thumb looks. Both at once feel smooth.
+3. Gold arrow points to the nearest sign; metres count down.
+4. Next to a sign, "Price this listing" -> 3 prices. Right = points + streak; wrong = streak resets. Sign turns PRICED.
+5. You cannot walk through houses or towers.
+6. After 2 minutes (or Pause -> Finish round) the result card shows your score; best score kept.
+
+VIEWING RUSH (3D)
+1. Left / right pads steer, Brake slows. Car drives itself.
+2. Follow the arrow to the gold beacon: points + 10 seconds.
+3. Hit a building fast: "Bump!" and the car slows. Grass is slower than road.
+4. Clock reaches 0 -> result card.
+
+OPEN HOUSE TOUR (3D)
+1. Walk every room; no walking through walls or furniture.
+2. Tap a gold sparkle on the buyer's list: +100 and a tick.
+3. Tap one NOT on the list: -5 seconds, sparkle turns red.
+4. All 3 found: +15 seconds and a new buyer.
+5. Sparkles on balcony, kitchen island, wardrobe, windows, door lock, aircon, study desk and bed are easy to tap.
+
+MATCH THE BUYER
+1. Swipe right/left and the Match/Skip buttons both work; Match and Skip are on screen without scrolling.
+2. A wrong answer shows the reason (e.g. "Over budget by RM 40,000") and takes 5 seconds.
+3. New buyer after every 6 listings.
+
+ALL FOUR
+- Switch language (EN / BM / 中文): all game text changes.
+- Press the phone's Home button during a 3D game, come back: the game is paused, not running.
+- Play 5 minutes each: note if the phone gets hot or slow.
+
+Notes / problems found:
+-

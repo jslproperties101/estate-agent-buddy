@@ -47,8 +47,8 @@ test('GS6 playing every game earns Tried every game', () => {
   for (const g of GAMES) s = recordResult(s, g.key, { score: 1, maxScore: 2 }, T0);
   assert.ok(s.badges.includes('allGames'));
 });
-test('GS7 three games registered in order, each with EN/BM/ZH title and blurb; badge names in 3 languages', () => {
-  assert.deepEqual(GAMES.map(g => g.key), ['buddyWalk', 'priceItRight', 'propertyRules']);
+test('GS7 seven games registered in order (Batch I added four), each with EN/BM/ZH title and blurb; badge names in 3 languages', () => {
+  assert.deepEqual(GAMES.map(g => g.key), ['buddyWalk', 'priceItRight', 'propertyRules', 'buddyStreets', 'viewingRush', 'openHouse', 'matchBuyer']);
   for (const g of GAMES) for (const l of ['en', 'bm', 'zh'] as const) { assert.ok(g.title[l]); assert.ok(g.blurb[l]); }
   assert.equal(gameByKey('nope'), undefined);
   for (const l of ['en', 'bm', 'zh'] as const) for (const b of Object.keys(gameStrings.en.badge)) assert.ok((gameStrings[l].badge as Record<string, string>)[b]);

@@ -1,6 +1,6 @@
 // v1buddychange013: best scores, play counts, daily streak and badges for the Games tile.
 // Kept on this phone only (browser storage, per viewer). Nothing here is synced or sent anywhere.
-import type { GameKey, GameResult } from './types';
+import { GAME_KEYS, type GameKey, type GameResult } from './types';
 
 export interface GameStat { best: number; bestMax: number; plays: number; lastDay?: string }
 export interface GamesState { v: 1; games: Partial<Record<GameKey, GameStat>>; streak: number; lastDay?: string; badges: string[] }
@@ -36,7 +36,7 @@ export function recordResult(prev: GamesState, key: GameKey, r: GameResult, now:
   if (score === max) badges.add('perfect');
   const total = Object.values(games).reduce((n, g) => n + (g?.plays ?? 0), 0);
   if (total >= 25) badges.add('plays25');
-  if ((['buddyWalk', 'priceItRight', 'propertyRules'] as GameKey[]).every(k => (games[k]?.plays ?? 0) > 0)) badges.add('allGames');
+  if (GAME_KEYS.every(k => (games[k]?.plays ?? 0) > 0)) badges.add('allGames');
   return { v: 1, games, streak, lastDay: day, badges: BADGES.filter(b => badges.has(b)) };
 }
 

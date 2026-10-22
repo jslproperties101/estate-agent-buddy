@@ -2,7 +2,9 @@
 // without touching the rest of the app. A game is a React component plus its own words in EN / BM / ZH.
 import type { Lang } from '../i18n';
 
-export type GameKey = 'buddyWalk' | 'priceItRight' | 'propertyRules';
+// v1buddychange015 (Batch I): + buddyStreets, viewingRush, openHouse, matchBuyer.
+export type GameKey = 'buddyWalk' | 'priceItRight' | 'propertyRules' | 'buddyStreets' | 'viewingRush' | 'openHouse' | 'matchBuyer';
+export const GAME_KEYS: readonly GameKey[] = ['buddyWalk', 'priceItRight', 'propertyRules', 'buddyStreets', 'viewingRush', 'openHouse', 'matchBuyer'];
 
 /** What a game reports when a round ends. score is 0..maxScore; higher is better. */
 export interface GameResult { score: number; maxScore: number }
