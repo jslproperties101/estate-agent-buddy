@@ -21,6 +21,9 @@ import { checkAccount } from './security/account';
 import { refreshFeed, maintenanceActive, updateVerdict } from './feed/feed';
 import { MarketNewsScreen, AnnouncementBanners, AnnouncementPopup, BlockingNotice, SoftUpdateBanner, usePublicSettings, useUnreadNews } from './feed/FeedUI';
 import { feedStrings } from './feed/strings';
+import { GamesHub, GameFrame } from './games/GamesUI';
+import { gameStrings } from './games/strings';
+import { gameByKey } from './games/registry';
 import { BUILD as BUILD_INFO } from './native/updates';
 import { logLogin } from './security/loginLog';
 import { startupStrings } from './startup/strings';
@@ -67,7 +70,7 @@ import { StartChoice, needsStartChoice } from './ui/StartChoice';
 import { CountryChoice, useCountryChoice, useTermsChoice } from './ui/CountryChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMegaphone, IconCreative, IconMatch,
+  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMegaphone, IconGame, IconCreative, IconMatch,
 } from './icons';
 import { BottomAd } from './adverts/AdBar';
 import { c11Strings } from './ui/c011Strings';
@@ -587,6 +590,8 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
     case 'auditExport': return exportStrings[lang].exportTitle;
     case 'deal': { const d = cc001Strings[lang].deal; return s.kind === 'booking' ? d.titleBooking : s.kind === 'sale' ? d.titleSale : s.kind === 'rental' ? d.titleRental : d.titleOthers; }
     case 'trackSales': return cc001Strings[lang].sales.title;
+    case 'games': return gameStrings[lang].title;
+    case 'game': return gameByKey(s.key)?.title[lang] ?? gameStrings[lang].title;
   }
 }
 
@@ -674,6 +679,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'auditExport': return <AuditExportScreen key={s.keys.join(',')} lang={lang} go={go} keys={s.keys} person={s.person} actions={s.actions} />;
     case 'deal': return <DealScreen key={`${s.propertyId}-${s.kind}`} lang={lang} propertyId={s.propertyId} kind={s.kind} go={go} back={back} />;
     case 'trackSales': return <TrackSalesScreen lang={lang} go={go} />;
+    case 'games': return <GamesHub lang={lang} go={go} />;
+    case 'game': return <GameFrame key={s.key} lang={lang} gameKey={s.key} back={back} />;
   }
 }
 
@@ -703,6 +710,11 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
           </button>
         ))}
       </nav>
+      {/* v1buddychange013: one full-width Games tile under the 15 cards (the 3 x 5 grid stays as approved). */}
+      <button className="tile games-tile" data-testid="open-games" data-key="games" onClick={() => go({ name: 'games' })} aria-label={gameStrings[lang].title}>
+        <span className="tile-icon"><IconGame /></span>
+        <span className="games-tile-text"><span className="tile-label">{gameStrings[lang].title}</span><small>{gameStrings[lang].cardHint}</small></span>
+      </button>
       {askAgenda && (
         <ChoiceDialog lang={lang} title={x1.agendaQ} testId="agenda-ask" onCancel={() => setAskAgenda(false)} choices={[
           { label: x1.calendar, primary: true, testId: 'agenda-calendar', onPick: () => { setAskAgenda(false); go({ name: 'calendar' }); } },

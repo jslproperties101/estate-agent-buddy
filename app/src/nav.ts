@@ -75,7 +75,10 @@ export type Screen =
   | { name: 'auditExport'; keys: string[]; person?: string; actions?: ('edit' | 'delete' | 'restore' | 'permission' | 'membership' | 'export')[] }
   // ClaudeChanges001: the Booked / Sold / Rented pages and Track My Sales
   | { name: 'deal'; propertyId: string; kind: DealKind }
-  | { name: 'trackSales' };
+  | { name: 'trackSales' }
+  // v1buddychange013: the Games tile and one running game
+  | { name: 'games' }
+  | { name: 'game'; key: string };
 
 /** Which deal page (ClaudeChanges001 change 11). */
 export type DealKind = 'booking' | 'sale' | 'rental' | 'others';
