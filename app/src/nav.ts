@@ -30,8 +30,9 @@ export type Screen =
   | { name: 'banners'; propertyId?: string }
   | { name: 'finance' }
   // JoyChange002: the Project feature (new developments)
-  | { name: 'projects' }
-  | { name: 'marketNews' }
+  | { name: 'projects'; openId?: string }
+  // MainForAdmin-E: openId = a post opened from a tapped push alert
+  | { name: 'marketNews'; openId?: string }
   // JoyChange010-04: files shared into the app, waiting to be moved into a property
   | { name: 'sharedDocs' }
   | { name: 'projectDetail'; id: string }

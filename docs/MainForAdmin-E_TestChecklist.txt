@@ -1,0 +1,43 @@
+MAIN APP "Estate Agent AI Buddy" — MainForAdmin-E (Admin EAB feature flags + tapped alert opens the post) — TEST CHECKLIST
+Written: 22 Oct 2026. TEST database (EAB-QA-Test) only. Production untouched. Nothing merged into main.
+APK: the QA APK from GitHub Release qa-<commit> of branch feature/qa-mainforadmin-e (installs BESIDE your real app as "EAB QA").
+Database: nothing new. Needs AdminBatch006 (already on EAB-QA-Test, 41/41 on 22 Oct 2026) and send-push deployed with
+the FCM_SERVICE_ACCOUNT secret (for section P).
+You need: an Android phone with the QA APK signed in as a TEST AGENT (not your Owner account), and Admin EAB
+(AdminBatch006 APK or web) signed in as Owner or Admin.
+Note: Admin EAB's Feature flags page still says "The main app does not read these switches yet" — ignore it for this test.
+Report problems by code, e.g. "F2 failed: GPS card still shown".
+
+F. FEATURE FLAGS (home cards)
+[ ] F1. Admin EAB → Feature flags → New flag → Feature name "GPS card", key  tile.gps , Every agent, Switch on now OFF
+        → reason → Save.
+[ ] F2. On the phone, open the app (or wait about a minute) → the GPS card is gone from Home. The other cards stay in
+        their places (Subsale List still card 14, AI Assisted Command card 15).
+[ ] F3. Admin EAB → switch tile.gps ON → reason → on the phone after about a minute (or reopen) the GPS card is back.
+[ ] F4. Make an audience group with only your test agent's email. Edit tile.gps → Chosen audience groups → that group →
+        Switch off → the test agent loses the GPS card; a second agent (not in the group) still has it.
+[ ] F5. Turn on airplane mode, close and reopen the app → the cards stay as last heard (no error).
+[ ] F6. A key the app does not know (e.g. "something.else") changes nothing on the phone.
+[ ] F7. Clean up: switch tile.gps ON (or set it to Every agent ON) so the card is back for everyone.
+
+P. TAPPED PUSH ALERT OPENS THE POST (app CLOSED for each test: swipe it away first)
+[ ] P1. Admin EAB → Market News → new post with "send alert" ON → Publish → Send waiting alerts.
+        On the phone, tap the alert → the app opens on Market News and Intelligence with THAT post open (website / PDF
+        buttons visible), and its "New" mark is gone.
+[ ] P2. Same with a Project (audience everyone) → tap → Projects opens with that project open.
+[ ] P3. Same with an Announcement shown as a banner → close the banner on the phone first (✕), swipe the app away,
+        send another alert for it (or a new banner) → tap → Home opens with the announcement as a pop-up → OK → the
+        closed banner does not come back.
+[ ] P4. Announcement as a pop-up → tap the alert → the pop-up shows → OK → it does not show again.
+[ ] P5. Publish + send an alert, then WITHDRAW the post in Admin EAB before tapping → tap → Market News opens with
+        "This post is no longer available."
+[ ] P6. App in the BACKGROUND (open Calculator, then press the phone's Home button; do not swipe it away) → send an
+        alert → tap it → the app comes back with the post open, the same way as P1. (While the app is on screen,
+        Android may not show the alert at all — that is how it already worked.)
+[ ] P7. Admin EAB → push counts for the post in P1 → "opened" went up by one.
+[ ] P8. Switch the phone language to Bahasa Melayu, repeat P5 → message in BM. Same in 中文.
+
+Automatic results (22 Oct 2026, this branch, local): typecheck pass, lint pass (338 files), unit 611/611, screen tests 193/193
+(7 new: flags hide a card, no-flags database, tap opens news / project / announcement, withdrawn post, offline).
+Not in this batch: iPhone push, beta.<name> test features (the switch exists; no feature uses it yet), changing the note
+on Admin EAB's Feature flags page.

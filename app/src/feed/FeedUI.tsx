@@ -1,6 +1,6 @@
 // MainForAdmin-D screens: Market News and Intelligence, Admin-pushed Projects with invitation codes, announcements
 // (banner / pop-up), force update and maintenance mode. Everything shown comes from the company's database (feed.ts).
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
@@ -26,6 +26,21 @@ export function useUnreadNews(): number { return unreadNews(useFeed().items); }
 
 const open = (u?: string) => { if (u) void openInBrowser(u); };
 
+/** MainForAdmin-E: a post opened from a tapped push alert starts open, is marked read once, and is scrolled into view. */
+function useTappedPost(openId: string | undefined, items: FeedItem[], setOpenId: (id: string) => void) {
+  const { store, cfg } = useFeed();
+  const done = useRef(false);
+  const item = openId ? items.find(i => i.id === openId) : undefined;
+  useEffect(() => {
+    if (done.current || !item) return;
+    done.current = true;
+    setOpenId(item.id);
+    if (!item.opened_at) void markFeed(store, cfg, item.id, 'opened');
+    const el = typeof document !== 'undefined' ? document.querySelector(`[data-id="${item.id}"]`) : null;
+    (el as HTMLElement | null)?.scrollIntoView?.({ block: 'start' });
+  }, [item, store, cfg, setOpenId]);
+}
+
 function Links({ item, lang }: { item: FeedItem; lang: Lang }) {
   const t = feedStrings[lang];
   const link = safeUrl(item.link_url); const pdf = safeUrl(item.pdf_url);
@@ -39,11 +54,12 @@ function Links({ item, lang }: { item: FeedItem; lang: Lang }) {
 }
 
 // ---------- Market News and Intelligence ----------
-export function MarketNewsScreen({ lang }: { lang: Lang }) {
+export function MarketNewsScreen({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
   const { store, items, cfg } = useFeed();
   const t = feedStrings[lang];
   const news = ofKind(items, 'news');
   const [openId, setOpenId] = useState<string | null>(null);
+  useTappedPost(tapped, news, setOpenId);
   const at = store.getState().meta.feed?.at;
   const stale = !at || Date.now() - at > 30 * 60_000;
   const unread = unreadNews(items);
@@ -79,7 +95,7 @@ export function MarketNewsScreen({ lang }: { lang: Lang }) {
 }
 
 // ---------- Projects pushed from Admin EAB (shown under "Add New Project") ----------
-export function PushedProjects({ lang }: { lang: Lang }) {
+export function PushedProjects({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
   const { store, items, cfg } = useFeed();
   const t = feedStrings[lang];
   const list = ofKind(items, 'project');
@@ -87,6 +103,7 @@ export function PushedProjects({ lang }: { lang: Lang }) {
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<RedeemResult | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  useTappedPost(tapped, list, setOpenId);
   const signedIn = !!store.getState().meta.syncSession && configured(cfg);
   async function add() {
     if (busy) return;
@@ -158,13 +175,24 @@ export function AnnouncementBanners({ lang }: { lang: Lang }) {
   );
 }
 
-/** One pop-up at a time, in Admin's order; it stays until the agent taps OK. */
-export function AnnouncementPopup({ lang }: { lang: Lang }) {
+/** One pop-up at a time, in Admin's order; it stays until the agent taps OK.
+ *  MainForAdmin-E: showId = an announcement whose push alert was tapped; it is shown here even if it is a banner or was
+ *  answered before. OK on a tapped banner only closes it (the banner's own ✕ still decides whether it stays on Home). */
+export function AnnouncementPopup({ lang, showId, onDone }: { lang: Lang; showId?: string | null; onDone?: () => void }) {
   const { store, items, cfg } = useFeed();
   const t = feedStrings[lang];
-  const i = openPopups(items)[0];
+  const tapped = showId ? items.find(x => x.id === showId && x.kind === 'announcement') : undefined;
+  useEffect(() => {
+    if (showId && !tapped) onDone?.();   // gone meanwhile: nothing to show
+    else if (tapped && !tapped.opened_at) void markFeed(store, cfg, tapped.id, 'opened');
+  }, [showId, tapped, store, cfg, onDone]);
+  const i = tapped ?? openPopups(items)[0];
   if (!i) return null;
   const img = safeUrl(i.image_url);
+  const ok = () => {
+    if (i.display === 'popup' || !tapped) void markFeed(store, cfg, i.id, 'acknowledged');
+    if (tapped) onDone?.();
+  };
   return (
     <div className="sheet-scrim announce-scrim" role="presentation">
       <div className="sheet" role="alertdialog" aria-modal="true" aria-labelledby="ann-t" data-testid="announcement-popup" data-id={i.id}>
@@ -173,7 +201,7 @@ export function AnnouncementPopup({ lang }: { lang: Lang }) {
         {img && <img className="feed-img" src={img} alt="" loading="lazy" referrerPolicy="no-referrer" />}
         {i.body && <p className="feed-body">{i.body}</p>}
         <Links item={i} lang={lang} />
-        <button type="button" className="btn primary big" onClick={() => void markFeed(store, cfg, i.id, 'acknowledged')} data-testid="announcement-ok">{t.ok}</button>
+        <button type="button" className="btn primary big" onClick={ok} data-testid="announcement-ok">{t.ok}</button>
       </div>
     </div>
   );

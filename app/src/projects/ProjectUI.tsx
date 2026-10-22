@@ -32,7 +32,7 @@ const priceText = (p: Project, t: ReturnType<typeof strings2>) => {
 const strings2 = (lang: Lang) => projectStrings[lang];
 
 // ---------- the list ----------
-export function ProjectList({ lang, go }: { lang: Lang; go: Go }) {
+export function ProjectList({ lang, go, openId }: { lang: Lang; go: Go; openId?: string }) {
   const { state } = useApp();
   const t = projectStrings[lang];
   const [q, setQ] = useRemembered('q', '');
@@ -46,7 +46,7 @@ export function ProjectList({ lang, go }: { lang: Lang; go: Go }) {
     <section className="stack" data-testid="projects">
       <button className="btn primary add-property" data-testid="project-add" onClick={() => go({ name: 'projectForm' })}><span aria-hidden="true">＋</span> {t.add}</button>
       {/* MainForAdmin-D (JoyChange005-Main Part1): the invitation code and the projects pushed from Admin EAB. */}
-      <PushedProjects lang={lang} />
+      <PushedProjects lang={lang} openId={openId} />
       {state.projects.length > 0 && <input aria-label={t.search} placeholder={t.search} value={q} onChange={e => setQ(e.target.value)} data-testid="project-search" />}
       {state.projects.length === 0 && <p className="muted empty" data-testid="projects-empty">{t.empty}</p>}
       {state.projects.length > 0 && list.length === 0 && <p className="muted">{t.none}</p>}

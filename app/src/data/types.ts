@@ -359,6 +359,8 @@ export interface Meta {
   feedMarks?: { id: string; what: 'opened' | 'acknowledged' | 'dismissed'; at: string; userId: string }[];
   /** MainForAdmin-D: force update and maintenance mode as last heard from the company's database. */
   publicSettings?: import('../feed/feed').PublicSettings;
+  /** MainForAdmin-E: the feature switches Admin EAB set for this account, as last heard (eab_my_flags). */
+  flags?: import('../feed/flags').FlagCache;
   /** MainForAdmin-D: the minimum version whose soft "please update" notice was closed on this phone. */
   softUpdateClosed?: string;
   /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */

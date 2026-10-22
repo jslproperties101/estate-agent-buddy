@@ -32,6 +32,9 @@ const en = {
   maintTitle: 'Under maintenance', maintDefault: 'The app is under maintenance. Please try again later.',
   maintBack: (t: string) => `Expected back: ${t}`, maintRetry: 'Check again', maintNote: 'Your data on this phone is safe.',
   yourVersion: (v: string, need: string) => `Your version: ${v}. Needed: ${need} or newer.`,
+  // MainForAdmin-E: a tapped push alert whose post is not on this phone
+  tapGone: 'This post is no longer available.',
+  tapOffline: 'This post could not be loaded. Connect to the internet and open Market News and Intelligence again.',
 };
 export type FeedStrings = typeof en;
 
@@ -62,6 +65,8 @@ const bm: FeedStrings = {
   maintTitle: 'Dalam penyelenggaraan', maintDefault: 'Aplikasi sedang diselenggara. Sila cuba sebentar lagi.',
   maintBack: (t: string) => `Dijangka kembali: ${t}`, maintRetry: 'Semak semula', maintNote: 'Data anda dalam telefon ini selamat.',
   yourVersion: (v: string, need: string) => `Versi anda: ${v}. Diperlukan: ${need} atau lebih baharu.`,
+  tapGone: 'Hantaran ini tidak lagi tersedia.',
+  tapOffline: 'Hantaran ini tidak dapat dimuatkan. Sambung ke internet dan buka Berita dan Risikan Pasaran sekali lagi.',
 };
 
 const zh: FeedStrings = {
@@ -91,6 +96,8 @@ const zh: FeedStrings = {
   maintTitle: '系统维护中', maintDefault: '应用正在维护。请稍后再试。',
   maintBack: (t: string) => `预计恢复时间：${t}`, maintRetry: '重新检查', maintNote: '您手机上的数据是安全的。',
   yourVersion: (v: string, need: string) => `您的版本：${v}。需要：${need} 或更新版本。`,
+  tapGone: '此帖子已不再提供。',
+  tapOffline: '无法加载此帖子。请连接互联网后再次打开市场新闻与情报。',
 };
 
 export const feedStrings: Record<Lang, FeedStrings> = { en, bm, zh };

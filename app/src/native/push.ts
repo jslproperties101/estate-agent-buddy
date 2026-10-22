@@ -92,6 +92,30 @@ export async function ackFeedPush(store: Store, cfg: SyncConfig, item: string | 
 export const pendingFeedAcks = () => pendingAcks.slice();
 export const clearFeedAcks = () => { pendingAcks = []; };
 
+// MainForAdmin-E: a tapped feed alert opens that post. The tap can arrive before the screens are ready (the app was
+// closed and the tap started it), so the latest tap waits here until the app shell listens.
+let tapListener: ((item: string) => void) | undefined;
+let pendingTap: string | undefined;
+/** The app shell listens for tapped feed alerts. A tap that came earlier is handed over at once. Returns "stop listening". */
+export function onFeedTap(fn: (item: string) => void): () => void {
+  tapListener = fn;
+  const p = pendingTap; pendingTap = undefined;
+  if (p) fn(p);
+  return () => { if (tapListener === fn) tapListener = undefined; };
+}
+/** Called for a tapped notification; only feed alerts (with a post id) open something. Exported for tests. */
+export function feedTapped(n: unknown): void {
+  const item = feedItemOf(n);
+  if (!item) return;
+  if (tapListener) tapListener(item); else pendingTap = item;
+}
+
+// Screen-test build only (scripts/build.mjs --no-env): a stand-in for tapping a feed alert. Absent from the APK and website.
+declare const __EAB_TEST__: boolean | undefined;
+if (typeof __EAB_TEST__ !== 'undefined' && __EAB_TEST__ && typeof window !== 'undefined') {
+  (window as unknown as { __eabFeedTap?: (id: string) => void }).__eabFeedTap = id => feedTapped({ notification: { data: { kind: 'feed', item_id: id } } });
+}
+
 let started = false;
 /** Starts push on this phone once per opening of the app. `onMessage` runs when a message arrives or is tapped. */
 export async function startPush(store: Store, cfg: SyncConfig, lang: () => string, onMessage: () => void): Promise<'on' | 'off' | 'refused'> {
@@ -110,7 +134,7 @@ export async function startPush(store: Store, cfg: SyncConfig, lang: () => strin
     await p.addListener('registration', (t: { value: string }) => { void registerToken(store, cfg, t.value, lang()); });
     await p.addListener('registrationError', () => { /* no Google Play services or no internet: try again next opening */ started = false; usage.error('push.registration'); });
     await p.addListener('pushNotificationReceived', (n: unknown) => { usage.push('push.received'); void ackFeedPush(store, cfg, feedItemOf(n), 'received'); onMessage(); });
-    await p.addListener('pushNotificationActionPerformed', (n: unknown) => { usage.push('push.opened'); void ackFeedPush(store, cfg, feedItemOf(n), 'opened'); onMessage(); });
+    await p.addListener('pushNotificationActionPerformed', (n: unknown) => { usage.push('push.opened'); void ackFeedPush(store, cfg, feedItemOf(n), 'opened'); feedTapped(n); onMessage(); });
     await p.register();
     return 'on';
   } catch { started = false; return 'off'; }

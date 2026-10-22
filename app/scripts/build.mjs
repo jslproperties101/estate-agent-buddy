@@ -55,7 +55,9 @@ await build({
   minify: process.env.EAB_NOMINIFY ? false : true,
   sourcemap: true,
   outdir: OUT,
-  define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config), __EAB_BUILD__: JSON.stringify(buildInfo) },
+  // __EAB_TEST__: true only in the screen-test build (--no-env), never in the APK or the website. It lets the screen tests
+  // stand in for a tapped push alert, which a browser cannot receive (MainForAdmin-E).
+  define: { 'process.env.NODE_ENV': '"production"', __EAB_CONFIG__: JSON.stringify(config), __EAB_BUILD__: JSON.stringify(buildInfo), __EAB_TEST__: JSON.stringify(noEnv) },
   loader: { '.webp': 'dataurl' },
   plugins: [capacitorPlugin()],
   logLevel: 'info',

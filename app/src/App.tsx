@@ -18,7 +18,10 @@ import { ChoiceDialog } from './ui/common';
 import { saveStrings } from './ui/savestrings';
 import { beginStartup, startupLang, StartupPhase, SPLASH_MS, FORCE_OPEN_MS, splashStep, splashDots } from './startup/startup';
 import { checkAccount } from './security/account';
-import { refreshFeed, maintenanceActive, updateVerdict } from './feed/feed';
+import { refreshFeed, maintenanceActive, updateVerdict, myFeed } from './feed/feed';
+import { refreshFlags, myFlags, tileHidden } from './feed/flags';
+import { feedTapTarget } from './feed/tap';
+import { onFeedTap } from './native/push';
 import { MarketNewsScreen, AnnouncementBanners, AnnouncementPopup, BlockingNotice, SoftUpdateBanner, usePublicSettings, useUnreadNews } from './feed/FeedUI';
 import { feedStrings } from './feed/strings';
 import { BUILD as BUILD_INFO } from './native/updates';
@@ -278,6 +281,8 @@ function useAutoSync() {
         if (store.getState().meta.syncSession) await checkAccount(store, cfg);
         // MainForAdmin-D: news, pushed projects and announcements for this agent, in the app's language.
         if (store.getState().meta.syncSession) await refreshFeed(store, cfg, store.getState().settings.lang ?? 'en');
+        // MainForAdmin-E: the feature switches Admin EAB set for this agent (home tiles, test features).
+        if (store.getState().meta.syncSession) await refreshFlags(store, cfg);
       }
       finally { busy.current = false; }
     };
@@ -429,6 +434,23 @@ function Shell() {
     });
   }, [store]);
 
+  // MainForAdmin-E: a tapped push alert for an Admin EAB post opens that post (feed/tap.ts says where). The feed is read
+  // again first, so a post published a moment ago is there and a withdrawn one is known to be gone.
+  const [tapAnnouncement, setTapAnnouncement] = useState<string | null>(null);
+  const tapRef = useRef({ go, showToast, lang, screen });
+  tapRef.current = { go, showToast, lang, screen };
+  useEffect(() => onFeedTap(id => {
+    void (async () => {
+      const cfg = config(store.getState().settings);
+      const fresh = await refreshFeed(store, cfg, store.getState().settings.lang ?? 'en').catch(() => false);
+      const { go: g, showToast: say, lang: l, screen: cur } = tapRef.current;
+      const target = feedTapTarget(myFeed(store), id, fresh);
+      if (target.announcementId) setTapAnnouncement(target.announcementId);
+      if (!(target.screen.name === 'home' && cur.name === 'home')) g(target.screen);
+      if (target.message) say(feedStrings[l][target.message === 'gone' ? 'tapGone' : 'tapOffline'], 'error');
+    })();
+  }), [store]);
+
   const country = useCountryChoice();
   const terms = useTermsChoice();
   useEffect(() => { usage.screen(screen.name); }, [screen.name]);
@@ -488,7 +510,7 @@ function Shell() {
             has not accepted the current version yet. */}
         {country.ask || terms.ask
           ? <CountryChoice lang={lang} onChoose={c => { if (country.ask || c !== state.settings.country) country.choose(c); }} askCountry={country.ask || terms.ask} askTerms={terms.ask} onAccept={m => void terms.accept(m)} initial={state.settings.country} />
-          : needsStartChoice(state) ? <StartChoice lang={lang} /> : <AnnouncementPopup lang={lang} />}
+          : needsStartChoice(state) ? <StartChoice lang={lang} /> : <AnnouncementPopup lang={lang} showId={tapAnnouncement} onDone={() => setTapAnnouncement(null)} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
         <BottomAd lang={lang} />
@@ -627,8 +649,8 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'propertyMap': return <PropertyMap key={s.id ?? ''} lang={lang} go={go} id={s.id} />;
     case 'banners': return <BannerScreen key={s.propertyId ?? ''} lang={lang} go={go} propertyId={s.propertyId} />;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
-    case 'projects': return <ProjectList lang={lang} go={go} />;
-    case 'marketNews': return <MarketNewsScreen lang={lang} />;
+    case 'projects': return <ProjectList key={s.openId ?? ''} lang={lang} go={go} openId={s.openId} />;
+    case 'marketNews': return <MarketNewsScreen key={s.openId ?? ''} lang={lang} openId={s.openId} />;
     case 'sharedDocs': return <SharedDocsScreen lang={lang} />;
     case 'projectDetail': return <ProjectDetail lang={lang} id={s.id} go={go} />;
     case 'projectForm': return <ProjectForm lang={lang} id={s.id} go={go} back={back} />;
@@ -680,7 +702,9 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
 /** Home (Change 011): the 15 cards and nothing else; the Today and Recent Properties sections were removed. The fixed
  *  advert below the cards is drawn by the shell. */
 function Home({ lang, go }: { lang: Lang; go: Go }) {
-  const { state } = useApp();
+  const { state, store } = useApp();
+  // MainForAdmin-E: a tile Admin EAB switched off for this agent (tile.<key>) is left out; the others keep their numbers.
+  const flags = myFlags(store);
   const t = strings[lang];
   const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
   const x1 = cc001Strings[lang];
@@ -694,7 +718,7 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
       <AnnouncementBanners lang={lang} />
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
       <nav className="grid" aria-label={t.home}>
-        {TILES.map((tile, i) => (
+        {TILES.map((tile, i) => tileHidden(flags, tile.key) ? null : (
           <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
             aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}>
             <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
