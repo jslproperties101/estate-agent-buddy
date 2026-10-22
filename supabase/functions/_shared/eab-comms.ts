@@ -84,11 +84,11 @@ export function reportLines(d: ReportData): { section: string; rows: [string, st
     { section: 'Operations', rows: [['Syncs this week', n(d.sync_runs)], ['Syncs that failed', n(d.sync_fails)], ['New support tickets', n(d.tickets_new)],
       ['Tickets still open', n(d.tickets_open)], ['Posts published', n(d.posts_published)], ['Broadcasts sent', n(d.broadcasts_sent)]] },
     { section: 'Admin EAB', rows: [['Admin actions recorded', n(d.admin_actions)], ['Records viewed by admins', n(d.admin_views)],
-      ['Audit log check', d.log_chain_ok ? 'OK — no change found' : 'PROBLEM — open Master Audit Log']] },
+      ['Audit log check', d.log_chain_ok ? 'OK - no change found' : 'PROBLEM - open Master Audit Log']] },
   ];
 }
 /** Only characters the built-in PDF font can draw (others become "?"). */
-export const pdfSafe = (s: string) => s.replace(/[^\x20-\x7E -ÿ]/g, '?');
+export const pdfSafe = (s: string) => s.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '?');
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const h = await crypto.subtle.digest('SHA-256', bytes);
