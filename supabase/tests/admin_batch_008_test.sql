@@ -6,7 +6,7 @@ declare
   x uuid := gen_random_uuid(); y uuid := gen_random_uuid(); z uuid := gen_random_uuid(); ws uuid := gen_random_uuid();
   pass int := 0; fail int := 0; msgs text := '';
   j jsonb; n bigint; b1 uuid; b2 uuid; b3 uuid; g1 uuid; rid bigint; tok text; run uuid; t1 uuid; t2 uuid; e1 uuid; act0 bigint; acc0 bigint;
-  sat timestamptz;
+  sat timestamptz; ids bigint[]; yid bigint;
 begin
   insert into auth.users (id, email, created_at, raw_user_meta_data) values
     (o, 'b8-owner@test.invalid', now() - interval '40 days', '{}'), (a, 'b8-admin@test.invalid', now() - interval '40 days', '{}'),
@@ -96,19 +96,20 @@ begin
   begin perform public.eab_bc_result(1, true); fail := fail + 1; msgs := msgs || ' [5c admin writes result]';
   exception when insufficient_privilege then pass := pass + 1; end;
   execute 'reset role';
+  -- the Edge Function only uses the functions; the tables are read here as the database owner
+  select array_agg(r.id) into ids from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.status = 'pending';
+  select r.id into yid from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.user_id = y;
+  select r.token into tok from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.user_id = x;
   execute 'set local role service_role';
-  for rid, tok in select r.id, r.token from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.status = 'pending' loop
-    perform public.eab_bc_result(rid, true, null, 'resend-test-id');
-  end loop;
-  if not public.eab_bc_result((select r.id from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.user_id = y), true) then pass := pass + 1;
+  foreach rid in array ids loop perform public.eab_bc_result(rid, true, null, 'resend-test-id'); end loop;
+  if not public.eab_bc_result(yid, true) then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || ' [5d skipped row changed]'; end if;
   if public.eab_bc_finish(b2) = 'done' then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [5e finish]'; end if;
   -- unsubscribe link: turns "news & offers" off for x
-  select r.token into tok from public.eab_broadcast_recipients r where r.broadcast_id = b2 and r.user_id = x;
   j := public.eab_bc_unsubscribe(tok);
-  if (j->>'ok')::boolean and not public.eab_news_consent(x) and not (public.eab_bc_unsubscribe('00')->>'ok')::boolean
-    then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [5f unsubscribe]'; end if;
+  if not (public.eab_bc_unsubscribe('00')->>'ok')::boolean then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [5f2 bad token]'; end if;
   execute 'reset role';
+  if (j->>'ok')::boolean and not public.eab_news_consent(x) then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [5f unsubscribe]'; end if;
   insert into public.eab_terms_acceptance (user_id, kind, accepted) values (x, 'marketing', true);   -- x says yes again
 
   -- ================= WhatsApp tap-to-send =================
@@ -141,6 +142,7 @@ begin
   perform public.eab_admin_broadcast_claim(b1, 10, 't');
   execute 'reset role'; execute 'set local role service_role';
   if not public.eab_bc_unclaim(b1) then fail := fail + 1; msgs := msgs || ' [7c unclaim refused]'; end if;
+  execute 'reset role';
   if (select status from public.eab_broadcasts where id = b1) = 'queued' then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || ' [7c unclaim]'; end if;
   execute 'reset role'; execute 'set local role authenticated';
@@ -191,7 +193,9 @@ begin
     then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [9f data]'; end if;
   begin perform public.eab_report_stored(run, 'r.pdf', repeat('a', 64), 100); fail := fail + 1; msgs := msgs || ' [9g stored without file]';
   exception when no_data_found then pass := pass + 1; end;
-  insert into storage.objects (bucket_id, name) values ('eab-vault', 'reports/' || run || '/' || repeat('a', 64));
+  execute 'reset role';
+  insert into storage.objects (bucket_id, name) values ('eab-vault', 'reports/' || run || '/' || repeat('a', 64));   -- the upload, as storage would
+  execute 'set local role service_role';
   j := public.eab_report_stored(run, 'EAB-weekly-2026-W43.pdf', repeat('a', 64), 1234);
   j := public.eab_report_finished(run, array['b8-owner@test.invalid', 'b8-compliance@test.invalid']);
   if j->>'status' = 'emailed' and cardinality(array(select jsonb_array_elements_text(j->'emailed_to'))) = 2 then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [9h finished]'; end if;
@@ -254,6 +258,8 @@ begin
   exception when insufficient_privilege then pass := pass + 1; end;
   j := public.eab_admin_task_save('{"title": "Viewer own note"}', 'v');
   if not (j->>'shared')::boolean then pass := pass + 1; else fail := fail + 1; msgs := msgs || ' [11h viewer private]'; end if;
+  begin perform public.eab_admin_task_save(jsonb_build_object('id', j->>'id', 'shared', true), 'v'); fail := fail + 1; msgs := msgs || ' [11h2 viewer shares own]';
+  exception when insufficient_privilege then pass := pass + 1; end;
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   perform public.eab_admin_task_save(jsonb_build_object('id', t1, 'removed', true), 'a');
   if not exists (select 1 from jsonb_array_elements(public.eab_admin_todo()->'tasks') t where (t->>'id')::uuid = t1) then pass := pass + 1;

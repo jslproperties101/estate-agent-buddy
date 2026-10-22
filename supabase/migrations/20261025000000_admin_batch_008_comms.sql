@@ -531,7 +531,8 @@ begin
   out := (select to_jsonb(r) from public.eab_report_runs r where r.id = rid);
   perform public.eab_admin_write_action('report_run', null, ref, btrim(p_reason), null, out, p_device);
   return out || jsonb_build_object('recipients', (select coalesce(jsonb_agg(a.email), '[]'::jsonb) from public.eab_report_settings s
-                                                    join public.eab_admins a on a.user_id = any (s.recipients) and a.active where s.id));
+                                                    join public.eab_admins a on a.user_id = any (s.recipients) and a.active and a.role in ('owner', 'compliance')
+                                                   where s.id));
 end $$;
 
 -- SERVICE ROLE ONLY: the hourly check. Makes this week's scheduled run if the schedule is on, today is the day, the hour
@@ -776,6 +777,9 @@ begin
   if p ? 'shared' and (p->>'shared')::boolean is distinct from cur.shared and cur.owner_user <> auth.uid() then
     raise exception 'only the person who made it can make it private or shared' using errcode = '42501';
   end if;
+  if coalesce((p->>'shared')::boolean, false) and public.eab_admin_role() = 'viewer' then
+    raise exception 'a Viewer can only make private items' using errcode = '42501';
+  end if;
   if p ? 'title' and nullif(btrim(coalesce(p->>'title', '')), '') is null then raise exception 'a title is required' using errcode = '22023'; end if;
   update public.eab_admin_tasks set
     title = coalesce(nullif(btrim(p->>'title'), ''), title),
@@ -820,6 +824,9 @@ begin
   if not public.eab_admin_todo_may(cur.owner_user, cur.shared) then raise exception 'not allowed' using errcode = '42501'; end if;
   if p ? 'shared' and (p->>'shared')::boolean is distinct from cur.shared and cur.owner_user <> auth.uid() then
     raise exception 'only the person who made it can make it private or shared' using errcode = '42501';
+  end if;
+  if coalesce((p->>'shared')::boolean, false) and public.eab_admin_role() = 'viewer' then
+    raise exception 'a Viewer can only make private items' using errcode = '42501';
   end if;
   update public.eab_admin_events set
     title = coalesce(nullif(btrim(p->>'title'), ''), title),
