@@ -146,7 +146,7 @@ begin
           from j where j.jd between f and t),
   r as (select n.n,
                count(*) filter (where c.jd + n.n <= today) eligible,
-               count(*) filter (where c.jd + n.n <= today and exists (select 1 from a where a.user_id = c.user_id and a.day >= c.jd + n.n))) kept
+               count(*) filter (where c.jd + n.n <= today and exists (select 1 from a where a.user_id = c.user_id and a.day >= c.jd + n.n)) kept
           from c cross join (values (7), (30), (90)) n(n) group by n.n)
   select jsonb_build_object(
     'from', f, 'to', t, 'joined', (select count(*) from c),
