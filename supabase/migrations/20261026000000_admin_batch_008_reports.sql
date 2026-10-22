@@ -13,6 +13,12 @@
 --     Saved reports are shared with every admin allowed to run that source.
 -- Additive only: one new table, the Vault accepts two new kinds, new functions.
 
+do $$ begin
+  if to_regclass('public.eab_pdpa_requests') is null or to_regclass('public.eab_complaints') is null or to_regclass('public.eab_ticket_notes') is null then
+    raise exception 'Apply AdminBatch006 and AdminBatch007 (20261024000000_admin_batch_007_compliance.sql) first. Nothing was changed.';
+  end if;
+end $$;
+
 -- =====================================================================================================
 -- tables
 -- =====================================================================================================
