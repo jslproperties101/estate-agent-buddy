@@ -7,6 +7,7 @@ import {
 import { recordHash } from './hash';
 import { diffOptions, queue } from './optionSync';
 import { fileRefs } from './fileRefs';
+import { lockedChange } from '../buddy/locks';
 import { AuditEntry, actionFor, diffFields, newestFirst } from '../audit/model';
 
 export const newId = () =>
@@ -16,6 +17,7 @@ export function emptyState(): AppState {
   return {
     properties: [], contacts: [], inquiries: [], appointments: [], tasks: [], journeys: [],
     deals: [], expenses: [], incomes: [], targets: [], expertThreads: [], banners: [], calculations: [], projects: [],
+    acctJournals: [], acctInvoices: [], acctSales: [], acctEinvoices: [], acctLeads: [], acctStaff: [], acctAttendance: [], acctPayruns: [], acctProducts: [], acctProfile: [],
     profile: {},
     settings: { lang: 'en', layout: 'large' }, // Change 28: Large Cards on a first install; afterwards the last choice is kept
     options: {},
@@ -51,7 +53,7 @@ type Listener = () => void;
 /** Change 010: a local change to a record this person may not make (another agent's record shared View Only, or an
  *  action only its owner may take). Thrown by the store itself, so no screen or command can get round it; the cloud
  *  refuses the same change again. */
-export class AccessError extends Error { constructor(public key: string, public why: 'view-only' | 'owner-only') { super(`not allowed (${why}): ${key}`); } }
+export class AccessError extends Error { constructor(public key: string, public why: 'view-only' | 'owner-only' | 'locked') { super(`not allowed (${why}): ${key}`); } }
 
 export class Store {
   private state: AppState;
@@ -187,6 +189,8 @@ export class Store {
    *  View Only: nothing. View and Edit: edits and restore; a To-Do / Calendar entry may also be deleted; a property is
    *  never archived or deleted by anyone but its owner (they get a deletion request instead). */
   private checkWrite(key: string, before: Record<string, unknown> | undefined, after: Record<string, unknown> | null, removing: boolean) {
+    // Buddy POS AI: posted journals, issued invoices, POS receipts, sent e-Invoices and payroll runs are final (buddy/locks.ts).
+    if (lockedChange(key.slice(0, key.indexOf(':')), before, removing ? null : after)) throw new AccessError(key, 'locked');
     const info = this.state.meta.shared?.[key];
     if (!info) return;
     if (info.level !== 'edit') throw new AccessError(key, 'view-only');

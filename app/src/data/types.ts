@@ -5,6 +5,8 @@ import type { Listing } from '../listing/model';
 import type { Lang } from '../i18n';
 import type { PurchaseInput, RentalInput, SaleInput } from '../domain/calculator';
 
+import type { AcctAttendance, AcctEinvoice, AcctInvoice, AcctJournal, AcctLead, AcctPayrun, AcctProduct, AcctProfile, AcctSale, AcctStaff } from '../buddy/model';
+
 export interface Base { id: string; created: number; updated: number; sample?: boolean }
 
 // ---------- contacts and leads ----------
@@ -306,6 +308,8 @@ export interface Settings {
   workspaceView?: 'personal' | 'team';
   /** Change 010 Q120: the Export Management section used last (Saved Exports or Deleted Exports). */
   exportSection?: 'saved' | 'deleted';
+  /** Buddy POS AI Phase 1: the feature switch on this phone (off by default). Admin EAB's beta.buddy-pos-ai also turns it on. */
+  buddyPos?: boolean;
 }
 
 export interface CustomOption { value: string; added: number; used: number }
@@ -477,10 +481,22 @@ export interface Collections {
   calculations: Calculation;
   /** JoyChange002: new developments (projects/model.ts). */
   projects: Project;
+  // Buddy POS AI (buddy/model.ts): the accounting suite's books, synced like every other record.
+  acctJournals: AcctJournal;
+  acctInvoices: AcctInvoice;
+  acctSales: AcctSale;
+  acctEinvoices: AcctEinvoice;
+  acctLeads: AcctLead;
+  acctStaff: AcctStaff;
+  acctAttendance: AcctAttendance;
+  acctPayruns: AcctPayrun;
+  acctProducts: AcctProduct;
+  acctProfile: AcctProfile;
 }
 export type CollectionName = keyof Collections;
 export const COLLECTIONS: CollectionName[] = [
   'properties', 'contacts', 'inquiries', 'appointments', 'tasks', 'journeys', 'deals', 'expenses', 'incomes', 'targets', 'expertThreads', 'banners', 'calculations', 'projects',
+  'acctJournals', 'acctInvoices', 'acctSales', 'acctEinvoices', 'acctLeads', 'acctStaff', 'acctAttendance', 'acctPayruns', 'acctProducts', 'acctProfile',
 ];
 
 export interface Singletons { profile: Profile; settings: Settings; options: OptionLists; meta: Meta }

@@ -1,5 +1,6 @@
 // Every screen in the app and what it needs to open. App.tsx draws the current screen; others call go(...).
 import type { Filters, Listing } from './listing/model';
+import type { BuddyTab } from './buddy/BuddyUI';
 import type { ApptKind, CollectionName, ExpertKey, Task } from './data/types';
 
 export type FormSection =
@@ -76,7 +77,9 @@ export type Screen =
   | { name: 'auditExport'; keys: string[]; person?: string; actions?: ('edit' | 'delete' | 'restore' | 'permission' | 'membership' | 'export')[] }
   // ClaudeChanges001: the Booked / Sold / Rented pages and Track My Sales
   | { name: 'deal'; propertyId: string; kind: DealKind }
-  | { name: 'trackSales' };
+  | { name: 'trackSales' }
+  // Buddy POS AI Phase 1 (behind the feature switch, opened from Agent Financial)
+  | { name: 'buddy'; tab?: BuddyTab };
 
 /** Which deal page (ClaudeChanges001 change 11). */
 export type DealKind = 'booking' | 'sale' | 'rental' | 'others';

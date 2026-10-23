@@ -9,7 +9,7 @@
     "lint": "node scripts/lint.mjs",
     "test:unit": "node scripts/test-unit.mjs",
     "build": "node scripts/build.mjs",
-    "test:ui": "node --test tests/ui.test.mjs tests/ui-change010.test.mjs tests/ui-cc001.test.mjs tests/ui-change019.test.mjs tests/ui-change013.test.mjs tests/ui-website.test.mjs tests/ui-change046.test.mjs tests/ui-batch006-1.test.mjs tests/ui-batch006-2.test.mjs tests/ui-batch006-3.test.mjs tests/ui-batch006-4.test.mjs tests/ui-mainforadmin-b.test.mjs tests/ui-mainforadmin-d.test.mjs tests/ui-joychange010.test.mjs tests/ui-mainforadmin-e.test.mjs",
+    "test:ui": "node --test tests/ui.test.mjs tests/ui-change010.test.mjs tests/ui-cc001.test.mjs tests/ui-change019.test.mjs tests/ui-change013.test.mjs tests/ui-website.test.mjs tests/ui-change046.test.mjs tests/ui-batch006-1.test.mjs tests/ui-batch006-2.test.mjs tests/ui-batch006-3.test.mjs tests/ui-batch006-4.test.mjs tests/ui-mainforadmin-b.test.mjs tests/ui-mainforadmin-d.test.mjs tests/ui-joychange010.test.mjs tests/ui-mainforadmin-e.test.mjs tests/ui-buddy-pos-ai.test.mjs",
     "test": "npm run typecheck && npm run lint && npm run test:unit && node scripts/build.mjs --no-env && npm run test:ui",
     "single": "node scripts/single.mjs",
     "android:setup": "node scripts/android-setup.mjs"

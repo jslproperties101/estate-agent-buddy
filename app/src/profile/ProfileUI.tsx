@@ -1,6 +1,7 @@
 // Button 10 — User Profile / Digital Name Card, the name-card sender, and Settings.
 // Sending: the app prepares the message and opens WhatsApp (or the phone's share sheet for the card images).
 // The agent reviews it there and presses Send; nothing is ever sent automatically.
+import { buddyStrings } from '../buddy/strings';
 import { useState } from 'react';
 import { AboutCard } from '../native/UpdateUI';
 import { BUILD } from '../native/updates';
@@ -308,6 +309,10 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <div className="seg" role="group" aria-label={followStrings[lang].settingTitle}>
           {FOLLOW_UP_CHOICES.map(d => <button key={d} data-days={d} aria-pressed={(s.followUpDays ?? DEFAULT_FOLLOW_UP_DAYS) === d} onClick={() => store.setSingleton('settings', { followUpDays: d })}>{d === 0 ? followStrings[lang].off : followStrings[lang].days(d)}</button>)}
         </div>
+      </div>
+      <div className="card stack-sm" data-testid="buddy-setting">
+        <label className="check"><input type="checkbox" data-testid="buddy-toggle" checked={s.buddyPos === true} onChange={e => store.setSingleton('settings', { buddyPos: e.target.checked })} /> {buddyStrings[lang].switchLabel}</label>
+        <small className="muted">{buddyStrings[lang].switchHint}</small>
       </div>
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>

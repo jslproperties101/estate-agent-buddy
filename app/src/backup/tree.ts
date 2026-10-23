@@ -27,6 +27,8 @@
 // Names use the record's current values; empty levels are "… Not Recorded"; identity always comes from the stable ID in
 // each file's header and in Index.csv, never from a folder name. Two items that would get the same name in one folder:
 // the later one (by creation, then id) gets " [first 8 characters of its id]".
+import type { AcctAttendance, AcctEinvoice, AcctInvoice, AcctJournal, AcctLead, AcctPayrun, AcctSale, AcctStaff } from '../buddy/model';
+import { totals as buddyTotals } from '../buddy/engine';
 import type { AppState, Appointment, CollectionName, Contact, Deal, ExpertThread, Expense, Income, Inquiry, Journey, Target, Task, Calculation, Banner } from '../data/types';
 import type { Project } from '../projects/model';
 import { BUYER_ROLES, VENDOR_ROLES } from '../data/types';
@@ -61,7 +63,7 @@ const photosN = (n: number) => `${n} photo${n === 1 ? '' : 's'}`;
 const DOC_FOLDER: Record<string, string> = { brochure: 'Brochures and Floor Plans', floorplan: 'Brochures and Floor Plans', other: 'Other', title: 'Property Title', correspondence: 'Owner Correspondence', transaction: 'Agreements' };
 const MOD = {
   props: 'Property Listing', todo: 'To-Do', cal: 'Calendar', contacts: 'Contacts', inq: 'Inquiries and Viewings', gps: 'GPS Assistance',
-  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings', projects: 'Projects',
+  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings', projects: 'Projects', buddy: 'Buddy POS AI',
 };
 /** Settings fields that are never written to Drive (keys and addresses). */
 const SECRET_SETTINGS = new Set(['mapsApiKey', 'supabaseUrl', 'supabaseAnonKey', 'expertApiUrl']);
@@ -228,6 +230,32 @@ export function buildTree(state: AppState, opts: TreeOptions = {}): TreeEntry[] 
   if (expenses.length) add({ key: 'finance:expenses', group: 'finance', path: [MOD.fin], name: 'Expenses.csv', mime: 'text/csv', text: csv(['id', 'date', 'category', 'amount_rm', 'property', 'note'], expenses.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map(e => [e.id, e.date, e.category, e.amount, propTitle(e.propertyId), e.note])), waiting: fin('expenses', expenses) });
   if (incomes.length) add({ key: 'finance:incomes', group: 'finance', path: [MOD.fin], name: 'Income.csv', mime: 'text/csv', text: csv(['id', 'date', 'source', 'amount_rm', 'note'], incomes.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map(e => [e.id, e.date, e.source, e.amount, e.note])), waiting: fin('incomes', incomes) });
   if (targets.length) add({ key: 'finance:targets', group: 'finance', path: [MOD.fin], name: 'Targets.txt', mime: 'text/plain', text: textDoc('Targets', undefined, undefined, targets.slice().sort((a, b) => (a.key < b.key ? -1 : 1)).map(t => [`${t.period === 'year' ? 'Year' : 'Month'} ${t.key}`, `RM ${t.amount}`] as [string, string])), waiting: fin('targets', targets) });
+
+  // ---------- Buddy POS AI (tables, one file per kind of record) ----------
+  const bp = (c: CollectionName, name: string, head: string[], rows: (string | number | undefined)[][], list: { id: string }[]) => {
+    if (list.length) add({ key: `buddy:${c}`, group: 'buddy', path: [MOD.buddy], name, mime: 'text/csv', text: csv(head, rows), waiting: fin(c, list) });
+  };
+  const jr = mine('acctJournals', state.acctJournals) as AcctJournal[];
+  bp('acctJournals', 'General Journal.csv', ['id', 'no', 'date', 'status', 'source', 'ref', 'memo', 'account', 'debit_rm', 'credit_rm', 'reversed_by'],
+    jr.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).flatMap(j => j.lines.map(l => [j.id, j.no, j.date, j.status, j.source, j.ref, j.memo, l.acc, l.dr, l.cr, j.reversedBy])), jr);
+  const iv = mine('acctInvoices', state.acctInvoices) as AcctInvoice[];
+  bp('acctInvoices', 'Invoices.csv', ['id', 'no', 'date', 'due', 'status', 'buyer', 'buyer_tin', 'subtotal_rm', 'tax_rm', 'total_rm', 'paid_on'],
+    iv.map(i => { const t = buddyTotals(i.lines); return [i.id, i.no, i.date, i.due, i.status, i.buyer.name, i.buyer.tin, t.sub, t.tax, t.total, i.paidOn]; }), iv);
+  const sl = mine('acctSales', state.acctSales) as AcctSale[];
+  bp('acctSales', 'POS Receipts.csv', ['id', 'no', 'date', 'time', 'method', 'subtotal_rm', 'tax_rm', 'total_rm', 'buyer', 'journal'],
+    sl.map(s => [s.id, s.no, s.date, s.time, s.method, s.sub, s.tax, s.total, s.buyer?.name, s.journalNo]), sl);
+  const ev = mine('acctEinvoices', state.acctEinvoices) as AcctEinvoice[];
+  bp('acctEinvoices', 'e-Invoices.csv', ['id', 'ref', 'kind', 'date', 'status', 'buyer', 'buyer_tin', 'total_rm', 'uuid', 'submission_uid'],
+    ev.map(e => [e.id, e.refNo, e.kind, e.date, e.status, e.buyer.name, e.buyer.tin, buddyTotals(e.lines).total, e.uuid, e.submissionUid]), ev);
+  const ld = mine('acctLeads', state.acctLeads) as AcctLead[];
+  bp('acctLeads', 'Leads.csv', ['id', 'name', 'phone', 'interest', 'stage', 'expected_fee_rm', 'follow_up'], ld.map(l => [l.id, l.name, l.phone, l.interest, l.stage, l.value, l.next]), ld);
+  const sf = mine('acctStaff', state.acctStaff) as AcctStaff[];
+  bp('acctStaff', 'Staff.csv', ['id', 'name', 'role', 'basic_rm', 'allowance_rm', 'commission_rm', 'pcb_rm', 'active'], sf.map(s => [s.id, s.name, s.role, s.basic, s.allowance, s.commission, s.pcb, s.active ? 'yes' : 'no']), sf);
+  const at = mine('acctAttendance', state.acctAttendance) as AcctAttendance[];
+  bp('acctAttendance', 'Attendance.csv', ['id', 'staff', 'date', 'in', 'out'], at.map(a => [a.id, sf.find(s => s.id === a.staffId)?.name ?? a.staffId, a.date, a.in, a.out]), at);
+  const pr0 = mine('acctPayruns', state.acctPayruns) as AcctPayrun[];
+  bp('acctPayruns', 'Payroll.csv', ['month', 'journal', 'staff', 'gross_rm', 'epf_ee', 'epf_er', 'socso_ee', 'socso_er', 'eis_ee', 'eis_er', 'pcb', 'net_rm'],
+    pr0.flatMap(p => p.slips.map(s => [p.month, p.journalNo, s.name, s.gross, s.epfEe, s.epfEr, s.socsoEe, s.socsoEr, s.eisEe, s.eisEr, s.pcb, s.net])), pr0);
 
   perRecord('projects', mine('projects', state.projects) as Project[], [MOD.projects], p => p.name || 'Project', 'Project',
     p => `Unit types:\n${p.unitTypes.map(u => `- ${u.name}${u.priceFrom !== undefined ? ` RM ${u.priceFrom}` : ''}${u.priceTo !== undefined ? ` to RM ${u.priceTo}` : ''}${u.units !== undefined ? `, ${u.units} units` : ''}`).join('\n')}\nBookings:\n${p.bookings.map(b => `- ${b.unitNo} ${b.status}${b.buyerName ? ` ${b.buyerName}` : ''}${b.bookedOn ? ` ${b.bookedOn}` : ''}`).join('\n')}\n`);

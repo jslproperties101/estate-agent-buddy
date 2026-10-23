@@ -8,6 +8,8 @@ import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
 import { Go } from '../nav';
 import { financeStrings } from './strings';
+import { buddyStrings } from '../buddy/strings';
+import { buddyEnabled } from '../buddy/access';
 import { DEAL_STATUSES, Deal, Expense, Income } from '../data/types';
 import { summarise, monthlyIncome, myCommission, commissionFrom, EXPENSE_CATEGORIES, INCOME_SOURCES, Period } from '../domain/finance';
 import { rm, cardTitle, Listing, rentCommissionRm } from '../listing/model';
@@ -48,6 +50,13 @@ export function FinanceScreen({ lang, go }: { lang: Lang; go: Go }) {
 
   return (
     <section className="stack" data-testid="finance">
+      {buddyEnabled(store) && (
+        <div className="card stack-sm" data-testid="buddy-entry">
+          <div className="card-title">{buddyStrings[lang].title}</div>
+          <small className="muted">{buddyStrings[lang].openHint}</small>
+          <button className="btn primary" data-testid="open-buddy" onClick={() => go({ name: 'buddy' })}>{buddyStrings[lang].open}</button>
+        </div>
+      )}
       <Tabs label={f.title} value={kind} onChange={setKind} options={[{ value: 'month', label: f.month }, { value: 'year', label: f.year }]} />
       <div className="between cal-head">
         <button className="icon-btn" aria-label={f.prev} onClick={() => shift(-1)}>‹</button>
