@@ -1,0 +1,10 @@
+MainForAdmin-G test checklist (QA APK from feature/qa-mainforadmin-g) - 23 Oct 2026
+Needs: EAB-QA-Test database with AdminBatch009 applied, Admin EAB 0.9.0 APK (Owner or Admin).
+
+[ ] 1. Sign in on the QA app on phone A (and, if you have one, phone B) with the same agent account.
+[ ] 2. Admin EAB -> open that agent -> Phones tab: phone A (and B) are listed with model, app version, first / last seen.
+[ ] 3. On phone A: "Remove this phone", type a reason, Continue, confirm. It shows "Removed - signed out at its next open or sync".
+[ ] 4. On phone A: close and reopen the app (or sync). It goes to the sign-in screen saying it was signed out. Your listings are still on the phone.
+[ ] 5. Phone B (not removed) keeps working.
+[ ] 6. Sign in again on phone A: it works. Admin EAB Phones tab now says "Removed, but signed in again afterwards".
+[ ] 7. Master Audit Log shows "Device removed" with your reason.

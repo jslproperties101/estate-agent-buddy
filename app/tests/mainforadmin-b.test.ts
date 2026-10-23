@@ -27,6 +27,11 @@ test('B-2 the account decision: suspended / banned / closed sign out; a forced s
   assert.equal(verdict({ status: 'active', force_logout_after: at }, Date.parse(at) - 1000), 'forced');
   assert.equal(verdict({ status: 'active', force_logout_after: at }, Date.parse(at) + 1000), 'ok', 'signed in again after it');
   assert.equal(verdict({ status: 'active', force_logout_after: at }, undefined), 'forced', 'a sign-in from before this version counts as earlier');
+  // MainForAdmin-G: this phone was removed by the company
+  assert.equal(verdict({ status: 'active' }, Date.parse(at) - 1000, at), 'forced', 'removed after this sign-in');
+  assert.equal(verdict({ status: 'active' }, Date.parse(at) + 1000, at), 'ok', 'signed in again after the removal');
+  assert.equal(verdict({ status: 'active' }, 5, null), 'ok', 'never removed');
+  assert.equal(verdict({ status: 'suspended' }, Date.parse(at) - 1000, at), 'blocked', 'a blocked account says blocked');
 });
 test('B-3 licence: only the accepted types are sent; the number is trimmed', () => {
   assert.equal(licenceKey('ren', ' REN 123 ', 'u1'), 'REN|REN 123|u1');

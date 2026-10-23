@@ -3,7 +3,9 @@
 //  - suspended / banned / closed: signs out and the sign-in screen shows the reason and the support contact;
 //  - forced sign-out: signs out when this phone's sign-in happened before the time the admin chose;
 //  - sends the licence (when it changed), a Terms answer or a marketing choice made offline, and the queued sign-in log;
-//  - MainForAdmin-F: sends the agent's own Contact number when it changed (for Admin EAB WhatsApp broadcasts).
+//  - MainForAdmin-F: sends the agent's own Contact number when it changed (for Admin EAB WhatsApp broadcasts);
+//  - MainForAdmin-G: asks whether the company removed THIS phone (eab_my_device); if it was removed after this phone's
+//    sign-in, the phone is signed out the same way as a forced sign-out (signing in again works).
 // A database without these functions (an older project) is treated as "nothing to report": the app keeps working.
 // The phone's own records are never deleted by any of this.
 import type { Store } from '../data/store';
@@ -32,10 +34,17 @@ export function phoneForServer(phone: string | undefined): string | undefined {
 }
 
 /** What the app should do with the account the database reported. Pure, for tests. */
-export function verdict(a: MyAccount, signedInAt: number | undefined): 'ok' | 'blocked' | 'forced' {
+export function verdict(a: MyAccount, signedInAt: number | undefined, deviceRemovedAt?: string | null): 'ok' | 'blocked' | 'forced' {
   if (a.status && a.status !== 'active') return 'blocked';
   if (a.force_logout_after && Date.parse(a.force_logout_after) > (signedInAt ?? 0)) return 'forced';
+  if (deviceRemovedAt && Date.parse(deviceRemovedAt) > (signedInAt ?? 0)) return 'forced';
   return 'ok';
+}
+
+/** MainForAdmin-G: when the company removed this phone (null = never). An older database without the function = never. */
+async function deviceRemovedAt(store: Store, cfg: SyncConfig): Promise<string | null> {
+  try { return (await rpc<{ removed_at: string | null }>(store, cfg, 'eab_my_device', { p_device_id: deviceId() }))?.removed_at ?? null; }
+  catch { return null; }
 }
 
 let busy = false;
@@ -48,7 +57,7 @@ export async function checkAccount(store: Store, cfg: SyncConfig): Promise<'ok' 
     let a: MyAccount;
     try { a = await rpc<MyAccount>(store, cfg, 'eab_my_account'); }
     catch (e) { return e instanceof TeamError && e.code === 'unavailable' ? 'unavailable' : 'offline'; }
-    const v = verdict(a, s.signedInAt);
+    const v = verdict(a, s.signedInAt, a.status === 'active' || !a.status ? await deviceRemovedAt(store, cfg) : null);
     if (v !== 'ok') {
       await logLogin(v === 'forced' ? 'forced_out' : 'blocked', v === 'forced' ? undefined : a.status);
       await flushLoginLog(store, cfg);

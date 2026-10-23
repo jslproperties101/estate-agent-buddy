@@ -27,7 +27,7 @@ before(async () => {
 after(async () => { await browser?.close(); server?.close(); });
 
 /** A phone signed in as one account. `account(body)` answers eab_my_account; every rpc call is recorded. */
-async function phone({ account, signedInAt, settings = {}, profile, local = {} } = {}) {
+async function phone({ account, signedInAt, settings = {}, profile, local = {}, device } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const calls = [];
   const user = { id: 'u-mb', email: 'mb@x.com', metadata: { full_name: 'Test', country: 'Malaysia' } };
@@ -40,6 +40,7 @@ async function phone({ account, signedInAt, settings = {}, profile, local = {} }
     if (m) {
       const body = JSON.parse(req.postData() || '{}');
       calls.push({ fn: m[1], body });
+      if (m[1] === 'eab_my_device' && device) return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(device(body)) });
       if (m[1] === 'eab_my_account' && account) return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(account()) });
       if (m[1] === 'eab_accept_terms') return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ ...account(), terms: { version: body.p_version, at: new Date().toISOString() } }) });
       if (['eab_log_login', 'eab_set_my_licence', 'eab_set_marketing'].includes(m[1])) return route.fulfill({ status: 200, headers: cors, body: '1' });
@@ -90,6 +91,28 @@ test('MB2 a forced sign-out applies to a sign-in made before it, not after it', 
   assert.equal(await afterIt.page.getByTestId('login-blocked').count(), 0, 'signed in after the forced time: stays in');
   assert.equal(await afterIt.page.locator('nav.grid').count(), 1);
   await afterIt.ctx.close();
+});
+
+test('MB-G1 a phone the company removed is signed out; a sign-in made after the removal stays in (MainForAdmin-G)', async () => {
+  const at = new Date(Date.now() - 10 * 60_000).toISOString();
+  const removed = await phone({ account: active(), device: () => ({ removed_at: at }), signedInAt: Date.now() - 60 * 60_000 });
+  await removed.page.getByTestId('login-blocked').waitFor({ timeout: 15000 });
+  assert.equal(await removed.page.getByTestId('login-blocked').getAttribute('data-status'), 'forced');
+  const asked = removed.calls.find(c => c.fn === 'eab_my_device');
+  assert.match(asked.body.p_device_id, /^d-/, 'the phone sends its own device id');
+  await waitFor(() => removed.calls.some(c => c.fn === 'eab_log_login' && c.body.p_events.some(e => e.event === 'forced_out')));
+  assert.deepEqual(removed.errors, []);
+  await removed.ctx.close();
+  const again = await phone({ account: active(), device: () => ({ removed_at: at }), signedInAt: Date.now() - 60_000 });
+  await waitFor(() => again.calls.some(c => c.fn === 'eab_my_device'));
+  await again.page.waitForTimeout(500);
+  assert.equal(await again.page.getByTestId('login-blocked').count(), 0, 'signed in again after the removal: stays in');
+  await again.ctx.close();
+  const older = await phone({ account: active(), signedInAt: Date.now() - 60 * 60_000 });
+  await waitFor(() => older.calls.some(c => c.fn === 'eab_my_device'));
+  await older.page.waitForTimeout(500);
+  assert.equal(await older.page.getByTestId('login-blocked').count(), 0, 'an older database without eab_my_device: nothing happens');
+  await older.ctx.close();
 });
 
 test('MB3 Terms not accepted yet: the tickboxes; Continue explains without the tick; the Terms open with the company name; the answer is saved', async () => {
