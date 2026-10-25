@@ -1,4 +1,4 @@
-# Buddy POS AI — Phase 1
+# AI Buddy POS — Phase 1
 
 Branch `feature/qa-acc-buddy-ai`, started from `feature/qa-mainforadmin-g` at `422cf4c` (24 Oct 2026).
 Scope approved by the owner on 24 Oct 2026: everything in the prototype, data on the phone plus the existing sync,
@@ -8,7 +8,7 @@ behind a feature switch.
 
 | Area | What it does | Status |
 |---|---|---|
-| Feature switch | Off by default. On from Settings → "Buddy POS AI (test feature)", or from Admin EAB with the test feature `beta.buddy-pos-ai`. When on, Agent Financial shows "Open Buddy POS AI". No home tile is added or moved. | IMPLEMENTED |
+| Feature switch | Off by default. On from Settings → "AI Buddy POS (test feature)", or from Admin EAB with the test feature `beta.buddy-pos-ai`. When on, Agent Financial shows "Open AI Buddy POS". No home tile is added or moved. | IMPLEMENTED |
 | Ledger | Double-entry chart of accounts for an estate agency (21 accounts). Journal entries: draft → posted (numbered JV-0001…) → reversed by a new posted entry. Debits must equal credits. | IMPLEMENTED |
 | Locks | The store itself refuses: editing or deleting a posted journal, rewriting an issued invoice, deleting a POS receipt, changing a submitted e-Invoice's content, changing or deleting a payroll run (`buddy/locks.ts`, `data/store.ts`). | IMPLEMENTED |
 | Invoices | Draft, post (receivable, income, 8% service tax), record payment (bank), create e-Invoice. | IMPLEMENTED |
@@ -22,7 +22,7 @@ behind a feature switch.
 | Payroll rates | Flat-rate ESTIMATES (EPF 11% / 13% or 12% above RM5,000; SOCSO 0.5% / 1.75% and EIS 0.2% / 0.2% up to RM6,000; PCB typed per person). Not the official schedules. | PARTIALLY DONE |
 | Insights | Rule-based on the phone: overdue invoices, receivables, follow-ups, e-Invoice items waiting, cash runway, payroll not posted, SST collected. | IMPLEMENTED |
 | Sync | Ten new collections (`acctJournals`, `acctInvoices`, `acctSales`, `acctEinvoices`, `acctLeads`, `acctStaff`, `acctAttendance`, `acctPayruns`, `acctProducts`, `acctProfile`) go through the existing `eab_records` sync. No database migration. | IMPLEMENTED BUT NOT PROVEN (no sync against a Supabase project was run) |
-| Drive backup | A "Buddy POS AI" folder with CSV files (journal, invoices, receipts, e-Invoices, leads, staff, attendance, payroll). | IMPLEMENTED |
+| Drive backup | A "AI Buddy POS" folder with CSV files (journal, invoices, receipts, e-Invoices, leads, staff, attendance, payroll). | IMPLEMENTED |
 | Example data | "Load example data" fills every tab with marked sample records that never sync; "Remove example data" takes them away. | IMPLEMENTED |
 | Languages | English, Bahasa Malaysia and Chinese for every screen text and account name. | IMPLEMENTED |
 
@@ -39,8 +39,8 @@ behind a feature switch.
 
 ## How to try it (QA APK)
 
-1. Settings → tick "Buddy POS AI (test feature)".
-2. Agent Financial → Open Buddy POS AI → Load example data.
+1. Settings → tick "AI Buddy POS (test feature)".
+2. Agent Financial → Open AI Buddy POS → Load example data.
 3. POS: tap a service, Charge. Journal: the POS entry is there. Reports: trial balance debits = credits.
 4. Journal: New journal entry; it cannot be posted until it balances; Reverse a posted entry.
 5. e-Invoice: Submit says the LHDN sandbox is not connected (no function deployed). Nothing turns Valid.

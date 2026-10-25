@@ -308,7 +308,7 @@ export interface Settings {
   workspaceView?: 'personal' | 'team';
   /** Change 010 Q120: the Export Management section used last (Saved Exports or Deleted Exports). */
   exportSection?: 'saved' | 'deleted';
-  /** Buddy POS AI Phase 1: the feature switch on this phone (off by default). Admin EAB's beta.buddy-pos-ai also turns it on. */
+  /** AI Buddy POS Phase 1: the feature switch on this phone (off by default). Admin EAB's beta.buddy-pos-ai also turns it on. */
   buddyPos?: boolean;
 }
 
@@ -481,7 +481,7 @@ export interface Collections {
   calculations: Calculation;
   /** JoyChange002: new developments (projects/model.ts). */
   projects: Project;
-  // Buddy POS AI (buddy/model.ts): the accounting suite's books, synced like every other record.
+  // AI Buddy POS (buddy/model.ts): the accounting suite's books, synced like every other record.
   acctJournals: AcctJournal;
   acctInvoices: AcctInvoice;
   acctSales: AcctSale;

@@ -63,7 +63,7 @@ const photosN = (n: number) => `${n} photo${n === 1 ? '' : 's'}`;
 const DOC_FOLDER: Record<string, string> = { brochure: 'Brochures and Floor Plans', floorplan: 'Brochures and Floor Plans', other: 'Other', title: 'Property Title', correspondence: 'Owner Correspondence', transaction: 'Agreements' };
 const MOD = {
   props: 'Property Listing', todo: 'To-Do', cal: 'Calendar', contacts: 'Contacts', inq: 'Inquiries and Viewings', gps: 'GPS Assistance',
-  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings', projects: 'Projects', buddy: 'Buddy POS AI',
+  fin: 'Agent Financial', calc: 'Property Calculator', profile: 'Agent Profile', expert: 'Ask Expert', settings: 'Settings', projects: 'Projects', buddy: 'AI Buddy POS',
 };
 /** Settings fields that are never written to Drive (keys and addresses). */
 const SECRET_SETTINGS = new Set(['mapsApiKey', 'supabaseUrl', 'supabaseAnonKey', 'expertApiUrl']);
@@ -231,7 +231,7 @@ export function buildTree(state: AppState, opts: TreeOptions = {}): TreeEntry[] 
   if (incomes.length) add({ key: 'finance:incomes', group: 'finance', path: [MOD.fin], name: 'Income.csv', mime: 'text/csv', text: csv(['id', 'date', 'source', 'amount_rm', 'note'], incomes.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map(e => [e.id, e.date, e.source, e.amount, e.note])), waiting: fin('incomes', incomes) });
   if (targets.length) add({ key: 'finance:targets', group: 'finance', path: [MOD.fin], name: 'Targets.txt', mime: 'text/plain', text: textDoc('Targets', undefined, undefined, targets.slice().sort((a, b) => (a.key < b.key ? -1 : 1)).map(t => [`${t.period === 'year' ? 'Year' : 'Month'} ${t.key}`, `RM ${t.amount}`] as [string, string])), waiting: fin('targets', targets) });
 
-  // ---------- Buddy POS AI (tables, one file per kind of record) ----------
+  // ---------- AI Buddy POS (tables, one file per kind of record) ----------
   const bp = (c: CollectionName, name: string, head: string[], rows: (string | number | undefined)[][], list: { id: string }[]) => {
     if (list.length) add({ key: `buddy:${c}`, group: 'buddy', path: [MOD.buddy], name, mime: 'text/csv', text: csv(head, rows), waiting: fin(c, list) });
   };

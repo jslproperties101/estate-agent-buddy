@@ -78,7 +78,7 @@ export type Screen =
   // ClaudeChanges001: the Booked / Sold / Rented pages and Track My Sales
   | { name: 'deal'; propertyId: string; kind: DealKind }
   | { name: 'trackSales' }
-  // Buddy POS AI Phase 1 (behind the feature switch, opened from Agent Financial)
+  // AI Buddy POS Phase 1 (behind the feature switch, opened from Agent Financial)
   | { name: 'buddy'; tab?: BuddyTab };
 
 /** Which deal page (ClaudeChanges001 change 11). */

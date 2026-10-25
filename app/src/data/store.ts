@@ -189,7 +189,7 @@ export class Store {
    *  View Only: nothing. View and Edit: edits and restore; a To-Do / Calendar entry may also be deleted; a property is
    *  never archived or deleted by anyone but its owner (they get a deletion request instead). */
   private checkWrite(key: string, before: Record<string, unknown> | undefined, after: Record<string, unknown> | null, removing: boolean) {
-    // Buddy POS AI: posted journals, issued invoices, POS receipts, sent e-Invoices and payroll runs are final (buddy/locks.ts).
+    // AI Buddy POS: posted journals, issued invoices, POS receipts, sent e-Invoices and payroll runs are final (buddy/locks.ts).
     if (lockedChange(key.slice(0, key.indexOf(':')), before, removing ? null : after)) throw new AccessError(key, 'locked');
     const info = this.state.meta.shared?.[key];
     if (!info) return;

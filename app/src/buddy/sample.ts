@@ -1,4 +1,4 @@
-// Buddy POS AI: example books for trying the suite (Load example data). Every record is marked sample, so it is never
+// AI Buddy POS: example books for trying the suite (Load example data). Every record is marked sample, so it is never
 // sent to the cloud, never counted as the agent's own data and can be removed again in one tap. Dates follow "today":
 // last month and this month.
 import type {

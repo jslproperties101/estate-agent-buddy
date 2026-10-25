@@ -1,4 +1,4 @@
-// Buddy POS AI: the double-entry ledger and everything that posts to it. Pure functions: they take the current records
+// AI Buddy POS: the double-entry ledger and everything that posts to it. Pure functions: they take the current records
 // and return the records to save, so the screens decide when to save and the tests can check every rule.
 import type {
   Account, AcctAttendance, AcctEinvoice, AcctInvoice, AcctJournal, AcctLead, AcctPayrun, AcctSale, AcctStaff, JournalLine,

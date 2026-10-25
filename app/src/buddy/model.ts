@@ -1,4 +1,4 @@
-// Buddy POS AI (Phase 1): the records of the accounting suite. Every record is an ordinary synced record (eab_records),
+// AI Buddy POS (Phase 1): the records of the accounting suite. Every record is an ordinary synced record (eab_records),
 // so it is saved on the phone first and reaches the cloud with the next sync, exactly like a property or a contact.
 //  - Money is always Malaysian ringgit, kept as a number rounded to sen.
 //  - A posted journal is never edited or deleted: a mistake is corrected with a reversal (see locks.ts).

@@ -1,4 +1,4 @@
-// Buddy POS AI: the phone's side of LHDN MyInvois. The phone never holds LHDN credentials: it asks the company's own
+// AI Buddy POS: the phone's side of LHDN MyInvois. The phone never holds LHDN credentials: it asks the company's own
 // server function (supabase/functions/myinvois) to sign and send the document, and saves only what that function answers.
 // Until the function is deployed with the MyInvois sandbox credentials, every call answers "not-configured" and the
 // e-Invoice stays Ready to submit; nothing pretends it was sent.

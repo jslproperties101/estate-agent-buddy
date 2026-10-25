@@ -1,4 +1,4 @@
-// Buddy POS AI Phase 1: the ledger rules, invoices, POS, reports, e-Invoice documents and checks, payroll estimates,
+// AI Buddy POS Phase 1: the ledger rules, invoices, POS, reports, e-Invoice documents and checks, payroll estimates,
 // the locks on final records, and the phone's side of the MyInvois function. Nothing here calls LHDN or a real project.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ const buyer: Party = { name: 'Tan Holdings Sdn Bhd', tin: 'C10987654320', brn: '
 const co: AcctProfile = { id: 'company', created: 0, updated: 0, msic: '68201', msicDesc: 'Real estate agents', party: { name: 'Example Realty Sdn Bhd', tin: 'C21234567890', brn: '202301012345', sst: 'W10-2310-32000123', addr: 'Jalan Ampang', city: 'Kuala Lumpur', state: '14', postcode: '50450' } };
 const draftInv = (over: Partial<AcctInvoice> = {}): AcctInvoice => ({ id: ids.id(), created: 0, updated: 0, date: '2026-10-10', due: '2026-11-09', buyer, status: 'draft', lines: [{ desc: 'Agency commission', qty: 1, price: 24000, taxPct: 8, acc: '4000' }], ...over });
 
-test('collections: every Buddy POS AI kind is synced like the rest and starts empty', () => {
+test('collections: every AI Buddy POS kind is synced like the rest and starts empty', () => {
   for (const c of ['acctJournals', 'acctInvoices', 'acctSales', 'acctEinvoices', 'acctLeads', 'acctStaff', 'acctAttendance', 'acctPayruns', 'acctProducts', 'acctProfile'] as const) {
     assert.ok(COLLECTIONS.includes(c), c);
     assert.deepEqual(emptyState()[c], []);

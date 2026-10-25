@@ -1,4 +1,4 @@
-// Supabase Edge Function: Buddy POS AI → LHDN MyInvois (Phase 1, sandbox first).
+// Supabase Edge Function: AI Buddy POS → LHDN MyInvois (Phase 1, sandbox first).
 // The LHDN credentials stay here as secrets and never go into the app.
 //   supabase secrets set MYINVOIS_ENV=preprod                       (preprod = sandbox; prod only after approval)
 //   supabase secrets set MYINVOIS_CLIENT_ID=... MYINVOIS_CLIENT_SECRET=...

@@ -1,4 +1,4 @@
-// Buddy POS AI (Phase 1): the accounting suite's screen. One ledger behind every tab: POS sales, invoices, receipts and
+// AI Buddy POS (Phase 1): the accounting suite's screen. One ledger behind every tab: POS sales, invoices, receipts and
 // payroll all post journal entries, and the reports read only posted entries. Opened from Agent Financial when the
 // feature switch is on (buddy/access.ts).
 import { useState, type ReactNode } from 'react';

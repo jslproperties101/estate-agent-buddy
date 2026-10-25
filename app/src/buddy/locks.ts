@@ -1,4 +1,4 @@
-// Buddy POS AI: what may still change once a financial record is final. The store checks this on every local save
+// AI Buddy POS: what may still change once a financial record is final. The store checks this on every local save
 // (data/store.ts checkWrite), so no screen, command or restore path can quietly rewrite the books.
 //  - Journal: a draft may change or be deleted. Posted: only marking it reversed. Reversed: nothing.
 //  - Invoice: a draft may change or be deleted. Posted: only being paid and linked to its e-Invoice. Paid: only the link.

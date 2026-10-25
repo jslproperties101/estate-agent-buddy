@@ -1,4 +1,4 @@
-// Buddy POS AI: LHDN MyInvois e-Invoices. Builds the UBL 2.1 JSON document LHDN expects and checks it before it is sent.
+// AI Buddy POS: LHDN MyInvois e-Invoices. Builds the UBL 2.1 JSON document LHDN expects and checks it before it is sent.
 // Sending happens only through the myinvois server function (myinvoisClient.ts); nothing here talks to LHDN.
 //  - Rules used (checked 24 Oct 2026): a sale above RM10,000 needs its own e-Invoice; other POS receipts may go into one
 //    consolidated e-Invoice per month, due within 7 days after the month ends; a validated e-Invoice can be cancelled

@@ -1,9 +1,9 @@
-// Buddy POS AI text, in three languages.
+// AI Buddy POS text, in three languages.
 import type { Lang } from '../i18n';
 
 const en = {
-  title: 'Buddy POS AI',
-  open: 'Open Buddy POS AI', openHint: 'Accounts, POS, invoices, LHDN e-Invoice, customers and payroll in one ledger.',
+  title: 'AI Buddy POS',
+  open: 'Open AI Buddy POS', openHint: 'Accounts, POS, invoices, LHDN e-Invoice, customers and payroll in one ledger.',
   tabs: { overview: 'Overview', pos: 'POS', invoices: 'Invoices', customers: 'Customers', people: 'People', journal: 'Journal', einvoice: 'e-Invoice', reports: 'Reports', setup: 'Setup' },
   kpi: { net: 'Net profit this month', revenue: 'Revenue this month', expenses: 'Expenses this month', receivables: 'To collect', cash: 'Cash and bank' },
   insightsTitle: 'Buddy insights', insightsHint: 'Worked out from your own books on this phone.',
@@ -104,13 +104,13 @@ const en = {
     '4000': 'Agency commission income', '4010': 'Rental management fees', '4100': 'Counter services (POS)', '5000': 'Co-broke commission paid',
     '6000': 'Property portal listings', '6100': 'Office rent', '6200': 'Utilities & internet', '6300': 'Transport & fuel', '6400': 'Salaries, allowances & commission', '6410': 'Employer EPF, SOCSO & EIS',
   } as Record<string, string>,
-  switchLabel: 'Buddy POS AI (test feature)', switchHint: 'Shows the accounting suite in Agent Financial. Off by default.',
+  switchLabel: 'AI Buddy POS (test feature)', switchHint: 'Shows the accounting suite in Agent Financial. Off by default.',
 };
 export type BuddyStrings = typeof en;
 
 const bm: BuddyStrings = {
-  title: 'Buddy POS AI',
-  open: 'Buka Buddy POS AI', openHint: 'Akaun, POS, invois, e-Invois LHDN, pelanggan dan gaji dalam satu lejar.',
+  title: 'AI Buddy POS',
+  open: 'Buka AI Buddy POS', openHint: 'Akaun, POS, invois, e-Invois LHDN, pelanggan dan gaji dalam satu lejar.',
   tabs: { overview: 'Ringkasan', pos: 'POS', invoices: 'Invois', customers: 'Pelanggan', people: 'Kakitangan', journal: 'Jurnal', einvoice: 'e-Invois', reports: 'Laporan', setup: 'Tetapan' },
   kpi: { net: 'Untung bersih bulan ini', revenue: 'Hasil bulan ini', expenses: 'Perbelanjaan bulan ini', receivables: 'Untuk dikutip', cash: 'Tunai dan bank' },
   insightsTitle: 'Pandangan Buddy', insightsHint: 'Dikira daripada buku anda sendiri di telefon ini.',
@@ -202,12 +202,12 @@ const bm: BuddyStrings = {
     '4000': 'Pendapatan komisen agensi', '4010': 'Yuran pengurusan sewaan', '4100': 'Perkhidmatan kaunter (POS)', '5000': 'Komisen co-broke dibayar',
     '6000': 'Iklan portal hartanah', '6100': 'Sewa pejabat', '6200': 'Utiliti & internet', '6300': 'Pengangkutan & minyak', '6400': 'Gaji, elaun & komisen', '6410': 'KWSP, PERKESO & SIP majikan',
   },
-  switchLabel: 'Buddy POS AI (ciri ujian)', switchHint: 'Menunjukkan suite perakaunan dalam Kewangan Ejen. Mati secara lalai.',
+  switchLabel: 'AI Buddy POS (ciri ujian)', switchHint: 'Menunjukkan suite perakaunan dalam Kewangan Ejen. Mati secara lalai.',
 };
 
 const zh: BuddyStrings = {
-  title: 'Buddy POS AI',
-  open: '打开 Buddy POS AI', openHint: '账目、POS、发票、LHDN 电子发票、客户和薪资，同一本账。',
+  title: 'AI Buddy POS',
+  open: '打开 AI Buddy POS', openHint: '账目、POS、发票、LHDN 电子发票、客户和薪资，同一本账。',
   tabs: { overview: '概览', pos: 'POS', invoices: '发票', customers: '客户', people: '员工', journal: '日记账', einvoice: '电子发票', reports: '报表', setup: '设置' },
   kpi: { net: '本月净利润', revenue: '本月收入', expenses: '本月支出', receivables: '待收款', cash: '现金和银行' },
   insightsTitle: 'Buddy 提示', insightsHint: '根据本手机上的账目计算。',
@@ -299,7 +299,7 @@ const zh: BuddyStrings = {
     '4000': '中介佣金收入', '4010': '租赁管理费', '4100': '柜台服务 (POS)', '5000': '合作佣金支出',
     '6000': '房产网站刊登费', '6100': '办公室租金', '6200': '水电与网络', '6300': '交通与油费', '6400': '薪资、津贴与佣金', '6410': '雇主 EPF、SOCSO 与 EIS',
   },
-  switchLabel: 'Buddy POS AI（测试功能）', switchHint: '在代理财务中显示会计套件。默认关闭。',
+  switchLabel: 'AI Buddy POS（测试功能）', switchHint: '在代理财务中显示会计套件。默认关闭。',
 };
 
 export const buddyStrings: Record<Lang, BuddyStrings> = { en, bm, zh };

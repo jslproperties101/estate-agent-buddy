@@ -1,4 +1,4 @@
-// Buddy POS AI Phase 1 screen tests in a real Chromium browser at phone width, signed out (everything on the phone).
+// AI Buddy POS Phase 1 screen tests in a real Chromium browser at phone width, signed out (everything on the phone).
 // Not a phone, not Supabase and not LHDN: the e-Invoice test only checks that nothing is claimed as sent.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,7 +44,7 @@ async function phone(settings = {}) {
 }
 const openFinance = async page => { await page.locator('nav.grid > button[data-key="finance"]').click(); await page.getByTestId('finance').waitFor(); };
 
-test('B1 switch off by default: Agent Financial shows no Buddy POS AI entry', async () => {
+test('B1 switch off by default: Agent Financial shows no AI Buddy POS entry', async () => {
   const { page, ctx, errors } = await phone();
   await openFinance(page);
   assert.equal(await page.getByTestId('buddy-entry').count(), 0);
