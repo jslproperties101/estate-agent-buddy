@@ -37,9 +37,12 @@ if (!sha) { try { sha = (await import('node:child_process')).execSync('git rev-p
 const qa = process.env.EAB_QA === '1';
 // EAB_WEBSITE=1 makes the laptop website (JoyChange002 Change 47): wide layout, no adverts, no phone-only parts. Not a secret.
 const website = process.env.EAB_WEBSITE === '1';
+// EAB_POS=1 makes the standalone AI Buddy POS app: its own Android package, name and storage; it opens straight into
+// AI Buddy POS (switch always on) and never updates itself from the real app's or the QA app's list. Not a secret.
+const pos = process.env.EAB_POS === '1';
 // releaseLabel (package.json) is a display-only milestone name ("2.0.010" = the integrated Changes 001-010). It is never
 // compared: installs and updates use the commit (sha), the semantic version and nativeVersion only.
-const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}), ...(website ? { website: true } : {}) };
+const buildInfo = { sha, version: pkg.version, nativeVersion: pkg.nativeVersion ?? 1, builtAt: new Date().toISOString(), ...(pkg.releaseLabel ? { release: String(pkg.releaseLabel) } : {}), ...(qa ? { qa: true } : {}), ...(pos ? { pos: true } : {}), ...(website ? { website: true } : {}) };
 
 // EAB_OUTDIR: another output folder (the screen tests build a QA copy beside dist/). Default dist/.
 const OUT = process.env.EAB_OUTDIR || 'dist';

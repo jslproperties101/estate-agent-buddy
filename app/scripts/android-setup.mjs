@@ -15,8 +15,11 @@ const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 // EAB_QA=1: the isolated QA app. A different package name (so it installs BESIDE the real app with its own storage and cannot
 // overwrite it), its own sign-in return link and its own app name. The web side is built with the same flag (updates off).
 const QA = process.env.EAB_QA === '1';
-const APP_ID = QA ? `${cfg.appId}.qa` : cfg.appId;
-const APP_NAME = QA ? 'EAB QA' : cfg.appName;
+// EAB_POS=1: the standalone AI Buddy POS app: its own package (installs beside the real app and the QA app, own storage), own
+// name and sign-in return link; the web side is built with the same flag (opens in AI Buddy POS, never updates itself).
+const POS = process.env.EAB_POS === '1';
+const APP_ID = POS ? 'com.jslproperties.aibuddypos' : QA ? `${cfg.appId}.qa` : cfg.appId;
+const APP_NAME = POS ? 'AI Buddy POS' : QA ? 'EAB QA' : cfg.appName;
 const A = 'android/app/src/main';
 const must = p => { if (!existsSync(p)) throw new Error(`Missing ${p}: run "npx cap add android" first.`); return p; };
 const edit = (p, fn) => { const s = readFileSync(must(p), 'utf8'); const t = fn(s); if (t !== s) writeFileSync(p, t); };
@@ -110,8 +113,19 @@ for (const [dir, label] of [['values', 'Estate Agent AI Buddy Document Upload'],
   if (existsSync(src)) {
     const j = JSON.parse(readFileSync(src, 'utf8'));
     const ids = (j.client ?? []).map(c => c.client_info?.android_client_info?.package_name);
-    if (!ids.includes(APP_ID)) throw new Error(`google-services.json has no Android app ${APP_ID} (it has ${ids.join(', ')})`);
-    copyFileSync(src, 'android/app/google-services.json');
+    if (POS && !ids.includes(APP_ID)) {
+      // The POS app is not registered in Firebase yet. So the build can still pass, it borrows the QA app's entry under the POS
+      // package name. Push alerts are NOT expected to work in the POS app until it is added as an Android app in Firebase.
+      const base = (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === `${cfg.appId}.qa`);
+      if (!base) throw new Error(`google-services.json has no Android app ${cfg.appId}.qa to borrow for ${APP_ID}`);
+      const copy = JSON.parse(JSON.stringify(base)); copy.client_info.android_client_info.package_name = APP_ID;
+      j.client.push(copy);
+      writeFileSync('android/app/google-services.json', JSON.stringify(j, null, 2));
+      console.log(`WARNING: ${APP_ID} is not in google-services.json: borrowed the QA entry (push alerts unverified/unsupported for the POS app).`);
+    } else {
+      if (!ids.includes(APP_ID)) throw new Error(`google-services.json has no Android app ${APP_ID} (it has ${ids.join(', ')})`);
+      copyFileSync(src, 'android/app/google-services.json');
+    }
   }
 }
 
@@ -138,8 +152,8 @@ if (existsSync(styles)) edit(styles, s => (s.includes('android:windowBackground'
 const run = Number(process.env.GITHUB_RUN_NUMBER || 1);
 edit('android/app/build.gradle', s => {
   // The version name carries the native version ("2.0.0-n2"): automatic updates check it before installing a bundle.
-  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}${QA ? '-qa' : ''}-n${pkg.nativeVersion ?? 1}"`);
-  if (QA) s = s.replace(/applicationId\s+"[^"]*"/, `applicationId "${APP_ID}"`);
+  s = s.replace(/versionCode\s+\d+/, `versionCode ${run}`).replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}${POS ? '-pos' : QA ? '-qa' : ''}-n${pkg.nativeVersion ?? 1}"`);
+  if (QA || POS) s = s.replace(/applicationId\s+"[^"]*"/, `applicationId "${APP_ID}"`);
   if (!s.includes('android-config/debug.keystore')) {
     s = s.replace(/android\s*\{/, `android {
     signingConfigs {
@@ -632,4 +646,4 @@ public class EabSpeechPlugin extends Plugin {
 `);
 }
 
-console.log(`Android project configured: ${APP_NAME} (${APP_ID}${QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);
+console.log(`Android project configured: ${APP_NAME} (${APP_ID}${POS ? ', standalone POS build: separate package, updates off' : QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);

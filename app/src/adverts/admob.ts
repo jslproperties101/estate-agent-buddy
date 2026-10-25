@@ -10,7 +10,7 @@
 // The banner is drawn by Android itself, at the bottom of the app's own screen area, above the phone's back / home /
 // recent buttons. The web page leaves the same height free at the bottom (CSS variable --ad-h, see AdBar.tsx), so the
 // banner never covers a button, a field or the last line of a list.
-import { IS_QA, isNative, platform, plugin, pluginMissing } from '../native/native';
+import { IS_POS, IS_QA, isNative, platform, plugin, pluginMissing } from '../native/native';
 
 export const ADMOB_APP_ID = 'ca-app-pub-5995234129917229~3821658996';
 export const ADMOB_BANNER_UNIT = 'ca-app-pub-5995234129917229/3681049037';
@@ -29,7 +29,7 @@ type AdMobPlugin = {
 /** True when this build may show a native AdMob banner (the Android app with the AdMob plugin inside). */
 export const nativeAdsAvailable = (): boolean => isNative() && platform() === 'android' && !pluginMissing('AdMob') && !!plugin('AdMob');
 /** The QA app only ever shows Google's test ads. */
-export const testAdsOnly = (): boolean => IS_QA;
+export const testAdsOnly = (): boolean => IS_QA || IS_POS;
 
 let started: Promise<boolean> | null = null;
 let shown = false;

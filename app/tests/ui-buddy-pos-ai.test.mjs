@@ -120,3 +120,27 @@ test('B4 e-Invoice without a connected server: submit says the sandbox is not co
   assert.deepEqual(errors, []);
   await ctx.close();
 });
+
+test('B5 standalone AI Buddy POS build (EAB_POS=1): opens straight into AI Buddy POS with no switch, and does not check for updates', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const POS_DIST = new URL('../.test-pos-dist/', import.meta.url).pathname;
+  const r = spawnSync(process.execPath, ['scripts/build.mjs', '--no-env'], { cwd: new URL('..', import.meta.url).pathname, env: { ...process.env, EAB_POS: '1', EAB_OUTDIR: '.test-pos-dist' }, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const ctx = await browser.newContext({ viewport: { width: 384, height: 824 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await ctx.route('https://pos.test/**', async route => {
+    const u = new URL(route.request().url());
+    const file = join(POS_DIST, u.pathname === '/' ? 'index.html' : u.pathname);
+    try { await route.fulfill({ status: 200, contentType: types[extname(file)] ?? 'application/octet-stream', body: await readFile(file) }); }
+    catch { await route.fulfill({ status: 404, body: '' }); }
+  });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('https://pos.test/'); await page.waitForSelector('[data-testid="start-empty"]');
+  await page.getByTestId('start-empty').click();
+  await page.getByTestId('buddy').waitFor();
+  assert.equal(await page.getByRole('tab', { name: 'POS' }).count(), 1, 'the POS tab is there with no Settings switch turned on');
+  await page.screenshot({ path: `${SHOTS}buddy-standalone.png`, fullPage: true });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

@@ -20,3 +20,4 @@ app/.test-web-dist
 # Change 006 Layer 4: key holders' private keys must never be committed
 *.private.json
 *.eab
+app/.test-pos-dist

@@ -11,7 +11,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { isNative, plugin, platform } from './native';
 
-export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string; /** Release label (e.g. "2.0.010", the integrated Changes 001–010 milestone). Display only: never compared for updates. */ release?: string; qa?: boolean }
+export interface BuildInfo { sha: string; version: string; nativeVersion: number; builtAt: string; /** Release label (e.g. "2.0.010", the integrated Changes 001–010 milestone). Display only: never compared for updates. */ release?: string; qa?: boolean; pos?: boolean }
 declare const __EAB_BUILD__: BuildInfo | undefined;
 export const BUILD: BuildInfo = (typeof __EAB_BUILD__ !== 'undefined' && __EAB_BUILD__) || { sha: 'dev', version: '0.0.0', nativeVersion: 1, builtAt: '' };
 
@@ -63,6 +63,8 @@ export async function installedNativeVersion(): Promise<number> {
 
 /** Checks GitHub Pages for a newer version and, in the Android app, downloads it ready for the next start. */
 export async function checkForUpdate(fetchFn: typeof fetch = fetch): Promise<UpdateState> {
+  // The standalone AI Buddy POS app has no update list of its own yet: it never checks (a new APK is installed by hand).
+  if (BUILD.pos && !override()) return { kind: 'none' };
   // The QA build only ever looks at the QA list (QA_UPDATE_MANIFEST); it never sees the real app's list.
   // The single-file copy opened from the phone's storage cannot update itself.
   // On the web, only the published site checks (not a copy opened from the phone's storage or a local test server).

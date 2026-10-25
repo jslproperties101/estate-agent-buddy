@@ -79,7 +79,7 @@ import { c11Strings } from './ui/c011Strings';
 import { BuyerHistoryScreen } from './agenda/BuyerHistoryUI';
 import { BuyerMatchingScreen, BuyerMatchesScreen } from './contacts/BuyerMatchingUI';
 import { CreativeMediaScreen } from './marketing/CreativeMediaUI';
-import { nativeLook, hideSplash } from './native/native';
+import { nativeLook, hideSplash, IS_POS } from './native/native';
 import { platformOf } from './security/loginLog';
 import { BUILD } from './native/updates';
 import { usage, detectDevice, asUsagePlatform } from './usage/logger';
@@ -303,7 +303,7 @@ function Shell() {
   const { state, store } = useApp();
   const lang: Lang = state.settings.lang ?? 'en';
   const t = strings[lang];
-  const [screen, setScreen] = useState<Screen>({ name: 'home' });
+  const [screen, setScreen] = useState<Screen>(IS_POS ? { name: 'buddy' } : { name: 'home' });
   const stack = useRef<Screen[]>([]);
   // Change 27: each place in the Back history has an id, so its scroll position and screen state come back with it.
   const [entry, setEntry] = useState(() => newEntryId());

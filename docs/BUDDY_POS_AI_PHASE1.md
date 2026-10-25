@@ -45,3 +45,14 @@ behind a feature switch.
 4. Journal: New journal entry; it cannot be posted until it balances; Reverse a posted entry.
 5. e-Invoice: Submit says the LHDN sandbox is not connected (no function deployed). Nothing turns Valid.
 6. Remove example data when done.
+
+## Standalone AI Buddy POS app (QA branches)
+
+A second Android app built from the same code with `EAB_POS=1`: package `com.jslproperties.aibuddypos`, app name "AI Buddy POS",
+release tag `pos-<commit>`, file `AIBuddyPOS-<commit>-debug.apk`. It installs beside the real app and the QA app, with its own
+storage (its own books; nothing is shared with the QA app on the phone). It opens straight into AI Buddy POS with the switch
+always on; Back goes to the normal Estate Agent AI Buddy home underneath. It uses the TEST Supabase project and never checks for
+updates (install each new APK by hand).
+
+Not done / not proven: push alerts (the app is not registered in Firebase; the build borrows the QA entry), Google sign-in return
+(`com.jslproperties.aibuddypos://auth-callback` is not in the Supabase redirect list), and nothing tested on a phone.

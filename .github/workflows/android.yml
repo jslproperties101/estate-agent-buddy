@@ -103,6 +103,8 @@ jobs:
 
   android:
     # "prod" = the normal debug APK (same package as your real app, publishes the update package).
+    # "pos"  = the standalone AI Buddy POS app (QA branches only): own package com.jslproperties.aibuddypos, opens in AI Buddy POS,
+    #          uses the TEST Supabase project, no automatic updates, release tag pos-<commit>.
     # "qa"   = the isolated QA APK (separate package name and storage, updates itself from its own beta-updates list, release tag qa-<commit>).
     # Integrated release 2.0.010 (Oct 2026), narrowest safe change:
     #   - a branch whose name contains "qa", or a dated change branch starting with "2." (owner, 17 Oct 2026), builds
@@ -112,19 +114,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: ${{ fromJSON((contains(github.ref_name, 'qa') || startsWith(github.ref_name, '2.')) && '["qa"]' || '["prod"]') }}
+        variant: ${{ fromJSON((contains(github.ref_name, 'qa') || startsWith(github.ref_name, '2.')) && '["qa","pos"]' || '["prod"]') }}
     name: android (${{ matrix.variant }})
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app } }
     env:
       EAB_QA: ${{ matrix.variant == 'qa' && '1' || '' }}
-      PUBLISH_APK: ${{ (matrix.variant == 'qa' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update') && '1' || '' }}
+      EAB_POS: ${{ matrix.variant == 'pos' && '1' || '' }}
+      PUBLISH_APK: ${{ (matrix.variant == 'qa' || matrix.variant == 'pos' || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/v2-full-update') && '1' || '' }}
       EAB_GOOGLE_MAPS_API_KEY: ${{ secrets.EAB_GOOGLE_MAPS_API_KEY }}
       # The QA APK never gets the production Supabase project built in: it uses the separate TEST project's secrets
       # (EAB_QA_SUPABASE_URL / EAB_QA_SUPABASE_ANON_KEY) when they exist; without them the QA app asks for the
       # connection on its sign-in screen (Connection settings). Production builds are unchanged.
-      EAB_SUPABASE_URL: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_URL || matrix.variant != 'qa' && secrets.EAB_SUPABASE_URL || '' }}
-      EAB_SUPABASE_ANON_KEY: ${{ matrix.variant == 'qa' && secrets.EAB_QA_SUPABASE_ANON_KEY || matrix.variant != 'qa' && secrets.EAB_SUPABASE_ANON_KEY || '' }}
+      EAB_SUPABASE_URL: ${{ matrix.variant != 'prod' && secrets.EAB_QA_SUPABASE_URL || matrix.variant == 'prod' && secrets.EAB_SUPABASE_URL || '' }}
+      EAB_SUPABASE_ANON_KEY: ${{ matrix.variant != 'prod' && secrets.EAB_QA_SUPABASE_ANON_KEY || matrix.variant == 'prod' && secrets.EAB_SUPABASE_ANON_KEY || '' }}
       EAB_EXPERT_API_URL: ${{ secrets.EAB_EXPERT_API_URL }}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
@@ -178,7 +181,7 @@ jobs:
       - name: Check the APK (package name, app name, launcher icons, splash, QA flag)
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
-          if [ "$EAB_QA" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy.qa "EAB QA" qa; else node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy "Estate Agent AI Buddy" prod; fi
+          if [ "$EAB_POS" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.aibuddypos "AI Buddy POS" pos; elif [ "$EAB_QA" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy.qa "EAB QA" qa; else node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy "Estate Agent AI Buddy" prod; fi
       - name: Check the APK signature (same debug key every build)
         run: |
           SHA1=$(keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA1:' | awk '{print $2}')
@@ -188,7 +191,7 @@ jobs:
         id: apk
         run: |
           SHORT=${GITHUB_SHA::7}
-          if [ "$EAB_QA" = "1" ]; then OUT="EstateAgentBuddy-QA-${SHORT}-debug.apk"; TAG="qa-$SHORT"; else OUT="EstateAgentBuddy-${SHORT}-debug.apk"; TAG="android-$SHORT"; fi
+          if [ "$EAB_POS" = "1" ]; then OUT="AIBuddyPOS-${SHORT}-debug.apk"; TAG="pos-$SHORT"; elif [ "$EAB_QA" = "1" ]; then OUT="EstateAgentBuddy-QA-${SHORT}-debug.apk"; TAG="qa-$SHORT"; else OUT="EstateAgentBuddy-${SHORT}-debug.apk"; TAG="android-$SHORT"; fi
           cp android/app/build/outputs/apk/debug/app-debug.apk "../$OUT"
           echo "file=$OUT" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -212,7 +215,11 @@ jobs:
           cd ..
           TAG='${{ steps.apk.outputs.tag }}'
           {
-            if [ "$EAB_QA" = "1" ]; then
+            if [ "$EAB_POS" = "1" ]; then
+              echo "**AI Buddy POS (standalone test app)** for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
+              echo
+              echo "Package com.jslproperties.aibuddypos, app name AI Buddy POS: installs BESIDE the real app and the QA app, with its own empty storage. It opens straight into AI Buddy POS. It does not update itself: install each new APK by hand. Push alerts are not set up for it."
+            elif [ "$EAB_QA" = "1" ]; then
               echo "**QA APK (isolated test app)** for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
               echo
               echo "Package com.jslproperties.estateagentbuddy.qa, app name EAB QA: installs BESIDE your real app, with its own empty storage. It updates itself from newer QA builds (never from the real app's updates); Settings -> About shows the commit it is running. Settings -> About shows the commit and says QA."
