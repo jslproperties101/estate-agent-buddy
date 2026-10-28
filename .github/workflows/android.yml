@@ -61,11 +61,12 @@ jobs:
       - name: Check the APK
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
-          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -1) node scripts/verify-apk.mjs "$APK"
-          SHA1=$(keytool -printcert -jarfile "$APK" | grep -m1 'SHA1:' | awk '{print $2}')
-          echo "APK SHA1 $SHA1"
-          test "$SHA1" = "94:12:A2:BA:D8:49:19:EF:A5:2C:A7:CF:8C:07:3D:09:EE:8E:D8:74"
-          ls -la "$APK"
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          echo "::notice::build-tools $BT, APK size $(stat -c %s $APK) bytes"
+          AAPT=$( [ -x "$BT/aapt" ] && echo "$BT/aapt" || echo "" ) node scripts/verify-apk.mjs "$APK"
+          CERT=$("$BT/apksigner" verify --print-certs "$APK" | grep -m1 'SHA-1 digest' | awk '{print $NF}')
+          echo "::notice::APK signer SHA-1 $CERT"
+          test "$CERT" = "9412a2bad84919efa52ca7cf8c073d09ee8ed874" || { echo "::error::APK signed with an unexpected key: $CERT"; exit 1; }
       - name: Name the APK
         id: apk
         run: |
