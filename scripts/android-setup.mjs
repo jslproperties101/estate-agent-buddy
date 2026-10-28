@@ -2,13 +2,17 @@
 //  - version code from the GitHub build number, version name from package.json;
 //  - navy window background (no white flash before the app draws);
 //  - internet permission (News); nothing else is requested.
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs';
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const must = p => { if (!existsSync(p)) throw new Error(`Missing ${p}: run "npx cap add android" first.`); return p; };
 const edit = (p, fn) => writeFileSync(p, fn(readFileSync(must(p), 'utf8')));
 
 const code = Number(process.env.GITHUB_RUN_NUMBER || 1);
-edit('android/app/build.gradle', s => s
+// Same signing key every build (android-config/debug.keystore), so a new APK installs over the previous one.
+copyFileSync('android-config/debug.keystore', 'android/app/mwab-debug.keystore');
+edit('android/app/build.gradle', s => (s.includes('mwab-debug.keystore') ? s : s.replace(/^android\s*\{/m,
+  "android {\n    signingConfigs {\n        debug {\n            storeFile file('mwab-debug.keystore')\n            storePassword 'android'\n            keyAlias 'androiddebugkey'\n            keyPassword 'android'\n        }\n    }"))
+
   .replace(/versionCode\s+\d+/, `versionCode ${code}`)
   .replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`));
 
