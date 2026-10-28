@@ -310,6 +310,8 @@ export interface Settings {
   exportSection?: 'saved' | 'deleted';
   /** AI Buddy POS Phase 1: the feature switch on this phone (off by default). Admin EAB's beta.buddy-pos-ai also turns it on. */
   buddyPos?: boolean;
+  /** Billing (sandbox / test mode): the feature switch on this phone (off by default). Admin EAB's beta.billing also turns it on. */
+  billing?: boolean;
 }
 
 export interface CustomOption { value: string; added: number; used: number }
@@ -365,6 +367,8 @@ export interface Meta {
   publicSettings?: import('../feed/feed').PublicSettings;
   /** MainForAdmin-E: the feature switches Admin EAB set for this account, as last heard (eab_my_flags). */
   flags?: import('../feed/flags').FlagCache;
+  /** Billing: this account's plans as last heard from the database (eab_my_billing); kept so it also works offline. */
+  billing?: import('../billing/entitlement').BillingCache;
   /** MainForAdmin-D: the minimum version whose soft "please update" notice was closed on this phone. */
   softUpdateClosed?: string;
   /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */

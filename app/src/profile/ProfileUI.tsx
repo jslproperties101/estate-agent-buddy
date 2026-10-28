@@ -2,6 +2,9 @@
 // Sending: the app prepares the message and opens WhatsApp (or the phone's share sheet for the card images).
 // The agent reviews it there and presses Send; nothing is ever sent automatically.
 import { buddyStrings } from '../buddy/strings';
+import { billingStrings } from '../billing/strings';
+import { billingEnabled } from '../billing/access';
+import { BillingCard } from '../billing/BillingUI';
 import { useState } from 'react';
 import { AboutCard } from '../native/UpdateUI';
 import { BUILD } from '../native/updates';
@@ -314,6 +317,11 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <label className="check"><input type="checkbox" data-testid="buddy-toggle" checked={s.buddyPos === true} onChange={e => store.setSingleton('settings', { buddyPos: e.target.checked })} /> {buddyStrings[lang].switchLabel}</label>
         <small className="muted">{buddyStrings[lang].switchHint}</small>
       </div>
+      <div className="card stack-sm" data-testid="billing-setting">
+        <label className="check"><input type="checkbox" data-testid="billing-toggle" checked={s.billing === true} onChange={e => store.setSingleton('settings', { billing: e.target.checked })} /> {billingStrings[lang].switchLabel}</label>
+        <small className="muted">{billingStrings[lang].switchHint}</small>
+      </div>
+      {billingEnabled(store) && <BillingCard lang={lang} />}
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>

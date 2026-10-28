@@ -1,0 +1,122 @@
+// Billing (sandbox / test mode) screen text, in three languages. Every screen says it is test mode: no real money is charged.
+import type { Lang } from '../i18n';
+
+const en = {
+  switchLabel: 'Plans and payments (test feature)', switchHint: 'Shows plans and test payments in Settings. Test mode only: no real money is charged. Off by default.',
+  title: 'Plans (test mode)',
+  banner: 'Test mode: payments here use the providers’ test systems. No real money is charged.',
+  signIn: 'Sign in to see your plans.',
+  products: { pro: 'Pro', pos: 'AI Buddy POS add-on' } as Record<string, string>,
+  state: {
+    none: 'Not active', ended: 'Ended',
+    trialing: (d: string) => `Free trial until ${d}`,
+    active: (d: string) => `Active, renews around ${d}`,
+    canceling: (d: string) => `Paid until ${d}, then it stops`,
+    grace: (d: string) => `Payment late: still allowed until ${d}`,
+  },
+  testTag: 'test',
+  startTrial: (n: number) => `Start ${n}-day free trial`,
+  trialUsed: 'Free trial already used.',
+  trialStarted: 'Free trial started.',
+  planName: { pro_monthly: 'Pro, monthly', pro_yearly: 'Pro, yearly', pos_monthly: 'AI Buddy POS, monthly' } as Record<string, string>,
+  per: { month: 'per month', year: 'per year' } as Record<string, string>,
+  proposal: 'Prices are proposals until the owner approves them.',
+  payWith: 'Pay with',
+  providers: { fpx: 'Online banking (FPX)', stripe: 'Card', google_play: 'Google Play' } as Record<string, string>,
+  providerNote: {
+    fpx: 'One payment for one period. It does not renew by itself.',
+    stripe: 'Card subscription that renews by itself.',
+    google_play: 'Subscription through Google Play.',
+  } as Record<string, string>,
+  unavailable: { 'android-only': 'Only in the Android app.', 'plugin-missing': 'This APK does not include Google Play Billing yet.' } as Record<string, string>,
+  pay: (p: string) => `Pay ${p} (test)`,
+  alreadyPaid: 'Already paid by another method.',
+  opened: 'The test payment page was opened. Come back here and tap Refresh when you are done.',
+  verified: 'Purchase checked.',
+  refresh: 'Refresh', refreshed: 'Plans updated.', refreshFailed: 'Could not reach the server. Showing the last plans heard.',
+  err: {
+    'not-configured': 'Payments are not set up on the server yet.', 'not-signed-in': 'Sign in first.', network: 'No connection. Try again.',
+    refused: 'The server refused this request.', 'not-linked': 'That purchase belongs to another account.', other: 'Something went wrong. Nothing was charged here.',
+  } as Record<string, string>,
+};
+export type BillingStrings = typeof en;
+
+const bm: BillingStrings = {
+  switchLabel: 'Pelan dan pembayaran (ciri ujian)', switchHint: 'Menunjukkan pelan dan pembayaran ujian dalam Tetapan. Mod ujian sahaja: tiada wang sebenar dikenakan. Mati secara lalai.',
+  title: 'Pelan (mod ujian)',
+  banner: 'Mod ujian: pembayaran di sini menggunakan sistem ujian penyedia. Tiada wang sebenar dikenakan.',
+  signIn: 'Log masuk untuk melihat pelan anda.',
+  products: { pro: 'Pro', pos: 'Tambahan AI Buddy POS' },
+  state: {
+    none: 'Tidak aktif', ended: 'Tamat',
+    trialing: (d: string) => `Percubaan percuma hingga ${d}`,
+    active: (d: string) => `Aktif, diperbaharui sekitar ${d}`,
+    canceling: (d: string) => `Dibayar hingga ${d}, kemudian berhenti`,
+    grace: (d: string) => `Bayaran lewat: masih dibenarkan hingga ${d}`,
+  },
+  testTag: 'ujian',
+  startTrial: (n: number) => `Mula percubaan percuma ${n} hari`,
+  trialUsed: 'Percubaan percuma sudah digunakan.',
+  trialStarted: 'Percubaan percuma bermula.',
+  planName: { pro_monthly: 'Pro, bulanan', pro_yearly: 'Pro, tahunan', pos_monthly: 'AI Buddy POS, bulanan' },
+  per: { month: 'sebulan', year: 'setahun' },
+  proposal: 'Harga ialah cadangan sehingga pemilik meluluskannya.',
+  payWith: 'Bayar dengan',
+  providers: { fpx: 'Perbankan dalam talian (FPX)', stripe: 'Kad', google_play: 'Google Play' },
+  providerNote: {
+    fpx: 'Satu bayaran untuk satu tempoh. Tidak diperbaharui sendiri.',
+    stripe: 'Langganan kad yang diperbaharui sendiri.',
+    google_play: 'Langganan melalui Google Play.',
+  },
+  unavailable: { 'android-only': 'Hanya dalam aplikasi Android.', 'plugin-missing': 'APK ini belum mengandungi Google Play Billing.' },
+  pay: (p: string) => `Bayar ${p} (ujian)`,
+  alreadyPaid: 'Sudah dibayar melalui kaedah lain.',
+  opened: 'Halaman bayaran ujian dibuka. Kembali ke sini dan ketik Muat semula apabila siap.',
+  verified: 'Pembelian disemak.',
+  refresh: 'Muat semula', refreshed: 'Pelan dikemas kini.', refreshFailed: 'Tidak dapat sampai ke pelayan. Menunjukkan pelan terakhir yang diketahui.',
+  err: {
+    'not-configured': 'Pembayaran belum disediakan di pelayan.', 'not-signed-in': 'Log masuk dahulu.', network: 'Tiada sambungan. Cuba lagi.',
+    refused: 'Pelayan menolak permintaan ini.', 'not-linked': 'Pembelian itu milik akaun lain.', other: 'Sesuatu tidak kena. Tiada apa dikenakan di sini.',
+  },
+};
+
+const zh: BillingStrings = {
+  switchLabel: '方案与付款（测试功能）', switchHint: '在设置中显示方案和测试付款。仅限测试模式：不会收取真实款项。默认关闭。',
+  title: '方案（测试模式）',
+  banner: '测试模式：此处的付款使用服务商的测试系统，不会收取真实款项。',
+  signIn: '请登录以查看您的方案。',
+  products: { pro: 'Pro', pos: 'AI Buddy POS 附加包' },
+  state: {
+    none: '未启用', ended: '已结束',
+    trialing: (d: string) => `免费试用至 ${d}`,
+    active: (d: string) => `已启用，约 ${d} 续订`,
+    canceling: (d: string) => `已付费至 ${d}，之后停止`,
+    grace: (d: string) => `付款逾期：仍可使用至 ${d}`,
+  },
+  testTag: '测试',
+  startTrial: (n: number) => `开始 ${n} 天免费试用`,
+  trialUsed: '免费试用已使用过。',
+  trialStarted: '免费试用已开始。',
+  planName: { pro_monthly: 'Pro，按月', pro_yearly: 'Pro，按年', pos_monthly: 'AI Buddy POS，按月' },
+  per: { month: '每月', year: '每年' },
+  proposal: '价格在业主批准前仅为建议。',
+  payWith: '付款方式',
+  providers: { fpx: '网上银行（FPX）', stripe: '银行卡', google_play: 'Google Play' },
+  providerNote: {
+    fpx: '一次付款对应一个周期，不会自动续订。',
+    stripe: '银行卡订阅，自动续订。',
+    google_play: '通过 Google Play 订阅。',
+  },
+  unavailable: { 'android-only': '仅限 Android 应用。', 'plugin-missing': '此 APK 尚未包含 Google Play Billing。' },
+  pay: (p: string) => `支付 ${p}（测试）`,
+  alreadyPaid: '已通过其他方式付款。',
+  opened: '已打开测试付款页面。完成后请回到这里点击刷新。',
+  verified: '购买已核实。',
+  refresh: '刷新', refreshed: '方案已更新。', refreshFailed: '无法连接服务器。显示最近获取的方案。',
+  err: {
+    'not-configured': '服务器尚未设置付款。', 'not-signed-in': '请先登录。', network: '没有网络连接，请重试。',
+    refused: '服务器拒绝了此请求。', 'not-linked': '该购买属于另一个账户。', other: '出了点问题。此处没有任何扣款。',
+  },
+};
+
+export const billingStrings: Record<Lang, BillingStrings> = { en, bm, zh };
