@@ -17,7 +17,7 @@ Android app for MM2H families moving to Malaysia. Package `com.jslproperties.mal
 
 ## Build
 GitHub Actions (`.github/workflows/android.yml`) runs the tests on every push, then builds a debug APK and attaches it
-to a pre-release named `android-<commit>`. The APK is signed with `android-config/debug.keystore` every time, so new
+to a pre-release named `mwab-<commit>`. The APK is signed with `android-config/debug.keystore` every time, so new
 builds install over old ones.
 
 Local: `npm install --omit=optional`, `npx playwright install chromium`, `npm test`, `npm run serve`.

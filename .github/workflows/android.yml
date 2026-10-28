@@ -1,6 +1,6 @@
 # Malaysia Welcome AI Buddy — test and build the Android APK on every push.
 #  test     lint, unit tests, browser screen tests (phone-sized Chromium)
-#  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone
+#  android  debug APK (Capacitor), attached to a GitHub Release "mwab-<commit>" for download on the phone
 name: Build
 
 on:
@@ -73,7 +73,7 @@ jobs:
           OUT="MalaysiaWelcomeAIBuddy-${SHORT}-debug.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$OUT"
           echo "file=$OUT" >> "$GITHUB_OUTPUT"
-          echo "tag=android-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "tag=mwab-$SHORT" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: '${{ steps.apk.outputs.file }}' }
       - name: Release with the APK
