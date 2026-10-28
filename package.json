@@ -1,0 +1,25 @@
+{
+  "name": "malaysia-welcome-ai-buddy",
+  "private": true,
+  "version": "1.0.0",
+  "nativeVersion": 1,
+  "type": "module",
+  "description": "Malaysia Welcome AI Buddy: an Android app for MM2H families settling in Malaysia.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test:unit": "node --test tests/unit.test.mjs",
+    "test:ui": "node --test tests/ui.test.mjs",
+    "test": "npm run lint && npm run test:unit && npm run build && npm run test:ui",
+    "serve": "node scripts/serve.mjs dist 5173"
+  },
+  "devDependencies": {
+    "playwright": "1.56.0"
+  },
+  "optionalDependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/assets": "^3.0.5"
+  }
+}

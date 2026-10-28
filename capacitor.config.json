@@ -1,0 +1,23 @@
+{
+  "appId": "com.jslproperties.malaysiawelcome",
+  "appName": "Malaysia Welcome AI Buddy",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "SplashScreen": {
+      "launchShowDuration": 700,
+      "launchAutoHide": true,
+      "backgroundColor": "#0B2545",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    }
+  }
+}

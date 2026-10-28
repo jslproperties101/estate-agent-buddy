@@ -1,0 +1,86 @@
+# Malaysia Welcome AI Buddy — test and build the Android APK on every push.
+#  test     lint, unit tests, browser screen tests (phone-sized Chromium)
+#  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone
+name: Build
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Install (without the Android packages)
+        run: npm install --omit=optional --no-audit --no-fund
+      - name: Browser for screen tests
+        run: npx playwright install --with-deps chromium
+      - name: Tests
+        run: npm test
+      - name: Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: screens, path: tests/screens, if-no-files-found: ignore }
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - name: Install (with the Android packages)
+        run: npm install --no-audit --no-fund
+      - name: Build the app
+        run: npm run build
+      - name: Android project
+        run: |
+          npx cap add android
+          npx @capacitor/assets generate --android --iconBackgroundColor '#0B2545' --iconBackgroundColorDark '#0B2545' --splashBackgroundColor '#0B2545' --splashBackgroundColorDark '#0B2545'
+          npx cap sync android
+          node scripts/android-setup.mjs
+      - name: Same signing key every build (so new APKs install over old ones)
+        run: mkdir -p ~/.android && cp android-config/debug.keystore ~/.android/debug.keystore
+      - name: Build the APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Check the APK
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -1) node scripts/verify-apk.mjs "$APK"
+          SHA1=$(keytool -printcert -jarfile "$APK" | grep -m1 'SHA1:' | awk '{print $2}')
+          echo "APK SHA1 $SHA1"
+          test "$SHA1" = "94:12:A2:BA:D8:49:19:EF:A5:2C:A7:CF:8C:07:3D:09:EE:8E:D8:74"
+          ls -la "$APK"
+      - name: Name the APK
+        id: apk
+        run: |
+          SHORT=${GITHUB_SHA::7}
+          OUT="MalaysiaWelcomeAIBuddy-${SHORT}-debug.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$OUT"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+          echo "tag=android-$SHORT" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: '${{ steps.apk.outputs.file }}' }
+      - name: Release with the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ steps.apk.outputs.tag }}'
+          printf 'Debug APK for commit %s (%s), build %s.\n\nInstall: open this page on the Android phone, tap the .apk, allow installing from this source, then Install.\n' "$GITHUB_SHA" "$GITHUB_REF_NAME" "$GITHUB_RUN_NUMBER" > notes.md
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" '${{ steps.apk.outputs.file }}' --prerelease --target "$GITHUB_SHA" --title "Malaysia Welcome AI Buddy $TAG" --notes-file notes.md

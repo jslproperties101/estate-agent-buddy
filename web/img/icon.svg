@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#13315C"/><stop offset="1" stop-color="#0B2545"/></linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD84D"/><stop offset="1" stop-color="#F2B705"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="0" fill="url(#bg)"/>
+  <g stroke="#F2B705" stroke-width="34" stroke-linecap="round" opacity=".9">
+    <line x1="512" y1="300" x2="512" y2="370"/><line x1="330" y1="372" x2="378" y2="420"/><line x1="694" y1="372" x2="646" y2="420"/>
+    <line x1="252" y1="540" x2="320" y2="540"/><line x1="772" y1="540" x2="704" y2="540"/>
+  </g>
+  <path d="M352 600 a160 160 0 0 1 320 0 z" fill="url(#sun)"/>
+  <path d="M300 520 L512 360 L724 520" fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+  <rect x="232" y="600" width="560" height="40" rx="20" fill="#FFFFFF"/>
+  <path d="M512 760 c-40-34-120-70-120-118 c0-30 24-50 52-50 c30 0 52 20 68 44 c16-24 38-44 68-44 c28 0 52 20 52 50 c0 48-80 84-120 118z" fill="#D7263D" transform="translate(0,-10)"/>
+</svg>
