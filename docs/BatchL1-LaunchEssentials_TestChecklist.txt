@@ -1,0 +1,27 @@
+Batch L1 - Launch Essentials - phone test checklist
+Main app (Estate Agent AI Buddy), QA APK, build c7fad8a, 29 Oct 2026
+APK: https://github.com/jslproperties101/estate-agent-buddy/releases/tag/qa-c7fad8a  (tap EstateAgentBuddy-QA-c7fad8a-debug.apk under Assets)
+Report each line as "worked" or "failed" plus what you saw.
+
+INSTALL
+1. Open the old EAB QA app first. It should say a new APK is needed (native version 6 -> 7). Worked / failed
+2. Install the new APK over it. Your data is still there, Settings -> About shows build c7fad8a and native 7. Worked / failed
+
+CRASH REPORTING (new in L1)
+3. Use the app normally for 5 minutes (open properties, buyers, AI Command, Marketing Studio). Nothing looks different. Worked / failed
+4. Close the app fully and open it again (Crashlytics sends reports on the next opening).
+5. Firebase console -> project estate-agent-ai-buddy-a7ac7 -> Crashlytics -> choose the app com.jslproperties.estateagentbuddy.qa.
+   First time only: press "Enable Crashlytics" if asked. Then the app should show as connected (no crashes yet is fine). Worked / failed
+6. If the app ever closes by itself during any test, open it again, then check Crashlytics: the crash should appear within a few minutes,
+   with only an account id (no name, email or phone). Worked / failed / not happened
+
+ALREADY BUILT EARLIER - QUICK RE-CHECK BEFORE LAUNCH (signed out / fresh install on the second phone)
+7. First login: one Country box (Malaysia), Terms tickbox required, news tickbox optional, Continue always the same colour;
+   Continue without the Terms tick shows the message. Worked / failed
+8. Typing in any box: the box moves to about 30% from the top, pop-ups lift above the keyboard. Worked / failed
+9. Any dropdown: gold centre pop-up with a search bar, + Add New at the bottom. Worked / failed
+10. AI Assisted Command: tap the mic 5 times in a row; Listening shows only when ready, words are captured each time. Worked / failed
+
+NOT IN THIS BATCH
+- No database changes. Production database is not touched.
+- Terms text is still the 1.1 draft: a Malaysian lawyer should check it before real agents sign up.
