@@ -327,7 +327,7 @@ function Shell() {
     const stop = usage.start();
     // Batch L1: crash reports (Firebase Crashlytics) with the screen and the account id only; nothing in the browser.
     void setCrashUser(userId);
-    const stopCrash = startCrashReporting(window, () => usage.currentScreen());
+    const stopCrash = startCrashReporting(window, () => usage.screenForCrash());
     return () => { stop(); stopCrash(); store.onCreate = undefined; store.onFileAdded = undefined; store.onEdit = undefined; store.onDelete = undefined; };
   }, [store, userId]);
   useEffect(() => { void setCrashKeys({ appVersion: BUILD.version, lang }); }, [lang]);

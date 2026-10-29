@@ -24,7 +24,7 @@ Model: Opus 5.5, High (Joe's choice, 29 Oct 2026).
   error messages; at most 10 reports a minute. Access refusals (view-only records) are not reported.
 - Browser, laptop website and older APKs: nothing happens.
 - New native part (`@capacitor-firebase/crashlytics`), so **nativeVersion 6 → 7**: older APKs are told to install the new APK.
-- Files: `app/src/native/crash.ts`, `app/src/App.tsx`, `app/src/usage/logger.ts` (`currentScreen()`),
+- Files: `app/src/native/crash.ts`, `app/src/App.tsx`, `app/src/usage/logger.ts` (`screenForCrash()`),
   `app/scripts/android-setup.mjs` (Crashlytics Gradle plugin 3.0.3), `.github/workflows/android.yml` (plugin check),
   `app/tests/batch-l1-crash.test.ts`, `app/tests/ui.test.mjs` (U30 expects native 7).
 
