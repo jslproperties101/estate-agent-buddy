@@ -127,6 +127,8 @@ export class UsageLogger {
     this.track({ kind: 'screen', name: c, screen: c });
   }
   setOverlay(name: string) { this.overlayCode = codeOf(name, 40); }
+  /** Batch L1: the screen open now (short code), for crash reports. */
+  currentScreen(): string { return this.screenCode; }
   /** A sync or backup finished. Successful runs that changed nothing are noted at most every 30 minutes. */
   sync(name: string, ok: boolean, value?: number) {
     if (ok && name === 'sync.run' && !value) {

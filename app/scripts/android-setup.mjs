@@ -129,6 +129,18 @@ for (const [dir, label] of [['values', 'Estate Agent AI Buddy Document Upload'],
   }
 }
 
+// 1c. Batch L1 (launch essentials): Firebase Crashlytics, so a crash that closes the app is reported (JoyChange005 open
+//     item: the app had no crash reporting). Uses the same Firebase project and google-services.json as push alerts; the
+//     native part comes from @capacitor-firebase/crashlytics, the Gradle plugin uploads nothing else. Free Firebase feature.
+edit('android/build.gradle', s => {
+  if (s.includes('firebase-crashlytics-gradle')) return s;
+  const gms = /(classpath\s+['"]com\.google\.gms:google-services:[^'"]+['"])/;
+  if (!gms.test(s)) throw new Error('android/build.gradle: Google services classpath not found (needed next to Crashlytics)');
+  return s.replace(gms, `$1\n        classpath 'com.google.firebase:firebase-crashlytics-gradle:3.0.3'`);
+});
+edit('android/app/build.gradle', s => (s.includes("'com.google.firebase.crashlytics'") ? s
+  : `${s.trimEnd()}\n\n// Batch L1: Firebase Crashlytics (crash reports for the app; same Firebase project as push alerts).\napply plugin: 'com.google.firebase.crashlytics'\n`));
+
 // 2. Names and the URL scheme.
 edit(`${A}/res/values/strings.xml`, s => {
   const set = (name, value) => {

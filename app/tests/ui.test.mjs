@@ -1411,7 +1411,7 @@ test('U30 updates: a newer published version is offered on the web; About shows 
   assert.match(await page.getByTestId('update-bar').innerText(), /new version/i);
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   const v = await page.getByTestId('about-version').innerText();
-  assert.match(v, /^Release 2\.0\.010 · Version 2\.2\.0 · build \w+ · native 6/i, "release label shown, internal version is valid SemVer and higher than 2.1.0");
+  assert.match(v, /^Release 2\.0\.010 · Version 2\.2\.0 · build \w+ · native 7/i, "release label shown, internal version is valid SemVer and higher than 2.1.0");
   published = v.match(/build (\w+)/)[1];
   await page.getByTestId('check-update').click();
   assert.match(await page.getByTestId('update-msg').innerText(), /latest version/i);

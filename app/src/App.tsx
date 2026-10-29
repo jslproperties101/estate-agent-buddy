@@ -22,6 +22,7 @@ import { refreshFeed, maintenanceActive, updateVerdict, myFeed } from './feed/fe
 import { refreshFlags, myFlags, tileHidden } from './feed/flags';
 import { feedTapTarget } from './feed/tap';
 import { onFeedTap } from './native/push';
+import { setCrashKeys, setCrashUser, startCrashReporting } from './native/crash';
 import { MarketNewsScreen, AnnouncementBanners, AnnouncementPopup, BlockingNotice, SoftUpdateBanner, usePublicSettings, useUnreadNews } from './feed/FeedUI';
 import { feedStrings } from './feed/strings';
 import { BUILD as BUILD_INFO } from './native/updates';
@@ -324,8 +325,12 @@ function Shell() {
     store.onEdit = c => usage.feature(`${c}.edit`);
     store.onDelete = c => usage.feature(`${c}.delete`);
     const stop = usage.start();
-    return () => { stop(); store.onCreate = undefined; store.onFileAdded = undefined; store.onEdit = undefined; store.onDelete = undefined; };
+    // Batch L1: crash reports (Firebase Crashlytics) with the screen and the account id only; nothing in the browser.
+    void setCrashUser(userId);
+    const stopCrash = startCrashReporting(window, () => usage.currentScreen());
+    return () => { stop(); stopCrash(); store.onCreate = undefined; store.onFileAdded = undefined; store.onEdit = undefined; store.onDelete = undefined; };
   }, [store, userId]);
+  useEffect(() => { void setCrashKeys({ appVersion: BUILD.version, lang }); }, [lang]);
   // Old deleted records, their removed pictures and forgotten drafts are cleared after 30 days.
   useEffect(() => { void store.purgeOld(); }, [store]);
 
