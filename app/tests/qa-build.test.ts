@@ -64,6 +64,7 @@ function project(): string {
   writeFileSync(join(main, 'res/values/strings.xml'), '<resources>\n    <string name="app_name">x</string>\n    <string name="title_activity_main">x</string>\n    <string name="package_name">com.x</string>\n    <string name="custom_url_scheme">com.x</string>\n</resources>\n');
   writeFileSync(join(main, 'res/values/styles.xml'), '<resources><style name="AppTheme.NoActionBar" parent="x"></style></resources>');
   writeFileSync(join(d, 'android/app/build.gradle'), 'android {\n    namespace "com.jslproperties.estateagentbuddy"\n    defaultConfig {\n        applicationId "com.jslproperties.estateagentbuddy"\n        versionCode 1\n        versionName "1.0"\n    }\n}\n');
+  writeFileSync(join(d, 'android/build.gradle'), "buildscript {\n    dependencies {\n        classpath 'com.android.tools.build:gradle:8.7.2'\n        classpath 'com.google.gms:google-services:4.4.2'\n    }\n}\n");
   mkdirSync(join(d, 'android-config'), { recursive: true });
   // The activity exactly as `npx cap add android` generates it (Change 015 adds the system-bar handling to it).
   const pkg = join(main, 'java/com/jslproperties/estateagentbuddy');
@@ -79,7 +80,9 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   assert.equal(rp.status, 0, rp.stderr);
   const gp = readFileSync(join(prod, 'android/app/build.gradle'), 'utf8');
   assert.match(gp, /applicationId "com\.jslproperties\.estateagentbuddy"/);
-  assert.match(gp, /versionName "2\.2\.0-n6"/, 'JoyChange002 JoyChange003 Batches E and F added the speech and file plugins, so the native version went up');
+  assert.match(gp, /versionName "2\.2\.0-n7"/, 'Batch L1 added the Crashlytics plugin, so the native version went up');
+  assert.match(gp, /apply plugin: 'com\.google\.firebase\.crashlytics'/, 'Batch L1: Crashlytics applied to the app');
+  assert.match(readFileSync(join(prod, 'android/build.gradle'), 'utf8'), /firebase-crashlytics-gradle:3\.0\.3/, 'Batch L1: Crashlytics Gradle plugin on the build classpath');
   assert.ok(existsSync(join(prod, 'android/app/google-services.json')), 'Change 25: Firebase config next to the app build file');
   assert.match(readFileSync(join(prod, 'android/app/src/main/AndroidManifest.xml'), 'utf8'), /windowSoftInputMode="adjustResize"/, 'Change 30: the page shrinks above the keyboard');
   const sp = readFileSync(join(prod, 'android/app/src/main/res/values/strings.xml'), 'utf8');
@@ -92,7 +95,7 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const gq = readFileSync(join(qa, 'android/app/build.gradle'), 'utf8');
   assert.match(gq, /applicationId "com\.jslproperties\.estateagentbuddy\.qa"/);
   assert.match(gq, /namespace "com\.jslproperties\.estateagentbuddy"/, 'the code package is unchanged');
-  assert.match(gq, /versionName "2\.2\.0-qa-n6"/, 'the native version stays readable by the update logic');
+  assert.match(gq, /versionName "2\.2\.0-qa-n7"/, 'the native version stays readable by the update logic');
   const sq = readFileSync(join(qa, 'android/app/src/main/res/values/strings.xml'), 'utf8');
   assert.match(sq, /name="app_name">EAB QA</);
   assert.match(sq, /name="package_name">com\.jslproperties\.estateagentbuddy\.qa</);
