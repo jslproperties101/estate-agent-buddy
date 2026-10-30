@@ -9,10 +9,11 @@ import { fmtDate } from '../lib/dates';
 import { useToast } from '../ui/toast';
 import { BillingError, cachedRows, refreshBilling, startTrial } from './api';
 import { canPurchase, resolveEntitlement, type Line } from './entitlement';
-import { PLANS, TRIAL_DAYS, plansOf, rm, type PayProvider, type Product } from './plans';
+import { TRIAL_DAYS, plansOf, rm, type PayProvider, type Product } from './plans';
 import { PROVIDER_IDS, availability, startPayment } from './providers';
 import { billingStrings, type BillingStrings } from './strings';
 
+// The Market News plans ('news') are not offered here: they are Google Play only and shown on their own screen (NewsPaywall).
 const PRODUCTS: Product[] = ['pro', 'pos'];
 
 function lineText(s: BillingStrings, l: Line, lang: Lang): string {
@@ -93,7 +94,7 @@ export function BillingCard({ lang }: { lang: Lang }) {
               </div>
             );
           })}
-          {avail.ok && PLANS.some(p => !canPurchase(ent[p.product], provider)) && <small className="muted">{s.alreadyPaid}</small>}
+          {avail.ok && PRODUCTS.flatMap(p => plansOf(p)).some(p => !canPurchase(ent[p.product], provider)) && <small className="muted">{s.alreadyPaid}</small>}
           <small className="muted">{s.proposal}</small>
           <button className="btn small secondary" data-testid="billing-refresh" disabled={busy} onClick={refresh}>{s.refresh}</button>
         </>

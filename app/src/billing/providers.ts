@@ -7,7 +7,7 @@ import type { Store } from '../data/store';
 import type { SyncConfig } from '../data/sync';
 import { openInBrowser, platform, plugin, pluginMissing } from '../native/native';
 import { startCheckout, verifyPlayPurchase, BillingError } from './api';
-import { PLANS, planById, type PayProvider, type Plan } from './plans';
+import { PLANS, PRODUCT_PROVIDERS, planById, type PayProvider, type Plan } from './plans';
 
 type FetchFn = typeof fetch;
 
@@ -24,7 +24,11 @@ export function availability(id: PayProvider): Availability {
 
 export type PayStep = { kind: 'opened'; env: 'sandbox' | 'live' } | { kind: 'verified'; status: string; env: 'sandbox' | 'live' };
 
-/** The native side of Google Play Billing (to be built as an Android plugin). */
+/**
+ * The native side of Google Play Billing: the app's own Android plugin "PlayBilling" (scripts/android-setup.mjs, built only
+ * when EAB_PLAY_BILLING=1). productId is the plan id, which must equal the Play Console subscription id. The plugin does NOT
+ * acknowledge the purchase: the server does, after checking it with Google (supabase/functions/billing, play_verify).
+ */
 export interface PlayBillingPlugin { purchase(o: { productId: string; obfuscatedAccountId: string }): Promise<{ purchaseToken: string }> }
 
 export const sha256Hex = async (s: string): Promise<string> =>
@@ -33,6 +37,7 @@ export const sha256Hex = async (s: string): Promise<string> =>
 export async function startPayment(store: Store, cfg: SyncConfig, id: PayProvider, planId: string, fetchFn: FetchFn = fetch): Promise<PayStep> {
   const plan: Plan | undefined = planById(planId);
   if (!plan || !PLANS.includes(plan)) throw new BillingError('other', 'unknown plan');
+  if (!PRODUCT_PROVIDERS[plan.product].includes(id)) throw new BillingError('other', 'provider not offered for this plan');
   const a = availability(id);
   if (!a.ok) throw new BillingError('other', a.reason);
   if (id === 'google_play') {

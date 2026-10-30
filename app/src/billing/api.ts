@@ -45,9 +45,10 @@ export const verifyPlayPurchase = (store: Store, cfg: SyncConfig, planId: PlanId
   call<PlayAnswer>(store, cfg, { action: 'play_verify', planId, purchaseToken }, fetchFn);
 
 const PROVIDERS: PayProvider[] = ['stripe', 'fpx', 'google_play'];
+const PRODUCTS: Product[] = ['pro', 'pos', 'news'];
 const isRow = (r: unknown): r is BillingRow => {
   const x = r as Record<string, unknown> | null;
-  return !!x && (x.product === 'pro' || x.product === 'pos') && typeof x.status === 'string'
+  return !!x && PRODUCTS.includes(x.product as Product) && typeof x.status === 'string'
     && (x.provider === 'trial' || PROVIDERS.includes(x.provider as PayProvider)) && (x.env === 'sandbox' || x.env === 'live');
 };
 

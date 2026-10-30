@@ -88,6 +88,39 @@ begin
   if n = 1 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n6g other agent rows: ' || n; end if;
   reset role;
 
+  -- 7. Batch A: Market News ('news') rows are accepted from Google Play only, with a news plan, and have no free trial
+  r := public.eab_billing_apply('google_play', 'gp_news_1', a, 'play.active', 'news', 'news_monthly', 'active', 'sandbox',
+        now() + interval '30 days', null, false, 'GPA.1', null, now());
+  if r = 'applied' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n7a news monthly: ' || r; end if;
+  r := public.eab_billing_apply('google_play', 'gp_news_2', b, 'play.active', 'news', 'news_yearly', 'active', 'sandbox',
+        now() + interval '365 days', null, false, 'GPA.2', null, now());
+  if r = 'applied' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n7b news yearly: ' || r; end if;
+  begin
+    perform public.eab_billing_apply('stripe', 'evt_news', a, 'k', 'news', 'news_monthly', 'active', 'sandbox', now() + interval '30 days', null, false, null, null, now());
+    fail := fail + 1; msgs := msgs || E'\n7c news by card accepted';
+  exception when others then pass := pass + 1; end;
+  begin
+    perform public.eab_billing_apply('fpx', 'bill_news', a, 'k', 'news', 'news_monthly', 'active', 'sandbox', null, 30, true, null, 100, now());
+    fail := fail + 1; msgs := msgs || E'\n7d news by FPX accepted';
+  exception when others then pass := pass + 1; end;
+  begin
+    perform public.eab_billing_apply('google_play', 'gp_mix', a, 'k', 'news', 'pro_monthly', 'active', 'sandbox', now() + interval '30 days', null, false, null, null, now());
+    fail := fail + 1; msgs := msgs || E'\n7e another product''s plan accepted for news';
+  exception when others then pass := pass + 1; end;
+  begin
+    perform public.eab_billing_start_trial(a, 'news', 14, 'sandbox');
+    fail := fail + 1; msgs := msgs || E'\n7f news trial accepted';
+  exception when others then pass := pass + 1; end;
+  begin
+    insert into public.eab_billing_entitlements (user_id, product, status, provider) values (a, 'gold', 'active', 'stripe');
+    fail := fail + 1; msgs := msgs || E'\n7g unknown product accepted by the table';
+  exception when others then pass := pass + 1; end;
+  perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  if (select count(*) from public.eab_my_billing() where product = 'news' and plan_id = 'news_monthly' and provider = 'google_play') = 1 then pass := pass + 1;
+  else fail := fail + 1; msgs := msgs || E'\n7h own news row not readable'; end if;
+  reset role;
+
   raise exception 'TEST RESULT: % passed, % failed%', pass, fail, msgs;
 end
 $test$;

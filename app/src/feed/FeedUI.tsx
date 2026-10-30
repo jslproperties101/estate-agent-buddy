@@ -10,6 +10,9 @@ import { BUILD } from '../native/updates';
 import { fmtDateTime } from '../lib/dates';
 import { rm } from '../lib/money';
 import { feedStrings } from './strings';
+import { billingEnabled, featureAllowed } from '../billing/access';
+import { refreshBilling } from '../billing/api';
+import { NewsPaywall } from '../billing/NewsPaywall';
 import {
   FeedItem, markFeed, maintenanceActive, maintenanceText, myFeed, ofKind, openBanners, openPopups, redeemCode,
   refreshPublicSettings, safeUrl, unreadNews, updateVerdict, type RedeemResult,
@@ -21,8 +24,12 @@ function useFeed() {
   return { store, items: myFeed(store), cfg: config(store.getState().settings) };
 }
 
-/** The unread count for the megaphone badge. */
-export function useUnreadNews(): number { return unreadNews(useFeed().items); }
+/** The unread count for the megaphone badge. Batch A: 0 while Market News is behind the paywall for this account (billing on,
+ *  no active news plan), so the Home tile never advertises posts the agent cannot open. With billing off: as before. */
+export function useUnreadNews(): number {
+  const { store, items } = useFeed();
+  return featureAllowed(store, 'marketNews') ? unreadNews(items) : 0;
+}
 
 const open = (u?: string) => { if (u) void openInBrowser(u); };
 
@@ -54,7 +61,19 @@ function Links({ item, lang }: { item: FeedItem; lang: Lang }) {
 }
 
 // ---------- Market News and Intelligence ----------
-export function MarketNewsScreen({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
+/** Batch A: with billing switched on, Market News needs an active 'news' plan; without one the subscription box is shown and
+ *  no post (title, body, picture, unread count) is drawn. With billing off (the default) the screen is exactly as before. */
+export function MarketNewsScreen({ lang, openId }: { lang: Lang; openId?: string }) {
+  const { store, cfg } = useFeed();
+  const on = billingEnabled(store);
+  const me = store.getState().meta.syncSession?.userId;
+  // Billing on: read this account's plans when the screen opens, so a new or ended subscription shows at once.
+  useEffect(() => { if (on && me) void refreshBilling(store, cfg); }, [on, me]);   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!featureAllowed(store, 'marketNews')) return <section className="stack" data-testid="market-news"><NewsPaywall lang={lang} /></section>;
+  return <NewsFeed lang={lang} openId={openId} />;
+}
+
+function NewsFeed({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
   const { store, items, cfg } = useFeed();
   const t = feedStrings[lang];
   const news = ofKind(items, 'news');

@@ -8,13 +8,17 @@
 --   * A signed-in agent reads only their own rows, through eab_my_billing().
 --   * No card numbers and no raw provider payloads are stored: only the event id, kind, plan, amount and time.
 --
+-- Batch A (30 Oct 2026): product 'news' (Market News and Intelligence access; plans news_monthly, news_yearly; Google Play only,
+-- no free trial). The check constraints are (re)named and replaced below, so a database that already ran the first version of
+-- this file accepts 'news' rows after running it again.
+--
 -- Safe to run twice. Rollback: supabase/proposed/20261028000000_billing_sandbox_rollback.sql
 begin;
 
 create table if not exists public.eab_billing_entitlements (
   user_id              uuid not null references auth.users (id) on delete cascade,
-  product              text not null check (product in ('pro', 'pos')),
-  plan_id              text check (plan_id is null or plan_id in ('pro_monthly', 'pro_yearly', 'pos_monthly')),
+  product              text not null,
+  plan_id              text,
   status               text not null check (status in ('trialing', 'active', 'past_due', 'canceled', 'expired')),
   provider             text not null check (provider in ('trial', 'fpx', 'stripe', 'google_play')),
   provider_ref         text,
@@ -26,6 +30,14 @@ create table if not exists public.eab_billing_entitlements (
   updated_at           timestamptz not null default now(),
   primary key (user_id, product)
 );
+-- The product and plan lists (Batch A added 'news'). Dropped and added again so that re-running this file updates them; the
+-- first version's unnamed checks (eab_billing_entitlements_product_check / _plan_id_check) are replaced the same way.
+alter table public.eab_billing_entitlements drop constraint if exists eab_billing_entitlements_product_check;
+alter table public.eab_billing_entitlements drop constraint if exists eab_billing_entitlements_plan_id_check;
+alter table public.eab_billing_entitlements add constraint eab_billing_entitlements_product_check
+  check (product in ('pro', 'pos', 'news'));
+alter table public.eab_billing_entitlements add constraint eab_billing_entitlements_plan_id_check
+  check (plan_id is null or plan_id in ('pro_monthly', 'pro_yearly', 'pos_monthly', 'news_monthly', 'news_yearly'));
 alter table public.eab_billing_entitlements enable row level security;
 revoke all on public.eab_billing_entitlements from public, anon, authenticated;
 
@@ -56,6 +68,7 @@ revoke all on function public.eab_my_billing() from public, anon;
 grant execute on function public.eab_my_billing() to authenticated;
 
 -- One free trial per person per product, ever (a row for that product already existing means it was used or paid for).
+-- Pro and POS only: the Market News plans ('news') have no free trial.
 create or replace function public.eab_billing_start_trial(p_user uuid, p_product text, p_days integer, p_env text)
 returns text
 language plpgsql security definer set search_path = public as $$
@@ -85,7 +98,10 @@ returns text
 language plpgsql security definer set search_path = public as $$
 declare n integer; cur public.eab_billing_entitlements%rowtype; new_end timestamptz;
 begin
-  if p_provider not in ('fpx', 'stripe', 'google_play') or p_product not in ('pro', 'pos')
+  if p_provider not in ('fpx', 'stripe', 'google_play') or p_product not in ('pro', 'pos', 'news')
+     -- 'news' (Market News) is sold through Google Play only, and the plan must belong to the product
+     or (p_product = 'news' and p_provider <> 'google_play')
+     or (p_plan is not null and p_plan not like (p_product || '\_%'))
      or p_status not in ('trialing', 'active', 'past_due', 'canceled', 'expired') or p_env not in ('sandbox', 'live')
      or coalesce(p_event_id, '') = '' then
     raise exception 'bad billing event';

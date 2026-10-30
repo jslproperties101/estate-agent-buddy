@@ -1,4 +1,6 @@
 // Billing (sandbox / test mode) screen text, in three languages. Every screen says it is test mode: no real money is charged.
+// Batch A: `paywall` is the Market News and Intelligence subscription box. Its Malay and Chinese are DRAFTS, to be checked by a
+// native speaker (as for the other feed screens).
 import type { Lang } from '../i18n';
 
 const en = {
@@ -6,7 +8,7 @@ const en = {
   title: 'Plans (test mode)',
   banner: 'Test mode: payments here use the providers’ test systems. No real money is charged.',
   signIn: 'Sign in to see your plans.',
-  products: { pro: 'Pro', pos: 'AI Buddy POS add-on' } as Record<string, string>,
+  products: { pro: 'Pro', pos: 'AI Buddy POS add-on', news: 'Market News and Intelligence' } as Record<string, string>,
   state: {
     none: 'Not active', ended: 'Ended',
     trialing: (d: string) => `Free trial until ${d}`,
@@ -18,7 +20,7 @@ const en = {
   startTrial: (n: number) => `Start ${n}-day free trial`,
   trialUsed: 'Free trial already used.',
   trialStarted: 'Free trial started.',
-  planName: { pro_monthly: 'Pro, monthly', pro_yearly: 'Pro, yearly', pos_monthly: 'AI Buddy POS, monthly' } as Record<string, string>,
+  planName: { pro_monthly: 'Pro, monthly', pro_yearly: 'Pro, yearly', pos_monthly: 'AI Buddy POS, monthly', news_monthly: 'Monthly', news_yearly: 'Yearly' } as Record<string, string>,
   per: { month: 'per month', year: 'per year' } as Record<string, string>,
   proposal: 'Prices are proposals until the owner approves them.',
   payWith: 'Pay with',
@@ -38,6 +40,20 @@ const en = {
     'not-configured': 'Payments are not set up on the server yet.', 'not-signed-in': 'Sign in first.', network: 'No connection. Try again.',
     refused: 'The server refused this request.', 'not-linked': 'That purchase belongs to another account.', other: 'Something went wrong. Nothing was charged here.',
   } as Record<string, string>,
+  paywall: {
+    title: 'Subscribe to read Market News and Intelligence',
+    unlocks: 'A subscription unlocks the Market News and Intelligence menu only. Everything else in the app stays as it is.',
+    saves: (n: number) => `Saves about ${n}% versus 12 months`,
+    subscribe: 'Subscribe',
+    via: 'Paid through Google Play. Google Play shows the final price in your currency before you pay. Cancel any time in Google Play.',
+    restore: 'Restore / Refresh',
+    checking: 'Waiting for Google Play…',
+    done: 'Subscription confirmed by the server.',
+    notYet: 'The server has not confirmed this subscription yet. Tap Restore / Refresh in a minute.',
+    cancelled: 'Purchase cancelled. Nothing was charged.',
+    pending: 'The payment is pending in Google Play. Access starts when Google confirms it; tap Restore / Refresh later.',
+    noneFound: 'No active subscription found for this account.',
+  },
 };
 export type BillingStrings = typeof en;
 
@@ -46,7 +62,7 @@ const bm: BillingStrings = {
   title: 'Pelan (mod ujian)',
   banner: 'Mod ujian: pembayaran di sini menggunakan sistem ujian penyedia. Tiada wang sebenar dikenakan.',
   signIn: 'Log masuk untuk melihat pelan anda.',
-  products: { pro: 'Pro', pos: 'Tambahan AI Buddy POS' },
+  products: { pro: 'Pro', pos: 'Tambahan AI Buddy POS', news: 'Berita dan Risikan Pasaran' },
   state: {
     none: 'Tidak aktif', ended: 'Tamat',
     trialing: (d: string) => `Percubaan percuma hingga ${d}`,
@@ -58,7 +74,7 @@ const bm: BillingStrings = {
   startTrial: (n: number) => `Mula percubaan percuma ${n} hari`,
   trialUsed: 'Percubaan percuma sudah digunakan.',
   trialStarted: 'Percubaan percuma bermula.',
-  planName: { pro_monthly: 'Pro, bulanan', pro_yearly: 'Pro, tahunan', pos_monthly: 'AI Buddy POS, bulanan' },
+  planName: { pro_monthly: 'Pro, bulanan', pro_yearly: 'Pro, tahunan', pos_monthly: 'AI Buddy POS, bulanan', news_monthly: 'Bulanan', news_yearly: 'Tahunan' },
   per: { month: 'sebulan', year: 'setahun' },
   proposal: 'Harga ialah cadangan sehingga pemilik meluluskannya.',
   payWith: 'Bayar dengan',
@@ -78,6 +94,20 @@ const bm: BillingStrings = {
     'not-configured': 'Pembayaran belum disediakan di pelayan.', 'not-signed-in': 'Log masuk dahulu.', network: 'Tiada sambungan. Cuba lagi.',
     refused: 'Pelayan menolak permintaan ini.', 'not-linked': 'Pembelian itu milik akaun lain.', other: 'Sesuatu tidak kena. Tiada apa dikenakan di sini.',
   },
+  paywall: {
+    title: 'Langgan untuk membaca Berita dan Risikan Pasaran',
+    unlocks: 'Langganan hanya membuka menu Berita dan Risikan Pasaran. Bahagian lain aplikasi kekal seperti biasa.',
+    saves: (n: number) => `Jimat kira-kira ${n}% berbanding 12 bulan`,
+    subscribe: 'Langgan',
+    via: 'Dibayar melalui Google Play. Google Play menunjukkan harga akhir dalam mata wang anda sebelum anda membayar. Batalkan bila-bila masa dalam Google Play.',
+    restore: 'Pulihkan / Muat semula',
+    checking: 'Menunggu Google Play…',
+    done: 'Langganan disahkan oleh pelayan.',
+    notYet: 'Pelayan belum mengesahkan langganan ini. Ketik Pulihkan / Muat semula sebentar lagi.',
+    cancelled: 'Pembelian dibatalkan. Tiada apa dikenakan.',
+    pending: 'Bayaran masih belum selesai dalam Google Play. Akses bermula apabila Google mengesahkannya; ketik Pulihkan / Muat semula kemudian.',
+    noneFound: 'Tiada langganan aktif untuk akaun ini.',
+  },
 };
 
 const zh: BillingStrings = {
@@ -85,7 +115,7 @@ const zh: BillingStrings = {
   title: '方案（测试模式）',
   banner: '测试模式：此处的付款使用服务商的测试系统，不会收取真实款项。',
   signIn: '请登录以查看您的方案。',
-  products: { pro: 'Pro', pos: 'AI Buddy POS 附加包' },
+  products: { pro: 'Pro', pos: 'AI Buddy POS 附加包', news: '市场新闻与情报' },
   state: {
     none: '未启用', ended: '已结束',
     trialing: (d: string) => `免费试用至 ${d}`,
@@ -97,7 +127,7 @@ const zh: BillingStrings = {
   startTrial: (n: number) => `开始 ${n} 天免费试用`,
   trialUsed: '免费试用已使用过。',
   trialStarted: '免费试用已开始。',
-  planName: { pro_monthly: 'Pro，按月', pro_yearly: 'Pro，按年', pos_monthly: 'AI Buddy POS，按月' },
+  planName: { pro_monthly: 'Pro，按月', pro_yearly: 'Pro，按年', pos_monthly: 'AI Buddy POS，按月', news_monthly: '按月', news_yearly: '按年' },
   per: { month: '每月', year: '每年' },
   proposal: '价格在业主批准前仅为建议。',
   payWith: '付款方式',
@@ -116,6 +146,20 @@ const zh: BillingStrings = {
   err: {
     'not-configured': '服务器尚未设置付款。', 'not-signed-in': '请先登录。', network: '没有网络连接，请重试。',
     refused: '服务器拒绝了此请求。', 'not-linked': '该购买属于另一个账户。', other: '出了点问题。此处没有任何扣款。',
+  },
+  paywall: {
+    title: '订阅以阅读市场新闻与情报',
+    unlocks: '订阅仅解锁“市场新闻与情报”菜单。应用的其他部分保持不变。',
+    saves: (n: number) => `比按月付 12 个月节省约 ${n}%`,
+    subscribe: '订阅',
+    via: '通过 Google Play 付款。付款前 Google Play 会以您的货币显示最终价格。可随时在 Google Play 中取消。',
+    restore: '恢复 / 刷新',
+    checking: '正在等待 Google Play…',
+    done: '服务器已确认订阅。',
+    notYet: '服务器尚未确认此订阅。请稍后点击“恢复 / 刷新”。',
+    cancelled: '购买已取消。没有任何扣款。',
+    pending: 'Google Play 中的付款仍在处理中。Google 确认后即可使用；请稍后点击“恢复 / 刷新”。',
+    noneFound: '此账户没有有效的订阅。',
   },
 };
 

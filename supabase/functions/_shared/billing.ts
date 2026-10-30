@@ -6,21 +6,31 @@
 // (docs/MONETISATION_PLAN.md) until the owner approves them; app/src/billing/plans.ts has a copy, and a test keeps the two
 // the same.
 
-export type Product = 'pro' | 'pos';
-export type PlanId = 'pro_monthly' | 'pro_yearly' | 'pos_monthly';
+// Batch A (30 Oct 2026): 'news' = Market News and Intelligence access, USD 1 a month / USD 9 a year, Google Play ONLY.
+// The Play Console subscription product ids MUST equal these plan ids (news_monthly, news_yearly): play_verify grants only
+// when Google's answer names exactly the plan id the phone asked for.
+export type Product = 'pro' | 'pos' | 'news';
+export type PlanId = 'pro_monthly' | 'pro_yearly' | 'pos_monthly' | 'news_monthly' | 'news_yearly';
 export type Status = 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired';
 export type Provider = 'trial' | 'fpx' | 'stripe' | 'google_play';
 export type Env = 'sandbox' | 'live';
 
-export interface PlanDef { id: PlanId; product: Product; interval: 'month' | 'year'; amountSen: number; days: number }
+/** amountSen: the amount in the plan's currency's smallest unit (sen for MYR, the default; cents for USD). */
+export interface PlanDef { id: PlanId; product: Product; interval: 'month' | 'year'; amountSen: number; days: number; currency?: 'MYR' | 'USD' }
 export const PLANS: Record<PlanId, PlanDef> = {
   pro_monthly: { id: 'pro_monthly', product: 'pro', interval: 'month', amountSen: 4900, days: 30 },
   pro_yearly: { id: 'pro_yearly', product: 'pro', interval: 'year', amountSen: 49000, days: 365 },
   pos_monthly: { id: 'pos_monthly', product: 'pos', interval: 'month', amountSen: 3900, days: 30 },
+  news_monthly: { id: 'news_monthly', product: 'news', interval: 'month', amountSen: 100, days: 30, currency: 'USD' },
+  news_yearly: { id: 'news_yearly', product: 'news', interval: 'year', amountSen: 900, days: 365, currency: 'USD' },
 };
 export const TRIAL_DAYS = 14;
 export const isPlanId = (x: unknown): x is PlanId => typeof x === 'string' && Object.prototype.hasOwnProperty.call(PLANS, x);
-export const isProduct = (x: unknown): x is Product => x === 'pro' || x === 'pos';
+export const isProduct = (x: unknown): x is Product => x === 'pro' || x === 'pos' || x === 'news';
+/** Products with the server's free trial. 'news' has none (the owner asked for paid access only). */
+export const isTrialProduct = (x: unknown): x is 'pro' | 'pos' => x === 'pro' || x === 'pos';
+/** May this plan be paid by card (Stripe) or FPX (Billplz)? Only the MYR Pro / POS plans; 'news' is Google Play only. */
+export const webPayable = (id: PlanId): boolean => PLANS[id].product !== 'news' && (PLANS[id].currency ?? 'MYR') === 'MYR';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID.test(x);
 
@@ -137,6 +147,7 @@ export function mapStripeEvent(ev: J): Mapped {
   const userId = str(md.user_id); const planId = md.plan_id;
   if (!isUuid(userId) || !isPlanId(planId)) return { ignored: 'no-app-metadata' };
   if (PLANS[planId].product !== md.product) return { ignored: 'plan-product-mismatch' };
+  if (!webPayable(planId)) return { ignored: 'not-a-card-plan' };
   const status = type.endsWith('.deleted') ? 'expired' : STRIPE_STATUS[str(sub?.status)];
   if (!status) return { ignored: `status-${str(sub?.status) || 'none'}` };
   // Newer Stripe API versions keep the period on the subscription item, older ones on the subscription.
@@ -162,6 +173,7 @@ export function mapBillplzBill(bill: J, collectionId: string, env: Env): Mapped 
   const userId = str(bill?.reference_1); const planId = bill?.reference_2;
   if (!id) return { ignored: 'no-bill-id' };
   if (!isUuid(userId) || !isPlanId(planId)) return { ignored: 'no-app-reference' };
+  if (!webPayable(planId)) return { ignored: 'not-an-fpx-plan' };
   if (str(bill?.collection_id) !== collectionId) return { ignored: 'other-collection' };
   if (bill?.paid !== true || bill?.state !== 'paid') return { ignored: 'not-paid' };
   const plan = PLANS[planId];

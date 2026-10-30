@@ -7,7 +7,7 @@ import { createHmac, generateKeyPairSync, createVerify, createHash } from 'node:
 import { readFileSync, readdirSync } from 'node:fs';
 import { MemoryBackend } from '../src/data/backend';
 import { Store } from '../src/data/store';
-import { BILLING_LIVE, FEATURE_PRODUCT, GRACE_DAYS, PLANS, TRIAL_DAYS, planById, plansOf, rm } from '../src/billing/plans';
+import { BILLING_LIVE, FEATURE_PRODUCT, GRACE_DAYS, PLANS, PRODUCT_PROVIDERS, TRIAL_DAYS, planById, plansOf, price, rm, yearlySaving } from '../src/billing/plans';
 import { canPurchase, canUse, resolveEntitlement, resolveLine, type BillingRow } from '../src/billing/entitlement';
 import { billingEnabled, featureAllowed } from '../src/billing/access';
 import { BillingError, cachedEntitlement, cachedRows, refreshBilling, startCheckout, startTrial } from '../src/billing/api';
@@ -43,9 +43,9 @@ test('B-1 the phone’s plan list equals the server’s price list (the server i
   assert.equal(rm(4900), 'RM 49'); assert.equal(rm(4950), 'RM 49.50');
 });
 
-test('B-2 safe defaults: sandbox only, and nothing is gated until the owner decides', () => {
+test('B-2 safe defaults: sandbox only, and only what the owner decided is gated (Batch A: Market News)', () => {
   assert.equal(BILLING_LIVE, false);
-  assert.deepEqual(FEATURE_PRODUCT, {});
+  assert.deepEqual(FEATURE_PRODUCT, { marketNews: 'news' });
 });
 
 // ── access rules ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ test('B-6 with billing off everything works; with it on only listed features nee
   assert.equal(canUse('x', pro, true, { x: 'pro' }), true);
   assert.equal(canUse('x', pro, true, { x: 'pos' }), false);
   assert.equal(canUse('unlisted', none, true, {}), true, 'not listed: free');
-  assert.equal(canUse('unlisted', none, true), true, 'the real table is empty: nothing is gated');
+  assert.equal(canUse('unlisted', none, true), true, 'not in the real table: not gated');
 });
 
 test('B-7 nobody pays twice for the same thing; a one-time FPX payment can be paid again', () => {
@@ -549,4 +549,101 @@ test('B-34 webhook: sandbox may rely on the read-back alone, but going live with
 test('B-35 the server functions never write secrets or tokens to a log', () => {
   const files = ['billing/handler.ts', 'billing/index.ts', 'billing-webhook/handler.ts', 'billing-webhook/index.ts', '_shared/billing.ts'];
   for (const f of files) assert.doesNotMatch(readFileSync(new URL(`../../supabase/functions/${f}`, import.meta.url), 'utf8'), /console\.(log|info|debug|warn|error)/, f);
+});
+
+// ── Batch A: Market News and Intelligence subscriptions ('news', Google Play only) ─────────────────────────────────────
+const newsRow = (o: Partial<BillingRow> = {}) => row({ product: 'news', plan_id: 'news_monthly', provider: 'google_play', ...o });
+
+test('B-36 news plans: USD 1 a month and USD 9 a year, ids equal to the Play Console ids, Google Play only; MYR plans unchanged', () => {
+  assert.deepEqual(plansOf('news').map(p => [p.id, p.interval, p.amountSen, p.days, p.currency]), [['news_monthly', 'month', 100, 30, 'USD'], ['news_yearly', 'year', 900, 365, 'USD']]);
+  assert.deepEqual(S.PLANS.news_monthly, { id: 'news_monthly', product: 'news', interval: 'month', amountSen: 100, days: 30, currency: 'USD' });
+  assert.deepEqual(S.PLANS.news_yearly, { id: 'news_yearly', product: 'news', interval: 'year', amountSen: 900, days: 365, currency: 'USD' });
+  assert.equal(price(planById('news_monthly')!), 'USD 1'); assert.equal(price(planById('news_yearly')!), 'USD 9');
+  assert.equal(price(planById('pro_monthly')!), 'RM 49', 'MYR display unchanged'); assert.equal(price(planById('pro_yearly')!), 'RM 490');
+  for (const p of plansOf('pro').concat(plansOf('pos'))) assert.equal(p.currency, undefined, `${p.id} is still a plain MYR plan`);
+  assert.equal(yearlySaving(planById('news_monthly')!, planById('news_yearly')!), 25);
+  assert.equal(yearlySaving({ ...planById('news_monthly')!, amountSen: 100 }, { ...planById('news_yearly')!, amountSen: 1200 }), 0, 'no saving: nothing claimed');
+  assert.equal(yearlySaving({ ...planById('news_monthly')!, amountSen: 200 }, planById('news_yearly')!), 63, 'computed from the prices, not written in');
+  assert.deepEqual(PRODUCT_PROVIDERS.news, ['google_play']);
+  assert.ok(S.isPlanId('news_monthly') && S.isPlanId('news_yearly') && !S.isPlanId('news_lifetime'));
+  assert.ok(S.isProduct('news') && !S.isTrialProduct('news'));
+  assert.equal(S.webPayable('news_monthly'), false); assert.equal(S.webPayable('pro_monthly'), true);
+});
+
+test('B-37 news access: only an active news plan opens Market News; Pro or POS never do, and news never opens Pro', () => {
+  const at = (rows: BillingRow[]) => resolveEntitlement(rows, NOW, false);
+  assert.equal(at([]).news.state, 'none');
+  assert.equal(at([newsRow()]).news.active, true);
+  assert.equal(at([newsRow({ plan_id: 'news_yearly', cancel_at_period_end: true })]).news.state, 'canceling');
+  assert.equal(at([newsRow({ status: 'canceled', period_end: iso(NOW - 1) })]).news.active, false, 'cancelled and ended');
+  assert.equal(at([newsRow({ status: 'expired' })]).news.active, false);
+  assert.equal(at([newsRow({ period_end: null })]).news.active, false, 'an active row with no end is not trusted');
+  assert.equal(canUse('marketNews', at([row()]), true), false, 'Pro does not open Market News');
+  assert.equal(canUse('marketNews', at([row({ product: 'pos', plan_id: 'pos_monthly' })]), true), false);
+  assert.equal(canUse('marketNews', at([newsRow()]), true), true);
+  assert.equal(canUse('x', at([newsRow()]), true, { x: 'pro' }), false, 'news does not open a Pro feature');
+  assert.equal(canUse('marketNews', at([]), false), true, 'billing off: as before');
+  assert.equal(resolveEntitlement([newsRow()], NOW, true).news.active, false, 'live: a sandbox purchase never counts');
+});
+
+test('B-38 the gate on the phone: billing off shows the news as before; on, it needs a news plan for THIS account', async () => {
+  const store = await signedIn();
+  assert.equal(featureAllowed(store, 'marketNews'), true, 'switch off');
+  store.setSingleton('settings', { billing: true });
+  assert.equal(featureAllowed(store, 'marketNews'), false, 'switch on, no plan');
+  assert.equal(await refreshBilling(store, cfg, fakeRpc([newsRow({ period_end: iso(Date.now() + 5 * DAY) })]).fetchFn), true);
+  assert.equal(cachedRows(store).length, 1, 'a news row is accepted from the database');
+  assert.equal(featureAllowed(store, 'marketNews'), true);
+  store.setSingleton('meta', { syncSession: { accessToken: 't', refreshToken: 'r', expiresAt: Date.now() + 3600_000, email: 'b@x.c', userId: 'u2' } });
+  assert.equal(featureAllowed(store, 'marketNews'), false, 'another account never uses this one’s plan');
+  store.setSingleton('settings', { billing: false });
+  assert.equal(featureAllowed(store, 'marketNews'), true, 'switch off again: as before');
+});
+
+test('B-39 news can only be paid through Google Play: card and FPX are refused on the phone; Google Play needs the Android app', async () => {
+  const store = await signedIn();
+  for (const p of ['stripe', 'fpx'] as const)
+    await assert.rejects(startPayment(store, cfg, p, 'news_monthly'), (e: BillingError) => /provider not offered/.test(e.message), p);
+  await assert.rejects(startPayment(store, cfg, 'google_play', 'news_yearly'), (e: BillingError) => /android-only/.test(e.message));
+  await assert.rejects(startPayment(store, cfg, 'google_play', 'news_forever'), (e: BillingError) => /unknown plan/.test(e.message));
+});
+
+test('B-40 server: news_monthly and news_yearly bought on Google Play are checked with Google, applied as news and acknowledged', async () => {
+  for (const planId of ['news_monthly', 'news_yearly'] as const) {
+    const w = playWorld(playSub({ lineItems: [{ productId: planId, expiryTime: iso(NOW + 30 * DAY), autoRenewingPlan: { autoRenewEnabled: true } }] }));
+    const r = await handleBilling(post({ action: 'play_verify', planId, purchaseToken: TOKEN, amount: 0, price: 0, product: 'pro' }), w.deps);
+    assert.equal(r.status, 200, planId); assert.equal((await r.json()).status, 'active');
+    const rpc = JSON.parse(w.calls.find(c => c.url.endsWith('/rpc/eab_billing_apply'))!.body);
+    assert.equal(rpc.p_product, 'news'); assert.equal(rpc.p_plan, planId); assert.equal(rpc.p_provider, 'google_play');
+    assert.equal(rpc.p_amount_sen, null, 'an amount sent by the phone is never used');
+    assert.ok(w.calls.some(c => c.url.includes(`/purchases/subscriptions/${planId}/tokens/`) && c.url.endsWith(':acknowledge')), 'acknowledged by the server, under the same id');
+  }
+  const other = playWorld(playSub({ lineItems: [{ productId: 'news_yearly', expiryTime: iso(NOW + DAY) }] }));
+  assert.equal((await handleBilling(post({ action: 'play_verify', planId: 'news_monthly', purchaseToken: TOKEN }), other.deps)).status, 422, 'Google’s product id must equal the plan asked for');
+  assert.equal(other.calls.filter(c => c.url.includes('/rpc/')).length, 0);
+});
+
+test('B-41 server: unknown news plans, a news trial, and news by card or FPX are refused before any provider or database call', async () => {
+  const w = world({ ...STRIPE_ENV, ...BILLPLZ_ENV }, { ...userAnswer, ...applied() });
+  for (const body of [
+    { action: 'play_verify', planId: 'news_lifetime', purchaseToken: TOKEN }, { action: 'play_verify', planId: 'news', purchaseToken: TOKEN },
+    { action: 'checkout', provider: 'stripe', planId: 'news_monthly' }, { action: 'checkout', provider: 'fpx', planId: 'news_yearly', amount: 100 },
+    { action: 'trial', product: 'news' },
+  ]) assert.equal((await handleBilling(post(body), w.deps)).status, 400, JSON.stringify(body));
+  assert.equal(w.calls.filter(c => !c.url.endsWith('/auth/v1/user')).length, 0, 'nothing reached Stripe, Billplz, Google or the database');
+  // a Stripe event or a Billplz bill naming a news plan never grants anything
+  const ev = { id: 'evt_n', type: 'customer.subscription.created', created: NOW / 1000, livemode: false, data: { object: { id: 'sub', status: 'active', current_period_end: NOW / 1000 + 86400, metadata: { user_id: U1, product: 'news', plan_id: 'news_monthly' } } } };
+  assert.ok('ignored' in S.mapStripeEvent(ev));
+  assert.ok('ignored' in S.mapBillplzBill({ id: 'b1', reference_1: U1, reference_2: 'news_monthly', collection_id: 'col1', paid: true, state: 'paid', paid_amount: 100 }, 'col1', 'sandbox'));
+});
+
+test('B-42 the Play Billing plugin: only built when asked (QA APK), never acknowledges, passes the account hash, and needs no secret', () => {
+  const setup = readFileSync(new URL('../scripts/android-setup.mjs', import.meta.url), 'utf8');
+  assert.match(setup, /const PLAY_BILLING = process\.env\.EAB_PLAY_BILLING === '1'/);
+  assert.match(setup, /if \(PLAY_BILLING\) \{[\s\S]*@CapacitorPlugin\(name = "PlayBilling"\)/);
+  assert.match(setup, /\$\{PLAY_BILLING \? `[\s\S]*registerPlugin\(PlayBillingPlugin\.class\);` : ''\}/, 'registered only in builds with the plugin');
+  assert.match(setup, /setObfuscatedAccountId\(account\)/); assert.match(setup, /ProductType\.SUBS/);
+  assert.doesNotMatch(setup, /acknowledgePurchase\s*\(|consumeAsync\s*\(/, 'the server acknowledges, never the phone');
+  const wf = readFileSync(new URL('../../.github/workflows/android.yml', import.meta.url), 'utf8');
+  assert.match(wf, /EAB_PLAY_BILLING: \$\{\{ matrix\.variant == 'qa' && '1' \|\| '' \}\}/, 'QA APK only');
 });

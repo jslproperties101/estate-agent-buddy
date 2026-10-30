@@ -12,7 +12,7 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Feature switch | Off by default. On from Settings → "Plans and payments (test feature)", or from Admin EAB with the test feature `beta.billing`. With it off the app behaves exactly as before and the database is never asked for plans. | IMPLEMENTED |
 | Plans | Pro (monthly RM49, yearly RM490) and the AI Buddy POS add-on (monthly RM39), in MYR. **The prices are my proposals, not decisions.** The server holds the only price list it trusts (`supabase/functions/_shared/billing.ts`); the phone never sends an amount, and a test keeps the phone's copy equal to the server's. | IMPLEMENTED (prices PROPOSED) |
 | Access rules | Trial, active, cancelled-until-period-end, late with 7 days' grace, expired; a row that cannot be trusted gives no access; sandbox (test) purchases stop counting when `BILLING_LIVE` is set true. | IMPLEMENTED |
-| Gating | **Nothing is gated.** The list of "feature → product" is empty on purpose (`FEATURE_PRODUCT`), so every feature works for everybody until you decide what needs Pro (see the proposal below). | NOT DONE (waiting for your decision) |
+| Gating | Only **Market News and Intelligence** is gated (Batch A, your request of 30 Oct 2026: `FEATURE_PRODUCT.marketNews = 'news'`), and only while the billing switch is on. Everything else works for everybody until you decide what needs Pro (see the proposal below). | IMPLEMENTED for Market News only |
 | Free trial | 14 days, one per person per product, ever, started by the server (the phone cannot start or extend one). | IMPLEMENTED |
 | Database | `eab_billing_entitlements` and `eab_billing_events`, three functions, no direct table access for the phone, one change per provider event id, an older event never overwrites a newer one, one-time payments stack. File: `supabase/proposed/20261028000000_billing_sandbox.sql` (+ rollback + SQL test). | IMPLEMENTED, run on a local PostgreSQL 16 only (see tests). Not applied to any Supabase project. |
 | FPX (Billplz sandbox) | `billing` function makes a bill for the server's price, naming the agent and plan. `billing-webhook` checks the X Signature, then **reads the bill back from Billplz** and grants only if it is paid, in our collection, for exactly the plan's price. A one-time payment for one period (30 or 365 days); it does not renew by itself. | IMPLEMENTED BUT NOT PROVEN (never called Billplz; the X Signature rule is written from Billplz's description and not checked against their sandbox) |
@@ -22,7 +22,18 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Screens | A "Plans (test mode)" card in Settings: test-mode banner, state per product, trial button, provider choice, plans with prices, Pay (test), Refresh. English, Malay, Chinese. | IMPLEMENTED |
 | One Harta API | You answered "One harta api" to the first question and did not say what it is; I could not find it online. **Nothing was built for it.** | NOT DONE (needs your explanation) |
 
-## Which features to charge for: a proposal, nothing is gated yet
+## Batch A (30 Oct 2026): Market News and Intelligence "access" plans
+
+| | |
+|---|---|
+| Plans | `news_monthly` USD 1.00 / 30 days, `news_yearly` USD 9.00 / 365 days (the yearly note "saves about 25%" is computed from the two prices). Same list on the phone and the server; a test keeps them equal. Existing MYR plans unchanged. |
+| How to pay | **Google Play only** (no card, no FPX, no free trial). The phone buys the plan id through the app's own `PlayBilling` plugin; the server (`play_verify`) checks it with Google, writes the entitlement and acknowledges it. |
+| Play Console ids | The subscription product ids **must be exactly** `news_monthly` and `news_yearly`. |
+| Screen | Billing switch on and no active news plan: a subscription box replaces the news list (no titles, bodies or unread number; the Home badge is hidden). Switch off: exactly as before. |
+| Native plugin | Written into `scripts/android-setup.mjs`, built only with `EAB_PLAY_BILLING=1` (set for the QA APK only). **Never compiled with the real Billing Library here and never run on a phone.** |
+| Not done | Server-side hiding of paid posts (the feed and the push alert text still reach every agent the post is for: see "Known limits"); Google's real-time notifications for renewals and cancellations (the plan is read again only when the agent buys or taps Restore / Refresh). |
+
+## Which features to charge for: a proposal (only Market News is gated, Batch A)
 
 The app has no limits today, so a paywall would take something away from people who have it free. Two ways, both need your decision:
 
@@ -70,6 +81,7 @@ Fees change; check each provider's current price list before deciding. Not state
 - One active provider per product: someone who pays by FPX while a Stripe subscription runs is blocked in the app; the database does not enforce it.
 - A one-time FPX payment has no reminder before it ends; add a reminder before going live.
 - Payments, tax and receipts for **your own** sales (service tax, e-Invoice for business customers, refunds, terms and privacy text) need an accountant's check before going live.
+- Batch A paywall is enforced **on the phone only**: `eab_my_feed` still sends news posts to non-subscribers (kept in the phone's storage, not shown) and `send-push` still puts the post's title and text in the alert. Before charging real money, the database and `send-push` must leave news out for agents without an active news plan.
 - Going live needs: your approval, the prices, `BILLING_ALLOW_LIVE=true`, live keys, `BILLING_LIVE = true` in `app/src/billing/plans.ts`, the Play Billing plugin if Android in-app is wanted, and a test of every path on a real phone.
 
 ## Tests run on 28 Oct 2026

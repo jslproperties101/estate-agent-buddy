@@ -1,14 +1,14 @@
 // Billing, the signed-in agent's side (SANDBOX / TEST MODE ONLY). Called by the app with the agent's sign-in token; Supabase
 // checks that token before index.ts runs. Actions:
-//   trial        start the one free trial of Pro or the POS add-on
+//   trial        start the one free trial of Pro or the POS add-on (none for the Market News plans)
 //   checkout     start a Stripe (test) Checkout or a Billplz (sandbox) FPX bill; answers the page address to open
-//   play_verify  check a Google Play purchase with Google and apply it
+//   play_verify  check a Google Play purchase with Google and apply it (also the Market News plans news_monthly / news_yearly)
 // The price always comes from this server (_shared/billing.ts), never from the app. Provider keys are function secrets and
 // never go into the app. Nothing here grants access from a card or bank answer alone: access is written by
 // billing-webhook (Stripe, Billplz) or by the verified Google answer below.
 import {
-  BILLPLZ_SANDBOX, PLANS, TRIAL_DAYS, applyParams, googleServiceJwt, isPlanId, isProduct, isUuid, liveRefusal, mapPlaySubscription,
-  safeReturnUrl, type Env, type Product,
+  BILLPLZ_SANDBOX, PLANS, TRIAL_DAYS, applyParams, googleServiceJwt, isPlanId, isTrialProduct, isUuid, liveRefusal, mapPlaySubscription,
+  safeReturnUrl, webPayable, type Env, type Product,
 } from '../_shared/billing.ts';
 
 export interface Deps { env: (k: string) => string; fetch: typeof fetch; now: () => number }
@@ -25,7 +25,7 @@ function config(d: Deps) {
     allowLive, env: (allowLive ? 'live' : 'sandbox') as Env,
     url: d.env('SUPABASE_URL').replace(/\/+$/, ''), anon: d.env('SUPABASE_ANON_KEY'), service: d.env('SUPABASE_SERVICE_ROLE_KEY'),
     stripeKey: d.env('STRIPE_SECRET_KEY'),
-    stripePrice: { pro_monthly: d.env('STRIPE_PRICE_PRO_MONTHLY'), pro_yearly: d.env('STRIPE_PRICE_PRO_YEARLY'), pos_monthly: d.env('STRIPE_PRICE_POS_MONTHLY') },
+    stripePrice: { pro_monthly: d.env('STRIPE_PRICE_PRO_MONTHLY'), pro_yearly: d.env('STRIPE_PRICE_PRO_YEARLY'), pos_monthly: d.env('STRIPE_PRICE_POS_MONTHLY') } as Partial<Record<keyof typeof PLANS, string>>,
     billplzKey: d.env('BILLPLZ_API_KEY'), billplzCollection: d.env('BILLPLZ_COLLECTION_ID'), billplzBase: (d.env('BILLPLZ_BASE_URL') || BILLPLZ_SANDBOX).replace(/\/+$/, ''),
     returnUrl: safeReturnUrl(d.env('BILLING_RETURN_URL')),
     playPackage: d.env('PLAY_PACKAGE_NAME'), playEmail: d.env('PLAY_SERVICE_ACCOUNT_EMAIL'), playKey: d.env('PLAY_SERVICE_ACCOUNT_PRIVATE_KEY').replace(/\\n/g, '\n'),
@@ -119,12 +119,13 @@ export async function handleBilling(req: Request, d: Deps): Promise<Response> {
   try { body = await req.json(); } catch { return json({ error: 'bad request' }, 400); }
   try {
     if (body.action === 'trial') {
-      if (!isProduct(body.product)) return json({ error: 'bad request' }, 400);
+      if (!isTrialProduct(body.product)) return json({ error: 'bad request' }, 400);   // no free trial of 'news'
       const result = await rpc(d, c, 'eab_billing_start_trial', { p_user: user.id, p_product: body.product as Product, p_days: TRIAL_DAYS, p_env: c.env });
       return json({ result });
     }
     if (body.action === 'checkout') {
       if (!isPlanId(body.planId)) return json({ error: 'bad request' }, 400);
+      if (!webPayable(body.planId)) return json({ error: 'bad request' }, 400);   // 'news' plans: Google Play only
       if (body.provider === 'stripe') return await stripeCheckout(d, c, user, body.planId);
       if (body.provider === 'fpx') return await fpxBill(d, c, user, body.planId);
       return json({ error: 'bad request' }, 400);

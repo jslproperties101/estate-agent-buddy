@@ -7,6 +7,7 @@
 //  - the sign-in return link com.jslproperties.eaaibuddy://auth-callback opens the app (Google login);
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
+//  - EAB_PLAY_BILLING=1 only: the app's own Google Play Billing plugin (Batch A, Market News subscriptions; untested on a phone).
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
 import { readFileSync, writeFileSync, existsSync, readdirSync, copyFileSync, mkdirSync } from 'node:fs';
 
@@ -18,6 +19,9 @@ const QA = process.env.EAB_QA === '1';
 // EAB_POS=1: the standalone AI Buddy POS app: its own package (installs beside the real app and the QA app, own storage), own
 // name and sign-in return link; the web side is built with the same flag (opens in AI Buddy POS, never updates itself).
 const POS = process.env.EAB_POS === '1';
+// EAB_PLAY_BILLING=1 (Batch A): adds the app's own Google Play Billing plugin "PlayBilling" (Market News subscriptions).
+// Off unless set, so a build that has not been tried with it stays exactly as before. UNTESTED ON A REAL DEVICE.
+const PLAY_BILLING = process.env.EAB_PLAY_BILLING === '1';
 const APP_ID = POS ? 'com.jslproperties.aibuddypos' : QA ? `${cfg.appId}.qa` : cfg.appId;
 // EA AI Buddy rename (31 Oct 2026): the package before the rename. Only used to borrow its Firebase entry (see 1b).
 const LEGACY_APP_ID = 'com.jslproperties.estateagentbuddy';
@@ -233,7 +237,9 @@ public class MainActivity extends BridgeActivity {
         // JoyChange003 Change 55: the app's own speech plugin (one warm recogniser, every event reported, clean restarts).
         registerPlugin(EabSpeechPlugin.class);
         // JoyChange010-04: files shared into the app from WhatsApp or another app (Shared Documents tray).
-        registerPlugin(EabSharePlugin.class);
+        registerPlugin(EabSharePlugin.class);${PLAY_BILLING ? `
+        // Batch A: Google Play Billing for the Market News subscriptions (only in builds made with EAB_PLAY_BILLING=1).
+        registerPlugin(PlayBillingPlugin.class);` : ''}
         super.onCreate(savedInstanceState);
         // Change 015: solid black system navigation area; app content (web page and AdMob banner) directly above it.
         getWindow().getDecorView().setBackgroundColor(Color.BLACK);
@@ -665,4 +671,151 @@ public class EabSpeechPlugin extends Plugin {
 `);
 }
 
-console.log(`Android project configured: ${APP_NAME} (${APP_ID}${POS ? ', standalone POS build: separate package, updates off' : QA ? ', QA build: separate package, updates off' : ''}), version ${pkg.version} (${run}).`);
+// Batch A (EAB_PLAY_BILLING=1 only): the app's own Google Play Billing plugin, next to MainActivity, for the Market News and
+// Intelligence subscriptions (news_monthly, news_yearly). WRITTEN WITHOUT AN ANDROID BUILD OR A DEVICE: untested.
+//  purchase({ productId, obfuscatedAccountId }) -> { purchaseToken }
+//    productId            the plan id, which must equal the Play Console subscription product id; the BASE PLAN is bought
+//                         (special offers such as free trials set up in Play Console are not used)
+//    obfuscatedAccountId  the SHA-256 (64 hex) of the agent's id; Google returns it with the purchase and the server only
+//                         accepts a purchase made for the agent who sends it
+//  Rejects with code USER_CANCELED, PENDING (paid later, e.g. cash), ALREADY_OWNED, NOT_FOUND, BUSY, UNAVAILABLE or ERROR_<n>.
+//  It does NOT acknowledge the purchase: the server acknowledges it after checking it with Google (billing, play_verify).
+//  Google Play Billing Library 7.1.1 (com.android.billingclient:billing), added to the app's Gradle dependencies; the library
+//  adds the com.android.vending.BILLING permission itself.
+if (PLAY_BILLING) {
+  edit('android/app/build.gradle', s => (s.includes('com.android.billingclient:billing') ? s
+    : `${s.trimEnd()}\n\n// Batch A: Google Play Billing (Market News subscriptions; PlayBillingPlugin).\ndependencies {\n    implementation 'com.android.billingclient:billing:7.1.1'\n}\n`));
+  const pkg = /^package ([^;]+);/m.exec(readFileSync(mainActivity, 'utf8'))?.[1];
+  if (!pkg) throw new Error(`No package line in ${mainActivity}`);
+  writeFileSync(mainActivity.replace(/MainActivity\.java$/, 'PlayBillingPlugin.java'), `package ${pkg};
+
+import com.android.billingclient.api.BillingClient;
+import com.android.billingclient.api.BillingClientStateListener;
+import com.android.billingclient.api.BillingFlowParams;
+import com.android.billingclient.api.BillingResult;
+import com.android.billingclient.api.PendingPurchasesParams;
+import com.android.billingclient.api.ProductDetails;
+import com.android.billingclient.api.Purchase;
+import com.android.billingclient.api.PurchasesUpdatedListener;
+import com.android.billingclient.api.QueryProductDetailsParams;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.util.Collections;
+import java.util.List;
+
+@CapacitorPlugin(name = "PlayBilling")
+public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListener {
+    private BillingClient client;
+    /** The purchase waiting for Google Play's answer (one at a time). */
+    private PluginCall waiting;
+    private String waitingProduct;
+
+    private BillingClient client() {
+        if (client == null) {
+            client = BillingClient.newBuilder(getContext())
+                .setListener(this)
+                .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
+                .build();
+        }
+        return client;
+    }
+
+    /** Runs then once Google Play Billing is connected; rejects the call when it cannot connect. */
+    private void connected(final PluginCall call, final Runnable then) {
+        BillingClient c = client();
+        if (c.isReady()) { then.run(); return; }
+        c.startConnection(new BillingClientStateListener() {
+            @Override
+            public void onBillingSetupFinished(BillingResult r) {
+                if (r.getResponseCode() == BillingClient.BillingResponseCode.OK) then.run();
+                else call.reject("Google Play Billing is not available (" + r.getResponseCode() + ")", "UNAVAILABLE");
+            }
+
+            @Override
+            public void onBillingServiceDisconnected() { /* the next call connects again */ }
+        });
+    }
+
+    @PluginMethod
+    public void purchase(final PluginCall call) {
+        final String productId = call.getString("productId");
+        final String account = call.getString("obfuscatedAccountId");
+        if (productId == null || !productId.matches("[a-z0-9_.]{1,40}")) { call.reject("bad productId", "BAD_REQUEST"); return; }
+        if (account == null || !account.matches("[0-9a-f]{64}")) { call.reject("bad obfuscatedAccountId", "BAD_REQUEST"); return; }
+        if (waiting != null) { call.reject("another purchase is in progress", "BUSY"); return; }
+        connected(call, () -> {
+            QueryProductDetailsParams q = QueryProductDetailsParams.newBuilder()
+                .setProductList(Collections.singletonList(QueryProductDetailsParams.Product.newBuilder()
+                    .setProductId(productId).setProductType(BillingClient.ProductType.SUBS).build()))
+                .build();
+            client().queryProductDetailsAsync(q, (r, list) -> {
+                if (r.getResponseCode() != BillingClient.BillingResponseCode.OK || list == null || list.isEmpty()) {
+                    call.reject("Subscription " + productId + " was not found in Google Play", "NOT_FOUND");
+                    return;
+                }
+                final ProductDetails details = list.get(0);
+                String token = null;
+                List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
+                if (offers != null) {
+                    for (ProductDetails.SubscriptionOfferDetails o : offers) {
+                        if (o.getOfferId() == null) { token = o.getOfferToken(); break; }   // the base plan, no special offer
+                    }
+                }
+                if (token == null) { call.reject("No active base plan for " + productId, "NOT_FOUND"); return; }
+                final BillingFlowParams flow = BillingFlowParams.newBuilder()
+                    .setProductDetailsParamsList(Collections.singletonList(BillingFlowParams.ProductDetailsParams.newBuilder()
+                        .setProductDetails(details).setOfferToken(token).build()))
+                    .setObfuscatedAccountId(account)
+                    .build();
+                getActivity().runOnUiThread(() -> {
+                    if (waiting != null) { call.reject("another purchase is in progress", "BUSY"); return; }
+                    waiting = call; waitingProduct = productId;
+                    BillingResult launched = client().launchBillingFlow(getActivity(), flow);
+                    if (launched.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+                        waiting = null; waitingProduct = null;
+                        reject(call, launched.getResponseCode());
+                    }
+                });
+            });
+        });
+    }
+
+    private static void reject(PluginCall call, int code) {
+        if (code == BillingClient.BillingResponseCode.USER_CANCELED) call.reject("cancelled", "USER_CANCELED");
+        else if (code == BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED) call.reject("already owned", "ALREADY_OWNED");
+        else call.reject("Google Play Billing error " + code, "ERROR_" + code);
+    }
+
+    @Override
+    public void onPurchasesUpdated(BillingResult r, List<Purchase> purchases) {
+        PluginCall call = waiting; String product = waitingProduct;
+        waiting = null; waitingProduct = null;
+        if (call == null) return;   // nobody is waiting (for example a renewal): the server learns it at its next check
+        if (r.getResponseCode() != BillingClient.BillingResponseCode.OK || purchases == null) { reject(call, r.getResponseCode()); return; }
+        for (Purchase p : purchases) {
+            if (!p.getProducts().contains(product)) continue;
+            if (p.getPurchaseState() == Purchase.PurchaseState.PENDING) { call.reject("pending", "PENDING"); return; }
+            if (p.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                // Not acknowledged here on purpose: the server acknowledges it after checking it with Google.
+                JSObject o = new JSObject();
+                o.put("purchaseToken", p.getPurchaseToken());
+                call.resolve(o);
+                return;
+            }
+        }
+        call.reject("No purchase of " + product + " in Google Play's answer", "NOT_FOUND");
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (client != null) { try { client.endConnection(); } catch (Exception e) { /* ignore */ } }
+        client = null;
+    }
+}
+`);
+}
+
+console.log(`Android project configured: ${APP_NAME} (${APP_ID}${POS ? ', standalone POS build: separate package, updates off' : QA ? ', QA build: separate package, updates off' : ''}${PLAY_BILLING ? ', with Google Play Billing (untested on a device)' : ''}), version ${pkg.version} (${run}).`);

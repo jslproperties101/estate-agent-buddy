@@ -19,7 +19,7 @@ export interface BillingCache { userId: string; rows: BillingRow[]; at: number }
  */
 export type LineState = 'none' | 'trialing' | 'active' | 'canceling' | 'grace' | 'expired';
 export interface Line { product: Product; state: LineState; active: boolean; until?: number; provider?: BillingRow['provider']; planId?: PlanId; sandbox: boolean }
-export interface Entitlement { pro: Line; pos: Line }
+export interface Entitlement { pro: Line; pos: Line; news: Line }
 
 const DAY = 86_400_000;
 const ms = (x: string | null): number | undefined => { const t = x ? Date.parse(x) : NaN; return Number.isFinite(t) ? t : undefined; };
@@ -52,12 +52,12 @@ export function resolveLine(rows: BillingRow[], product: Product, now: number, l
 }
 
 export function resolveEntitlement(rows: BillingRow[], now: number, live: boolean = BILLING_LIVE): Entitlement {
-  return { pro: resolveLine(rows, 'pro', now, live), pos: resolveLine(rows, 'pos', now, live) };
+  return { pro: resolveLine(rows, 'pro', now, live), pos: resolveLine(rows, 'pos', now, live), news: resolveLine(rows, 'news', now, live) };
 }
 
 /**
  * May this feature be used? When billing is switched off (the default) everything works as before. A feature that is not in
- * the table (nothing is, yet) is free.
+ * the table is free.
  */
 export function canUse(feature: string, ent: Entitlement, billingOn: boolean, table: Partial<Record<string, Product>> = FEATURE_PRODUCT): boolean {
   if (!billingOn) return true;
