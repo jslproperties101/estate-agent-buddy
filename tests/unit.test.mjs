@@ -144,3 +144,32 @@ test('reference content is complete and links are https', () => {
   assert.ok(C.INTEGRATIONS.length >= 8);
   for (const c of C.SAMPLE_COUPONS) assert.match(c.merchant, /sample/i);
 });
+
+// ---------- Share with MM2H office ----------
+import * as O from '../web/js/office.js';
+
+test('office: what is shared — never passport numbers, dates of birth, documents or money', () => {
+  const st = S.emptyState();
+  st.profile = { familyName: 'Tan', tier: 'Gold', state: 'Penang', arrival: '2026-12-01' };
+  st.family = [{ id: 'm1', name: 'Tan Ah Kow', relation: 'Principal', dob: '1970-01-01', nationality: 'Singapore', passportNo: 'E1234567', passportExpiry: '2030-01-01', passExpiry: '2031-05-01' },
+               { id: 'm2', name: 'Lim Mei', relation: 'Spouse', dob: '1972-02-02', passportNo: 'E7654321' }];
+  st.fd = { bank: 'Maybank', amount: '500000', currency: 'USD' };
+  st.docs = [{ id: 'd1', title: 'Passport scan' }];
+  st.stages[0].status = 'done';
+  const p = O.payload(st);
+  const text = JSON.stringify(p);
+  for (const secret of ['E1234567', 'E7654321', '1970-01-01', '1972-02-02', 'Maybank', '500000', 'Passport scan']) assert.ok(!text.includes(secret), `not sent: ${secret}`);
+  assert.equal(p.consent, true);
+  assert.equal(p.family.family_name, 'Tan'); assert.equal(p.family.nationality, 'Singapore'); assert.equal(p.family.city, 'Penang');
+  assert.deepEqual(p.members.map(m => [m.name, m.relation, m.pass_type, m.pass_expiry]), [['Tan Ah Kow', 'Principal', 'MM2H Gold', '2031-05-01'], ['Lim Mei', 'Spouse', 'MM2H Gold', '']]);
+  assert.equal(p.applications[0].notes, `1 of ${st.stages.length} steps done`);
+  assert.equal(p.applications[0].stage, st.stages[1].title);
+});
+
+test('office: minimum version check and no office in a build without it', () => {
+  assert.equal(O.needsUpdate('1.2.0', '1.1.9'), true);
+  assert.equal(O.needsUpdate('1.2.0', '1.2.0'), false);
+  assert.equal(O.needsUpdate('1.2', '1.10.0'), false);
+  assert.equal(O.needsUpdate(null, '1.0.0'), false);
+  assert.equal(O.available(), false, 'the default build-info has no office');
+});

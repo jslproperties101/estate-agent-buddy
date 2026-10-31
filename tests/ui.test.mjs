@@ -273,3 +273,78 @@ test('layout fits a small phone with no sideways scrolling', async () => {
     assert.ok(over <= 0, `${m.id} overflows by ${over}px`);
   }
 });
+
+// ---------- Share with MM2H office (a build with the office set; fake office database) ----------
+import { execFileSync } from 'node:child_process';
+const OFFICE = 'https://fakeoffice.supabase.co';
+test('office: content from the office shows; share needs consent + Google; then report a problem and stop sharing', async () => {
+  execFileSync(process.execPath, ['scripts/build.mjs'], { env: { ...process.env, MW_OFFICE_URL: OFFICE, MW_OFFICE_KEY: 'sb_publishable_test', MW_OUTDIR: 'dist-office' }, stdio: 'pipe' });
+  const osrv = await serve('dist-office');
+  const ourl = `http://127.0.0.1:${osrv.address().port}/`;
+  const page = await newPage();
+  const calls = [];
+  let maintenance = false;
+  const ok = b => ({ status: 200, contentType: 'application/json', body: JSON.stringify(b) });
+  await page.route(`${OFFICE}/**`, async r => {
+    const u = r.request().url();
+    const fn = u.split('/rpc/')[1];
+    let args = {};
+    try { args = r.request().postDataJSON() ?? {}; } catch { /* none */ }
+    calls.push({ fn: fn ?? u, args, auth: r.request().headers().authorization });
+    if (u.includes('/auth/v1/authorize')) { const back = new URL(u).searchParams.get('redirect_to'); return r.fulfill({ status: 302, headers: { location: `${back}&code=c1` } }); }
+    if (u.includes('/auth/v1/token')) return r.fulfill(ok({ access_token: 'famtok', refresh_token: 'r', expires_in: 3600, user: { id: 'f1', email: 'tan@example.com' } }));
+    if (u.includes('/auth/v1/logout')) return r.fulfill({ status: 204 });
+    switch (fn) {
+      case 'eab_app_status': return r.fulfill(ok({ maintenance_on: maintenance, maintenance_message: 'Back by 6pm', min_version: '9.0.0', update_url: 'https://play.google.com/x', announcement: 'Office closed on Friday', flags: {} }));
+      case 'mm2h_content_list': return r.fulfill(ok([{ kind: 'hotspot', id: 'h1', title: 'Penang Hill', area: 'Penang', body: 'Funicular to the top', url: 'https://penanghill.gov.my' },
+        { kind: 'knowledge', id: 'k1', title: 'Fixed deposit withdrawal', body: 'Office answer: you may withdraw for approved purposes after a year.' }]));
+      case 'mm2h_sync': return r.fulfill(ok({ ok: true, at: '2026-10-31T01:00:00Z' }));
+      case 'eab_app_ticket': return r.fulfill(ok('t1'));
+      case 'mm2h_forget_me': return r.fulfill(ok(null));
+      default: return r.fulfill({ status: 404, body: '{}' });
+    }
+  });
+  // onboard on the office build
+  await page.goto(ourl);
+  await page.fill('[data-testid=onboard-name]', 'Tan');
+  await page.selectOption('[data-testid=onboard-tier]', 'Gold');
+  await page.click('[data-testid=onboard-start]');
+  await page.waitForSelector('[data-testid=office-banner]');
+  assert.match(await page.textContent('[data-testid=office-banner]'), /Office closed on Friday/);
+  assert.match(await page.textContent('[data-testid=office-update]'), /9\.0\.0/);
+  await page.goto(`${ourl}#/hotspots`);
+  await page.waitForSelector('[data-testid=office-hotspot]');
+  assert.match(await page.textContent('[data-testid=office-hotspot]'), /Penang Hill/);
+  await page.goto(`${ourl}#/chat`);
+  await page.fill('input[name=q]', 'Can I make a fixed deposit withdrawal?');
+  await page.click('[data-testid=send]');
+  await page.waitForSelector('text=Office answer');
+  assert.equal(calls.filter(c => c.fn === 'mm2h_sync').length, 0, 'nothing shared before consent');
+  // settings: consent first, then Google
+  await page.goto(`${ourl}#/settings`);
+  assert.ok(await page.isDisabled('[data-testid=office-signin]'), 'sign-in waits for the consent box');
+  await page.check('[data-testid=office-consent]');
+  await page.click('[data-testid=office-signin]');
+  await page.waitForSelector('[data-testid=office-share]');
+  const sync = calls.find(c => c.fn === 'mm2h_sync');
+  assert.ok(sync, 'shared after sign-in'); assert.equal(sync.auth, 'Bearer famtok');
+  assert.equal(sync.args.p.family.family_name, 'Tan'); assert.equal(sync.args.p.consent, true);
+  assert.match(await page.textContent('[data-testid=office-card]'), /tan@example\.com/);
+  await page.screenshot({ path: `${SHOTS}/30-office-sharing.png`, fullPage: true });
+  await page.fill('[data-testid=problem-subject]', 'Coupons page is blank');
+  await page.click('[data-testid=problem-send]');
+  await page.waitForSelector('text=Sent to the MM2H office');
+  assert.equal(calls.find(c => c.fn === 'eab_app_ticket').args.p_subject, 'Coupons page is blank');
+  await page.click('[data-testid=office-stop]');
+  await page.waitForSelector('[data-testid=office-consent]');
+  assert.ok(calls.some(c => c.fn === 'mm2h_forget_me'), 'deleted from the office');
+  assert.equal(await page.evaluate(() => localStorage.getItem('mwab:office:session')), null);
+  // maintenance closes the app
+  maintenance = true;
+  await page.goto(ourl); await page.reload();
+  await page.waitForSelector('[data-testid=maintenance]');
+  assert.match(await page.textContent('[data-testid=maintenance]'), /Back by 6pm/);
+  await page.screenshot({ path: `${SHOTS}/31-office-maintenance.png`, fullPage: true });
+  assert.deepEqual(page.errors, []);
+  osrv.close();
+});

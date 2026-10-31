@@ -4,6 +4,7 @@ import * as C from './content.js';
 import { MENUS, t, menuName } from './i18n.js';
 import { putFile, getFile, deleteFile, clearFiles, imageToDataUrl } from './files.js';
 import { BUILD } from './build-info.js';
+import * as O from './office.js';
 
 let state = S.load();
 const $app = document.getElementById('app');
@@ -33,6 +34,24 @@ function dueLabel(days) {
   return `${days} ${L('daysLeft')}`;
 }
 const chip = (text, cls = '') => `<span class="chip ${cls}">${esc(text)}</span>`;
+/** Items the MM2H office published for this kind (hotspots, coupons, services…). Empty when there are none. */
+function officeList(kind, title = 'From the MM2H office') {
+  const items = O.contentOf(kind);
+  if (!items.length) return '';
+  return `<section><h3>${esc(title)}</h3><ul class="cards">${items.map(i => `<li class="card col" data-testid="office-${kind}"><div class="card-main"><strong>${esc(i.title)}</strong>
+    ${[i.area, i.status, i.valid_until ? `Valid until ${fmtDate(i.valid_until)}` : ''].filter(Boolean).length ? `<span>${esc([i.area, i.status, i.valid_until ? `Valid until ${fmtDate(i.valid_until)}` : ''].filter(Boolean).join(' · '))}</span>` : ''}
+    ${i.body ? `<span class="desc">${esc(i.body)}</span>` : ''}</div>
+    <span class="actions">${i.phone ? `<a class="act" href="tel:${esc(String(i.phone).replace(/[^\d+]/g, ''))}">Call</a>` : ''}${safeUrl(i.url) ? `<a class="act" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">Open</a>` : ''}</span></li>`).join('')}</ul></section>`;
+}
+/** Office banners on Home: announcement, and "please update" when this version is older than the minimum. */
+function officeBanners() {
+  const st = O.cachedStatus();
+  if (!st) return '';
+  const out = [];
+  if (st.announcement) out.push(`<p class="callout" data-testid="office-banner">📣 ${esc(st.announcement)}</p>`);
+  if (O.needsUpdate(st.min_version)) out.push(`<p class="callout warn" data-testid="office-update">A newer version (${esc(st.min_version)}) is needed.${safeUrl(st.update_url) ? ` <a href="${esc(safeUrl(st.update_url))}" target="_blank" rel="noopener">Update now</a>` : ' Please update the app.'}</p>`);
+  return out.join('');
+}
 const empty = (msg = L('nothingYet')) => `<div class="empty">${esc(msg)}</div>`;
 
 function header(id, extra = '') {
@@ -290,6 +309,36 @@ function menuGrid() {
     `<a class="tile" href="#/${m.id}" data-testid="menu-${m.id}"><span class="tile-icon" aria-hidden="true">${m.icon}</span><span class="tile-n">${m.n}</span><span class="tile-label">${esc(menuName(m.id, state.lang))}</span></a>`).join('')}</nav>`;
 }
 
+function officeSettings() {
+  if (!O.available()) return '';
+  const st = screens.settings;
+  const s = O.session();
+  if (!O.sharing()) {
+    return `<section class="card-block" data-testid="office-card"><h3>Share with MM2H office</h3>
+      <p class="muted">Optional. Lets your MM2H office see your application step and pass expiry dates so they can remind you, and lets you ask them for help.</p>
+      <p class="muted"><b>Sent:</b> family name, principal's nationality, state, arrival date, each member's name, relationship and MM2H pass expiry, and your current application step.<br>
+      <b>Never sent:</b> passport numbers, dates of birth, documents, photos, money details.</p>
+      <label class="inline"><input type="checkbox" data-act="officeconsent" ${st.consent ? 'checked' : ''} data-testid="office-consent"> I agree to share these details with the MM2H office. I can stop at any time, which deletes them from the office.</label>
+      <button class="btn primary" data-act="officesignin" ${st.consent ? '' : 'disabled'} data-testid="office-signin">Sign in with Google and share</button>
+      ${st.msg ? `<p class="note" role="status" data-testid="office-msg">${esc(st.msg)}</p>` : ''}</section>`;
+  }
+  const last = O.lastShared();
+  return `<section class="card-block" data-testid="office-card"><h3>Share with MM2H office</h3>
+    <p>Sharing as <b>${esc(s.email)}</b>.${last ? ` Last shared ${new Date(last).toLocaleString('en-MY')}.` : ''}</p>
+    <div class="quick"><button class="btn primary" data-act="officeshare" data-testid="office-share">Share now</button>
+      <button class="btn" data-act="officecopy" data-testid="office-copy">Ask for a copy of my data</button>
+      <button class="btn danger" data-act="officestop" data-testid="office-stop">Stop sharing and delete</button></div>
+    <form class="form compact" id="problemForm"><label for="pr-s">Report a problem to the office</label><input id="pr-s" name="subject" maxlength="200" placeholder="What went wrong?" data-testid="problem-subject">
+      <textarea name="body" rows="3" maxlength="5000" placeholder="Details (optional)"></textarea><button class="btn" data-testid="problem-send">Send</button></form>
+    ${st.msg ? `<p class="note" role="status" data-testid="office-msg">${esc(st.msg)}</p>` : ''}</section>`;
+}
+
+/** Shown instead of the app while the office has switched on maintenance. */
+function maintenancePage(st) {
+  return `<main class="page"><section class="hero"><h2>We'll be right back</h2><p data-testid="maintenance">${esc(st.maintenance_message || 'The app is being updated. Please try again soon.')}</p>
+    <button class="btn primary" data-act="officeretry">Try again</button></section></main>`;
+}
+
 const screens = {
   home() {
     const p = state.profile;
@@ -298,6 +347,7 @@ const screens = {
     const arr = S.daysUntil(p.arrival);
     return `${header('home')}
     <main class="page">
+      ${officeBanners()}
       <section class="hero">
         <p class="eyebrow">${L('welcome')}${p.familyName ? `, ${esc(p.familyName)} family` : ''}</p>
         <h2>${L('tagline')}</h2>
@@ -410,6 +460,7 @@ const screens = {
       ${t ? `<p class="callout">As a <b>${esc(t.tier)}</b> participant you must buy a residence of <b>${esc(t.property)}</b> after approval, and hold it for 10 years (upgrades allowed).</p>` : '<p class="callout">Buying a residence at your tier\'s minimum price is compulsory after approval. Choose your tier in Settings to see your minimum.</p>'}
       ${cardList('homes', state.homes, { empty: 'Shortlist condos and houses you like.', extra: h => (safeUrl(h.link) ? `<span class="mini">🔗 listing saved</span>` : '') })}
       ${addBtn('homes')}
+      ${officeList('housing', 'Listings from the MM2H office')}
       <p class="note">Property search through our Estate Agent AI Buddy app is a future integration (menu 16).</p></main>`;
   },
 
@@ -417,6 +468,7 @@ const screens = {
     return `${header('schools')}<main class="page">
       ${cardList('schools', [...state.schools].sort((a, b) => (a.deadline || '9').localeCompare(b.deadline || '9')), { empty: 'Shortlist schools with fees and deadlines.' })}
       ${addBtn('schools')}
+      ${officeList('school', 'Schools suggested by the MM2H office')}
       <section><h3>Curricula in Malaysia</h3><ul class="info">${C.CURRICULA.map(c => `<li><b>${esc(c.name)}</b><span>${esc(c.note)}</span></li>`).join('')}</ul></section></main>`;
   },
 
@@ -424,7 +476,8 @@ const screens = {
     return `${header('health')}<main class="page">
       <a class="emergency" href="tel:999" data-testid="call-999">📞 Emergency 999</a>
       <section><h3>Insurance policies</h3>${cardList('policies', state.policies, { empty: 'Health insurance covering Malaysia is required for MM2H.' })}${addBtn('policies')}</section>
-      <section><h3>Clinics & hospitals</h3>${cardList('providers', state.providers, { empty: 'Save your GP, hospital, dentist and pharmacy.' })}${addBtn('providers')}</section></main>`;
+      <section><h3>Clinics & hospitals</h3>${cardList('providers', state.providers, { empty: 'Save your GP, hospital, dentist and pharmacy.' })}${addBtn('providers')}</section>
+      ${officeList('healthcare', 'Healthcare & insurance from the MM2H office')}</main>`;
   },
 
   settle() {
@@ -442,6 +495,8 @@ const screens = {
     return `${header('guide')}<main class="page">
       <input class="search" type="search" placeholder="${esc(L('search'))} guide" value="${esc(screens.guide.q || '')}" data-act="guidesearch" aria-label="Search guide">
       ${items.length ? items.map(g => `<details class="acc" data-testid="guide-item"><summary>${esc(g.title)}</summary><p>${esc(g.body)}</p></details>`).join('') : empty('No guide topics match.')}
+      ${officeList('guide', 'Guides from the MM2H office')}
+      ${officeList('rule', 'MM2H rules & figures (official references)')}
     </main>`;
   },
 
@@ -470,7 +525,8 @@ const screens = {
       <section><h3>My contacts</h3>
         <div class="filters">${['All', ...C.CONTACT_CATEGORIES].map(c => `<button class="chip btnchip ${c === cat ? 'on' : ''}" data-act="dircat" data-cat="${c}">${c}</button>`).join('')}</div>
         ${mine.length ? `<ul class="cards">${mine.map(c => `<li class="card" data-testid="contacts-item"><a class="card-main" href="#/form/contacts/${esc(c.id)}"><strong>${esc(c.name)}</strong><span>${esc(COLLECTIONS.contacts.line(c))}</span></a>${actions(c)}</li>`).join('')}</ul>` : empty('Save your agent, lawyer, bank officer, movers and more.')}
-        ${addBtn('contacts')}</section></main>`;
+        ${addBtn('contacts')}</section>
+      ${officeList('service', 'Services recommended by the MM2H office')}</main>`;
   },
 
   tasks() {
@@ -509,6 +565,7 @@ const screens = {
       <section class="card-block"><h3>${L('language')}</h3><div class="seg">
         <button class="${state.lang === 'en' ? 'on' : ''}" data-act="lang" data-l="en">English</button>
         <button class="${state.lang === 'ms' ? 'on' : ''}" data-act="lang" data-l="ms" data-testid="lang-ms">Bahasa Malaysia</button></div></section>
+      ${officeSettings()}
       <section class="card-block"><h3>Backup & restore</h3>
         <p class="muted">Your data is stored only on this phone. Copy the backup text and keep it somewhere safe (e.g. email it to yourself). Document photos are not included.</p>
         <div class="quick"><button class="btn" data-act="backup" data-testid="backup">Create backup</button><button class="btn" data-act="restore" data-testid="restore">Restore</button></div>
@@ -524,7 +581,7 @@ const screens = {
     const cls = s => ({ 'Planned': 'todo', 'In design': 'doing', 'Needs approval': 'warn', 'Not started': 'muted', 'Available (link)': 'done' }[s] || '');
     return `${header('integrations')}<main class="page">
       <p class="lead">What is connected today, and what is coming. Nothing listed as Planned or In design works yet.</p>
-      <ul class="cards">${C.INTEGRATIONS.map(i => `<li class="card col" data-testid="integration"><div class="card-main"><strong>${esc(i.name)}</strong><span>${esc(i.note)}</span></div>${chip(i.status, cls(i.status))}</li>`).join('')}</ul></main>`;
+      <ul class="cards">${(O.contentOf('integration').length ? O.contentOf('integration').map(i => ({ name: i.title, note: i.body || '', status: i.status || 'Planned' })) : C.INTEGRATIONS).map(i => `<li class="card col" data-testid="integration"><div class="card-main"><strong>${esc(i.name)}</strong><span>${esc(i.note)}</span></div>${chip(i.status, cls(i.status))}</li>`).join('')}</ul></main>`;
   },
 
   news() {
@@ -538,6 +595,7 @@ const screens = {
       <section><h3>Official sources</h3><ul class="cards">
         <li class="card"><div class="card-main"><strong>MM2H official portal</strong><span>Rules, guidelines and announcements</span></div><a class="act" href="https://www.mm2h.gov.my/" target="_blank" rel="noopener">Open</a></li>
         <li class="card"><div class="card-main"><strong>Immigration Department</strong><span>Passes and visas</span></div><a class="act" href="${C.OFFICIAL_IMMIGRATION}" target="_blank" rel="noopener">Open</a></li></ul></section>
+      ${officeList('news_source', 'News sources from the MM2H office')}
       <p class="note">Headlines come from Google News search and open in your browser. They are not checked by us.</p></main>`;
   },
 
@@ -548,6 +606,7 @@ const screens = {
     return `${header('hotspots')}<main class="page">
       <div class="row2"><div><label for="hs-state">State</label><select id="hs-state" data-act="hsstate">${statesList.map(s => `<option ${s === st ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
       <div><label for="hs-cat">Type</label><select id="hs-cat" data-act="hscat">${['All', ...C.HOTSPOT_CATEGORIES].map(s => `<option ${s === cat ? 'selected' : ''}>${s}</option>`).join('')}</select></div></div>
+      ${officeList('hotspot', 'Hotspots from the MM2H office')}
       <label class="inline"><input type="checkbox" data-act="hsfav" ${fav ? 'checked' : ''}> Favourites only</label>
       ${items.length ? `<ul class="cards">${items.map(h => {
         const on = state.favHotspots.includes(h.id);
@@ -571,7 +630,7 @@ const screens = {
           <span class="actions">${chip(stLabel[s], stCls[s])}${c.code ? `<button class="act code" data-act="copy" data-code="${esc(c.code)}">${esc(c.code)} ⧉</button>` : ''}
           <button class="act" data-act="used" data-id="${c.id}" data-testid="used-${c.id}">${c.used ? 'Mark unused' : 'Mark used'}</button></span></li>`;
       }).join('')}</ul>` : empty('Save welcome offers and discount codes here. We remind you 7 days before they expire.')}${addBtn('coupons')}`
-        : `<p class="callout">Partner offers for MM2H families are coming soon (menu 16). These are <b>samples</b> to show how offers will look.</p>
+        : `${officeList('coupon', 'Offers from the MM2H office')}<p class="callout">Partner offers for MM2H families are coming soon (menu 16). These are <b>samples</b> to show how offers will look.</p>
         <ul class="cards">${C.SAMPLE_COUPONS.map(o => `<li class="card col coupon" data-testid="offer"><div class="card-main"><strong>${esc(o.title)}</strong><span>${esc(o.merchant)}</span><span class="desc">${esc(o.note)}</span></div>
           <span class="actions">${chip('Sample', 'muted')}<button class="act" data-act="claim" data-id="${o.id}" ${claimed.has(o.id) ? 'disabled' : ''} data-testid="claim-${o.id}">${claimed.has(o.id) ? 'In wallet' : 'Add to wallet'}</button></span></li>`).join('')}</ul>`}
     </main>`;
@@ -580,6 +639,7 @@ const screens = {
 screens.docs.q = ''; screens.guide.q = ''; screens.finance.rate = ''; screens.directory.cat = 'All';
 screens.tasks.month = ''; screens.news.topic = 'mm2h'; screens.news.status = ''; screens.hotspots.state = 'All';
 screens.hotspots.cat = 'All'; screens.hotspots.fav = false; screens.coupons.tab = 'mine';
+screens.settings.consent = false; screens.settings.msg = '';
 
 const STATES = ['Kuala Lumpur', 'Selangor', 'Penang', 'Johor', 'Melaka', 'Perak', 'Negeri Sembilan', 'Pahang', 'Kedah', 'Sabah', 'Sarawak', 'Terengganu', 'Kelantan', 'Perlis', 'Putrajaya', 'Labuan', 'Not decided'];
 
@@ -617,6 +677,8 @@ async function render() {
     bindForms();
     return;
   }
+  const ost = O.cachedStatus();
+  if (ost?.maintenance_on) { nav.hidden = true; $app.innerHTML = maintenancePage(ost); return; }
   nav.hidden = false;
   const [name, key, id] = route;
   if (name === 'form') {
@@ -653,12 +715,20 @@ function bindForms() {
     state.settle.push({ id: S.uid(), title: t, done: false, custom: true }); commit(); render();
   });
   on('chatForm', fd => ask(String(fd.get('q') || '')));
+  on('problemForm', async fd => {
+    const subject = String(fd.get('subject') || '').trim();
+    if (!subject) { toast('Write what went wrong'); return; }
+    try { await O.reportProblem(subject, String(fd.get('body') || '')); screens.settings.msg = 'Sent to the MM2H office. Thank you.'; }
+    catch { screens.settings.msg = 'Could not send. Check the internet and try again.'; }
+    render();
+  });
 }
 
 function ask(q) {
   q = q.trim();
   if (!q) return;
-  const r = C.answer(q);
+  const o = O.officeAnswer(q);
+  const r = o ? { a: o.body || o.title, go: null } : C.answer(q);
   state.chat.push({ from: 'me', text: q }, { from: 'buddy', text: r.a, go: r.go });
   state.chat = state.chat.slice(-80);
   commit(); render();
@@ -741,6 +811,25 @@ document.addEventListener('click', async e => {
       commit(); render(); break;
     }
     case 'ctab': screens.coupons.tab = el.dataset.t; render(); break;
+    case 'officesignin': {
+      if (!screens.settings.consent) return;
+      try { localStorage.setItem('mwab:office:consent', '1'); } catch { /* blocked */ }
+      try { await O.signIn(); } catch { screens.settings.msg = 'Could not open Google sign-in. Check the internet.'; render(); }
+      break;
+    }
+    case 'officeshare': await officeShare(); break;
+    case 'officecopy': {
+      try { await O.requestData('copy', ''); screens.settings.msg = 'Request sent. The office will send you a copy of what they hold.'; }
+      catch { screens.settings.msg = 'Could not send the request. Try again.'; }
+      render(); break;
+    }
+    case 'officestop': {
+      if (!confirm('Stop sharing? Everything the MM2H office holds about your family from this app will be deleted. Your data on this phone stays.')) return;
+      try { await O.stopSharing(); screens.settings.msg = 'Stopped. The office no longer holds your details from this app.'; screens.settings.consent = false; }
+      catch { screens.settings.msg = 'Could not reach the office. You are signed out on this phone; try "Stop sharing" again when online to delete from the office.'; }
+      render(); break;
+    }
+    case 'officeretry': await startOffice(); break;
     case 'copy': try { await navigator.clipboard.writeText(el.dataset.code); toast('Code copied'); } catch { toast(`Code: ${el.dataset.code}`); } break;
     case 'used': {
       const c = state.coupons.find(x => x.id === id);
@@ -770,6 +859,7 @@ document.addEventListener('change', e => {
   } else if (a === 'hsstate') { screens.hotspots.state = el.value; render(); }
   else if (a === 'hscat') { screens.hotspots.cat = el.value; render(); }
   else if (a === 'hsfav') { screens.hotspots.fav = el.checked; render(); }
+  else if (a === 'officeconsent') { screens.settings.consent = el.checked; render(); }
 });
 
 let typing;
@@ -786,6 +876,33 @@ document.addEventListener('input', e => {
     if (out) out.textContent = conv !== null ? `${(Number(state.fd.amount) || 0).toLocaleString('en-MY')} ${state.fd.currency} ≈ ${S.money(conv)}` : 'Enter the FD amount and a rate.';
   }
 });
+
+// ---------- MM2H office (optional) ----------
+async function officeShare(quiet = false) {
+  try { await O.share(state); screens.settings.msg = 'Shared with the MM2H office.'; }
+  catch (e) { screens.settings.msg = e.status === 401 ? 'Please sign in again.' : 'Could not share. Check the internet and try again.'; }
+  if (!quiet || location.hash.startsWith('#/settings')) render();
+}
+async function finishOffice(url) {
+  try {
+    if (!(await O.finishSignIn(url))) return;
+    let ok = false;
+    try { ok = localStorage.getItem('mwab:office:consent') === '1'; localStorage.removeItem('mwab:office:consent'); } catch { /* blocked */ }
+    if (ok) await officeShare(); else { screens.settings.msg = 'Signed in. Tick the box and tap Share now to share.'; render(); }
+    go('settings');
+  } catch (e) { screens.settings.msg = e.message || 'Sign-in did not finish.'; go('settings'); render(); }
+}
+async function startOffice() {
+  if (!O.available()) return;
+  await O.refresh();
+  render();
+  if (O.sharing()) officeShare(true);
+}
+window.addEventListener('error', e => O.noteError(e.message, location.hash));
+window.addEventListener('unhandledrejection', e => O.noteError(e.reason?.message || String(e.reason), location.hash));
+O.onReturn(url => finishOffice(url));
+if (/[?&]office=1/.test(location.search)) finishOffice(location.href);
+startOffice();
 
 window.addEventListener('hashchange', render);
 window.addEventListener('online', () => { if (location.hash.startsWith('#/news')) refreshNews(); });

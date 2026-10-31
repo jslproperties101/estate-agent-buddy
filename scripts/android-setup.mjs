@@ -16,8 +16,22 @@ edit('android/app/build.gradle', s => (s.includes('mwab-debug.keystore') ? s : s
   .replace(/versionCode\s+\d+/, `versionCode ${code}`)
   .replace(/versionName\s+"[^"]*"/, `versionName "${pkg.version}"`));
 
-edit('android/app/src/main/AndroidManifest.xml', s =>
-  s.includes('android.permission.INTERNET') ? s : s.replace(/<\/manifest>\s*$/, '    <uses-permission android:name="android.permission.INTERNET" />\n</manifest>\n'));
+edit('android/app/src/main/AndroidManifest.xml', s => {
+  if (!s.includes('android.permission.INTERNET')) s = s.replace(/<\/manifest>\s*$/, '    <uses-permission android:name="android.permission.INTERNET" />\n</manifest>\n');
+  // "Share with MM2H office": Google sign-in returns to com.jslproperties.malaysiawelcome://auth-callback
+  const scheme = JSON.parse(readFileSync('capacitor.config.json', 'utf8')).appId;
+  if (!s.includes(`android:scheme="${scheme}"`)) {
+    s = s.replace(/(<activity[^>]*android:name="[^"]*MainActivity"[\s\S]*?)(<\/activity>)/, `$1
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${scheme}" />
+            </intent-filter>
+        $2`);
+  }
+  return s;
+});
 
 const colors = 'android/app/src/main/res/values/colors.xml';
 writeFileSync(colors, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="colorPrimary">#0B2545</color>\n    <color name="colorPrimaryDark">#0B2545</color>\n    <color name="colorAccent">#F2B705</color>\n    <color name="mwab_bg">#0B2545</color>\n</resources>\n`);

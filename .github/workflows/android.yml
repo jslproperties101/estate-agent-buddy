@@ -38,6 +38,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      # "Share with MM2H office" (Admin MM2H database). Public key only. Without them the option is not offered.
+      MW_OFFICE_URL: ${{ secrets.MW_OFFICE_URL }}
+      MW_OFFICE_KEY: ${{ secrets.MW_OFFICE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
