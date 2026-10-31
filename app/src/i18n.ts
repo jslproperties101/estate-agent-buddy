@@ -12,8 +12,8 @@ export const LANGS: { code: Lang; short: string; label: string }[] = [
 export const htmlLang = (l: Lang) => (l === 'bm' ? 'ms' : l === 'zh' ? 'zh-Hans' : 'en');
 
 const en = {
-  appName: 'Estate Agent AI Buddy',
-  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
+  appName: 'EA AI Buddy',
+  appNameA: 'EA', appNameB: 'AI Buddy',
   back: 'Back',
   news: 'News',
   langSwitch: 'Language',
@@ -90,7 +90,7 @@ const en = {
   },
   update: {
     ready: 'A new version of the app is ready.', restart: 'Restart now', later: 'Later',
-    web: 'A new version of Estate Agent AI Buddy is available.', reload: 'Reload',
+    web: 'A new version of EA AI Buddy is available.', reload: 'Reload',
     apk: 'A new Android app is needed for new phone features. Your data stays when you install it over this one.', download: 'Download the new app',
     about: 'About this app', version: (v: string, sha: string, n: number) => `Version ${v} · build ${sha} · native ${n}`, release: (r: string) => `Release ${r}`,
     check: 'Check for updates', checking: 'Checking…', upToDate: 'This is the latest version.', qaOff: (sha: string) => `QA test build, commit ${sha}. It has its own data and updates itself from the QA builds only. Your real app is not touched.`, failed: (m: string) => `Could not check for updates (${m}).`,
@@ -128,7 +128,7 @@ const en = {
     stop: 'Listening… End recording',
     processing: 'Recognising your words…',
     noticeTitle: 'How speech becomes text',
-    notice: 'Your phone’s speech service (Google) turns your voice into text. It normally sends the sound to Google and needs internet. Estate Agent AI Buddy does not record or keep any audio. Do not say IC or bank numbers.',
+    notice: 'Your phone’s speech service (Google) turns your voice into text. It normally sends the sound to Google and needs internet. EA AI Buddy does not record or keep any audio. Do not say IC or bank numbers.',
     noticeOk: 'Use the speech service',
     noticeNo: 'Type instead',
     offline: 'No internet: the speech service usually needs internet. You can type, or use your keyboard microphone.',
@@ -154,8 +154,8 @@ const en = {
 export type Strings = typeof en;
 
 const bm: Strings = {
-  appName: 'Estate Agent AI Buddy',
-  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
+  appName: 'EA AI Buddy',
+  appNameA: 'EA', appNameB: 'AI Buddy',
   back: 'Kembali',
   news: 'Berita',
   langSwitch: 'Bahasa',
@@ -232,7 +232,7 @@ const bm: Strings = {
   },
   update: {
     ready: 'Versi baharu aplikasi sudah sedia.', restart: 'Mulakan semula sekarang', later: 'Nanti',
-    web: 'Versi baharu Estate Agent AI Buddy tersedia.', reload: 'Muat semula',
+    web: 'Versi baharu EA AI Buddy tersedia.', reload: 'Muat semula',
     apk: 'Aplikasi Android baharu diperlukan untuk ciri telefon baharu. Data anda kekal apabila anda memasangnya di atas aplikasi ini.', download: 'Muat turun aplikasi baharu',
     about: 'Tentang aplikasi ini', version: (v: string, sha: string, n: number) => `Versi ${v} · binaan ${sha} · natif ${n}`, release: (r: string) => `Keluaran ${r}`,
     check: 'Semak kemas kini', checking: 'Sedang menyemak…', upToDate: 'Ini versi terkini.', qaOff: (sha: string) => `Binaan ujian QA, commit ${sha}. Ia mempunyai data sendiri dan hanya dikemas kini daripada binaan QA. Aplikasi sebenar anda tidak disentuh.`, failed: (m: string) => `Tidak dapat menyemak kemas kini (${m}).`,
@@ -270,7 +270,7 @@ const bm: Strings = {
     stop: 'Sedang mendengar… Tamat rakaman',
     processing: 'Mengecam perkataan anda…',
     noticeTitle: 'Bagaimana suara menjadi teks',
-    notice: 'Perkhidmatan pertuturan telefon anda (Google) menukar suara kepada teks. Biasanya bunyi dihantar kepada Google dan memerlukan internet. Estate Agent AI Buddy tidak merakam atau menyimpan audio. Jangan sebut nombor IC atau akaun bank.',
+    notice: 'Perkhidmatan pertuturan telefon anda (Google) menukar suara kepada teks. Biasanya bunyi dihantar kepada Google dan memerlukan internet. EA AI Buddy tidak merakam atau menyimpan audio. Jangan sebut nombor IC atau akaun bank.',
     noticeOk: 'Guna perkhidmatan pertuturan',
     noticeNo: 'Taip sahaja',
     offline: 'Tiada internet: perkhidmatan pertuturan biasanya memerlukan internet. Anda boleh menaip, atau guna mikrofon papan kekunci.',
@@ -294,8 +294,8 @@ const bm: Strings = {
 };
 
 const zh: Strings = {
-  appName: 'Estate Agent AI Buddy',
-  appNameA: 'Estate Agent', appNameB: 'AI Buddy',
+  appName: 'EA AI Buddy',
+  appNameA: 'EA', appNameB: 'AI Buddy',
   back: '返回',
   news: '新闻',
   langSwitch: '语言',
@@ -372,7 +372,7 @@ const zh: Strings = {
   },
   update: {
     ready: '应用的新版本已准备好。', restart: '立即重启', later: '稍后',
-    web: 'Estate Agent AI Buddy 有新版本。', reload: '重新加载',
+    web: 'EA AI Buddy 有新版本。', reload: '重新加载',
     apk: '新的手机功能需要新的 Android 应用。覆盖安装时您的数据会保留。', download: '下载新应用',
     about: '关于本应用', version: (v: string, sha: string, n: number) => `版本 ${v} · 构建 ${sha} · 原生 ${n}`, release: (r: string) => `发布 ${r}`,
     check: '检查更新', checking: '正在检查…', upToDate: '已是最新版本。', qaOff: (sha: string) => `QA 测试版，提交 ${sha}。它有自己的数据，只会从 QA 版本自动更新。您的正式应用不受影响。`, failed: (m: string) => `无法检查更新（${m}）。`,
@@ -410,7 +410,7 @@ const zh: Strings = {
     stop: '正在聆听… 结束录音',
     processing: '正在识别您的话…',
     noticeTitle: '语音如何转为文字',
-    notice: '您手机的语音服务（Google）会把语音转为文字，通常会将声音发送给 Google 并需要网络。Estate Agent AI Buddy 不会录制或保存任何音频。请勿说出身份证或银行账号。',
+    notice: '您手机的语音服务（Google）会把语音转为文字，通常会将声音发送给 Google 并需要网络。EA AI Buddy 不会录制或保存任何音频。请勿说出身份证或银行账号。',
     noticeOk: '使用语音服务',
     noticeNo: '改为打字',
     offline: '没有网络：语音服务通常需要网络。您可以打字，或使用键盘上的麦克风。',

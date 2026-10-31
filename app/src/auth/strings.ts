@@ -3,7 +3,7 @@ import type { Lang } from '../i18n';
 import { titled3 } from '../lib/titleCase';
 
 const en = {
-  welcome: 'Sign in to Estate Agent AI Buddy',
+  welcome: 'Sign in to EA AI Buddy',
   sub: 'Your properties, contacts and team records, protected by your Google account.',
   google: 'Continue with Google',
   opening: 'Opening Google…',
@@ -67,7 +67,7 @@ const en = {
 export type AuthStrings = typeof en;
 
 const bm: AuthStrings = {
-  welcome: 'Log masuk ke Estate Agent AI Buddy',
+  welcome: 'Log masuk ke EA AI Buddy',
   sub: 'Hartanah, kenalan dan rekod pasukan anda, dilindungi oleh akaun Google anda.',
   google: 'Teruskan dengan Google',
   opening: 'Membuka Google…',
@@ -130,7 +130,7 @@ const bm: AuthStrings = {
 };
 
 const zh: AuthStrings = {
-  welcome: '登录 Estate Agent AI Buddy',
+  welcome: '登录 EA AI Buddy',
   sub: '您的房产、联系人和团队记录，由您的 Google 账号保护。',
   google: '使用 Google 继续',
   opening: '正在打开 Google…',

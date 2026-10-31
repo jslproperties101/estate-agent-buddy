@@ -1,4 +1,4 @@
-# Estate Agent Buddy — build and check on every push.
+# EA AI Buddy — build and check on every push.
 #  test     type check, lint, unit tests, browser screen tests (no keys needed)
 #  database Supabase migrations: roles and row-level security tested on PostgreSQL
 #  android  debug APK (Capacitor), attached to a GitHub Release "android-<commit>" for download on the phone;
@@ -156,7 +156,7 @@ jobs:
           mkdir -p ../site && cp -r dist/. ../site/ && mkdir -p ../site/updates
           (cd dist && zip -qr "../../site/updates/bundle-${SHORT}.zip" .)
           BASE="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}"
-          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-${SHORT}/EstateAgentBuddy-${SHORT}-debug.apk"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-${SHORT}/EAAIBuddy-${SHORT}-debug.apk"
           printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/updates/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
             "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > ../site/updates/latest.json
           cat ../site/updates/latest.json
@@ -181,7 +181,7 @@ jobs:
       - name: Check the APK (package name, app name, launcher icons, splash, QA flag)
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
-          if [ "$EAB_POS" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.aibuddypos "AI Buddy POS" pos; elif [ "$EAB_QA" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy.qa "EAB QA" qa; else node scripts/verify-apk.mjs "$APK" com.jslproperties.estateagentbuddy "Estate Agent AI Buddy" prod; fi
+          if [ "$EAB_POS" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.aibuddypos "AI Buddy POS" pos; elif [ "$EAB_QA" = "1" ]; then node scripts/verify-apk.mjs "$APK" com.jslproperties.eaaibuddy.qa "EA AI Buddy QA" qa; else node scripts/verify-apk.mjs "$APK" com.jslproperties.eaaibuddy "EA AI Buddy" prod; fi
       - name: Check the APK signature (same debug key every build)
         run: |
           SHA1=$(keytool -printcert -jarfile android/app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA1:' | awk '{print $2}')
@@ -191,7 +191,7 @@ jobs:
         id: apk
         run: |
           SHORT=${GITHUB_SHA::7}
-          if [ "$EAB_POS" = "1" ]; then OUT="AIBuddyPOS-${SHORT}-debug.apk"; TAG="pos-$SHORT"; elif [ "$EAB_QA" = "1" ]; then OUT="EstateAgentBuddy-QA-${SHORT}-debug.apk"; TAG="qa-$SHORT"; else OUT="EstateAgentBuddy-${SHORT}-debug.apk"; TAG="android-$SHORT"; fi
+          if [ "$EAB_POS" = "1" ]; then OUT="AIBuddyPOS-${SHORT}-debug.apk"; TAG="pos-$SHORT"; elif [ "$EAB_QA" = "1" ]; then OUT="EAAIBuddy-QA-${SHORT}-debug.apk"; TAG="qa-$SHORT"; else OUT="EAAIBuddy-${SHORT}-debug.apk"; TAG="android-$SHORT"; fi
           cp android/app/build/outputs/apk/debug/app-debug.apk "../$OUT"
           echo "file=$OUT" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -222,7 +222,7 @@ jobs:
             elif [ "$EAB_QA" = "1" ]; then
               echo "**QA APK (isolated test app)** for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}."
               echo
-              echo "Package com.jslproperties.estateagentbuddy.qa, app name EAB QA: installs BESIDE your real app, with its own empty storage. It updates itself from newer QA builds (never from the real app's updates); Settings -> About shows the commit it is running. Settings -> About shows the commit and says QA."
+              echo "Package com.jslproperties.eaaibuddy.qa, app name EA AI Buddy QA: installs BESIDE your real app, with its own empty storage. It updates itself from newer QA builds (never from the real app's updates); Settings -> About shows the commit it is running. Settings -> About shows the commit and says QA."
             else
               echo "Debug APK for commit ${GITHUB_SHA} (${GITHUB_REF_NAME}), build ${GITHUB_RUN_NUMBER}. WARNING: same package as your real app; it installs over it and may switch itself to the production bundle. For testing use the QA APK."
             fi
@@ -253,7 +253,7 @@ jobs:
           OUTD=$(mktemp -d)
           (cd dist && zip -qr "$OUTD/bundle-${SHORT}.zip" .)
           BASE="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/beta-updates"
-          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/qa-${SHORT}/EstateAgentBuddy-QA-${SHORT}-debug.apk"
+          APK="https://github.com/${GITHUB_REPOSITORY}/releases/download/qa-${SHORT}/EAAIBuddy-QA-${SHORT}-debug.apk"
           printf '{"sha":"%s","version":"%s","nativeVersion":%s,"bundle":"%s/bundle-%s.zip","apk":"%s","builtAt":"%s","branch":"%s"}\n' \
             "$SHORT" "$VERSION" "$NATIVE" "$BASE" "$SHORT" "$APK" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$GITHUB_REF_NAME" > "$OUTD/latest.json"
           cat "$OUTD/latest.json"

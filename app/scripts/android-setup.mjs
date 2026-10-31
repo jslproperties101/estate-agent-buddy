@@ -1,10 +1,10 @@
 // Configures the Android project that `npx cap add android` generates (run by the GitHub Actions build).
 // The generated android/ folder is not committed; this script makes every build the same:
-//  - app name "Estate Agent AI Buddy", package com.jslproperties.estateagentbuddy (from capacitor.config.json);
+//  - app name "EA AI Buddy", package com.jslproperties.eaaibuddy (from capacitor.config.json);
 //  - permissions: precise/approximate location (GPS Assistance), camera (property and banner photos),
 //    notifications (reminders, Android 13+), internet; storage for saved PDFs on Android 9 and older;
 //  - the AdMob app ID (Change 011);
-//  - the sign-in return link com.jslproperties.estateagentbuddy://auth-callback opens the app (Google login);
+//  - the sign-in return link com.jslproperties.eaaibuddy://auth-callback opens the app (Google login);
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
@@ -19,7 +19,9 @@ const QA = process.env.EAB_QA === '1';
 // name and sign-in return link; the web side is built with the same flag (opens in AI Buddy POS, never updates itself).
 const POS = process.env.EAB_POS === '1';
 const APP_ID = POS ? 'com.jslproperties.aibuddypos' : QA ? `${cfg.appId}.qa` : cfg.appId;
-const APP_NAME = POS ? 'AI Buddy POS' : QA ? 'EAB QA' : cfg.appName;
+// EA AI Buddy rename (31 Oct 2026): the package before the rename. Only used to borrow its Firebase entry (see 1b).
+const LEGACY_APP_ID = 'com.jslproperties.estateagentbuddy';
+const APP_NAME = POS ? 'AI Buddy POS' : QA ? 'EA AI Buddy QA' : cfg.appName;
 const A = 'android/app/src/main';
 const must = p => { if (!existsSync(p)) throw new Error(`Missing ${p}: run "npx cap add android" first.`); return p; };
 const edit = (p, fn) => { const s = readFileSync(must(p), 'utf8'); const t = fn(s); if (t !== s) writeFileSync(p, t); };
@@ -73,7 +75,7 @@ edit(`${A}/AndroidManifest.xml`, s => {
             </intent-filter>
         $2`);
   }
-  // JoyChange010-04: the app in the phone's share list as "Estate Agent AI Buddy Document Upload" (its own label, the app's
+  // JoyChange010-04: the app in the phone's share list as "EA AI Buddy Document Upload" (its own label, the app's
   // icon). An alias of MainActivity, so a share opens the running app (singleTask) and EabSharePlugin receives the files.
   // Pictures and documents only (PDF, Word, Excel ...): no videos, no plain text.
   if (!s.includes('EabShareTarget')) {
@@ -101,7 +103,7 @@ edit(`${A}/AndroidManifest.xml`, s => {
 });
 
 // JoyChange010-04: the share-list label in the phone's language (English, Malay, Chinese).
-for (const [dir, label] of [['values', 'Estate Agent AI Buddy Document Upload'], ['values-ms', 'Muat Naik Dokumen Estate Agent AI Buddy'], ['values-zh', 'Estate Agent AI Buddy 文件上传']]) {
+for (const [dir, label] of [['values', 'EA AI Buddy Document Upload'], ['values-ms', 'Muat Naik Dokumen EA AI Buddy'], ['values-zh', 'EA AI Buddy 文件上传']]) {
   mkdirSync(`${A}/res/${dir}`, { recursive: true });
   writeFileSync(`${A}/res/${dir}/eab_share.xml`, `<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="eab_share_label">${label}</string>\n</resources>\n`);
 }
@@ -113,15 +115,19 @@ for (const [dir, label] of [['values', 'Estate Agent AI Buddy Document Upload'],
   if (existsSync(src)) {
     const j = JSON.parse(readFileSync(src, 'utf8'));
     const ids = (j.client ?? []).map(c => c.client_info?.android_client_info?.package_name);
-    if (POS && !ids.includes(APP_ID)) {
-      // The POS app is not registered in Firebase yet. So the build can still pass, it borrows the QA app's entry under the POS
-      // package name. Push alerts are NOT expected to work in the POS app until it is added as an Android app in Firebase.
-      const base = (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === `${cfg.appId}.qa`);
-      if (!base) throw new Error(`google-services.json has no Android app ${cfg.appId}.qa to borrow for ${APP_ID}`);
+    if (!ids.includes(APP_ID)) {
+      // Not registered in Firebase yet (the POS app; and EA AI Buddy's new packages until the owner adds them as Android
+      // apps in Firebase and replaces this file). So the build can still pass, the matching OLD Estate Agent AI Buddy entry
+      // is borrowed under the new package name: the real app borrows the old real app, QA and POS borrow the old QA app.
+      // Push alerts and crash reports are NOT expected to work for a borrowed package until it is properly registered.
+      const borrowFrom = !QA && !POS ? LEGACY_APP_ID : `${LEGACY_APP_ID}.qa`;
+      const base = (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === borrowFrom)
+        ?? (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === `${cfg.appId}.qa`);
+      if (!base) throw new Error(`google-services.json has no Android app ${borrowFrom} to borrow for ${APP_ID}`);
       const copy = JSON.parse(JSON.stringify(base)); copy.client_info.android_client_info.package_name = APP_ID;
       j.client.push(copy);
       writeFileSync('android/app/google-services.json', JSON.stringify(j, null, 2));
-      console.log(`WARNING: ${APP_ID} is not in google-services.json: borrowed the QA entry (push alerts unverified/unsupported for the POS app).`);
+      console.log(`WARNING: ${APP_ID} is not in google-services.json: borrowed the ${borrowFrom} entry (push alerts and crash reports unverified until ${APP_ID} is added in Firebase).`);
     } else {
       if (!ids.includes(APP_ID)) throw new Error(`google-services.json has no Android app ${APP_ID} (it has ${ids.join(', ')})`);
       copyFileSync(src, 'android/app/google-services.json');

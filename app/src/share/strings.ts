@@ -15,7 +15,7 @@ export interface ShareStrings {
 const en: ShareStrings = {
   title: 'Shared Documents', open: 'Open',
   empty: 'Nothing here yet.',
-  how: 'In WhatsApp (or any app), tap Share on a document or photo and choose “Estate Agent AI Buddy Document Upload”. It arrives here; then move it to the right property and folder.',
+  how: 'In WhatsApp (or any app), tap Share on a document or photo and choose “EA AI Buddy Document Upload”. It arrives here; then move it to the right property and folder.',
   moveToProperty: 'Move to property', property: 'Property', folder: 'Folder', move: 'Move', cancel: 'Cancel',
   del: 'Delete', delQ: 'Delete this file?', delBody: n => `“${n}” will be removed from this phone. It is not in any property.`, deleted: 'File deleted.',
   moved: (f, p) => `Moved to ${p} · ${f}.`, noProperty: 'Choose a property first.', notAllowed: 'You cannot add files to this property.', gone: 'This file is no longer here.',
@@ -34,7 +34,7 @@ const en: ShareStrings = {
 const bm: ShareStrings = {
   title: 'Dokumen Dikongsi', open: 'Buka',
   empty: 'Belum ada apa-apa di sini.',
-  how: 'Dalam WhatsApp (atau aplikasi lain), tekan Kongsi pada dokumen atau foto dan pilih “Muat Naik Dokumen Estate Agent AI Buddy”. Ia akan sampai di sini; kemudian pindahkan ke hartanah dan folder yang betul.',
+  how: 'Dalam WhatsApp (atau aplikasi lain), tekan Kongsi pada dokumen atau foto dan pilih “Muat Naik Dokumen EA AI Buddy”. Ia akan sampai di sini; kemudian pindahkan ke hartanah dan folder yang betul.',
   moveToProperty: 'Pindah ke hartanah', property: 'Hartanah', folder: 'Folder', move: 'Pindah', cancel: 'Batal',
   del: 'Padam', delQ: 'Padam fail ini?', delBody: n => `“${n}” akan dibuang dari telefon ini. Ia tidak berada dalam mana-mana hartanah.`, deleted: 'Fail dipadam.',
   moved: (f, p) => `Dipindah ke ${p} · ${f}.`, noProperty: 'Pilih hartanah dahulu.', notAllowed: 'Anda tidak boleh menambah fail pada hartanah ini.', gone: 'Fail ini sudah tiada di sini.',
@@ -53,7 +53,7 @@ const bm: ShareStrings = {
 const zh: ShareStrings = {
   title: '共享文件', open: '打开',
   empty: '这里还没有文件。',
-  how: '在 WhatsApp（或任何应用）中，对文件或照片点“分享”，然后选择“Estate Agent AI Buddy 文件上传”。文件会出现在这里，再把它移到正确的房产和文件夹。',
+  how: '在 WhatsApp（或任何应用）中，对文件或照片点“分享”，然后选择“EA AI Buddy 文件上传”。文件会出现在这里，再把它移到正确的房产和文件夹。',
   moveToProperty: '移到房产', property: '房产', folder: '文件夹', move: '移动', cancel: '取消',
   del: '删除', delQ: '删除此文件？', delBody: n => `“${n}”将从这部手机上删除。它不属于任何房产。`, deleted: '文件已删除。',
   moved: (f, p) => `已移到 ${p} · ${f}。`, noProperty: '请先选择房产。', notAllowed: '您不能为此房产添加文件。', gone: '此文件已不在这里。',

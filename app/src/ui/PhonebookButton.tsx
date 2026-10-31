@@ -13,7 +13,7 @@ const T = titled3( {
   en: {
     label: 'Choose from phone book', opening: 'Opening phone book…', none: 'No contact was chosen.', noPhone: 'This contact has no phone number. Type the number.',
     problem: {
-      denied: 'Contacts permission was refused. Allow Contacts for Estate Agent AI Buddy in the phone Settings → Apps → Permissions, then try again. You can also type the details.',
+      denied: 'Contacts permission was refused. Allow Contacts for EA AI Buddy in the phone Settings → Apps → Permissions, then try again. You can also type the details.',
       'plugin-missing': 'This installed version of the app does not include the phone book. Install the latest APK (Settings → About), or type the details.',
       unsupported: 'The phone book is not available in this browser. It works in the Android app and in Chrome on Android. Type the details instead.',
       failed: 'The phone book could not be opened. Try again, or type the details.',
@@ -22,7 +22,7 @@ const T = titled3( {
   bm: {
     label: 'Pilih daripada buku telefon', opening: 'Membuka buku telefon…', none: 'Tiada kenalan dipilih.', noPhone: 'Kenalan ini tiada nombor telefon. Taip nombornya.',
     problem: {
-      denied: 'Kebenaran Kenalan ditolak. Benarkan Kenalan untuk Estate Agent AI Buddy di Tetapan telefon → Aplikasi → Kebenaran, kemudian cuba lagi. Anda juga boleh menaip.',
+      denied: 'Kebenaran Kenalan ditolak. Benarkan Kenalan untuk EA AI Buddy di Tetapan telefon → Aplikasi → Kebenaran, kemudian cuba lagi. Anda juga boleh menaip.',
       'plugin-missing': 'Versi aplikasi yang dipasang tidak mengandungi buku telefon. Pasang APK terkini (Tetapan → Perihal), atau taip butirannya.',
       unsupported: 'Buku telefon tidak tersedia dalam pelayar ini. Ia berfungsi dalam aplikasi Android dan Chrome di Android. Taip butirannya.',
       failed: 'Buku telefon tidak dapat dibuka. Cuba lagi, atau taip butirannya.',
@@ -31,7 +31,7 @@ const T = titled3( {
   zh: {
     label: '从通讯录选择', opening: '正在打开通讯录…', none: '没有选择联系人。', noPhone: '此联系人没有电话号码，请手动输入。',
     problem: {
-      denied: '通讯录权限被拒绝。请在手机 设置 → 应用 → 权限 中为 Estate Agent AI Buddy 允许通讯录，然后再试。也可以手动输入。',
+      denied: '通讯录权限被拒绝。请在手机 设置 → 应用 → 权限 中为 EA AI Buddy 允许通讯录，然后再试。也可以手动输入。',
       'plugin-missing': '已安装的应用版本不包含通讯录功能。请安装最新的 APK（设置 → 关于），或手动输入。',
       unsupported: '此浏览器无法使用通讯录。安卓应用和安卓 Chrome 中可以使用。请手动输入。',
       failed: '无法打开通讯录。请再试一次，或手动输入。',

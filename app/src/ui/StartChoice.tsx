@@ -10,21 +10,21 @@ import { titled3 } from '../lib/titleCase';
 
 const T = titled3( {
   en: {
-    title: 'Welcome to Estate Agent AI Buddy',
+    title: 'Welcome to EA AI Buddy',
     body: 'How would you like to start?',
     sample: 'Populate with Sample Data', recommended: 'Recommended',
     sampleSub: 'Example properties, buyers, vendors, to-dos, calendar events, inquiries and viewings, all marked “Sample”, so you can see how everything works. Remove them any time in Settings → Sample data. Sample data stays on this phone and is never sent to your team.',
     empty: 'Start Without Sample Data', emptySub: 'A clean, empty workspace for your real work. You can still add sample data later in Settings.',
   },
   bm: {
-    title: 'Selamat datang ke Estate Agent AI Buddy',
+    title: 'Selamat datang ke EA AI Buddy',
     body: 'Bagaimana anda mahu bermula?',
     sample: 'Isi dengan Data Contoh', recommended: 'Disyorkan',
     sampleSub: 'Contoh hartanah, pembeli, penjual, tugasan, acara kalendar, pertanyaan dan lawatan, semuanya bertanda “Contoh”, supaya anda boleh lihat cara semuanya berfungsi. Buang bila-bila masa di Tetapan → Data contoh. Data contoh kekal di telefon ini dan tidak dihantar kepada pasukan anda.',
     empty: 'Mula Tanpa Data Contoh', emptySub: 'Ruang kerja kosong untuk kerja sebenar anda. Anda masih boleh menambah data contoh kemudian di Tetapan.',
   },
   zh: {
-    title: '欢迎使用 Estate Agent AI Buddy',
+    title: '欢迎使用 EA AI Buddy',
     body: '您想如何开始？',
     sample: '填入示例数据', recommended: '推荐',
     sampleSub: '示例房产、买家、卖家、待办、日历活动、询问和看房，全部标有“示例”，让您了解各项功能如何运作。可随时在 设置 → 示例数据 中删除。示例数据只保存在本机，不会发送给您的团队。',

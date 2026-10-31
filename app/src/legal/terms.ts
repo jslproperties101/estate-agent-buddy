@@ -9,10 +9,10 @@ export const TERMS_VERSION = '1.1-draft';
 
 type Sec = [string, string];
 const EN: { title: string; meta: string; sections: Sec[] } = {
-  title: 'TERMS AND CONDITIONS — Estate Agent AI Buddy',
+  title: 'TERMS AND CONDITIONS — EA AI Buddy',
   meta: 'Version 1.1 (draft) | Effective: [date of release]',
   sections: [
-    ['1. About these Terms', 'These Terms govern your use of the Estate Agent AI Buddy app ("the App"), operated by {COMPANY_NAME} ("we", "us"). By ticking the agreement box and using the App, you agree to these Terms. If you do not agree, do not use the App.'],
+    ['1. About these Terms', 'These Terms govern your use of the EA AI Buddy app ("the App"), operated by {COMPANY_NAME} ("we", "us"). By ticking the agreement box and using the App, you agree to these Terms. If you do not agree, do not use the App.'],
     ['2. Who may use the App', 'The App is for real estate agents, negotiators and their teams. You must be at least 18 years old. You are responsible for holding any registration or licence required by law (for example, with the Board of Valuers, Appraisers, Estate Agents and Property Managers in Malaysia) and for keeping it valid.'],
     ['3. Your account', 'You must give accurate information and keep your login secure. You are responsible for everything done under your account. Tell us immediately if you suspect unauthorised use.'],
     ['4. Your listings and content', 'You are fully responsible for every listing, photo, price, description and other content you add. Content must be true, accurate and not misleading, and you must have the owner\'s permission to advertise a property. You must not post false, fraudulent, discriminatory, infringing or unlawful content. You give us a licence to store, display and process your content to run the App.'],
@@ -32,10 +32,10 @@ const EN: { title: string; meta: string; sections: Sec[] } = {
   ],
 };
 const BM: typeof EN = {
-  title: 'TERMA DAN SYARAT — Estate Agent AI Buddy',
+  title: 'TERMA DAN SYARAT — EA AI Buddy',
   meta: 'Versi 1.1 (draf) | Berkuat kuasa: [tarikh keluaran]',
   sections: [
-    ['1. Mengenai Terma ini', 'Terma ini mengawal penggunaan aplikasi Estate Agent AI Buddy ("Aplikasi") yang dikendalikan oleh {COMPANY_NAME} ("kami"). Dengan menanda kotak persetujuan dan menggunakan Aplikasi, anda bersetuju dengan Terma ini. Jika anda tidak bersetuju, jangan gunakan Aplikasi.'],
+    ['1. Mengenai Terma ini', 'Terma ini mengawal penggunaan aplikasi EA AI Buddy ("Aplikasi") yang dikendalikan oleh {COMPANY_NAME} ("kami"). Dengan menanda kotak persetujuan dan menggunakan Aplikasi, anda bersetuju dengan Terma ini. Jika anda tidak bersetuju, jangan gunakan Aplikasi.'],
     ['2. Siapa boleh menggunakan Aplikasi', 'Aplikasi ini untuk ejen hartanah, perunding dan pasukan mereka. Anda mesti berumur sekurang-kurangnya 18 tahun. Anda bertanggungjawab memiliki dan mengekalkan sebarang pendaftaran atau lesen yang diwajibkan oleh undang-undang (contohnya dengan Lembaga Penilai, Pentaksir, Ejen Harta Tanah dan Pengurus Harta).'],
     ['3. Akaun anda', 'Anda mesti memberikan maklumat yang tepat dan menjaga keselamatan log masuk anda. Anda bertanggungjawab atas semua tindakan di bawah akaun anda. Maklumkan kami segera jika anda mengesyaki penggunaan tanpa kebenaran.'],
     ['4. Iklan dan kandungan anda', 'Anda bertanggungjawab sepenuhnya atas setiap iklan, gambar, harga, keterangan dan kandungan lain yang anda tambah. Kandungan mesti benar, tepat dan tidak mengelirukan, dan anda mesti mendapat kebenaran pemilik untuk mengiklankan hartanah. Anda tidak boleh menyiarkan kandungan palsu, menipu, diskriminasi, melanggar hak atau menyalahi undang-undang. Anda memberi kami lesen untuk menyimpan, memaparkan dan memproses kandungan anda bagi menjalankan Aplikasi.'],
@@ -55,10 +55,10 @@ const BM: typeof EN = {
   ],
 };
 const ZH: typeof EN = {
-  title: '条款与条件 — Estate Agent AI Buddy',
+  title: '条款与条件 — EA AI Buddy',
   meta: '版本 1.1（草稿）| 生效日期：[发布日期]',
   sections: [
-    ['1. 关于本条款', '本条款规范您对由 {COMPANY_NAME}（"我们"）运营的 Estate Agent AI Buddy 应用程序（"本应用"）的使用。勾选同意框并使用本应用，即表示您同意本条款。如不同意，请勿使用本应用。'],
+    ['1. 关于本条款', '本条款规范您对由 {COMPANY_NAME}（"我们"）运营的 EA AI Buddy 应用程序（"本应用"）的使用。勾选同意框并使用本应用，即表示您同意本条款。如不同意，请勿使用本应用。'],
     ['2. 使用资格', '本应用供房地产经纪人、谈判员及其团队使用。您必须年满18岁。您有责任持有并维持法律要求的任何注册或执照（例如马来西亚估价师、评估师、房地产经纪人及物业管理人局）。'],
     ['3. 您的账户', '您必须提供准确信息并妥善保管登录凭证。您须对账户下的一切行为负责。如怀疑账户被盗用，请立即通知我们。'],
     ['4. 您的房源与内容', '您须对所添加的每个房源、照片、价格、描述及其他内容承担全部责任。内容必须真实、准确且不具误导性，并须获得业主授权方可刊登房产广告。您不得发布虚假、欺诈、歧视、侵权或违法内容。您授予我们为运营本应用而存储、展示及处理您内容的许可。'],
@@ -80,9 +80,9 @@ const ZH: typeof EN = {
 
 const BY_LANG: Record<Lang, typeof EN> = { en: EN, bm: BM, zh: ZH };
 const MISSING: Record<Lang, { email: string; address: string; company: string }> = {
-  en: { email: '[email address]', address: '[business address]', company: 'the operator of Estate Agent AI Buddy' },
-  bm: { email: '[alamat e-mel]', address: '[alamat perniagaan]', company: 'pengendali Estate Agent AI Buddy' },
-  zh: { email: '[电子邮箱]', address: '[营业地址]', company: 'Estate Agent AI Buddy 的运营方' },
+  en: { email: '[email address]', address: '[business address]', company: 'the operator of EA AI Buddy' },
+  bm: { email: '[alamat e-mel]', address: '[alamat perniagaan]', company: 'pengendali EA AI Buddy' },
+  zh: { email: '[电子邮箱]', address: '[营业地址]', company: 'EA AI Buddy 的运营方' },
 };
 
 /** The Terms in one language, with the company name, email and address from the shared settings. */

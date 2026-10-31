@@ -60,7 +60,7 @@ test('J10-U1 the Property list has a Shared Documents folder; empty, it explains
   await btn.click();
   await page.waitForSelector('[data-testid="shared-docs"]');
   assert.match(await page.locator('header').innerText(), /Shared Documents/);
-  assert.match(await page.getByTestId('shared-empty').innerText(), /Estate Agent AI Buddy Document Upload/);
+  assert.match(await page.getByTestId('shared-empty').innerText(), /EA AI Buddy Document Upload/);
   assert.deepEqual(errors, []);
   await page.context().close();
 });

@@ -1,4 +1,4 @@
-# Estate Agent AI Buddy laptop website (JoyChange002 Change 47), uploaded by CI. Apache on InfinityFree.
+# EA AI Buddy laptop website (JoyChange002 Change 47), uploaded by CI. Apache on InfinityFree.
 Options -Indexes
 DirectoryIndex index.html
 <IfModule mod_rewrite.c>

@@ -56,7 +56,7 @@ export const IconRobot = ({ size = 40 }: P) => (
   <img className="robot-img" src={size > 48 ? robot192 : robot96} srcSet={`${robot96} 96w, ${robot192} 192w`} sizes={`${size}px`} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable={false} />
 );
 export const IconMic = svg('M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3M8 21h8');
-/** Estate Agent AI Buddy logo in the app: header, sign-in and first-start choice. Change 002a (owner, Oct 2026): the owner-supplied
+/** EA AI Buddy logo in the app: header, sign-in and first-start choice. Change 002a (owner, Oct 2026): the owner-supplied
  *  black-and-gold artwork (assets/brand/logo-002a-source.jpg) replaces the earlier red-bordered logo here only; the phone's
  *  launcher icon and the start-up `splash` artwork are unchanged. */
 export const IconLogo = ({ size = 28, big, splash }: P & { big?: boolean; splash?: boolean }) => (

@@ -209,10 +209,10 @@ const layoutProblems = page => page.evaluate(() => {
 
 // ---------------------------------------------------------------------------------------------------------------
 
-test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — Creative Media 4, Buyer Matching 10, Subsale List 14, AI Assisted Command 15; no Coming Soon labels; Agent Profile and Notifications at the top', async () => {
+test('U1 dashboard (Change 011, EA AI Buddy reskin 31 Oct 2026): EA AI Buddy, greeting card and four numbers, 15 cards (1–12 in 3 × 4, the AI banner, then two wide cards) — Creative Media 4, Buyer Matching 10, Subsale List 14, AI Assisted Command 15; no Coming Soon labels; Agent Profile and Notifications at the top', async () => {
   const page = await phone();
-  assert.equal(await page.locator('h1').getAttribute('aria-label'), 'Estate Agent AI Buddy');
-  assert.equal(await page.title(), 'Estate Agent AI Buddy');
+  assert.equal(await page.locator('h1').getAttribute('aria-label'), 'EA AI Buddy');
+  assert.equal(await page.title(), 'EA AI Buddy');
   const names = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => b.getAttribute('aria-label')));
   // Change 011 + owner's answers of 16 Oct 2026: Creative Media takes card 4, the property list becomes "Subsale List" at
   // card 14 (bottom centre), Agent Profile moves to the top bar, Buyer Matching uses the freed card 10 (Change 013).
@@ -265,14 +265,34 @@ test('U1 dashboard (Change 011): Estate Agent AI Buddy, 15 cards in 3 × 5 — C
   await tile(page, 'Contacts');
   assert.deepEqual(await page.locator('.hub-card strong').allInnerTexts(), ['Buyers', 'Vendors']);
   await home(page);
-  // Owner, 12 Oct 2026 (latest): Explorer Progress removed completely; the page starts with the cards.
-  assert.equal(await page.evaluate(() => document.querySelector('main.content > section > *')?.tagName), 'NAV');
+  // Owner, 12 Oct 2026: Explorer Progress removed completely. EA AI Buddy reskin (31 Oct 2026): the page starts with the
+  // greeting card, then the four numbers, then Quick Access and the cards.
+  assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('main.content > section > *')].map(e => e.getAttribute('data-testid') || e.tagName)), ['home-hero', 'home-stats', 'H2', 'NAV']);
+  assert.match(await page.getByTestId('home-hero').innerText(), /Good (morning|afternoon|evening),\s*Agent!/);
+  assert.equal(await page.locator('[data-testid^="home-stat-"]').count(), 4);
   for (const gone of [/Explorer progress/i, /km explored/i, /routes recorded/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
   assert.equal(await page.getByTestId('explorer-progress').count(), 0);
-  // 3 columns × 5 rows on a phone.
-  const boxes = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; }));
-  assert.equal(new Set(boxes.map(b => b[0])).size, 3, 'three columns');
-  assert.equal(new Set(boxes.map(b => b[1])).size, 5, 'five rows');
+  // Cards 1–12: 3 columns × 4 rows on a phone; then AI Assisted Command across the full width; then Calendar & To-Do and
+  // Subsale List side by side.
+  const boxes = await page.locator('nav.grid > button').evaluateAll(bs => bs.map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)]; }));
+  const twelve = boxes.slice(0, 12);
+  assert.equal(new Set(twelve.map(b => b[0])).size, 3, 'three columns');
+  assert.equal(new Set(twelve.map(b => b[1])).size, 4, 'four rows');
+  const [agenda, subsale, ai] = boxes.slice(12);
+  assert.ok(ai[1] > twelve[11][1] && agenda[1] > ai[1] && agenda[1] === subsale[1], 'AI banner below the 12 cards, the two wide cards below it, side by side');
+  assert.ok(ai[2] > twelve[0][2] * 2.5, 'AI banner is full width');
+  // Bottom tab bar: Home, Projects, AI Buddy (centre), Inquiries, More; Home is lit on the main screen.
+  assert.deepEqual(await page.locator('[data-testid="tab-bar"] button').evaluateAll(bs => bs.map(b => b.getAttribute('data-tab'))), ['home', 'projects', 'ai', 'inquiries', 'more']);
+  assert.equal(await page.locator('[data-tab="home"]').getAttribute('aria-current'), 'page');
+  await page.locator('[data-tab="more"]').click();
+  await page.getByTestId('more').waitFor();
+  assert.equal(await page.locator('[data-tab="more"]').getAttribute('aria-current'), 'page');
+  await page.locator('[data-tab="inquiries"]').click();
+  await page.waitForFunction(() => document.querySelector('main.content')?.getAttribute('data-screen') === 'activity');
+  assert.equal(await page.locator('[data-tab="inquiries"]').getAttribute('aria-current'), 'page');
+  await page.locator('[data-tab="home"]').click();
+  await page.waitForSelector('nav.grid');
+  assert.equal(await page.locator('header button[aria-label="Back"]').count(), 0, 'Home tab returns to the main screen (no Back button)');
   assert.equal(await page.getByText(/Profile & Name Card/).count(), 0, 'renamed to Agent Profile');
   for (const gone of [/GPS map/i, /Smart Capture/i]) assert.equal(await page.getByText(gone).count(), 0, String(gone));
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(8, 8, 10)', 'black theme');
@@ -1411,7 +1431,7 @@ test('U30 updates: a newer published version is offered on the web; About shows 
   assert.match(await page.getByTestId('update-bar').innerText(), /new version/i);
   await tile(page, 'Agent Profile'); await page.getByRole('button', { name: /Settings/i }).click();
   const v = await page.getByTestId('about-version').innerText();
-  assert.match(v, /^Release 2\.0\.010 · Version 2\.2\.0 · build \w+ · native 7/i, "release label shown, internal version is valid SemVer and higher than 2.1.0");
+  assert.match(v, /^Release 2\.0\.010 · Version 2\.2\.0 · build \w+ · native 8/i, "release label shown, internal version is valid SemVer and higher than 2.1.0");
   published = v.match(/build (\w+)/)[1];
   await page.getByTestId('check-update').click();
   assert.match(await page.getByTestId('update-msg').innerText(), /latest version/i);
@@ -1817,7 +1837,7 @@ test('U39b JoyChange006 Part 2 Change E: the start-up screen lasts the full ten 
   assert.match(await page.locator('.intro .logo-img').evaluate(i => getComputedStyle(i).animationName), /intro-spin/);
   assert.match(await page.locator('.intro .logo-img').evaluate(i => getComputedStyle(i).animationDuration), /^2s$/, 'half the earlier 1 s-per-turn speed');
   const brand = page.locator('.intro-brand');
-  assert.equal(await brand.locator('span').innerText(), 'Estate Agent');
+  assert.equal(await brand.locator('span').innerText(), 'EA');   // EA AI Buddy rename, 31 Oct 2026
   assert.equal(await brand.locator('em').innerText(), 'AI Buddy');
   const seen = [];
   const end = Date.now() + 11500;
@@ -4020,7 +4040,7 @@ test('U91 backup file: made from Settings, a bad file is refused, and a restore 
   // a file that is not a backup is refused and changes nothing
   await page.getByTestId('backup-file').setInputFiles({ name: 'notes.zip', mimeType: 'application/zip', buffer: Buffer.from('this is not a backup') });
   await page.locator('[data-testid="backup-msg"][role="alert"]').waitFor();
-  assert.match(await page.getByTestId('backup-msg').innerText(), /not an Estate Agent AI Buddy backup file\. Nothing was changed/i);
+  assert.match(await page.getByTestId('backup-msg').innerText(), /not an EA AI Buddy backup file\. Nothing was changed/i);
   // delete the contact on the phone, then restore it from the file
   await page.evaluate(() => new Promise((resolve, reject) => {
     const r = indexedDB.open('estate-agent-buddy');
@@ -4607,7 +4627,10 @@ test('U101 Change 011 (with Change 015): one fixed advert area above the phone n
     const ad = page.getByTestId('bottom-ad');
     assert.equal(await ad.count(), 1, `${where}: one advert area`);
     const box = await ad.boundingBox(); const vh = page.viewportSize().height;
-    assert.ok(Math.abs(box.y + box.height - vh) <= 1, `${where}: fixed at the bottom of the app area (${box.y + box.height} vs ${vh})`);
+    // EA AI Buddy reskin (owner, 31 Oct 2026): the tab bar is the last row; the advert sits directly above it.
+    const tabs = await page.getByTestId('tab-bar').boundingBox();
+    assert.ok(Math.abs(tabs.y + tabs.height - vh) <= 1, `${where}: tab bar at the bottom of the app area (${tabs.y + tabs.height} vs ${vh})`);
+    assert.ok(Math.abs(box.y + box.height - tabs.y) <= 1, `${where}: advert directly above the tab bar (${box.y + box.height} vs ${tabs.y})`);
     assert.ok(box.height >= 50 && box.height <= 60, `${where}: banner height (${box.height})`);
     assert.match(await ad.innerText(), /Ad space · placeholder/i, `${where}: clearly a placeholder in a browser`);
     // Change 015: the scrolling content ends directly above the advert, so nothing is ever under it
@@ -5282,7 +5305,10 @@ test('U120 Change 015 layout on normal screens: one scrolling content area, the 
     const vh = page.viewportSize().height;
     const ad = await page.getByTestId('bottom-ad').boundingBox();
     const main = await page.locator('main.content').boundingBox();
-    assert.ok(Math.abs(ad.y + ad.height - vh) <= 1, `${where}: advert at the bottom`);
+    // EA AI Buddy reskin (owner, 31 Oct 2026): advert, then the tab bar as the very last row.
+    const tabs = await page.getByTestId('tab-bar').boundingBox();
+    assert.ok(Math.abs(tabs.y + tabs.height - vh) <= 1, `${where}: tab bar at the bottom`);
+    assert.ok(Math.abs(ad.y + ad.height - tabs.y) <= 1, `${where}: advert directly above the tab bar`);
     assert.ok(main.y + main.height <= ad.y + 1, `${where}: content ends above the advert`);
     const scroll = await page.evaluate(() => ({ doc: document.scrollingElement.scrollHeight - window.innerHeight, overflow: getComputedStyle(document.querySelector('main.content')).overflowY }));
     assert.ok(scroll.doc <= 1, `${where}: the page itself does not scroll (${scroll.doc})`);

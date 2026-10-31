@@ -28,7 +28,7 @@ const en = {
   failed: 'The restore did not finish. Please check the phone before trying again.',
   cancel: 'Cancel',
   problem: {
-    'not-a-backup': 'This is not an Estate Agent AI Buddy backup file. Nothing was changed.',
+    'not-a-backup': 'This is not an EA AI Buddy backup file. Nothing was changed.',
     damaged: 'This backup file is damaged or incomplete. Nothing was changed.',
     unsupported: 'This backup file is not in a format this app can read. Nothing was changed.',
     'wrong-format': 'This backup file is not complete. Nothing was changed.',
@@ -110,7 +110,7 @@ const bm: S = {
   failed: 'Pemulihan tidak selesai. Sila semak telefon sebelum cuba lagi.',
   cancel: 'Batal',
   problem: {
-    'not-a-backup': 'Ini bukan fail sandaran Estate Agent AI Buddy. Tiada apa yang diubah.',
+    'not-a-backup': 'Ini bukan fail sandaran EA AI Buddy. Tiada apa yang diubah.',
     damaged: 'Fail sandaran ini rosak atau tidak lengkap. Tiada apa yang diubah.',
     unsupported: 'Fail sandaran ini bukan dalam format yang boleh dibaca oleh aplikasi ini. Tiada apa yang diubah.',
     'wrong-format': 'Fail sandaran ini tidak lengkap. Tiada apa yang diubah.',
@@ -191,7 +191,7 @@ const zh: S = {
   failed: '还原未完成。请先检查手机再重试。',
   cancel: '取消',
   problem: {
-    'not-a-backup': '这不是 Estate Agent AI Buddy 的备份文件。没有任何更改。',
+    'not-a-backup': '这不是 EA AI Buddy 的备份文件。没有任何更改。',
     damaged: '这个备份文件已损坏或不完整。没有任何更改。',
     unsupported: '这个备份文件的格式本应用无法读取。没有任何更改。',
     'wrong-format': '这个备份文件不完整。没有任何更改。',

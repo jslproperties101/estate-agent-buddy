@@ -1,5 +1,5 @@
 // JoyChange010-04: files shared INTO the app from WhatsApp (or any app), and moving documents between folders.
-//  - Android lists the app in its share sheet as "Estate Agent AI Buddy Document Upload" (scripts/android-setup.mjs,
+//  - Android lists the app in its share sheet as "EA AI Buddy Document Upload" (scripts/android-setup.mjs,
 //    EabSharePlugin). What arrives is kept in the phone's file storage and listed in the Shared Documents tray
 //    (meta.sharedInbox, this phone only, not synced: it is a tray, not a record).
 //  - From the tray the agent moves a file to one of their properties, into one of its document folders. It then becomes

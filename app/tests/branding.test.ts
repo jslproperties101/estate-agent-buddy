@@ -29,10 +29,10 @@ test('BR4 the start-up screens keep the earlier splash artwork', () => {
   assert.ok(readFileSync('src/App.tsx', 'utf8').includes('<IconLogo size={168} big splash />'));
 });
 
-test('BR3 the app name and package are fixed in the Capacitor config', () => {
+test('BR3 the app name and package are fixed in the Capacitor config (EA AI Buddy rename, 31 Oct 2026)', () => {
   const c = JSON.parse(readFileSync('capacitor.config.json', 'utf8')) as { appId: string; appName: string };
-  assert.equal(c.appId, 'com.jslproperties.estateagentbuddy');
-  assert.equal(c.appName, 'Estate Agent AI Buddy');
+  assert.equal(c.appId, 'com.jslproperties.eaaibuddy');
+  assert.equal(c.appName, 'EA AI Buddy');
 });
 
 const sha = (f: string) => createHash('sha256').update(readFileSync(f)).digest('hex');
@@ -44,7 +44,8 @@ test('BR5 Change 002a: the in-app logo (header, sign-in, first-start choice) is 
   // Everything that was NOT the marked logo keeps its exact bytes.
   const same: [string, string][] = [
     ['assets/icon-only.png', '7afa9631123b1e7a87846d1daece5c5c9b4105e87a93a481b99aa9d9d727b489'], ['assets/icon-foreground.png', 'ed6ddc2a51a1d3ac6afa6fc0cba0498cce61c470a998fe86f256b5ee549ad7e8'], ['assets/icon-background.png', '7acb6b8432ea712928638656cb569336e0250fc29064c290b5cd156841058073'],
-    ['assets/splash.png', '40faaeac3babd5dbec62154467e5ca8cccbb052f50b46a2439eda86f749a5a4e'], ['src/brand/splash-256.webp', 'b7639474c5dcbc2069bed6eedf0ceac96fc10bc264f2b7a31f4efeacf969feba'], ['src/brand/splash-512.webp', '82b38a8b2786c059f2fd34fcb1ff6c71eb64c6c2582fe06fd9873dc763e3acd9'],
+    // EA AI Buddy rename (31 Oct 2026): the splash artwork's first line now reads "EA" (scripts/rename-logo.py); nothing else in it changed.
+    ['assets/splash.png', '851277a8b27b5725845a3bb7b7000acd4feefc2492ab0d7ca766cbf553ed3066'], ['src/brand/splash-256.webp', '58d16fb3f4ce45fd7315e9138f67c91bfba85ec72c01881f47ba20362229e812'], ['src/brand/splash-512.webp', '5830f4411eca54ea74707351ef50e71f1ea0bd297d129d39a94549ba225bf165'],
   ];
   for (const [f, want] of same) assert.equal(sha(f), want, `${f} unchanged`);
 });

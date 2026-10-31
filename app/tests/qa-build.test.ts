@@ -38,8 +38,8 @@ test('QA1 the QA build updates itself, but only from its own QA list, never the 
 test('QA2 the QA build uses its own package name and sign-in return link', async () => {
   const { APP_ID, AUTH_CALLBACK, IS_QA } = await loadQa<typeof import('../src/native/native')>('src/native/native.ts');
   assert.equal(IS_QA, true);
-  assert.equal(APP_ID, 'com.jslproperties.estateagentbuddy.qa');
-  assert.equal(AUTH_CALLBACK, 'com.jslproperties.estateagentbuddy.qa://auth-callback');
+  assert.equal(APP_ID, 'com.jslproperties.eaaibuddy.qa');
+  assert.equal(AUTH_CALLBACK, 'com.jslproperties.eaaibuddy.qa://auth-callback');
 });
 
 const MANIFEST = `<?xml version="1.0" encoding="utf-8"?>
@@ -63,13 +63,13 @@ function project(): string {
   writeFileSync(join(main, 'AndroidManifest.xml'), MANIFEST);
   writeFileSync(join(main, 'res/values/strings.xml'), '<resources>\n    <string name="app_name">x</string>\n    <string name="title_activity_main">x</string>\n    <string name="package_name">com.x</string>\n    <string name="custom_url_scheme">com.x</string>\n</resources>\n');
   writeFileSync(join(main, 'res/values/styles.xml'), '<resources><style name="AppTheme.NoActionBar" parent="x"></style></resources>');
-  writeFileSync(join(d, 'android/app/build.gradle'), 'android {\n    namespace "com.jslproperties.estateagentbuddy"\n    defaultConfig {\n        applicationId "com.jslproperties.estateagentbuddy"\n        versionCode 1\n        versionName "1.0"\n    }\n}\n');
+  writeFileSync(join(d, 'android/app/build.gradle'), 'android {\n    namespace "com.jslproperties.eaaibuddy"\n    defaultConfig {\n        applicationId "com.jslproperties.eaaibuddy"\n        versionCode 1\n        versionName "1.0"\n    }\n}\n');
   writeFileSync(join(d, 'android/build.gradle'), "buildscript {\n    dependencies {\n        classpath 'com.android.tools.build:gradle:8.7.2'\n        classpath 'com.google.gms:google-services:4.4.2'\n    }\n}\n");
   mkdirSync(join(d, 'android-config'), { recursive: true });
   // The activity exactly as `npx cap add android` generates it (Change 015 adds the system-bar handling to it).
-  const pkg = join(main, 'java/com/jslproperties/estateagentbuddy');
+  const pkg = join(main, 'java/com/jslproperties/eaaibuddy');
   mkdirSync(pkg, { recursive: true });
-  writeFileSync(join(pkg, 'MainActivity.java'), 'package com.jslproperties.estateagentbuddy;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {}\n');
+  writeFileSync(join(pkg, 'MainActivity.java'), 'package com.jslproperties.eaaibuddy;\n\nimport com.getcapacitor.BridgeActivity;\n\npublic class MainActivity extends BridgeActivity {}\n');
   return d;
 }
 const setup = (dir: string, qa: boolean) => spawnSync(process.execPath, [resolve('scripts/android-setup.mjs')], { cwd: dir, env: { ...process.env, GITHUB_RUN_NUMBER: '7', EAB_QA: qa ? '1' : '' }, encoding: 'utf8' });
@@ -79,27 +79,27 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   const rp = setup(prod, false);
   assert.equal(rp.status, 0, rp.stderr);
   const gp = readFileSync(join(prod, 'android/app/build.gradle'), 'utf8');
-  assert.match(gp, /applicationId "com\.jslproperties\.estateagentbuddy"/);
-  assert.match(gp, /versionName "2\.2\.0-n7"/, 'Batch L1 added the Crashlytics plugin, so the native version went up');
+  assert.match(gp, /applicationId "com\.jslproperties\.eaaibuddy"/);
+  assert.match(gp, /versionName "2\.2\.0-n8"/, 'EA AI Buddy rename (new package): native version 8, so older APKs never take this web bundle');
   assert.match(gp, /apply plugin: 'com\.google\.firebase\.crashlytics'/, 'Batch L1: Crashlytics applied to the app');
   assert.match(readFileSync(join(prod, 'android/build.gradle'), 'utf8'), /firebase-crashlytics-gradle:3\.0\.3/, 'Batch L1: Crashlytics Gradle plugin on the build classpath');
   assert.ok(existsSync(join(prod, 'android/app/google-services.json')), 'Change 25: Firebase config next to the app build file');
   assert.match(readFileSync(join(prod, 'android/app/src/main/AndroidManifest.xml'), 'utf8'), /windowSoftInputMode="adjustResize"/, 'Change 30: the page shrinks above the keyboard');
   const sp = readFileSync(join(prod, 'android/app/src/main/res/values/strings.xml'), 'utf8');
-  assert.match(sp, /name="app_name">Estate Agent AI Buddy</);
-  assert.match(sp, /name="custom_url_scheme">com\.jslproperties\.estateagentbuddy</);
+  assert.match(sp, /name="app_name">EA AI Buddy</);
+  assert.match(sp, /name="custom_url_scheme">com\.jslproperties\.eaaibuddy</);
 
   const qa = project();
   const rq = setup(qa, true);
   assert.equal(rq.status, 0, rq.stderr);
   const gq = readFileSync(join(qa, 'android/app/build.gradle'), 'utf8');
-  assert.match(gq, /applicationId "com\.jslproperties\.estateagentbuddy\.qa"/);
-  assert.match(gq, /namespace "com\.jslproperties\.estateagentbuddy"/, 'the code package is unchanged');
-  assert.match(gq, /versionName "2\.2\.0-qa-n7"/, 'the native version stays readable by the update logic');
+  assert.match(gq, /applicationId "com\.jslproperties\.eaaibuddy\.qa"/);
+  assert.match(gq, /namespace "com\.jslproperties\.eaaibuddy"/, 'the code package is unchanged');
+  assert.match(gq, /versionName "2\.2\.0-qa-n8"/, 'the native version stays readable by the update logic');
   const sq = readFileSync(join(qa, 'android/app/src/main/res/values/strings.xml'), 'utf8');
-  assert.match(sq, /name="app_name">EAB QA</);
-  assert.match(sq, /name="package_name">com\.jslproperties\.estateagentbuddy\.qa</);
-  assert.match(sq, /name="custom_url_scheme">com\.jslproperties\.estateagentbuddy\.qa</);
+  assert.match(sq, /name="app_name">EA AI Buddy QA</);
+  assert.match(sq, /name="package_name">com\.jslproperties\.eaaibuddy\.qa</);
+  assert.match(sq, /name="custom_url_scheme">com\.jslproperties\.eaaibuddy\.qa</);
   // the real app's permissions are the same in both
   const mq = readFileSync(join(qa, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
   const mp = readFileSync(join(prod, 'android/app/src/main/AndroidManifest.xml'), 'utf8');
@@ -112,8 +112,8 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
   }
   // Change 015: black system navigation area and content above the system bars, in both; the package line is kept.
   for (const dir of [qa, prod]) {
-    const act = readFileSync(join(dir, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8');
-    assert.match(act, /^package com\.jslproperties\.estateagentbuddy;/);
+    const act = readFileSync(join(dir, 'android/app/src/main/java/com/jslproperties/eaaibuddy/MainActivity.java'), 'utf8');
+    assert.match(act, /^package com\.jslproperties\.eaaibuddy;/);
     assert.match(act, /setNavigationBarColor\(Color\.BLACK\)/);
     assert.match(act, /setOnApplyWindowInsetsListener/);
     assert.match(act, /keepBannerOnTheEdge/, 'the AdMob banner is not lifted a second time on Android 15+');
@@ -122,9 +122,9 @@ test('QA3 android-setup: the QA project gets another application id, name, retur
     assert.match(st, /android:navigationBarColor">@android:color\/black/);
   }
   // Running it again changes nothing (CI may run it twice).
-  const before = readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8');
+  const before = readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/eaaibuddy/MainActivity.java'), 'utf8');
   assert.equal(setup(qa, true).status, 0);
-  assert.equal(readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/estateagentbuddy/MainActivity.java'), 'utf8'), before);
+  assert.equal(readFileSync(join(qa, 'android/app/src/main/java/com/jslproperties/eaaibuddy/MainActivity.java'), 'utf8'), before);
 });
 
 test('QA4 nativeVersionOf still reads the native version from the QA version name', async () => {

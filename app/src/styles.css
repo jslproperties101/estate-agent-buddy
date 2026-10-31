@@ -1,4 +1,4 @@
-/* Estate Agent Buddy styles: black, shiny gold and white.
+/* EA AI Buddy styles: black, shiny gold and white.
    Phone first (Samsung S23 Ultra, 384 CSS px wide), also works in a desktop browser.
    Uses the phone's own fonts (nothing downloaded). Smallest text 14px; buttons at least 44px tall.
    Text always wraps instead of being cut off, so the longest of English, Bahasa Malaysia and Chinese fits. */
@@ -1593,3 +1593,129 @@ html.kb-open .opt-pop::after { display: none; }
 .buddy .bp-table tr.tot td { font-weight: 700; border-top: 1px solid var(--gold-edge); }
 .buddy .bp-json { max-height: 280px; overflow: auto; font-size: 12px; background: var(--card-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px; margin: 0; }
 .buddy .bp-code { overflow-wrap: anywhere; font-size: 13px; }
+
+/* ======================================================================================================================
+   EA AI Buddy reskin, Phase A (owner, 31 Oct 2026; the approved black-and-gold mockups): header wordmark with tagline,
+   the home dashboard (greeting card, four numbers, Quick Access cards, AI Assisted Command banner, two wide cards), the
+   bottom tab bar under the advert, and the More screen. Colours stay the app's own tokens (--gold, --gold-grad ...).
+   ====================================================================================================================== */
+:root { --tab-h: 64px; --card-r: 16px; --gold-soft: rgba(212,175,55,.45); }
+
+/* Header: logo, "EA AI Buddy" on one line (EA white, AI Buddy gold), the tagline under it. */
+.topbar.home h1.brand img.logo-img { width: 58px; height: 58px; margin: -8px 0; }
+.topbar.home .wordmark { gap: 2px; }
+.topbar.home .wordmark .wm-name { display: block; white-space: nowrap; font-size: clamp(19px, 6.2vw, 28px); line-height: 1.05; }
+.topbar.home .wordmark .wm-name > span { font-size: inherit; color: var(--ink); }
+.topbar.home .wordmark .wm-name > em { font-size: inherit; }
+.wm-tag { display: none; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px !important; font-weight: 600;
+  letter-spacing: .12em; color: var(--muted) !important; white-space: nowrap; }
+/* The owner's rule (no text under 14 px) leaves no room for the tagline beside the name on a phone: there it heads the
+   greeting card instead; from 560 px wide it sits under the name, as in the mockup. */
+@media (min-width: 560px) { .wm-tag { display: block; } .home .hero-tag { display: none; } }
+.hero-tag { font-size: 14px; font-weight: 700; letter-spacing: .06em; color: var(--gold-hi); }
+
+/* Greeting card with the house photo on the right. */
+.home .hero { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 156px; padding: 16px; border-radius: var(--card-r);
+  border: 1px solid transparent; background-color: #101012; background-size: cover; background-position: right center; background-repeat: no-repeat;
+  box-shadow: 0 8px 22px rgba(0,0,0,.5); outline: 1px solid var(--gold-soft); outline-offset: -1px; overflow: hidden; }
+.hero-text { display: flex; flex-direction: column; gap: 2px; max-width: 72%; }
+.hero-greet { font-size: 16px; color: var(--ink); }
+.hero-name { font-family: 'Noto Serif', Georgia, serif; font-size: clamp(26px, 8vw, 34px); line-height: 1.1; color: var(--ink); overflow-wrap: anywhere; }
+.hero-quote { font-size: 14px; color: var(--muted); font-style: italic; margin-top: 4px; }
+.hero-today { align-self: flex-start; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 48px; padding: 8px 12px;
+  border-radius: 12px; border: 1px solid var(--gold-soft); background: rgba(8,8,10,.72); color: var(--ink); text-align: left; backdrop-filter: blur(4px); }
+.hero-date { font-size: 14px; color: var(--ink); }
+.hero-tasks { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--gold-hi); }
+.hero-tasks svg { width: 18px; height: 18px; }
+
+/* Four live numbers: 2 × 2 on a phone, one row of four on a wide screen. */
+.stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px; border-radius: var(--card-r);
+  background: linear-gradient(160deg, #161518, #0D0D0F); outline: 1px solid var(--gold-soft); outline-offset: -1px; }
+.stat { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 6px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); text-align: left; min-width: 0; }
+.stat:active { background: rgba(212,175,55,.08); }
+.stat-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--gold-hi);
+  background: linear-gradient(160deg, rgba(246,227,161,.16), rgba(212,175,55,.05)); border: 1px solid var(--gold-soft); }
+.stat-icon svg { width: 22px; height: 22px; }
+.stat-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.stat-text small { font-size: 14px; color: var(--muted); }
+.stat-text strong { font-size: 18px; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 560px) { .stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.home .section-head { margin: 4px 0 -2px; font-size: 19px; }
+
+/* Quick Access: a 6-part grid, so ordinary cards take 2 parts (three across), the two wide cards 3 parts each and the AI
+   banner all 6. The AI banner is shown before the two wide cards (mockup order); the card numbers are unchanged. */
+.home nav.grid.dash { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.home nav.grid.dash > .tile { grid-column: span 2; }
+.home nav.grid.dash > .tile.robot-tile { grid-column: 1 / -1; order: 1; }
+.home nav.grid.dash > .tile.wide-tile { grid-column: span 3; order: 2; }
+.dash .tile { min-height: 96px; border-radius: 14px; padding: 10px 6px 8px; gap: 6px; justify-content: center; }
+.dash .tile .tile-icon { width: 44px; height: 44px; border-radius: 12px; }
+.dash .tile .tile-text { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; max-width: 100%; }
+.dash .tile .tile-sub { display: none; font-size: 14px; font-weight: 500; color: var(--muted); line-height: 1.2; }
+.dash .tile .tile-chev { display: none; color: var(--gold-hi); font-size: 22px; line-height: 1; }
+/* Wide cards (Calendar & To-Do, Subsale List): dark, icon left, words, chevron right; no full gold fill any more. */
+.dash .tile.wide-tile { flex-direction: row; justify-content: flex-start; text-align: left; gap: 8px; padding: 10px; min-height: 84px;
+  background: linear-gradient(160deg, #18171B, #0E0E10) padding-box, var(--gold-edge) border-box; background-size: cover; background-position: right center; color: var(--ink); }
+.dash .tile.wide-tile .tile-icon { color: var(--gold-hi); background: radial-gradient(circle at 30% 25%, rgba(246,227,161,.22), rgba(212,175,55,.06) 60%, transparent 70%); border-color: var(--gold-soft); }
+.dash .tile.wide-tile .tile-text { align-items: flex-start; flex: 1; }
+.dash .tile.wide-tile .tile-sub { display: block; }
+@media (max-width: 459px) { .dash .tile.wide-tile .tile-sub { display: none; } .dash .tile.wide-tile .tile-icon { width: 40px; height: 40px; } }
+.dash .tile.wide-tile .tile-chev { display: block; margin-left: auto; }
+.dash .tile.wide-tile[data-key="property"] { background-color: #131316; border: 1px solid var(--gold-soft); }
+/* AI Assisted Command: the full-width gold banner with the robot, a line of text and a Start Chat pill. */
+.dash .tile.robot-tile { flex-direction: row; justify-content: flex-start; text-align: left; gap: 10px; padding: 10px 12px; min-height: 92px; }
+.dash .tile.robot-tile .tile-icon, .dash .tile.robot-tile .tile-icon .robot-img { width: 68px; height: 68px; }
+.dash .tile.robot-tile .tile-text { align-items: flex-start; flex: 1; }
+.dash .tile.robot-tile .tile-label { font-size: 17px; font-weight: 800; color: var(--on-gold); }
+.dash .tile.robot-tile .tile-sub { display: block; color: rgba(17,17,17,.8); font-size: 14px; }
+.tile-cta { flex: none; align-self: center; padding: 8px 12px; border-radius: 22px; font-size: 14px; font-weight: 800; white-space: nowrap;
+  background: rgba(255,255,255,.35); border: 1px solid rgba(17,17,17,.25); color: var(--on-gold); }
+@media (max-width: 380px) { .tile-cta { display: none; } }
+/* On a wider screen ordinary cards become rows (icon, words with a short line under, chevron), as in the tablet mockup. */
+@media (min-width: 560px) {
+  .dash .tile:not(.robot-tile):not(.wide-tile) { flex-direction: row; justify-content: flex-start; text-align: left; padding: 10px 12px; min-height: 76px; }
+  .dash .tile:not(.robot-tile):not(.wide-tile) .tile-text { align-items: flex-start; flex: 1; }
+  .dash .tile .tile-sub, .dash .tile .tile-chev { display: block; }
+  .dash .tile:not(.robot-tile) .tile-chev { margin-left: auto; }
+}
+
+/* Bottom tab bar: the last row of the app, under the advert. The centre AI Buddy button is a raised gold circle. */
+.tab-bar { position: relative; flex: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; width: 100%; z-index: 13;
+  background: #070708; border-top: 1px solid transparent; border-image: var(--gold-edge) 1; padding: 0 max(4px, env(safe-area-inset-right, 0px)) 4px max(4px, env(safe-area-inset-left, 0px)); box-sizing: border-box; }
+.tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 58px; min-width: 0;
+  border: 0; background: none; color: var(--muted); font-size: 14px; font-weight: 600; }
+.tab .tab-icon { display: flex; }
+.tab .tab-icon svg { width: 24px; height: 24px; }
+.tab-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab[aria-current="page"] { color: var(--gold-hi); }
+.tab[aria-current="page"]::after { content: ''; position: absolute; bottom: 2px; width: 22px; height: 3px; border-radius: 2px; background: var(--gold-grad); }
+.tab.tab-ai { height: 64px; }
+.tab.tab-ai .tab-icon { width: 60px; height: 60px; margin-top: -22px; border-radius: 50%; align-items: center; justify-content: center;
+  background: var(--gold-grad); box-shadow: 0 0 0 3px #070708, 0 0 18px rgba(212,175,55,.55); }
+.tab.tab-ai .robot-img { width: 46px; height: 46px; object-fit: contain; }
+.tab.tab-ai[aria-current="page"]::after { display: none; }
+.tab:active { transform: translateY(1px); }
+
+/* More screen. */
+.more-screen { gap: 12px; }
+.more-profile { display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; color: var(--ink); min-height: 84px; }
+.more-avatar { flex: none; width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--gold); color: var(--gold-hi); background: #1B1B1F; }
+.more-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.more-avatar svg { width: 30px; height: 30px; }
+.more-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.more-who strong { font-size: 18px; overflow-wrap: anywhere; }
+.more-view { color: var(--gold-hi); font-weight: 700; }
+.more-list { padding: 4px 0; display: flex; flex-direction: column; }
+.more-row { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 0 14px; border: 0; background: none; color: var(--ink); font-size: 16px; text-align: left; }
+.more-row + .more-row { border-top: 1px solid var(--line); }
+.more-icon { color: var(--gold-hi); display: flex; }
+.more-icon svg { width: 22px; height: 22px; }
+.more-label { flex: 1; }
+.chev { color: var(--muted); font-size: 22px; }
+.more-about { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; }
+/* The laptop website keeps its wide layout of five cards a row (JoyChange002 Change 47); the phone-only dashboard grid
+   above does not apply there. */
+html.website .home nav.grid.dash { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+html.website .home nav.grid.dash > .tile, html.website .home nav.grid.dash > .tile.robot-tile, html.website .home nav.grid.dash > .tile.wide-tile { grid-column: auto; order: 0; }

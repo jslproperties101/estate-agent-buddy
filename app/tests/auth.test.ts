@@ -19,10 +19,10 @@ test('A1 PKCE: verifier format and S256 challenge (checked against Node crypto)'
 });
 
 test('A2 the Google sign-in address asks Supabase for Google with PKCE and the right return address', () => {
-  const u = new URL(authorizeUrl(cfg, 'com.jslproperties.estateagentbuddy://auth-callback', 'CH'));
+  const u = new URL(authorizeUrl(cfg, 'com.jslproperties.eaaibuddy://auth-callback', 'CH'));
   assert.equal(u.origin + u.pathname, 'https://proj.supabase.co/auth/v1/authorize');
   assert.equal(u.searchParams.get('provider'), 'google');
-  assert.equal(u.searchParams.get('redirect_to'), 'com.jslproperties.estateagentbuddy://auth-callback');
+  assert.equal(u.searchParams.get('redirect_to'), 'com.jslproperties.eaaibuddy://auth-callback');
   assert.equal(u.searchParams.get('code_challenge'), 'CH');
   assert.equal(u.searchParams.get('code_challenge_method'), 's256');
 });
@@ -39,7 +39,7 @@ test('A3 return from Google: code exchanged with the saved verifier, role fetche
   assert.deepEqual(await handleCallback(cfg, 'https://localhost/', fetchFn), { kind: 'none' });
 
   localStorage.setItem('eab-pkce-verifier', 'VERIFIER-123');
-  const r = await handleCallback(cfg, 'com.jslproperties.estateagentbuddy://auth-callback?code=abc', fetchFn);
+  const r = await handleCallback(cfg, 'com.jslproperties.eaaibuddy://auth-callback?code=abc', fetchFn);
   assert.equal(r.kind, 'signed-in');
   if (r.kind === 'signed-in') {
     assert.equal(r.session.email, 'agent@gmail.com');

@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { isReturnLink, closedTabMeansCancelled } from '../src/auth/returnState';
 
 test('S1 a link carrying a code or an error is a return from Google; other links are not', () => {
-  assert.equal(isReturnLink('com.jslproperties.estateagentbuddy://auth-callback?code=abc'), true);
-  assert.equal(isReturnLink('com.jslproperties.estateagentbuddy://auth-callback?error=access_denied'), true);
+  assert.equal(isReturnLink('com.jslproperties.eaaibuddy://auth-callback?code=abc'), true);
+  assert.equal(isReturnLink('com.jslproperties.eaaibuddy://auth-callback?error=access_denied'), true);
   assert.equal(isReturnLink('https://localhost/#error=access_denied&error_description=x'), true);
-  assert.equal(isReturnLink('com.jslproperties.estateagentbuddy://auth-callback'), false);
+  assert.equal(isReturnLink('com.jslproperties.eaaibuddy://auth-callback'), false);
   assert.equal(isReturnLink('https://localhost/?other=1'), false);
 });
 

@@ -3,7 +3,7 @@
 //    WebView has no Web Speech API, so this is the only way voice works inside the installed app.
 //  - Browser: the Web Speech API where the browser offers it (Chrome on Android/desktop, Safari).
 // Both normally send the audio to the phone maker's / Google's speech service to turn it into text.
-// Estate Agent Buddy itself does not record, keep or upload audio, and listens only while the microphone is on.
+// EA AI Buddy itself does not record, keep or upload audio, and listens only while the microphone is on.
 import { plugin, pluginMissing } from '../native/native';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

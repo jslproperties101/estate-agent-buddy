@@ -1,6 +1,6 @@
 // Change 010: the "Audit History Report" PDF layout. Runs without a browser (it takes a measuring function), so the
 // page rules are tested in Node:
-//  - every page: full header (logo, Estate Agent AI Buddy, report title, export date) and footer (page number, record
+//  - every page: full header (logo, EA AI Buddy, report title, export date) and footer (page number, record
 //    ID, unique export reference), and a subtle CONFIDENTIAL watermark that does not hide the content
 //  - no agency name, no table of contents, no signature or approval section
 //  - the audit table's column headings appear once, where the table starts, not on later pages

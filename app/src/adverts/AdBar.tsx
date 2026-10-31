@@ -9,10 +9,10 @@
 //    open; it comes back when the view closes.
 //  - FeedAd: the medium "in-feed" card that the Subsale List puts after every third property card shown.
 // None of this reads the app's records, so saving or syncing never redraws it, and it does nothing in the background.
-import { memo, useEffect, useState, useSyncExternalStore } from 'react';
+import { memo, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Lang } from '../i18n';
 import { c11Strings } from '../ui/c011Strings';
-import { BANNER_H, nativeAdsAvailable, setBannerVisible, startBanner, testAdsOnly } from './admob';
+import { BANNER_H, nativeAdsAvailable, setBannerMargin, setBannerVisible, startBanner, testAdsOnly } from './admob';
 import { isWebsite } from '../native/native';
 import { isKeyboardShown, subscribeKeyboard } from '../ui/keyboardAlign';
 
@@ -40,11 +40,15 @@ function setReserved(px: number) {
 // ---------- the fixed bottom area ----------
 /** `cover`: drawn on the start-up screen (Change 42). It shows the same banner but never touches the page's reserved height
  *  (--ad-h), which belongs to the app shell's own BottomAd, so removing the cover cannot reset it. */
-export const BottomAd = memo(function BottomAd(props: { lang: Lang; cover?: boolean }) {
+/** EA AI Buddy reskin (31 Oct 2026): `tabs` is the bottom tab bar, drawn as the last row UNDER the advert; it hides with the
+ *  advert (keyboard open, full-screen views) and its height is kept free at the bottom too (--ad-h), and the native banner
+ *  is lifted by the same height so it sits directly above the tabs. */
+export const BottomAd = memo(function BottomAd(props: { lang: Lang; cover?: boolean; tabs?: ReactNode; tabsHeight?: number }) {
   // JoyChange002 Change 47: no adverts on the laptop website (nothing is drawn and no space is kept free for one).
   return isWebsite() ? null : <BottomAdBar {...props} />;
 });
-const BottomAdBar = memo(function BottomAdBar({ lang, cover }: { lang: Lang; cover?: boolean }) {
+const BottomAdBar = memo(function BottomAdBar({ lang, cover, tabs, tabsHeight = 0 }: { lang: Lang; cover?: boolean; tabs?: ReactNode; tabsHeight?: number }) {
+  const lift = tabs ? tabsHeight : 0;
   const t = c11Strings[lang].ad;
   // JoyChange006 Change D: hidden while the keyboard is open too, so the space above the keyboard is all for the page.
   const immersive = useSyncExternalStore(subscribe, isImmersive);
@@ -60,11 +64,12 @@ const BottomAdBar = memo(function BottomAdBar({ lang, cover }: { lang: Lang; cov
     return () => { alive = false; };
   }, [native]);
   useEffect(() => { if (native === 'on') void setBannerVisible(!hidden); }, [hidden, native]);
-  useEffect(() => { if (!cover) setReserved(hidden ? 0 : height); }, [hidden, height, cover]);
+  useEffect(() => { if (!cover) setReserved(hidden ? 0 : height + lift); }, [hidden, height, cover, lift]);
+  useEffect(() => { if (!cover) void setBannerMargin(lift); }, [cover, lift]);
   useEffect(() => () => { if (!cover) setReserved(0); }, [cover]);
 
   if (hidden) return null;
-  return (
+  return (<>
     <aside className={`ad-bar ${native === 'on' ? 'native' : 'placeholder'}`} aria-label={t.label} data-testid="bottom-ad" data-ad={native === 'on' ? 'admob' : 'placeholder'}
       style={{ height }}>
       {native !== 'on' && (
@@ -74,7 +79,8 @@ const BottomAdBar = memo(function BottomAdBar({ lang, cover }: { lang: Lang; cov
         </div>
       )}
     </aside>
-  );
+    {tabs}
+  </>);
 });
 
 // ---------- in-feed card ----------

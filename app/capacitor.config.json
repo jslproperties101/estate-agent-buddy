@@ -1,6 +1,6 @@
 {
-  "appId": "com.jslproperties.estateagentbuddy",
-  "appName": "Estate Agent AI Buddy",
+  "appId": "com.jslproperties.eaaibuddy",
+  "appName": "EA AI Buddy",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false,

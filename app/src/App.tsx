@@ -1,4 +1,4 @@
-// Estate Agent AI Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
+// EA AI Buddy: the app shell. Opens the phone's storage, draws the header and the current screen, keeps the
 // Back history (including the Android back button), shows short messages and runs the reminder checks.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -70,10 +70,15 @@ import { diagStrings } from './voice/diagStrings';
 import { BugReportScreen } from './bugreport/BugReportUI';
 import { bugStrings } from './bugreport/strings';
 import { StartChoice, needsStartChoice } from './ui/StartChoice';
+import { MoreScreen, TabBar, TAB_H, tabOf, tabScreen, type TabKey } from './ui/TabBar';
+import { reskinStrings } from './ui/reskinStrings';
+import { homeStats, greetingPart, firstName } from './ui/homeStats';
+import heroHouse from './brand/hero-house.webp';
+import { rm } from './lib/money';
 import { CountryChoice, useCountryChoice, useTermsChoice } from './ui/CountryChoice';
 import {
   IconBack, IconAgenda, IconSales, IconTrend, IconHome, IconGps, IconExpert, IconBell, IconContacts, IconChat,
-  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMegaphone, IconCreative, IconMatch,
+  IconRobot, IconLogo, IconMoney, IconCalc, IconUser, IconProject, IconMegaphone, IconCreative, IconMatch, IconCalendar,
 } from './icons';
 import { BottomAd } from './adverts/AdBar';
 import { c11Strings } from './ui/c011Strings';
@@ -387,9 +392,21 @@ function Shell() {
   const back = useCallback(() => {
     if (stack.current.length) window.history.back(); else setScreen({ name: 'home' });
   }, []);
+  // EA AI Buddy reskin: the bottom tabs. Home goes all the way back to the main screen (so Back never returns to the
+  // screens left behind); from one tab's screen to another the new one takes its place; from anywhere else it opens on top.
+  const onTab = useCallback((k: TabKey) => {
+    const target = tabScreen(k);
+    if (k === 'home') { if (stack.current.length) window.history.go(-stack.current.length); else if (screen.name !== 'home') setScreen(target); return; }
+    if (screen.name === target.name) return;
+    go(target, { replace: tabOf(screen) !== undefined && tabOf(screen) !== 'home' });
+  }, [screen, go]);
   // The Android back button and the browser's Back both arrive here.
   useEffect(() => {
-    const onPop = () => {
+    const onPop = (e: PopStateEvent) => {
+      // EA AI Buddy reskin: the Home tab goes back several places at once (history.go(-n)); the history entry says how
+      // deep it is (eab = Back-list length when it was made; the first entry has none = 0). One Back is one place, as before.
+      const want = typeof (e.state as { eab?: unknown } | null)?.eab === 'number' ? (e.state as { eab: number }).eab : 0;
+      while (stack.current.length > Math.max(want, 0) + 1) { stack.current.pop(); forgetEntry(ids.current.pop() ?? -1); }
       const prev = stack.current.pop();
       forgetEntry(entryRef.current);
       const id = ids.current.pop() ?? newEntryId();
@@ -487,7 +504,7 @@ function Shell() {
           {/* ClaudeChanges001 change 2: no "Saved on This Phone" line under the title; a problem shows as a banner on the main page. */}
           <div className="title-col">
             {screen.name === 'home'
-              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={66} big /><span className="wordmark"><span>{t.appNameA}</span><em>{t.appNameB}</em></span></h1>
+              ? <h1 className="brand" aria-label={t.appName}><IconLogo size={58} big /><span className="wordmark"><span className="wm-name"><span>{t.appNameA}</span> <em>{t.appNameB}</em></span><small className="wm-tag" aria-hidden="true">{reskinStrings[lang].tagline}</small></span></h1>
               : <h1>{title}</h1>}
           </div>
           {screen.name === 'home' && <>
@@ -520,7 +537,8 @@ function Shell() {
           : needsStartChoice(state) ? <StartChoice lang={lang} /> : <AnnouncementPopup lang={lang} showId={tapAnnouncement} onDone={() => setTapAnnouncement(null)} />}
 
         {/* Change 011: the one advertising area for every normal screen, fixed above the phone's navigation buttons. */}
-        <BottomAd lang={lang} />
+        {/* EA AI Buddy reskin: the tab bar is the last row, directly under the advert (owner's choice, 31 Oct 2026). */}
+        <BottomAd lang={lang} tabs={<TabBar lang={lang} current={screen} onTab={onTab} />} tabsHeight={TAB_H} />
 
         {toast && (
           <div className={toast.kind === 'error' ? 'toast error' : 'toast'} role={toast.kind === 'error' ? 'alert' : 'status'} data-testid="toast" data-kind={toast.kind}>
@@ -555,6 +573,7 @@ function screenTitle(s: Screen, lang: Lang, state: ReturnType<Store['getState']>
   switch (s.name) {
     case 'home': return t.appName;
     case 'notifications': return t.notifications;
+    case 'more': return reskinStrings[lang].more.title;
     case 'contactsHome': return cs.contacts;
     case 'opportunities': return t.tiles.opportunities;
     case 'listing': return ls.title;
@@ -625,6 +644,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
   switch (s.name) {
     case 'home': return <Home lang={lang} go={go} />;
     case 'notifications': return <Notifications lang={lang} go={go} />;
+    case 'more': return <MoreScreen lang={lang} go={go} />;
     case 'contactsHome': return <ContactsHome lang={lang} go={go} />;
     case 'opportunities': return (
       <section className="stack" data-testid="opportunities">
@@ -708,29 +728,67 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
   }
 }
 
-/** Home (Change 011): the 15 cards and nothing else; the Today and Recent Properties sections were removed. The fixed
- *  advert below the cards is drawn by the shell. */
+/** Home. EA AI Buddy reskin, Phase A (owner, 31 Oct 2026, following the approved mockups): a greeting card with today's
+ *  date and how many things are due today, four live numbers from the agent's own records, then Quick Access. The 15
+ *  cards keep their order, numbers and keys (Change 011 / JoyChange002 Change 43): cards 1 to 12 in three columns, then
+ *  AI Assisted Command (15) as a wide gold banner, then Calendar & To-Do (13) and Subsale List (14) side by side.
+ *  The fixed advert and the tab bar below it are drawn by the shell. */
 function Home({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   // MainForAdmin-E: a tile Admin EAB switched off for this agent (tile.<key>) is left out; the others keep their numbers.
   const flags = myFlags(store);
   const t = strings[lang];
+  const r = reskinStrings[lang];
   const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
   const x1 = cc001Strings[lang];
   const [askAgenda, setAskAgenda] = useState(false);
   const tileLabel = (key: string) => t.tiles[key];
   const unreadNews = useUnreadNews();
+  const now = new Date();
+  const st = homeStats(state, now);
+  const who = firstName(state.profile.fullName) ?? r.agent;
+  const dateText = now.toLocaleDateString(lang === 'en' ? 'en-GB' : htmlLang(lang), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const Stat = ({ k, icon, label, value, sub, to }: { k: string; icon: JSX.Element; label: string; value: string; sub: string; to: Screen }) => (
+    <button type="button" className="stat" data-testid={`home-stat-${k}`} onClick={() => go(to)}>
+      <span className="stat-icon">{icon}</span>
+      <span className="stat-text"><small>{label}</small><strong>{value}</strong><small className="muted">{sub}</small></span>
+    </button>
+  );
   return (
     <section className="stack home">
       {/* ClaudeChanges001 change 2: below the header line, above the cards, only when something did not sync. */}
       <SyncBanner lang={lang} onReview={() => go({ name: 'syncReview' })} />
       <AnnouncementBanners lang={lang} />
       {invite && <button className="card link-card" data-testid="invite-banner" onClick={() => go({ name: 'team' })}><strong>{teamStrings[lang].linkFound}</strong></button>}
-      <nav className="grid" aria-label={t.home}>
+      <div className="hero" data-testid="home-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(8,8,10,.96) 0%, rgba(8,8,10,.78) 42%, rgba(8,8,10,.1) 100%), url(${heroHouse})` }}>
+        <div className="hero-text">
+          <span className="hero-tag" aria-hidden="true">{r.tagline}</span>
+          <span className="hero-greet">{r.greet[greetingPart(now.getHours())]}</span>
+          <strong className="hero-name" data-testid="home-greeting-name">{who}!</strong>
+          <span className="hero-quote">{r.quote}</span>
+        </div>
+        <button type="button" className="hero-today" data-testid="home-today" onClick={() => setAskAgenda(true)}>
+          <span className="hero-date">{dateText}</span>
+          <span className="hero-tasks"><IconAgenda /> {r.tasksToday(st.todayCount)} <span aria-hidden="true">›</span></span>
+        </button>
+      </div>
+      <div className="stat-row" data-testid="home-stats">
+        <Stat k="sales" icon={<IconSales />} label={r.stats.sales} value={rm(st.salesMonth)} sub={r.stats.salesSub} to={{ name: 'trackSales' }} />
+        <Stat k="deals" icon={<IconTrend />} label={r.stats.deals} value={String(st.activeDeals)} sub={r.stats.dealsSub} to={{ name: 'trackSales' }} />
+        <Stat k="inquiries" icon={<IconChat />} label={r.stats.inquiries} value={String(st.newInquiries)} sub={r.stats.inquiriesSub} to={{ name: 'activity', tab: 'inquiries' }} />
+        <Stat k="viewings" icon={<IconCalendar />} label={r.stats.viewings} value={String(st.viewings)} sub={r.stats.viewingsSub} to={{ name: 'activity', tab: 'viewings' }} />
+      </div>
+      <h2 className="section-head">{r.quick}</h2>
+      <nav className="grid dash" aria-label={t.home}>
         {TILES.map((tile, i) => tileHidden(flags, tile.key) ? null : (
-          <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
-            aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}>
-            <span className="tile-icon">{tile.icon()}</span><span className="tile-label">{tileLabel(tile.key)}</span>
+          <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''} ${tile.key === 'agenda' || tile.key === 'property' ? 'wide-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
+            aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}
+            style={tile.key === 'property' ? { backgroundImage: `linear-gradient(90deg, rgba(19,19,22,.97) 30%, rgba(19,19,22,.55) 100%), url(${heroHouse})` } : undefined}>
+            <span className="tile-icon">{tile.icon()}</span>
+            {tile.key === 'voice'
+              ? <span className="tile-text"><span className="tile-label">{r.ai.title}</span><small className="tile-sub">{r.ai.body}</small></span>
+              : <span className="tile-text"><span className="tile-label">{tileLabel(tile.key)}</span>{r.sub[tile.key] && <small className="tile-sub">{r.sub[tile.key]}</small>}</span>}
+            {tile.key === 'voice' ? <span className="tile-cta" aria-hidden="true">{r.ai.start} ›</span> : <span className="tile-chev" aria-hidden="true">›</span>}
             {tile.key === 'market' && unreadNews > 0 && <span className="tile-badge" data-testid="market-badge" aria-label={feedStrings[lang].unread(unreadNews)}>{unreadNews > 99 ? '99+' : unreadNews}</span>}
             {tile.key === 'opportunities' && teamBadgeCount(state) > 0 && <span className="tile-badge" data-testid="opportunities-badge" aria-label={teamStrings[lang].newInvites(teamBadgeCount(state))}>{teamBadgeCount(state)}</span>}
           </button>

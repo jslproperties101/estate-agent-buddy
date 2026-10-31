@@ -16,7 +16,7 @@ const has = (buf, text) => buf.includes(Buffer.from(text, 'utf16le')) || buf.inc
 need(has(manifest, wantPkg), `manifest does not contain package ${wantPkg}`);
 if (variant === 'prod') need(!has(manifest, `${wantPkg}.qa`), 'the production APK must not contain the QA package name');
 else need(has(manifest, `${wantPkg}`) && has(manifest, 'fileprovider'), `${variant} manifest looks incomplete`);
-if (variant === 'pos') need(!has(manifest, 'com.jslproperties.estateagentbuddy.qa'), 'the POS APK must not use the QA package name');
+if (variant === 'pos') need(!has(manifest, 'com.jslproperties.eaaibuddy.qa'), 'the POS APK must not use the QA package name');
 
 // App name (resources.arsc string pool).
 const arsc = read('resources.arsc');

@@ -193,7 +193,7 @@ export function buildPdf(pages: JpegPage[], info: { title?: string; now?: Date }
     add([`<< /Type /XObject /Subtype /Image /Width ${pg.w} /Height ${pg.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${pg.data.length} >>\nstream\n`, pg.data, '\nendstream']);
   });
   objs[1] = [`<< /Type /Pages /Count ${pages.length} /Kids [${kids.map(k => `${k} 0 R`).join(' ')}] >>`];
-  const infoObj = add([`<< /Title ${pdfText(info.title ?? 'Document')} /Producer (Estate Agent Buddy) /CreationDate (${pdfDate(info.now ?? new Date())}) >>`]);
+  const infoObj = add([`<< /Title ${pdfText(info.title ?? 'Document')} /Producer (EA AI Buddy) /CreationDate (${pdfDate(info.now ?? new Date())}) >>`]);
 
   const chunks: (Uint8Array | string)[] = ['%PDF-1.4\n%\xe2\xe3\xcf\xd3\n'];
   let pos = chunks.map(c => (typeof c === 'string' ? enc.encode(c).length : c.length)).reduce((a, b) => a + b, 0);

@@ -16,7 +16,7 @@ declare const __EAB_BUILD__: { qa?: boolean; website?: boolean; pos?: boolean } 
 export const IS_QA = typeof __EAB_BUILD__ !== 'undefined' && !!__EAB_BUILD__?.qa;
 /** The standalone AI Buddy POS app (EAB_POS=1 at build time): own package, opens in AI Buddy POS, never updates itself. */
 export const IS_POS = typeof __EAB_BUILD__ !== 'undefined' && !!__EAB_BUILD__?.pos;
-export const APP_ID = IS_POS ? 'com.jslproperties.aibuddypos' : IS_QA ? 'com.jslproperties.estateagentbuddy.qa' : 'com.jslproperties.estateagentbuddy';
+export const APP_ID = IS_POS ? 'com.jslproperties.aibuddypos' : IS_QA ? 'com.jslproperties.eaaibuddy.qa' : 'com.jslproperties.eaaibuddy';
 export const AUTH_CALLBACK = `${APP_ID}://auth-callback`;
 /** JoyChange002 Change 47: the laptop website (EAB_WEBSITE=1 at build time), opened in Chrome, Edge or Safari. Laid out for
  *  a wide screen, with no adverts and without the phone-only parts (live GPS journeys, the phone book). Never true inside
@@ -51,7 +51,7 @@ export async function closeBrowser(): Promise<void> {
 }
 
 export interface Listener { remove: () => Promise<void> | void }
-/** Calls fn when the app is opened through a link (Google sign-in returning to com.jslproperties.estateagentbuddy://…). */
+/** Calls fn when the app is opened through a link (Google sign-in returning to com.jslproperties.eaaibuddy://…). */
 export async function onAppUrlOpen(fn: (url: string) => void): Promise<Listener | null> {
   const app = plugin('App');
   if (!app) return null;

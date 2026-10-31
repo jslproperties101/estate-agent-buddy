@@ -1,0 +1,26 @@
+EA AI Buddy - rename + reskin Phase A - phone test checklist
+Main app, QA APK (com.jslproperties.eaaibuddy.qa, "EA AI Buddy QA"), branch feature/qa-ea-ai-buddy-reskin-a
+Report each line as "worked" or "failed" plus what you saw.
+
+INSTALL (new package = a NEW app beside the old one; it starts with empty storage)
+1. Open the old EAB QA app: it should say a new APK is needed (native 7 -> 8). Worked / failed
+2. Install the new APK. A second icon "EA AI Buddy QA" appears; the old EAB QA app is still there. Worked / failed
+3. Splash and logo read "EA / AI BUDDY". Settings -> About shows native 8. Worked / failed
+
+HOME
+4. Header: logo + "EA AI Buddy"; bell, language and profile buttons still work. Worked / failed
+5. Greeting card: tagline, "Good morning/afternoon/evening, <your first name or Agent>!", today's date, "N tasks today";
+   tapping it asks Calendar or To-Do. Worked / failed
+6. Four numbers (My Sales, Active Deals, New Inquiries, Viewings) match your records; each opens the right screen. Worked / failed
+7. Quick Access: 12 cards in 3 columns, then the gold AI Assisted Command banner, then Calendar & To-Do and Subsale List. Every card opens as before. Worked / failed
+
+TAB BAR AND ADVERT
+8. Bottom of the screen: tab bar (Home, Projects, round gold AI Buddy, Inquiries, More); the advert sits directly ABOVE it,
+   never over it and never under the phone's own navigation buttons. Worked / failed
+9. Typing in any box: advert and tab bar hide; they come back when the keyboard closes. Worked / failed
+10. Tap Projects, Inquiries, More, AI Buddy: each opens; Home always returns to the main screen; phone Back still works. Worked / failed
+11. More: profile card, Settings, Notifications, Team Workspace, Send Feedback all open. Worked / failed
+
+KNOWN UNTIL THE OWNER STEPS IN docs/EA_AI_BUDDY_RESKIN_A.md ARE DONE
+- Google sign-in may not return to the new app (Supabase redirect URL for the new package not added yet).
+- Push alerts and crash reports are not expected to work (new package not yet registered in Firebase).

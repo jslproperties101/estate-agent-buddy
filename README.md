@@ -1,7 +1,9 @@
-# Estate Agent AI Buddy
+# EA AI Buddy
 
-Field app for a Malaysian property negotiator working mainly in Nilai and Sepang (formerly "Estate Agent Buddy" and
-"Property Explorer"). The Android package id stays `com.jslproperties.estateagentbuddy`, so new APKs install over the old one.
+Field app for a Malaysian property negotiator working mainly in Nilai and Sepang (formerly "Estate Agent AI Buddy",
+"Estate Agent Buddy" and "Property Explorer"). Since 31 Oct 2026 (owner's decision) the Android package id is
+`com.jslproperties.eaaibuddy` (QA: `com.jslproperties.eaaibuddy.qa`); it installs as a NEW app beside the earlier
+`com.jslproperties.estateagentbuddy` APKs, not over them. See docs/EA_AI_BUDDY_RESKIN_A.md.
 Target: a native Android app (Capacitor) for the Samsung S23 Ultra, with Supabase (Singapore) as the cloud backend.
 
 ## ClaudeChanges001 (17 Oct 2026, QA build only)

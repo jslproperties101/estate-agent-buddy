@@ -23,6 +23,7 @@ type AdMobPlugin = {
   showBanner(o: { adId: string; adSize?: string; position?: string; margin?: number; isTesting?: boolean }): Promise<void>;
   hideBanner(): Promise<void>;
   resumeBanner(): Promise<void>;
+  removeBanner(): Promise<void>;
   addListener(event: string, fn: (info: { height?: number; width?: number }) => void): Promise<{ remove: () => void }>;
 };
 
@@ -36,6 +37,8 @@ let shown = false;
 let everShown = false;
 let wantShown = true;
 let heightListener: ((h: number) => void) | null = null;
+/** EA AI Buddy reskin: distance of the banner from the bottom (dp = CSS px), so it sits directly above the tab bar. */
+let margin = 0;
 
 /** Starts AdMob once and shows the bottom banner. Resolves false (and the page shows its placeholder) if anything fails. */
 export function startBanner(onHeight: (h: number) => void): Promise<boolean> {
@@ -54,7 +57,7 @@ export function startBanner(onHeight: (h: number) => void): Promise<boolean> {
       });
       await ad.addListener('bannerAdFailedToLoad', () => heightListener?.(BANNER_H));
       if (wantShown) {
-        await ad.showBanner({ adId: ADMOB_BANNER_UNIT, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testAdsOnly() });
+        await ad.showBanner({ adId: ADMOB_BANNER_UNIT, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin, isTesting: testAdsOnly() });
         shown = true; everShown = true;
       }
       return true;
@@ -71,9 +74,24 @@ export async function setBannerVisible(visible: boolean): Promise<void> {
   try {
     if (visible && !shown) {
       if (everShown) await ad.resumeBanner();
-      else await ad.showBanner({ adId: ADMOB_BANNER_UNIT, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin: 0, isTesting: testAdsOnly() });
+      else await ad.showBanner({ adId: ADMOB_BANNER_UNIT, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin, isTesting: testAdsOnly() });
       shown = true; everShown = true;
     }
     else if (!visible && shown) { await ad.hideBanner(); shown = false; }
   } catch { /* the banner stays as it was; the page layout is unaffected */ }
+}
+
+/** EA AI Buddy reskin: lifts the banner by `px` (the tab bar's height). The plugin only takes the margin when a banner is
+ *  shown, so a banner already on screen is removed and shown again at the new height. */
+export async function setBannerMargin(px: number): Promise<void> {
+  if (px === margin) return;
+  margin = px;
+  const ad = plugin<AdMobPlugin>('AdMob');
+  if (!ad || !started || !(await started) || !shown) return;
+  try {
+    await ad.removeBanner();
+    everShown = false;
+    await ad.showBanner({ adId: ADMOB_BANNER_UNIT, adSize: 'ADAPTIVE_BANNER', position: 'BOTTOM_CENTER', margin, isTesting: testAdsOnly() });
+    everShown = true;
+  } catch { /* the banner stays where it was */ }
 }

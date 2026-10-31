@@ -167,7 +167,7 @@ test('J25-2 the phone registers its push address once per person and language, a
   assert.equal(await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'bm', s.fetchFn), true);
   assert.equal(await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'bm', s.fetchFn), true);
   assert.equal(s.calls.filter(c => c.url.endsWith('/rpc/eab_push_register')).length, 1, 'not sent again when nothing changed');
-  assert.deepEqual(s.calls[0].body, { p_token: 'fcm-token-0123456789abcdef', p_app: 'com.jslproperties.estateagentbuddy', p_platform: 'android', p_lang: 'bm' });
+  assert.deepEqual(s.calls[0].body, { p_token: 'fcm-token-0123456789abcdef', p_app: 'com.jslproperties.eaaibuddy', p_platform: 'android', p_lang: 'bm' });
   await registerToken(a.store, cfg, 'fcm-token-0123456789abcdef', 'en', s.fetchFn);
   assert.equal(s.calls.filter(c => c.url.endsWith('/rpc/eab_push_register')).length, 2, 'sent again when the language changed');
   await unregisterToken(a.store, cfg, s.fetchFn);

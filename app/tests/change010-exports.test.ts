@@ -85,7 +85,7 @@ test('R5 PDF: header and footer on every page, watermark on every page, table he
   assert.ok(pages.length >= 3, `long report spans pages (${pages.length})`);
   pages.forEach((p, i) => {
     const t = texts(p);
-    assert.ok(t.includes('Estate Agent AI Buddy'), `brand on page ${i + 1}`);
+    assert.ok(t.includes('EA AI Buddy'), `brand on page ${i + 1}`);
     assert.ok(t.includes('Audit History Report'), `title on page ${i + 1}`);
     assert.ok(t.includes('15 Oct 2026, 4:30 PM (MYT, UTC+8)'), `export date on page ${i + 1}`);
     assert.ok(t.includes(`Page ${i + 1} of ${pages.length}`), `page number on page ${i + 1}`);

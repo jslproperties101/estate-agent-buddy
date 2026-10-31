@@ -10,6 +10,8 @@ export type FormSection =
 export type Screen =
   | { name: 'home' }
   | { name: 'notifications' }
+  // EA AI Buddy reskin (31 Oct 2026): the More tab (profile card, Settings, Notifications, Team, Feedback)
+  | { name: 'more' }
   | { name: 'contactsHome' }
   | { name: 'opportunities' }
   | { name: 'listing'; filters?: Filters }

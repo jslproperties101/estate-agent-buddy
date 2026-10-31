@@ -15,7 +15,7 @@ test('W1 QA branches build only the QA APK; feature branches publish no normal-p
   const release = wf.slice(wf.indexOf('- name: Release with the APK'));
   assert.match(release.split('\n').slice(0, 3).join('\n'), /if: env\.PUBLISH_APK == '1'/, 'the release step is gated');
   assert.match(wf, /if: github\.ref == 'refs\/heads\/main' \|\| github\.ref == 'refs\/heads\/feature\/v2-full-update'\n\s+environment: \{ name: github-pages/, 'web deploy only from main / v2-full-update');
-  assert.match(wf, /node scripts\/verify-apk\.mjs "\$APK" com\.jslproperties\.estateagentbuddy\.qa "EAB QA" qa/, 'the QA APK is checked for its own package and name');
+  assert.match(wf, /node scripts\/verify-apk\.mjs "\$APK" com\.jslproperties\.eaaibuddy\.qa "EA AI Buddy QA" qa/, 'the QA APK is checked for its own package and name');
   assert.match(wf, /node scripts\/verify-apk\.mjs "\$APK" com\.jslproperties\.aibuddypos "AI Buddy POS" pos/, 'the AI Buddy POS APK is checked for its own package and name');
 });
 

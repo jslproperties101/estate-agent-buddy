@@ -1,7 +1,7 @@
 // "Continue with Google": Google sign-in through Supabase Auth with PKCE (no secret on the phone).
 //  Web:     the page goes to Google and comes back to the same address with ?code=…; the code is exchanged here.
 //  Android: Google opens in the phone's browser tab (Google does not allow sign-in inside an app's web view) and
-//           returns to com.jslproperties.estateagentbuddy://auth-callback?code=…, which opens the app again.
+//           returns to com.jslproperties.eaaibuddy://auth-callback?code=…, which opens the app again.
 // Needs: Supabase URL + anon key, the Google provider switched on in Supabase, and the return addresses in the
 // Supabase redirect list (docs/SETUP.md). Nothing here pretends: a session exists only after Supabase issued one.
 import { isNative, openInBrowser, closeBrowser, AUTH_CALLBACK } from '../native/native';
