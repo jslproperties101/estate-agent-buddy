@@ -122,8 +122,9 @@ for (const [dir, label] of [['values', 'EA AI Buddy Document Upload'], ['values-
       // Push alerts and crash reports are NOT expected to work for a borrowed package until it is properly registered.
       const borrowFrom = !QA && !POS ? LEGACY_APP_ID : `${LEGACY_APP_ID}.qa`;
       const base = (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === borrowFrom)
-        ?? (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === `${cfg.appId}.qa`);
-      if (!base) throw new Error(`google-services.json has no Android app ${borrowFrom} to borrow for ${APP_ID}`);
+        ?? (j.client ?? []).find(c => c.client_info?.android_client_info?.package_name === cfg.appId)   // the new real app, when only it is registered
+        ?? (j.client ?? [])[0];
+      if (!base) throw new Error(`google-services.json has no Android app to borrow for ${APP_ID}`);
       const copy = JSON.parse(JSON.stringify(base)); copy.client_info.android_client_info.package_name = APP_ID;
       j.client.push(copy);
       writeFileSync('android/app/google-services.json', JSON.stringify(j, null, 2));
