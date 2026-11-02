@@ -144,6 +144,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
             return (
               <li key={c.id} className="contact-row" data-testid="contact-row" data-lead={role === 'buyer' ? c.leadStatus ?? '' : ''} data-vstat={role === 'vendor' ? c.vendorStatus ?? '' : ''}
                 style={statusOf(c) ? { borderLeftColor: colour(statusOf(c)!) } : undefined}>
+                <span className="avatar" aria-hidden="true" data-testid="contact-avatar">{(c.name.trim()[0] ?? '?').toUpperCase()}</span>
                 <button className="row-main" onClick={() => go({ name: 'contactDetail', id: c.id })}>
                   <strong>{c.name}</strong>
                   <small className="muted">{[c.phone, c.company, props ? `${s.properties}: ${props}` : ''].filter(Boolean).join(' · ') || s.phoneMissing}</small>
@@ -151,6 +152,7 @@ export function ContactsList({ lang, go, role }: { lang: Lang; go: Go; role: 've
                   <CardFoot lang={lang} collection="contacts" id={c.id} />
                 </button>
                 {usablePhone(c.phone) && <a className="btn small secondary" href={`tel:+${phoneDigits(c.phone)}`} aria-label={`${t.c.call}: ${c.name}`}>{t.c.call}</a>}
+                {usablePhone(c.phone) && <a className="btn small secondary wa-btn" data-testid="contact-wa" href={`https://wa.me/${phoneDigits(c.phone)}`} target="_blank" rel="noreferrer" aria-label={`${t.c.whatsapp}: ${c.name}`}>{t.c.whatsapp}</a>}
               </li>
             );
           })}

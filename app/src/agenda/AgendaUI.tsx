@@ -39,7 +39,7 @@ export function ActivityScreen({ lang, go, propertyId, contactId, tab }: { lang:
   return (
     <section className="stack">
       {(prop || contact) && <p className="small muted">{prop ? [prop.ref, cardTitle(prop)].filter(Boolean).join(' · ') : contact!.name}</p>}
-      <Tabs label={a.activity.title} value={t} onChange={setT} options={[
+      <Tabs className="seg-tabs" label={a.activity.title} value={t} onChange={setT} options={[
         { value: 'inquiries', label: a.inq.title, count: state.inquiries.filter(scoped).length },
         { value: 'viewings', label: a.view.title, count: state.appointments.filter(x => x.kind === 'viewing' && scoped(x)).length },
       ]} />

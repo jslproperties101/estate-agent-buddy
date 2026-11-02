@@ -36,18 +36,26 @@ export function ProjectList({ lang, go, openId }: { lang: Lang; go: Go; openId?:
   const { state } = useApp();
   const t = projectStrings[lang];
   const [q, setQ] = useRemembered('q', '');
+  const [st, setSt] = useRemembered<'all' | Project['status']>('pst', 'all');
   const list = useMemo(() => {
     const n = q.trim().toLowerCase();
     return state.projects
+      .filter(p => st === 'all' || p.status === st)
       .filter(p => !n || [p.name, p.developer, p.township, p.city, p.state].some(v => (v ?? '').toLowerCase().includes(n)))
       .sort((a, b) => b.updated - a.updated);
-  }, [state.projects, q]);
+  }, [state.projects, q, st]);
   return (
     <section className="stack" data-testid="projects">
       <button className="btn primary add-property" data-testid="project-add" onClick={() => go({ name: 'projectForm' })}><span aria-hidden="true">＋</span> {t.add}</button>
       {/* MainForAdmin-D (JoyChange005-Main Part1): the invitation code and the projects pushed from Admin EAB. */}
       <PushedProjects lang={lang} openId={openId} />
       {state.projects.length > 0 && <input aria-label={t.search} placeholder={t.search} value={q} onChange={e => setQ(e.target.value)} data-testid="project-search" />}
+      {state.projects.length > 0 && (
+        <div className="chip-row filter-chips" role="radiogroup" aria-label={t.f.status} data-testid="project-status-filter">
+          <button type="button" role="radio" aria-checked={st === 'all'} className={`chip-btn ${st === 'all' ? 'on' : ''}`} onClick={() => setSt('all')}>{strings[lang].c.all}</button>
+          {PROJECT_STATUSES.map(x => <button key={x} type="button" role="radio" aria-checked={st === x} className={`chip-btn ${st === x ? 'on' : ''}`} onClick={() => setSt(x)}>{t.status[x]}</button>)}
+        </div>
+      )}
       {state.projects.length === 0 && <p className="muted empty" data-testid="projects-empty">{t.empty}</p>}
       {state.projects.length > 0 && list.length === 0 && <p className="muted">{t.none}</p>}
       <ul className="project-list">

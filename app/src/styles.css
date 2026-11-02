@@ -1719,3 +1719,33 @@ html.kb-open .opt-pop::after { display: none; }
    above does not apply there. */
 html.website .home nav.grid.dash { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
 html.website .home nav.grid.dash > .tile, html.website .home nav.grid.dash > .tile.robot-tile, html.website .home nav.grid.dash > .tile.wide-tile { grid-column: auto; order: 0; }
+
+/* ===== EA AI Buddy reskin, Phase B: Projects, property cards and details, Contacts, Inquiries & Viewings ===== */
+/* Filter chips: one scrolling row of pills, like the mockup (All / Residential / ...). */
+.filter-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chips .chip-btn { flex: none; white-space: nowrap; background: #121214; }
+/* Projects list: dark card with a gold edge, gold "from" price, status pill. */
+.project-card { background: linear-gradient(180deg, #17171A, #101012); border: 1px solid var(--box-line); border-left: 4px solid var(--gold); border-radius: 16px; padding: 12px 14px; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.project-card .pc-name { font-size: 19px; }
+.project-card .pc-price { font-size: 18px; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.pj-st { border-radius: 999px; font-size: 14px; padding: 3px 12px; }
+/* Property cards and the property page headline. */
+.sc-card { border: 1px solid var(--box-line); border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.sc-large .sc-title { font-size: 19px; }
+.sc-status { border-radius: 999px; }
+.lc-price.big { font-size: 28px; letter-spacing: .01em; }
+/* Contacts: round gold-ringed initial, name and role lines, Call and WhatsApp pills on the right. */
+.contact-row { gap: 6px; border-left-width: 4px; padding: 6px 8px 6px 8px; border-radius: 16px; background: linear-gradient(180deg, #17171A, #101012); }
+.contact-row .avatar { flex: none; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800;
+  color: var(--gold-hi); background: #1E1A10; border: 2px solid var(--gold-soft); }
+.contact-row .row-main { padding: 4px 6px; }
+.contact-row .btn.small { min-height: 44px; min-width: 44px; border-radius: 22px; padding: 4px 12px; font-size: 14px; }
+.contact-row .wa-btn { border-color: #2FAE66; color: #5BE08F; }
+@media (max-width: 420px) { .contact-row { flex-wrap: wrap; } .contact-row .row-main { flex: 1 1 calc(100% - 60px); } .contact-row .btn.small { flex: 1 1 0; } }
+/* Inquiries & Viewings: full-width gold segmented switch, rounded cards with a gold edge. */
+.tabs.seg-tabs { flex-wrap: nowrap; background: #121214; border: 1px solid var(--line-2); border-radius: 999px; padding: 3px; gap: 3px; }
+.tabs.seg-tabs button { flex: 1 1 0; justify-content: center; border: 0; border-radius: 999px; background: transparent; }
+.tabs.seg-tabs button.on { background: var(--gold-grad); }
+.act-item { border-radius: 14px; border-left: 3px solid var(--gold-soft); background: linear-gradient(180deg, #17171A, #101012); }
+.sc-large .sc-tx { font-size: 14px; }

@@ -222,9 +222,9 @@ export function ContactSelect({ lang, value, onChange, label, roles, filter, req
   );
 }
 
-export function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string; count?: number }[]; onChange: (v: T) => void; label: string }) {
+export function Tabs<T extends string>({ value, options, onChange, label, className }: { value: T; options: { value: T; label: string; count?: number }[]; onChange: (v: T) => void; label: string; className?: string }) {
   return (
-    <div className="tabs" role="tablist" aria-label={label}>
+    <div className={className ? `tabs ${className}` : 'tabs'} role="tablist" aria-label={label}>
       {options.map(o => (
         <button key={o.value} role="tab" type="button" aria-selected={value === o.value} className={value === o.value ? 'on' : ''} onClick={() => onChange(o.value)}>
           {o.label}{o.count !== undefined ? <span className="count">{o.count}</span> : null}

@@ -15,7 +15,8 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
 | Home dashboard: greeting card, four live numbers, Quick Access cards with short lines, AI Assisted Command banner, wide Calendar & To-Do / Subsale List cards | DONE (browser-tested) |
 | Bottom tab bar: Home, Projects, AI Buddy (centre), Inquiries, More; advert directly above it | DONE in browser; native AdMob banner position NOT PROVEN on a phone |
 | More screen: profile card, Settings, Notifications, Team Workspace, Send Feedback, About | DONE |
-| Phase B (Projects, Property Details, Contacts, Inquiries & Viewings) and Phase C (Calendar, Calculator, News, Track My Sales, AI Assistant) | NOT DONE (next phases, after review) |
+| Phase B (Projects, Property Details, Contacts, Inquiries & Viewings) | IMPLEMENTED (look and layout only; browser-tested, not yet seen on a phone) — see below |
+| Phase C (Calendar, Calculator, News, Track My Sales, AI Assistant) | NOT DONE (next phase, after review) |
 
 ## What stays the same on purpose
 
@@ -30,7 +31,7 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
 
 ## Owner steps needed before the new package works fully
 
-1. **Firebase** (project `estate-agent-ai-buddy-a7ac7`): Add app → Android → `com.jslproperties.eaaibuddy` and
+1. **Firebase** (the owner's new project `eaai-buddy`; the old project was `estate-agent-ai-buddy-a7ac7`): Add app → Android → `com.jslproperties.eaaibuddy` and
    `com.jslproperties.eaaibuddy.qa`, each with the debug key SHA-1 (same as the current apps). Download the new
    `google-services.json` and replace `app/android-config/google-services.json`. Until then the build borrows the old
    entries under the new names: the APK builds and runs, but **push alerts and crash reports are not expected to work**.
@@ -53,3 +54,14 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
   (banner lifted by the tab bar's height), `app/src/styles.css`, `app/src/nav.ts`.
 - Tests: `app/tests/ea-reskin.test.ts` (new), updated U1, U30, U39b, U91, U101, U120, BR3, BR5, QA2, QA3, W1, R5, J25-2.
 - Database: `supabase/proposed/20261031000000_ea_ai_buddy_app_ids.sql` (+ rollback).
+
+## Phase B (3 Nov 2026) — what changed
+
+Look and layout only; no data, saving, sync or rules changed.
+- Projects: status filter chips (All, Upcoming, Launched, ...) above the list; dark cards with a gold edge and gold price.
+- Subsale List cards and the property page: card edge and headline price styling; for-sale / for-rent labels on large cards raised to 14 px.
+- Contacts: a round initial beside each person, and Call + WhatsApp buttons (WhatsApp uses the phone number, like the contact page).
+- Inquiries & Viewings: full-width gold segmented switch; rounded cards with a gold edge.
+- Tests: `app/tests/ui-reskin-b.test.mjs` (EB1-EB4). EB3 finds no projects in the sample data, so the filter itself is NOT exercised yet.
+- Not done on purpose: the mockup's Map View, Floor Plan / Gallery tabs on a property and a photo on every Projects card (they need
+  data the app does not have or new features). The existing gap under the title bar on list screens (Change 74) is unchanged.
