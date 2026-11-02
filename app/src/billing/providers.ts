@@ -29,7 +29,12 @@ export type PayStep = { kind: 'opened'; env: 'sandbox' | 'live' } | { kind: 'ver
  * when EAB_PLAY_BILLING=1). productId is the plan id, which must equal the Play Console subscription id. The plugin does NOT
  * acknowledge the purchase: the server does, after checking it with Google (supabase/functions/billing, play_verify).
  */
-export interface PlayBillingPlugin { purchase(o: { productId: string; obfuscatedAccountId: string }): Promise<{ purchaseToken: string }> }
+export interface PlayBillingPlugin {
+  /** type 'subs' (the default): a subscription (Market News). 'inapp' (Batch B): a one-time token pack. */
+  purchase(o: { productId: string; obfuscatedAccountId: string; type?: 'subs' | 'inapp' }): Promise<{ purchaseToken: string }>;
+  /** Batch B: purchases Google Play still holds for this Google account that the server has not consumed yet (type 'inapp'). */
+  owned?(o: { type: 'inapp' }): Promise<{ purchases: { productId: string; purchaseToken: string }[] }>;
+}
 
 export const sha256Hex = async (s: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');

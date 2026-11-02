@@ -8,6 +8,9 @@ export const Capacitor = {
   isPluginAvailable: (_name: string) => false,
   convertFileSrc: (path: string) => path,
 };
-export function registerPlugin<T = any>(_name: string): T {
+export function registerPlugin<T = any>(name: string): T {
+  // Unit tests only: a test may put a fake plugin in globalThis.__eabStubPlugins[name] (the real Capacitor never reads this).
+  const fake = (globalThis as any).__eabStubPlugins?.[name];
+  if (fake) return fake as T;
   return new Proxy({}, { get: () => async () => { throw new Error('native-unavailable'); } }) as T;
 }

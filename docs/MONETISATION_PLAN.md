@@ -20,7 +20,7 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Google Play | Server side: checks a purchase with Google (service account), requires that it was made for this agent (a hash of the agent's id is put on the purchase), applies it once, acknowledges it. Phone side: the interface to a native `PlayBilling` plugin. | **Server side IMPLEMENTED BUT NOT PROVEN. The Android plugin is NOT DONE**: no Android code was added, so the Google Play button says "this APK does not include Google Play Billing yet". |
 | Safety rails | A live Stripe key or the live Billplz address is refused by both functions unless `BILLING_ALLOW_LIVE=true` is set on purpose; the Billplz callback without its X Signature key is refused in live mode; return addresses must be https or the app's own scheme; no secrets in the phone's code (a test checks it); no logging of tokens. | IMPLEMENTED |
 | Screens | A "Plans (test mode)" card in Settings: test-mode banner, state per product, trial button, provider choice, plans with prices, Pay (test), Refresh. English, Malay, Chinese. | IMPLEMENTED |
-| One Harta API | You answered "One harta api" to the first question and did not say what it is; I could not find it online. **Nothing was built for it.** | NOT DONE (needs your explanation) |
+| One Harta API | Explained by the owner on 30 Oct 2026 (oneharta.com API: land tax, company, sale/rental and InfoSearch lookups charged in One Harta credits). Agents will pay for lookups with Ai Buddy Tokens (Batch B wallet, below); the lookups themselves are **Batch C, not built yet**. | NOT DONE (Batch C) |
 
 ## Batch A (30 Oct 2026): Market News and Intelligence "access" plans
 
@@ -32,6 +32,17 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Screen | Billing switch on and no active news plan: a subscription box replaces the news list (no titles, bodies or unread number; the Home badge is hidden). Switch off: exactly as before. |
 | Native plugin | Written into `scripts/android-setup.mjs`, built only with `EAB_PLAY_BILLING=1` (set for the QA APK only). **Never compiled with the real Billing Library here and never run on a phone.** |
 | Not done | Server-side hiding of paid posts (the feed and the push alert text still reach every agent the post is for: see "Known limits"); Google's real-time notifications for renewals and cancellations (the plan is read again only when the agent buys or taps Restore / Refresh). |
+
+## Batch B (3 Nov 2026): Ai Buddy Tokens
+
+| | |
+|---|---|
+| Price | 1 token = **USD 0.25** (owner's price). Packs: `tokens_20` USD 5, `tokens_100` USD 25, `tokens_400` USD 100, `tokens_1000` USD 250. The same list is held on the phone (`app/src/billing/plans.ts`), the server (`_shared/billing.ts`) and in the database function `eab_tokens_credit`; a test keeps the three equal. |
+| How to pay | **Google Play only**, as one-time (consumable, "in-app") products. The phone buys the pack through the `PlayBilling` plugin (`type: 'inapp'`); the server (`billing` function, action `tokens_verify`) checks the purchase with Google, requires that it was made for this agent, credits the pack's tokens once through `eab_tokens_credit`, then **consumes** the purchase (which also acknowledges it and lets the agent buy the same pack again). The phone never sends a token count or an amount. |
+| Play Console ids | The in-app product ids **must be exactly** `tokens_20`, `tokens_100`, `tokens_400`, `tokens_1000`. |
+| Database | `supabase/proposed/20261103000000_tokens_sandbox.sql` (+ rollback + `supabase/tests/tokens_sandbox_test.sql`): `eab_token_ledger` (every change; one credit per purchase), `eab_token_balances` (per agent **and per environment**, never below zero), `eab_my_tokens()` for the phone, `eab_tokens_credit()` for the server only. Test-mode tokens never become real tokens. Not applied to any Supabase project. |
+| Screen | Settings, below the Plans card, only while the billing switch is on: balance, the four packs with USD prices, Buy, **Restore purchases** (sends any paid purchase Google Play still holds to the server, e.g. after a lost connection; never credits twice), Refresh balance, last changes. English, Malay and Chinese (Malay and Chinese are drafts). |
+| Not done | **Spending tokens** (Batch C: Oneharta lookups, each charged in tokens on the server). Google's real-time notifications for refunds (a refunded pack is not taken back from the balance yet). A bonus on larger packs (owner to decide). |
 
 ## Which features to charge for: a proposal (only Market News is gated, Batch A)
 

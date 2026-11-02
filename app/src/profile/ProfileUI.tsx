@@ -5,6 +5,7 @@ import { buddyStrings } from '../buddy/strings';
 import { billingStrings } from '../billing/strings';
 import { billingEnabled } from '../billing/access';
 import { BillingCard } from '../billing/BillingUI';
+import { TokenWallet } from '../billing/TokenWallet';
 import { useState } from 'react';
 import { AboutCard } from '../native/UpdateUI';
 import { BUILD } from '../native/updates';
@@ -322,6 +323,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <small className="muted">{billingStrings[lang].switchHint}</small>
       </div>
       {billingEnabled(store) && <BillingCard lang={lang} />}
+      {billingEnabled(store) && <TokenWallet lang={lang} />}
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>

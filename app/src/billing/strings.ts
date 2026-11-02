@@ -1,6 +1,7 @@
 // Billing (sandbox / test mode) screen text, in three languages. Every screen says it is test mode: no real money is charged.
 // Batch A: `paywall` is the Market News and Intelligence subscription box. Its Malay and Chinese are DRAFTS, to be checked by a
-// native speaker (as for the other feed screens).
+// native speaker (as for the other feed screens). Batch B: `tokens` is the Ai Buddy Token wallet; its Malay and Chinese are
+// DRAFTS too.
 import type { Lang } from '../i18n';
 
 const en = {
@@ -53,6 +54,27 @@ const en = {
     cancelled: 'Purchase cancelled. Nothing was charged.',
     pending: 'The payment is pending in Google Play. Access starts when Google confirms it; tap Restore / Refresh later.',
     noneFound: 'No active subscription found for this account.',
+  },
+  // Batch B: the Ai Buddy Token wallet card in Settings.
+  tokens: {
+    title: 'Ai Buddy Tokens (test mode)',
+    what: 'Tokens pay for lookups such as land tax and company searches (coming next). 1 token = USD 0.25.',
+    balance: (n: number) => `Balance: ${n.toLocaleString('en-US')} tokens`,
+    pack: (n: number) => `${n.toLocaleString('en-US')} tokens`,
+    buy: 'Buy',
+    via: 'Paid through Google Play. Google Play shows the final price in your currency before you pay.',
+    restore: 'Restore purchases',
+    refresh: 'Refresh balance',
+    checking: 'Waiting for Google Play…',
+    credited: (n: number) => `${n.toLocaleString('en-US')} tokens added by the server.`,
+    already: 'This purchase was already added to your balance.',
+    pending: 'The payment is pending in Google Play. Tokens are added when Google confirms it; tap Restore purchases later.',
+    cancelled: 'Purchase cancelled. Nothing was charged.',
+    restored: (n: number) => (n > 0 ? `${n.toLocaleString('en-US')} tokens restored.` : 'Nothing to restore.'),
+    restoreFailed: 'Some purchases could not be checked. Try Restore purchases again later; nothing is lost.',
+    history: 'Recent changes',
+    noHistory: 'No tokens bought yet.',
+    kind: { purchase: 'Bought', spend: 'Used', refund: 'Refunded', adjust: 'Adjusted' } as Record<string, string>,
   },
 };
 export type BillingStrings = typeof en;
@@ -108,6 +130,26 @@ const bm: BillingStrings = {
     pending: 'Bayaran masih belum selesai dalam Google Play. Akses bermula apabila Google mengesahkannya; ketik Pulihkan / Muat semula kemudian.',
     noneFound: 'Tiada langganan aktif untuk akaun ini.',
   },
+  tokens: {
+    title: 'Token Ai Buddy (mod ujian)',
+    what: 'Token digunakan untuk carian seperti cukai tanah dan carian syarikat (akan datang). 1 token = USD 0.25.',
+    balance: (n: number) => `Baki: ${n.toLocaleString('en-US')} token`,
+    pack: (n: number) => `${n.toLocaleString('en-US')} token`,
+    buy: 'Beli',
+    via: 'Dibayar melalui Google Play. Google Play menunjukkan harga akhir dalam mata wang anda sebelum anda membayar.',
+    restore: 'Pulihkan pembelian',
+    refresh: 'Muat semula baki',
+    checking: 'Menunggu Google Play…',
+    credited: (n: number) => `${n.toLocaleString('en-US')} token ditambah oleh pelayan.`,
+    already: 'Pembelian ini sudah ditambah ke baki anda.',
+    pending: 'Pembayaran masih belum selesai di Google Play. Token ditambah apabila Google mengesahkannya; tekan Pulihkan pembelian kemudian.',
+    cancelled: 'Pembelian dibatalkan. Tiada caj dikenakan.',
+    restored: (n: number) => (n > 0 ? `${n.toLocaleString('en-US')} token dipulihkan.` : 'Tiada apa untuk dipulihkan.'),
+    restoreFailed: 'Sesetengah pembelian tidak dapat disemak. Cuba Pulihkan pembelian sekali lagi nanti; tiada apa yang hilang.',
+    history: 'Perubahan terkini',
+    noHistory: 'Belum ada token dibeli.',
+    kind: { purchase: 'Dibeli', spend: 'Digunakan', refund: 'Dipulangkan', adjust: 'Dilaraskan' } as Record<string, string>,
+  },
 };
 
 const zh: BillingStrings = {
@@ -160,6 +202,26 @@ const zh: BillingStrings = {
     cancelled: '购买已取消。没有任何扣款。',
     pending: 'Google Play 中的付款仍在处理中。Google 确认后即可使用；请稍后点击“恢复 / 刷新”。',
     noneFound: '此账户没有有效的订阅。',
+  },
+  tokens: {
+    title: 'Ai Buddy 代币（测试模式）',
+    what: '代币用于地税、公司等查询（即将推出）。1 个代币 = 0.25 美元。',
+    balance: (n: number) => `余额：${n.toLocaleString('en-US')} 个代币`,
+    pack: (n: number) => `${n.toLocaleString('en-US')} 个代币`,
+    buy: '购买',
+    via: '通过 Google Play 付款。付款前，Google Play 会以您的货币显示最终价格。',
+    restore: '恢复购买',
+    refresh: '刷新余额',
+    checking: '正在等待 Google Play…',
+    credited: (n: number) => `服务器已添加 ${n.toLocaleString('en-US')} 个代币。`,
+    already: '此购买已计入您的余额。',
+    pending: '该付款在 Google Play 中仍待处理。Google 确认后才会添加代币；请稍后点击“恢复购买”。',
+    cancelled: '已取消购买，未收取任何费用。',
+    restored: (n: number) => (n > 0 ? `已恢复 ${n.toLocaleString('en-US')} 个代币。` : '没有需要恢复的购买。'),
+    restoreFailed: '部分购买无法核实。请稍后再次点击“恢复购买”；不会有任何损失。',
+    history: '最近变动',
+    noHistory: '尚未购买代币。',
+    kind: { purchase: '购买', spend: '使用', refund: '退回', adjust: '调整' } as Record<string, string>,
   },
 };
 

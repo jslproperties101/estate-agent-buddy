@@ -3,12 +3,14 @@
 //   trial        start the one free trial of Pro or the POS add-on (none for the Market News plans)
 //   checkout     start a Stripe (test) Checkout or a Billplz (sandbox) FPX bill; answers the page address to open
 //   play_verify  check a Google Play purchase with Google and apply it (also the Market News plans news_monthly / news_yearly)
+//   tokens_verify  Batch B: check a Google Play one-time purchase of an Ai Buddy Token pack, credit the tokens once, then
+//                consume it (consuming also acknowledges it, and lets the agent buy the same pack again)
 // The price always comes from this server (_shared/billing.ts), never from the app. Provider keys are function secrets and
 // never go into the app. Nothing here grants access from a card or bank answer alone: access is written by
 // billing-webhook (Stripe, Billplz) or by the verified Google answer below.
 import {
-  BILLPLZ_SANDBOX, PLANS, TRIAL_DAYS, applyParams, googleServiceJwt, isPlanId, isTrialProduct, isUuid, liveRefusal, mapPlaySubscription,
-  safeReturnUrl, webPayable, type Env, type Product,
+  BILLPLZ_SANDBOX, PLANS, TOKEN_PACKS, TRIAL_DAYS, applyParams, creditParams, googleServiceJwt, isPackId, isPlanId, isTrialProduct, isUuid,
+  liveRefusal, mapPlayProduct, mapPlaySubscription, safeReturnUrl, webPayable, type Env, type PackId, type Product,
 } from '../_shared/billing.ts';
 
 export interface Deps { env: (k: string) => string; fetch: typeof fetch; now: () => number }
@@ -83,13 +85,20 @@ async function fpxBill(d: Deps, c: Cfg, user: { id: string; email: string }, pla
   return url.startsWith(`${c.billplzBase}/`) ? json({ url, env: c.billplzBase === BILLPLZ_SANDBOX ? 'sandbox' : 'live' }) : json({ error: 'billplz' }, 502);
 }
 
-async function playVerify(d: Deps, c: Cfg, user: { id: string }, planId: keyof typeof PLANS, token: string): Promise<Response> {
+/** A Play Developer API access token and the app's API address, or the answer to send when that is not possible. */
+async function googlePlay(d: Deps, c: Cfg): Promise<{ access: string; base: string } | Response> {
   if (!c.playPackage || !c.playEmail || !c.playKey || !c.url) return json({ error: 'not-configured' }, 503);
   const jwt = await googleServiceJwt(c.playEmail, c.playKey, 'https://www.googleapis.com/auth/androidpublisher', Math.floor(d.now() / 1000));
   const tr = await d.fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }) });
   if (!tr.ok) return json({ error: 'google-auth', status: tr.status }, 502);
   const access = str((await tr.json().catch(() => null))?.access_token);
-  const base = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(c.playPackage)}`;
+  return { access, base: `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(c.playPackage)}` };
+}
+
+async function playVerify(d: Deps, c: Cfg, user: { id: string }, planId: keyof typeof PLANS, token: string): Promise<Response> {
+  const g = await googlePlay(d, c);
+  if (g instanceof Response) return g;
+  const { access, base } = g;
   const gr = await d.fetch(`${base}/purchases/subscriptionsv2/tokens/${encodeURIComponent(token)}`, { headers: { authorization: `Bearer ${access}` } });
   if (!gr.ok) return json({ error: 'google', status: gr.status }, gr.status === 404 || gr.status === 400 ? 404 : 502);
   const sub = await gr.json().catch(() => null);
@@ -104,6 +113,33 @@ async function playVerify(d: Deps, c: Cfg, user: { id: string }, planId: keyof t
     await d.fetch(`${base}/purchases/subscriptions/${encodeURIComponent(planId)}/tokens/${encodeURIComponent(token)}:acknowledge`, { method: 'POST', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' }, body: '{}' });
   }
   return json({ result, status: m.applied.status, env: m.applied.env });
+}
+
+/**
+ * Batch B: one Google Play purchase of an Ai Buddy Token pack. Checked with Google; it must belong to this agent and be
+ * purchased (not pending or cancelled); the tokens come from this server's pack list; the database credits them once per
+ * purchase (eab_tokens_credit); then the purchase is consumed. A purchase already credited is consumed again if Google still
+ * holds it, so a lost answer never blocks buying the same pack again, and never credits twice.
+ */
+async function tokensVerify(d: Deps, c: Cfg, user: { id: string }, packId: PackId, token: string): Promise<Response> {
+  const g = await googlePlay(d, c);
+  if (g instanceof Response) return g;
+  const { access, base } = g;
+  const path = `${base}/purchases/products/${encodeURIComponent(packId)}/tokens/${encodeURIComponent(token)}`;
+  const gr = await d.fetch(path, { headers: { authorization: `Bearer ${access}` } });
+  if (!gr.ok) return json({ error: 'google', status: gr.status }, gr.status === 404 || gr.status === 400 ? 404 : 502);
+  const p = await gr.json().catch(() => null);
+  if (str(p?.obfuscatedExternalAccountId) !== await sha256Hex(user.id)) return json({ error: 'not-linked' }, 403);
+  const m = mapPlayProduct(p, { userId: user.id, packId, ref: `gp:${(await sha256Hex(token)).slice(0, 40)}` });
+  if ('ignored' in m) return json({ error: 'not-applicable', reason: m.ignored }, m.ignored === 'pending' ? 202 : 422);
+  if (m.credit.env === 'live' && !c.allowLive) return json({ error: 'live-refused' }, 403);
+  const result = await rpc(d, c, 'eab_tokens_credit', creditParams(m.credit));
+  let consumed = m.credit.consumed;
+  if (!consumed && (result === 'applied' || result === 'duplicate')) {
+    const cr = await d.fetch(`${path}:consume`, { method: 'POST', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' }, body: '{}' });
+    consumed = cr.ok;
+  }
+  return json({ result, tokens: TOKEN_PACKS[packId].tokens, env: m.credit.env, consumed });
 }
 
 export async function handleBilling(req: Request, d: Deps): Promise<Response> {
@@ -134,6 +170,11 @@ export async function handleBilling(req: Request, d: Deps): Promise<Response> {
       const token = str(body.purchaseToken);
       if (!isPlanId(body.planId) || !/^[\w.-]{20,4000}$/.test(token)) return json({ error: 'bad request' }, 400);
       return await playVerify(d, c, user, body.planId, token);
+    }
+    if (body.action === 'tokens_verify') {
+      const token = str(body.purchaseToken);
+      if (!isPackId(body.packId) || !/^[\w.-]{20,4000}$/.test(token)) return json({ error: 'bad request' }, 400);
+      return await tokensVerify(d, c, user, body.packId, token);
     }
     return json({ error: 'unknown action' }, 400);
   } catch {

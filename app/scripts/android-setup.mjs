@@ -7,7 +7,7 @@
 //  - the sign-in return link com.jslproperties.eaaibuddy://auth-callback opens the app (Google login);
 //  - version code from the build number, version name from package.json;
 //  - black window background so there is no white flash before the app draws.
-//  - EAB_PLAY_BILLING=1 only: the app's own Google Play Billing plugin (Batch A, Market News subscriptions; untested on a phone).
+//  - EAB_PLAY_BILLING=1 only: the app's own Google Play Billing plugin (Batch A Market News subscriptions, Batch B Ai Buddy Token packs; untested on a phone).
 // Usage: node scripts/android-setup.mjs   (after `npx cap add android` / `npx cap sync android`)
 import { readFileSync, writeFileSync, existsSync, readdirSync, copyFileSync, mkdirSync } from 'node:fs';
 
@@ -19,7 +19,7 @@ const QA = process.env.EAB_QA === '1';
 // EAB_POS=1: the standalone AI Buddy POS app: its own package (installs beside the real app and the QA app, own storage), own
 // name and sign-in return link; the web side is built with the same flag (opens in AI Buddy POS, never updates itself).
 const POS = process.env.EAB_POS === '1';
-// EAB_PLAY_BILLING=1 (Batch A): adds the app's own Google Play Billing plugin "PlayBilling" (Market News subscriptions).
+// EAB_PLAY_BILLING=1 (Batch A): adds the app's own Google Play Billing plugin "PlayBilling" (Market News subscriptions; Batch B token packs).
 // Off unless set, so a build that has not been tried with it stays exactly as before. UNTESTED ON A REAL DEVICE.
 const PLAY_BILLING = process.env.EAB_PLAY_BILLING === '1';
 const APP_ID = POS ? 'com.jslproperties.aibuddypos' : QA ? `${cfg.appId}.qa` : cfg.appId;
@@ -672,14 +672,19 @@ public class EabSpeechPlugin extends Plugin {
 }
 
 // Batch A (EAB_PLAY_BILLING=1 only): the app's own Google Play Billing plugin, next to MainActivity, for the Market News and
-// Intelligence subscriptions (news_monthly, news_yearly). WRITTEN WITHOUT AN ANDROID BUILD OR A DEVICE: untested.
+// Intelligence subscriptions (news_monthly, news_yearly), and (Batch B) the Ai Buddy Token packs.
+// WRITTEN WITHOUT AN ANDROID BUILD OR A DEVICE: untested.
 //  purchase({ productId, obfuscatedAccountId }) -> { purchaseToken }
 //    productId            the plan id, which must equal the Play Console subscription product id; the BASE PLAN is bought
 //                         (special offers such as free trials set up in Play Console are not used)
 //    obfuscatedAccountId  the SHA-256 (64 hex) of the agent's id; Google returns it with the purchase and the server only
 //                         accepts a purchase made for the agent who sends it
+//  Batch B: type "inapp" buys a one-time Ai Buddy Token pack (tokens_20 / _100 / _400 / _1000, Play Console in-app product ids)
+//    instead of a subscription. owned({ type: "inapp" }) -> { purchases: [{ productId, purchaseToken }] } lists the paid
+//    purchases Google Play still holds (paid but not yet consumed by the server), for "Restore purchases".
 //  Rejects with code USER_CANCELED, PENDING (paid later, e.g. cash), ALREADY_OWNED, NOT_FOUND, BUSY, UNAVAILABLE or ERROR_<n>.
-//  It does NOT acknowledge the purchase: the server acknowledges it after checking it with Google (billing, play_verify).
+//  It does NOT acknowledge or consume the purchase: the server does, after checking it with Google (billing, play_verify for
+//  subscriptions; tokens_verify consumes a token pack after crediting it).
 //  Google Play Billing Library 7.1.1 (com.android.billingclient:billing), added to the app's Gradle dependencies; the library
 //  adds the com.android.vending.BILLING permission itself.
 if (PLAY_BILLING) {
@@ -698,6 +703,8 @@ import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
+import com.android.billingclient.api.QueryPurchasesParams;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -743,20 +750,32 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
     public void purchase(final PluginCall call) {
         final String productId = call.getString("productId");
         final String account = call.getString("obfuscatedAccountId");
+        // Batch B: "inapp" = a one-time Ai Buddy Token pack; anything else (the default) = a subscription, as before.
+        final boolean inapp = "inapp".equals(call.getString("type", "subs"));
+        final String type = inapp ? BillingClient.ProductType.INAPP : BillingClient.ProductType.SUBS;
         if (productId == null || !productId.matches("[a-z0-9_.]{1,40}")) { call.reject("bad productId", "BAD_REQUEST"); return; }
         if (account == null || !account.matches("[0-9a-f]{64}")) { call.reject("bad obfuscatedAccountId", "BAD_REQUEST"); return; }
         if (waiting != null) { call.reject("another purchase is in progress", "BUSY"); return; }
         connected(call, () -> {
             QueryProductDetailsParams q = QueryProductDetailsParams.newBuilder()
                 .setProductList(Collections.singletonList(QueryProductDetailsParams.Product.newBuilder()
-                    .setProductId(productId).setProductType(BillingClient.ProductType.SUBS).build()))
+                    .setProductId(productId).setProductType(type).build()))
                 .build();
             client().queryProductDetailsAsync(q, (r, list) -> {
                 if (r.getResponseCode() != BillingClient.BillingResponseCode.OK || list == null || list.isEmpty()) {
-                    call.reject("Subscription " + productId + " was not found in Google Play", "NOT_FOUND");
+                    call.reject((inapp ? "Product " : "Subscription ") + productId + " was not found in Google Play", "NOT_FOUND");
                     return;
                 }
                 final ProductDetails details = list.get(0);
+                if (inapp) {
+                    // A one-time product has no base plan or offer token.
+                    launch(call, productId, BillingFlowParams.newBuilder()
+                        .setProductDetailsParamsList(Collections.singletonList(BillingFlowParams.ProductDetailsParams.newBuilder()
+                            .setProductDetails(details).build()))
+                        .setObfuscatedAccountId(account)
+                        .build());
+                    return;
+                }
                 String token = null;
                 List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
                 if (offers != null) {
@@ -770,17 +789,47 @@ public class PlayBillingPlugin extends Plugin implements PurchasesUpdatedListene
                         .setProductDetails(details).setOfferToken(token).build()))
                     .setObfuscatedAccountId(account)
                     .build();
-                getActivity().runOnUiThread(() -> {
-                    if (waiting != null) { call.reject("another purchase is in progress", "BUSY"); return; }
-                    waiting = call; waitingProduct = productId;
-                    BillingResult launched = client().launchBillingFlow(getActivity(), flow);
-                    if (launched.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                        waiting = null; waitingProduct = null;
-                        reject(call, launched.getResponseCode());
-                    }
-                });
+                launch(call, productId, flow);
             });
         });
+    }
+
+    private void launch(final PluginCall call, final String productId, final BillingFlowParams flow) {
+        getActivity().runOnUiThread(() -> {
+            if (waiting != null) { call.reject("another purchase is in progress", "BUSY"); return; }
+            waiting = call; waitingProduct = productId;
+            BillingResult launched = client().launchBillingFlow(getActivity(), flow);
+            if (launched.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+                waiting = null; waitingProduct = null;
+                reject(call, launched.getResponseCode());
+            }
+        });
+    }
+
+    /** Batch B: the one-time purchases Google Play still holds (paid, not yet consumed by the server), for Restore. */
+    @PluginMethod
+    public void owned(final PluginCall call) {
+        if (!"inapp".equals(call.getString("type"))) { call.reject("only type inapp", "BAD_REQUEST"); return; }
+        connected(call, () -> client().queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build(),
+            (r, purchases) -> {
+                if (r.getResponseCode() != BillingClient.BillingResponseCode.OK) { reject(call, r.getResponseCode()); return; }
+                JSArray list = new JSArray();
+                if (purchases != null) {
+                    for (Purchase p : purchases) {
+                        if (p.getPurchaseState() != Purchase.PurchaseState.PURCHASED) continue;
+                        for (String id : p.getProducts()) {
+                            JSObject o = new JSObject();
+                            o.put("productId", id);
+                            o.put("purchaseToken", p.getPurchaseToken());
+                            list.put(o);
+                        }
+                    }
+                }
+                JSObject out = new JSObject();
+                out.put("purchases", list);
+                call.resolve(out);
+            }));
     }
 
     private static void reject(PluginCall call, int code) {

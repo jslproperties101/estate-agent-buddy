@@ -369,6 +369,8 @@ export interface Meta {
   flags?: import('../feed/flags').FlagCache;
   /** Billing: this account's plans as last heard from the database (eab_my_billing); kept so it also works offline. */
   billing?: import('../billing/entitlement').BillingCache;
+  /** Batch B: this account's Ai Buddy Token wallet as last heard from the database (eab_my_tokens); kept for offline use. */
+  tokens?: import('../billing/tokens').TokenCache;
   /** MainForAdmin-D: the minimum version whose soft "please update" notice was closed on this phone. */
   softUpdateClosed?: string;
   /** MainForAdmin-B: the licence last sent to the database ("TYPE|number|user"), so it is sent only when it changed. */

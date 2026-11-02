@@ -50,3 +50,22 @@ export const yearlySaving = (monthly: Plan, yearly: Plan): number => {
   const twelve = monthly.amountSen * 12;
   return twelve > 0 && yearly.amountSen < twelve ? Math.round((1 - yearly.amountSen / twelve) * 100) : 0;
 };
+
+// ── Batch B (3 Nov 2026, owner's request): Ai Buddy Tokens ─────────────────────────────────────────────────────────────
+// 1 token = USD 0.25. Four packs, sold ONLY through Google Play as one-time (consumable) products. GOOGLE PLAY: each Play
+// Console in-app product id MUST be exactly the pack id below. The server holds its own copy (TOKEN_PACKS in
+// supabase/functions/_shared/billing.ts, and the database function eab_tokens_credit) and decides how many tokens a purchase
+// gives; a test keeps the three lists equal. Spending tokens (Oneharta lookups) is Batch C.
+export type PackId = 'tokens_20' | 'tokens_100' | 'tokens_400' | 'tokens_1000';
+export interface TokenPack { id: PackId; tokens: number; amountCents: number; currency: 'USD' }
+export const TOKEN_USD_CENTS = 25;
+export const TOKEN_PACKS: TokenPack[] = [
+  { id: 'tokens_20', tokens: 20, amountCents: 500, currency: 'USD' },
+  { id: 'tokens_100', tokens: 100, amountCents: 2500, currency: 'USD' },
+  { id: 'tokens_400', tokens: 400, amountCents: 10000, currency: 'USD' },
+  { id: 'tokens_1000', tokens: 1000, amountCents: 25000, currency: 'USD' },
+];
+export const packById = (id: string): TokenPack | undefined => TOKEN_PACKS.find(p => p.id === id);
+/** "USD 5", "USD 2.50": a USD amount in cents as written on screen. */
+export const usd = (cents: number): string =>
+  `USD ${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: cents % 100 === 0 ? 0 : 2, maximumFractionDigits: 2 })}`;

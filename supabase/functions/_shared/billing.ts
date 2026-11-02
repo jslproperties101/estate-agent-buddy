@@ -34,6 +34,51 @@ export const webPayable = (id: PlanId): boolean => PLANS[id].product !== 'news' 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (x: unknown): x is string => typeof x === 'string' && UUID.test(x);
 
+// ── Batch B (3 Nov 2026): Ai Buddy Tokens ─────────────────────────────────────────────────────────────────────────
+// 1 token = USD 0.25 (owner's price). Sold in four packs as Google Play ONE-TIME (in-app, consumable) products, Google Play
+// only. The Play Console product ids MUST equal these pack ids. The token count and price come from this list only (and the
+// database function holds the same list and refuses anything else); the phone never sends an amount or a token count.
+export type PackId = 'tokens_20' | 'tokens_100' | 'tokens_400' | 'tokens_1000';
+export interface PackDef { id: PackId; tokens: number; amountCents: number; currency: 'USD' }
+export const TOKEN_USD_CENTS = 25;
+export const TOKEN_PACKS: Record<PackId, PackDef> = {
+  tokens_20: { id: 'tokens_20', tokens: 20, amountCents: 500, currency: 'USD' },
+  tokens_100: { id: 'tokens_100', tokens: 100, amountCents: 2500, currency: 'USD' },
+  tokens_400: { id: 'tokens_400', tokens: 400, amountCents: 10000, currency: 'USD' },
+  tokens_1000: { id: 'tokens_1000', tokens: 1000, amountCents: 25000, currency: 'USD' },
+};
+export const isPackId = (x: unknown): x is PackId => typeof x === 'string' && Object.prototype.hasOwnProperty.call(TOKEN_PACKS, x);
+
+export interface TokenCredit { userId: string; packId: PackId; tokens: number; amountCents: number; env: Env; ref: string; consumed: boolean }
+export type TokenMapped = { credit: TokenCredit } | { ignored: string };
+
+/**
+ * Google Play one-time purchase (purchases.products.get answer) for one token pack the phone says it bought. Credited only
+ * when Google says it is purchased (not pending, not cancelled), for exactly this pack, quantity 1. A licence-tester purchase
+ * (purchaseType 0) is a sandbox purchase. ref is a hash of the purchase token: the same purchase never credits twice.
+ */
+export function mapPlayProduct(p: J, ctx: { userId: string; packId: PackId; ref: string }): TokenMapped {
+  const pack = TOKEN_PACKS[ctx.packId];
+  if (p?.productId !== undefined && str(p.productId) !== ctx.packId) return { ignored: 'pack-mismatch' };
+  const state = p?.purchaseState;
+  if (state === 1) return { ignored: 'canceled' };
+  if (state === 2) return { ignored: 'pending' };
+  if (state !== 0) return { ignored: 'not-purchased' };
+  const qty = p?.quantity === undefined ? 1 : Number(p.quantity);
+  if (qty !== 1) return { ignored: 'quantity' };
+  return {
+    credit: {
+      userId: ctx.userId, packId: ctx.packId, tokens: pack.tokens, amountCents: pack.amountCents,
+      env: p?.purchaseType === 0 ? 'sandbox' : 'live', ref: ctx.ref, consumed: p?.consumptionState === 1,
+    },
+  };
+}
+
+/** Parameters for eab_tokens_credit (supabase/proposed/20261103000000_tokens_sandbox.sql). */
+export function creditParams(c: TokenCredit): Record<string, unknown> {
+  return { p_user: c.userId, p_pack: c.packId, p_tokens: c.tokens, p_amount_cents: c.amountCents, p_env: c.env, p_provider: 'google_play', p_ref: c.ref };
+}
+
 // ── signatures ──────────────────────────────────────────────────────────────────────────────────────────────────────
 const enc = new TextEncoder();
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');

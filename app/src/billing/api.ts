@@ -44,6 +44,11 @@ export const startTrial = (store: Store, cfg: SyncConfig, product: Product, fetc
 export const verifyPlayPurchase = (store: Store, cfg: SyncConfig, planId: PlanId, purchaseToken: string, fetchFn: FetchFn = fetch) =>
   call<PlayAnswer>(store, cfg, { action: 'play_verify', planId, purchaseToken }, fetchFn);
 
+/** Batch B: the server's answer to one token-pack purchase. Pending purchases answer reason 'pending' and add nothing yet. */
+export type TokenAnswer = { result?: string; tokens?: number; env?: 'sandbox' | 'live'; consumed?: boolean; error?: string; reason?: string };
+export const verifyTokenPurchase = (store: Store, cfg: SyncConfig, packId: string, purchaseToken: string, fetchFn: FetchFn = fetch) =>
+  call<TokenAnswer>(store, cfg, { action: 'tokens_verify', packId, purchaseToken }, fetchFn);
+
 const PROVIDERS: PayProvider[] = ['stripe', 'fpx', 'google_play'];
 const PRODUCTS: Product[] = ['pro', 'pos', 'news'];
 const isRow = (r: unknown): r is BillingRow => {
