@@ -1,0 +1,31 @@
+BATCH 3 - NEW PACKAGE WIRING (EA AI Buddy, com.jslproperties.eaaibuddy.qa) - CHECKLIST
+Date 9 Nov 2026. Main app line feature/qa-ea-ai-buddy-reskin-a (842447f). TEST project only (EAB-QA-Test).
+
+DONE BY CLAUDE (9 Nov)
+[x] EAB-QA-Test: push sign-ups from com.jslproperties.eaaibuddy and .qa allowed (migration ea_ai_buddy_app_ids).
+[x] EAB-QA-Test: billing sandbox tables and functions (migration billing_sandbox) - own tests 28 passed, 0 failed.
+[x] EAB-QA-Test: Ai Buddy Tokens sandbox (migration tokens_sandbox) - own tests 21 passed, 0 failed.
+    (Tests ran inside the test project and were rolled back; nothing was left behind.)
+[ ] NOT done on purpose: block_direct_writes (would stop older test apps from saving; not in this batch).
+[ ] NOT done: billing / billing-webhook functions are not deployed (Batch 5, needs Google Play service account).
+
+JOE'S CONSOLE STEPS
+[ ] 1. Firebase console, project eaai-buddy -> Add app -> Android -> package com.jslproperties.eaaibuddy.qa, with the
+       same debug SHA-1 as the other apps. Download the NEW google-services.json (it then holds both packages) and send
+       it to Claude in chat. (Today it only has com.jslproperties.eaaibuddy, so the QA build borrows the OLD project's
+       entry: push alerts and crash reports do not work for the QA app.)
+[ ] 2. Supabase EAB-QA-Test -> Authentication -> URL Configuration -> Redirect URLs: add
+       com.jslproperties.eaaibuddy.qa://auth-callback   (and com.jslproperties.eaaibuddy://auth-callback for later).
+[ ] 3. Firebase eaai-buddy -> Project settings -> Service accounts -> Generate new private key. Supabase EAB-QA-Test ->
+       Edge Functions -> Secrets -> FCM_SERVICE_ACCOUNT = the whole JSON. (The OLD QA app then stops getting test
+       push alerts - expected.) Keep the JSON private; never paste it in chat or GitHub.
+
+CLAUDE AFTER STEP 1
+[ ] Replace app/android-config/google-services.json, build the QA APK, check the build no longer says "borrowed",
+    send the APK.
+
+PHONE TEST (after all of the above)
+[ ] a. Install the new QA APK (EAAIBuddy-QA-....apk). It installs beside the old QA app.
+[ ] b. Continue with Google -> comes back into the app signed in (needs step 2).
+[ ] c. Settings -> notifications on -> Admin EAB sends a test push -> it arrives (needs steps 1 and 3).
+[ ] d. Market News / Tokens screens open in test mode (buying needs Batch 5).

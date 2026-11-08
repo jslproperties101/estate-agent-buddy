@@ -31,6 +31,18 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
 
 ## Owner steps needed before the new package works fully
 
+**Batch 3 status (9 Nov 2026).** Step 3 is DONE on the TEST project (EAB-QA-Test, `talksazsqsgjriamwxdp`) together with
+the billing and token sandbox files: migrations `ea_ai_buddy_app_ids`, `billing_sandbox`, `tokens_sandbox` (same code as
+`supabase/proposed/`, checked function by function; their own tests run there: billing 28/28, tokens 21/21, rolled back).
+Production untouched. Steps 1, 2 and the push sender below are the owner's; step 4 is Batch 5 (the `billing` and
+`billing-webhook` functions are not deployed to the test project yet). Checklist: `docs/Batch3-NewPackage_TestChecklist.txt`.
+
+**Push sender (found in Batch 3).** `send-push` signs in to ONE Firebase project, from the secret `FCM_SERVICE_ACCOUNT`.
+Phones running the new package register with the new Firebase project `eaai-buddy`, so on the test project that secret
+must hold an `eaai-buddy` service-account key (Firebase → Project settings → Service accounts → Generate new private key;
+then Supabase → Edge Functions → Secrets). After that, phones still on the OLD QA app (old Firebase project) stop getting
+push alerts from the test project. Production keeps the old key until the new app is live there.
+
 1. **Firebase** (the owner's new project `eaai-buddy`; the old project was `estate-agent-ai-buddy-a7ac7`): Add app → Android → `com.jslproperties.eaaibuddy` and
    `com.jslproperties.eaaibuddy.qa`, each with the debug key SHA-1 (same as the current apps). Download the new
    `google-services.json` and replace `app/android-config/google-services.json`. Until then the build borrows the old
