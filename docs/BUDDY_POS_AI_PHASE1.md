@@ -56,3 +56,48 @@ updates (install each new APK by hand).
 
 Not done / not proven: push alerts (the app is not registered in Firebase; the build borrows the QA entry), Google sign-in return
 (`com.jslproperties.aibuddypos://auth-callback` is not in the Supabase redirect list), and nothing tested on a phone.
+
+## Batch 7 — go-live basics (9 Nov 2026, branch feature/qa-pos-golive)
+
+Joe's answers: numbering "All" (three ways, chosen per business), payroll "All" (official EPF / SOCSO / EIS tables and the PCB
+formula), MyInvois "Login and certificate".
+
+### Document numbers (7a)
+- `supabase/proposed/20261109200000_buddy_pos_numbering.sql` (+ rollback; test `supabase/tests/buddy_pos_numbering_test.sql`).
+  Applied to EAB-QA-Test on 9 Nov 2026 (18/0 there, rolled back). NOT on production.
+- Each business picks one way (Setup → Document numbers; owner or admin only):
+  - own series per phone (default): `INV-A-0001` on one phone, `INV-B-0001` on another; works offline after the first time;
+  - blocks: one series `INV-0001…`, 50 numbers handed to a phone at a time, topped up below 10;
+  - server: one series, each number from the server when posting (needs internet).
+- Every hand-out is logged (`eab_acct_blocks`). Numbers count as used only when the entry posts.
+- A phone not signed in to a business numbers on its own, as before. A business database without the functions: same.
+  A phone in a business that has never reached the server cannot post (it does not know the business's way).
+- Switching to one series starts above the highest one-series number in this phone's books (which hold the business's
+  synced records).
+
+### Payroll (7b) — `app/src/buddy/payroll.ts`
+- EPF Third Schedule (RM20 / RM100 steps, rounded up); 60+ 0% / 4%; foreign workers 2% / 2%.
+- PCB by LHDN's computerised formula (categories 1–3, children, OKU, spouse OKU, zakat, TP1 reliefs per month); tested
+  against LHDN's worked example (RM110.00). Older staff records keep the hand-entered PCB until a category is chosen.
+- SKBBK (Lindung 24 Jam) 0.75% from June 2026 wages, employee only, ceiling RM6,000; opt-out tick; paid with SOCSO (2310).
+- Zakat through payroll goes to new account 2340 Zakat payable.
+- SOCSO and EIS use a rule worked out from published PERKESO rows (step middle; 2.25% total to 5 sen, ties to even). It
+  must be checked against the official PERKESO table before real pay; wages of RM1,000 and below are marked.
+- Not covered: bonus / additional pay, pay from an earlier employer this year, BIK / VOLA. A business that starts payroll
+  here after January has no earlier months in the books, so PCB for that year is lower than it should be.
+
+### MyInvois v1.1 signing (7c)
+- `supabase/functions/_shared/myinvois_sign.ts` signs as LHDN's SDK "Signature" page describes; `myinvois/handler.ts` uses it.
+- Deployed to EAB-QA-Test (function `myinvois`). It answers "not connected" until these secrets are set there (Supabase
+  dashboard → Edge Functions → Secrets; never in chat or git): `MYINVOIS_ENV=preprod`, `MYINVOIS_CLIENT_ID`,
+  `MYINVOIS_CLIENT_SECRET`, `MYINVOIS_SUPPLIER_TIN`, `MYINVOIS_ALLOWED_USERS` (your Supabase user id), and the certificate as
+  `MYINVOIS_P12_BASE64` + `MYINVOIS_P12_PASSWORD` (or `MYINVOIS_CERT_PEM` + `MYINVOIS_KEY_PEM`).
+- The certificate's subject must hold the company TIN (organizationIdentifier) and BRN (serialNumber); the function checks
+  this before sending anything.
+- Tested with a self-made certificate and a stand-in LHDN only. Whether LHDN's sandbox accepts the signature is not known
+  until the first real sandbox submission.
+
+### Sync proof (7d)
+- `supabase/tests/buddy_pos_sync_test.sql`: all 10 accounting collections pushed by an agent through `eab_push_records`,
+  retried without duplicates, edited, refused on a stale edit, pulled by the owner, deleted, and invisible to an outsider.
+  12/0 on EAB-QA-Test (rolled back). Not tested between two real phones.
