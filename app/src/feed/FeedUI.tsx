@@ -1,6 +1,8 @@
 // MainForAdmin-D screens: Market News and Intelligence, Admin-pushed Projects with invitation codes, announcements
 // (banner / pop-up), force update and maintenance mode. Everything shown comes from the company's database (feed.ts).
 import { useEffect, useRef, useState } from 'react';
+import { reskinCStrings } from '../ui/reskinCStrings';
+import { IconNews } from '../icons';
 import type { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { config } from '../config';
@@ -77,9 +79,15 @@ export function MarketNewsScreen({ lang, openId }: { lang: Lang; openId?: string
 function NewsFeed({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
   const { store, items, cfg } = useFeed();
   const t = feedStrings[lang];
-  const news = ofKind(items, 'news');
+  const all = ofKind(items, 'news');
+  // Reskin Phase C (mockup 10): Latest / Unread pills; each post a row with its picture on the left, the title and date
+  // on the right; tapping opens the picture, text and links below, as before.
+  const rc = reskinCStrings[lang].news;
+  const [show, setShow] = useState<'all' | 'unread'>('all');
   const [openId, setOpenId] = useState<string | null>(null);
-  useTappedPost(tapped, news, setOpenId);
+  // Under "Unread" the post being read stays on screen until it is closed.
+  const news = show === 'unread' ? all.filter(i => !i.opened_at || i.id === openId) : all;
+  useTappedPost(tapped, all, setOpenId);
   const at = store.getState().meta.feed?.at;
   const stale = !at || Date.now() - at > 30 * 60_000;
   const unread = unreadNews(items);
@@ -89,20 +97,33 @@ function NewsFeed({ lang, openId: tapped }: { lang: Lang; openId?: string }) {
     if (next && !i.opened_at) void markFeed(store, cfg, i.id, 'opened');
   }
   return (
-    <section className="stack" data-testid="market-news">
+    <section className="stack news-c" data-testid="market-news">
+      {all.length > 0 && (
+        <div className="chip-row filter-chips" role="radiogroup" aria-label={rc.filter} data-testid="news-filter">
+          {(['all', 'unread'] as const).map(k => (
+            <button key={k} type="button" role="radio" aria-checked={show === k} className={`chip-btn ${show === k ? 'on' : ''}`} onClick={() => setShow(k)} data-testid={`news-filter-${k}`}>
+              {k === 'all' ? rc.all : rc.unread}{k === 'unread' && unread > 0 ? <span className="count">{unread}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
       {unread > 0 && <p className="small muted" data-testid="news-unread">{t.unread(unread)}</p>}
-      {news.length === 0 && <p className="muted empty" data-testid="news-empty">{t.noNews}</p>}
+      {all.length === 0 && <p className="muted empty" data-testid="news-empty">{t.noNews}</p>}
+      {all.length > 0 && news.length === 0 && <p className="muted empty" data-testid="news-none-unread">{rc.noUnread}</p>}
       {news.length > 0 && stale && typeof navigator !== 'undefined' && navigator.onLine === false && <p className="small muted">{t.offlineNote}</p>}
       <ul className="feed-list">
         {news.map(i => {
           const img = safeUrl(i.image_url); const isOpen = openId === i.id;
           return (
             <li key={i.id} className={`card feed-card ${i.opened_at ? '' : 'unread'}`} data-testid="news-card" data-id={i.id}>
-              <button type="button" className="feed-head" onClick={() => toggle(i)} aria-expanded={isOpen} data-testid="news-open">
-                <span className="between"><strong>{i.title}</strong>{!i.opened_at && <span className="badge new-badge fit" data-testid="news-new">{t.newBadge}</span>}</span>
-                {i.published_at && <small className="muted">{fmtDateTime(i.published_at, lang)}</small>}
+              <button type="button" className="feed-head news-row" onClick={() => toggle(i)} aria-expanded={isOpen} data-testid="news-open">
+                <span className={`news-thumb ${img ? '' : 'none'}`} aria-hidden="true">{img ? <img src={img} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <IconNews />}</span>
+                <span className="news-row-text">
+                  <span className="between"><strong>{i.title}</strong>{!i.opened_at && <span className="badge new-badge fit" data-testid="news-new">{t.newBadge}</span>}</span>
+                  {i.published_at && <small className="muted">{fmtDateTime(i.published_at, lang)}</small>}
+                </span>
               </button>
-              {img && <img className="feed-img" src={img} alt="" loading="lazy" referrerPolicy="no-referrer" />}
+              {img && isOpen && <img className="feed-img" src={img} alt="" loading="lazy" referrerPolicy="no-referrer" />}
               {i.body && <p className={isOpen ? 'feed-body' : 'feed-body clamp'} data-testid="news-body">{i.body}</p>}
               {isOpen && <Links item={i} lang={lang} />}
               {(i.body || i.link_url || i.pdf_url) && <button type="button" className="link-btn small" onClick={() => toggle(i)}>{isOpen ? t.showLess : t.readMore}</button>}

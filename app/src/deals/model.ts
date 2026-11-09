@@ -271,6 +271,32 @@ export function totals(list: Listing[], today = new Date()): Totals {
   return { received: r2(t.received), pending: r2(t.pending), month: r2(t.month), year: r2(t.year) };
 }
 
+/** Reskin Phase C (Track My Sales chart): commission received in each month of `year` (index 0 = January), by the date it
+ *  was received. Same records and rules as totals(). */
+export function receivedByMonth(list: Listing[], year: number, today = new Date()): number[] {
+  const out = new Array<number>(12).fill(0);
+  const y = String(year);
+  for (const l of list) {
+    const st = stageOf(l, ymdLocal(today));
+    if (!st) continue;
+    const c = commissionOf(l, st);
+    if (c.received && c.receivedOn?.startsWith(y)) {
+      const m = Number(c.receivedOn.slice(5, 7)) - 1;
+      if (m >= 0 && m < 12) out[m] += c.received;
+    }
+  }
+  return out.map(n => Math.round(n * 100) / 100);
+}
+
+/** This year so far against the same months last year, in whole percent; undefined when last year had nothing to compare. */
+export function changeVsLastYear(list: Listing[], today = new Date()): number | undefined {
+  const m = today.getMonth();
+  const sum = (a: number[]) => a.slice(0, m + 1).reduce((x, y) => x + y, 0);
+  const now = sum(receivedByMonth(list, today.getFullYear(), today));
+  const last = sum(receivedByMonth(list, today.getFullYear() - 1, today));
+  return last > 0 ? Math.round(((now - last) / last) * 100) : undefined;
+}
+
 /** Rent due dates (the chosen day each month; a short month uses its last day), from the tenancy start (or today) to its
  *  end, at most `max` of them. */
 export function rentDueDates(day: number, from: string, to: string | undefined, max: number): string[] {

@@ -246,3 +246,30 @@ test('NP9 the box is readable in Malay and Chinese', async () => {
     await ctx.close();
   }
 });
+
+test('NP11 reskin Phase C (mockup 10): Latest / Unread pills, a picture box left of each title, read posts leave the Unread list', async () => {
+  const { page, ctx, errors } = await phone({ billing: [] });
+  await openNews(page);
+  await waitFor(async () => (await page.getByTestId('news-card').count()) === 2);
+  await page.getByTestId('news-filter').waitFor();
+  assert.equal(await page.getByTestId('news-filter-all').getAttribute('aria-checked'), 'true');
+  assert.match(await page.getByTestId('news-filter-unread').innerText(), /Unread\s*2/);
+  // no picture on these posts: a news icon stands in, on the left of the title
+  const g = await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="news-card"]');
+    const th = card.querySelector('.news-thumb').getBoundingClientRect(); const ti = card.querySelector('.news-row-text strong').getBoundingClientRect();
+    return { thumbLeft: th.right <= ti.left + 1, thumbW: th.width, wide: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  assert.ok(g.thumbLeft && g.thumbW >= 80, 'picture box on the left'); assert.equal(g.wide, false);
+  await page.screenshot({ path: `${SHOTS}/np11-news.png` });
+  await page.getByTestId('news-filter-unread').click();
+  assert.equal(await page.getByTestId('news-card').count(), 2);
+  await page.getByTestId('news-open').first().click();
+  assert.equal(await page.getByTestId('news-card').count(), 2, 'the post being read stays while it is open');
+  await page.getByTestId('news-open').first().click();
+  await waitFor(async () => (await page.getByTestId('news-card').count()) === 1);
+  await page.getByTestId('news-filter-all').click();
+  assert.equal(await page.getByTestId('news-card').count(), 2, 'Latest still shows both');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

@@ -19,12 +19,15 @@ import { can } from '../team/access';
 import { teamStrings } from '../team/strings';
 import type { ContactRole } from '../data/types';
 import {
-  SPEC, DealSection, DealValue, DealPerson, DealRow, FieldSpec, Deal, personVal, stageOf, totals, upcoming, daysUntil, commissionOf, STAGES, Stage,
+  SPEC, DealSection, DealValue, DealPerson, DealRow, FieldSpec, Deal, personVal, stageOf, totals, upcoming, daysUntil, commissionOf, STAGES, Stage, receivedByMonth, changeVsLastYear,
 } from './model';
 import { saveTypedContact } from './contacts';
 import { syncDealReminders } from './reminders';
 import { fmtDate } from '../lib/dates';
 import { Select } from '../ui/Select';
+import { reskinCStrings } from '../ui/reskinCStrings';
+import { homeStats } from '../ui/homeStats';
+import { IconBuyer, IconCalendar, IconSales, IconTrend } from '../icons';
 
 /** Which role a person on a deal page gets as a contact. */
 const PERSON_ROLE: Record<string, ContactRole> = {
@@ -272,16 +275,42 @@ export function TrackSalesScreen({ lang, go }: { lang: Lang; go: Go }) {
   const due = upcoming(props, 60, today);
   const byId = new Map(props.map(p => [p.id, p]));
   const kindFor = (st: Stage): DealKind => (st === 'rented' || st === 'rentpending' ? 'rental' : st === 'others' ? 'others' : st === 'booked' || st === 'cancelled' ? 'booking' : 'sale');
+  // Reskin Phase C (mockup 4): the year's commission with a bar for each month so far, four live numbers, then the
+  // deadlines and deals as activity rows. Every figure is the agent's own records (sample records left out, as before).
+  const c = reskinCStrings[lang].sales;
+  const months = receivedByMonth(props, today.getFullYear(), today).slice(0, today.getMonth() + 1);
+  const peak = Math.max(...months, 0);
+  const change = changeVsLastYear(props, today);
+  const hs = homeStats(state, today);
+  const closed = withStage.filter(x => x.stage === 'completed' || x.stage === 'rented').length;
+  const monthName = (m: number) => new Date(2026, m, 1).toLocaleDateString(lang === 'zh' ? 'zh-CN' : lang === 'bm' ? 'ms-MY' : 'en-MY', { month: 'short' });
   return (
-    <section className="stack" data-testid="track-sales">
-      <div className="card stack-sm" data-testid="sales-totals">
-        <div className="card-title">{t.totals}</div>
-        <div className="kpi-grid">
-          <div className="kpi" data-testid="sales-received"><small className="muted">{t.earned}</small><strong>{rm(sum.received)}</strong></div>
-          <div className="kpi" data-testid="sales-pending"><small className="muted">{t.pending}</small><strong>{rm(sum.pending)}</strong></div>
-          <div className="kpi" data-testid="sales-month"><small className="muted">{t.month}</small><strong>{rm(sum.month)}</strong></div>
-          <div className="kpi" data-testid="sales-year"><small className="muted">{t.year}</small><strong>{rm(sum.year)}</strong></div>
+    <section className="stack track-sales" data-testid="track-sales">
+      <div className="card stack-sm ts-hero" data-testid="sales-totals">
+        <div className="between ts-hero-top">
+          <small className="ts-hero-label">{c.hero}</small>
+          {change !== undefined && <small className={`ts-change ${change < 0 ? 'down' : 'up'}`} data-testid="sales-change" title={c.vsLast}>{change < 0 ? '↓' : '↑'} {Math.abs(change)}%</small>}
         </div>
+        <strong className="ts-hero-amount" data-testid="sales-year">{rm(sum.year)}</strong>
+        <div className={`ts-chart ${months.length > 6 ? 'many' : ''}`} role="img" aria-label={`${c.chart(today.getFullYear())}: ${months.map((v, i) => `${monthName(i)} ${rm(v)}`).join(', ')}`} data-testid="sales-chart">
+          {months.map((v, i) => (
+            <span key={i} className="ts-bar-col">
+              <span className="ts-bar" style={{ height: `${peak > 0 ? Math.max(4, Math.round((v / peak) * 100)) : 4}%` }} data-value={v} />
+              <small className="ts-bar-m" aria-hidden="true">{monthName(i)}</small>
+            </span>
+          ))}
+        </div>
+        <div className="kpi-grid ts-kpis">
+          <div className="kpi" data-testid="sales-month"><small className="muted">{t.month}</small><strong>{rm(sum.month)}</strong></div>
+          <div className="kpi" data-testid="sales-pending"><small className="muted">{t.pending}</small><strong>{rm(sum.pending)}</strong></div>
+          <div className="kpi" data-testid="sales-received"><small className="muted">{t.earned}</small><strong>{rm(sum.received)}</strong></div>
+        </div>
+      </div>
+      <div className="ts-tiles" data-testid="sales-tiles">
+        <div className="ts-tile" data-testid="sales-closed"><span className="stat-icon"><IconSales /></span><span className="stat-text"><strong>{closed}</strong><small>{c.closed}</small></span></div>
+        <div className="ts-tile" data-testid="sales-progress"><span className="stat-icon"><IconTrend /></span><span className="stat-text"><strong>{hs.activeDeals}</strong><small>{c.progress}</small></span></div>
+        <button type="button" className="ts-tile" data-testid="sales-leads" onClick={() => go({ name: 'activity', tab: 'inquiries' })}><span className="stat-icon"><IconBuyer /></span><span className="stat-text"><strong>{hs.newInquiries}</strong><small>{c.leads} · {c.leadsSub}</small></span></button>
+        <button type="button" className="ts-tile" data-testid="sales-viewings" onClick={() => go({ name: 'activity', tab: 'viewings' })}><span className="stat-icon"><IconCalendar /></span><span className="stat-text"><strong>{hs.viewings}</strong><small>{c.viewings} · {c.viewingsSub}</small></span></button>
       </div>
       <div className="card stack-sm" data-testid="sales-deadlines">
         <div className="card-title">{t.deadlines}</div>

@@ -16,7 +16,7 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
 | Bottom tab bar: Home, Projects, AI Buddy (centre), Inquiries, More; advert directly above it | DONE in browser; native AdMob banner position NOT PROVEN on a phone |
 | More screen: profile card, Settings, Notifications, Team Workspace, Send Feedback, About | DONE |
 | Phase B (Projects, Property Details, Contacts, Inquiries & Viewings) | IMPLEMENTED (look and layout only; browser-tested, not yet seen on a phone) — see below |
-| Phase C (Calendar, Calculator, News, Track My Sales, AI Assistant) | NOT DONE (next phase, after review) |
+| Phase C (Calendar, Calculator, News, Track My Sales, AI Assistant) | IMPLEMENTED 9 Nov 2026 (look and layout only; browser-tested, not yet seen on a phone) — see below |
 
 ## What stays the same on purpose
 
@@ -28,6 +28,32 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
   inquiries in the last 7 days, viewings in the next 7 days, open tasks and appointments today. "Property views" from the
   mockup is not shown because the app does not record it.
 - The hero house photo is cut from the owner's own mockup (app/src/brand/hero-house.webp).
+
+## Phase C (9 Nov 2026) — what changed
+
+From the owner's mockups 4, 5, 6, 9 and 10 (sent 9 Nov). Look and layout only; no data, saving, sync or rules changed.
+Branch `feature/qa-reskin-c` (on `feature/qa-batch5-payments`).
+- Track My Sales: gold-edged card with the commission received this year and a gold bar for each month so far (the month
+  names alternate on a narrow phone because of the 14 px rule; the spoken label names every month); the change against the
+  same months last year when there is one; this month / pending / all-time received under it; four tiles (Deals Closed =
+  completed sales and rentals, In Progress, New Inquiries 7 days, Viewings next 7 days; the last two open their lists);
+  deadlines and deals as gold-edged rows with a chevron. Sample records stay out of the money, as before.
+- AI Assistant (AI Assisted Command): the gold robot beside "Your Personal Real Estate Assistant" in the strip under the
+  title bar (still about a tenth of the screen, Change 65); the box, mic, Clear and AI Process as before; then one gold-edged
+  row per kind of command (from "How to use and examples"); a tap puts its example in the box.
+- Calendar & To-Do: gold Month / Week switch, days without boxes and the chosen day as a gold circle, the status filter as
+  pills, the day's entries on a gold time line.
+- Property Calculator: section pills (they wrap to a second line, never scroll sideways); label and box on one line; the monthly instalment in a gold card with the
+  loan, total interest and total payment under it (same figures as the list below).
+- Market News: Latest / Unread pills; each post a row with its picture (or a news icon) on the left, title, date and "New";
+  tapping opens the full picture, text and links as before.
+- Fix found on the way: a chosen filter pill lost its gold fill (Phase B rule order), also on Projects.
+- Not done on purpose (the app has no data or feature for them): Track My Sales month / period pickers and "Recent
+  Activities" feed, the Calendar's Day view and type filter (All / Viewings / Meetings / Tasks), the calculator's
+  Affordability tab, News categories (Analysis / Tips / Videos) and an Add button on News, and an open chat on the AI page
+  (it understands commands, not free questions). The mockup's figures (e.g. RM 2,026 a month) are illustrations; the app
+  shows its own sums (RM 450,000 over 35 years at 4.5% is RM 2,129.66).
+- Tests: `app/tests/ui-reskin-c.test.mjs` (EC1–EC4), `ui-news-paywall.test.mjs` NP11, `app/tests/reskin-c.test.ts` (RC1–RC3).
 
 ## Owner steps needed before the new package works fully
 

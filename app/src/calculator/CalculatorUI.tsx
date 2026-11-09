@@ -3,6 +3,8 @@
 import { useRemembered } from '../ui/screenMemory';
 import { PropertyRow } from '../ui/PropertyPicker';
 import { useMemo, useState } from 'react';
+import { reskinCStrings } from '../ui/reskinCStrings';
+import { IconCalc } from '../icons';
 import { Lang } from '../i18n';
 import { useApp } from '../data/useStore';
 import { newId } from '../data/store';
@@ -45,6 +47,7 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
   const { state, store } = useApp();
   const t = calcStrings[lang];
   const cx = t.x;
+  const rc = reskinCStrings[lang].calc;
   const [propId, setPropId] = useState<string | undefined>(propertyId);
   const [contactId, setContactId] = useState<string | undefined>(undefined);
   const [editingId, setEditingId] = useState<string | undefined>(undefined);
@@ -157,7 +160,7 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
           {cx.hist.rates} <button type="button" className="btn small ghost" onClick={() => setOverride(undefined)} data-testid="calc-use-today">{cx.hist.useToday}</button>
         </p>
       )}
-      <Tabs label={t.title} value={tab} onChange={setTab} options={(['purchase', 'rental', 'sale', 'commission', 'history', 'assumptions'] as Tab[]).map(k => ({ value: k, label: k === 'history' ? cx.tab : t.tabs[k], ...(k === 'history' ? { count: state.calculations.length } : {}) }))} />
+      <Tabs className="chip-tabs" label={t.title} value={tab} onChange={setTab} options={(['purchase', 'rental', 'sale', 'commission', 'history', 'assumptions'] as Tab[]).map(k => ({ value: k, label: k === 'history' ? cx.tab : t.tabs[k], ...(k === 'history' ? { count: state.calculations.length } : {}) }))} />
 
       {(tab === 'purchase' || tab === 'rental') && (
         <div className="card stack-sm">
@@ -184,6 +187,19 @@ export function CalculatorScreen({ lang, propertyId, go }: { lang: Lang; propert
 
       {tab === 'purchase' && (
         <div className="card stack-sm calc-out" data-testid="purchase-result">
+          {/* Reskin Phase C (mockup 9): the monthly instalment in a gold card, loan, interest and total payment under it. */}
+          <div className="calc-hero" data-testid="calc-hero">
+            <div className="calc-hero-main">
+              <small>{rc.monthly}</small>
+              <strong data-testid="calc-hero-monthly">{rm2(pr.monthly)}</strong>
+            </div>
+            <span className="calc-hero-icon" aria-hidden="true"><IconCalc /></span>
+          </div>
+          <div className="calc-hero-sub">
+            <span><small>{rc.loan}</small><strong>{rm2(pr.loan)}</strong></span>
+            <span><small>{rc.interest}</small><strong>{rm2(pr.totalInterest)}</strong></span>
+            <span><small>{rc.payment}</small><strong>{rm2(pr.totalRepayment)}</strong></span>
+          </div>
           <Row k={t.out.downPayment} v={rm2(pr.downPayment)} testId="out-down" />
           <Row k={t.out.loan} v={rm2(pr.loan)} testId="out-loan" />
           <Row k={t.out.monthly} v={rm2(pr.monthly)} strong testId="out-monthly" />

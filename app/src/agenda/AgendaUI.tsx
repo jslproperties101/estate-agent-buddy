@@ -371,7 +371,9 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
     : `${fmtDate(ymd(days[0]), lang, { day: 'numeric', month: 'short' })} – ${fmtDate(ymd(days[6]), lang, { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
   return (
-    <section className="stack" data-testid="calendar">
+    // Reskin Phase C (mockup 6): gold month / week switch, the chosen day as a gold circle, filter pills and the day's
+    // entries on a gold time line. Look and layout only.
+    <section className="stack calendar-c" data-testid="calendar">
       <div className="between cal-head">
         <button className="icon-btn" aria-label={view === 'month' ? a.cal.prev : a.cal.prevWeek} onClick={() => shift(-1)}>‹</button>
         <strong data-testid="cal-title">{title}</strong>
@@ -409,9 +411,9 @@ export function CalendarScreen({ lang, go, date }: { lang: Lang; go: Go; date?: 
           <button className="btn small primary" onClick={() => go({ name: 'apptForm', kind: 'meeting', date: sel })}>{a.cal.add}</button>
           <button className="btn small secondary" onClick={() => go({ name: 'taskForm', prefill: { due: sel } })}>{a.cal.addTask}</button>
         </div>
-        <Tabs label={a.cal.title} value={filter} onChange={setFilter} options={(['all', 'open', 'completed', 'cancelled'] as const).map(f => ({ value: f, label: a.cal.filter[f] }))} />
+        <Tabs className="chip-tabs" label={a.cal.title} value={filter} onChange={setFilter} options={(['all', 'open', 'completed', 'cancelled'] as const).map(f => ({ value: f, label: a.cal.filter[f] }))} />
         {appts.length === 0 && items.tasks.length === 0 && <Empty>{a.cal.none}</Empty>}
-        <ul className="act-list">
+        <ul className="act-list cal-tl">
           {appts.map(ap => ap.kind === 'viewing'
             ? <ViewingItem key={ap.id} lang={lang} v={ap} go={go} showProperty />
             : <ApptItem key={ap.id} lang={lang} ap={ap} go={go} onStatus={s => { if (can(store.getState(), 'edit', 'appointments', ap.id)) store.upsert('appointments', setApptStatus(ap, s)); }} />)}

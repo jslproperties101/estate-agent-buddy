@@ -37,7 +37,8 @@ import { fmtDateTime } from '../lib/dates';
 import { agendaStrings } from '../agenda/strings';
 import { PropertyThumb } from '../ui/PropertyPicker';
 import { SpeechBox } from '../ui/SpeechBox';
-import { IconLogo } from '../icons';
+import { IconRobot } from '../icons';
+import { reskinCStrings } from '../ui/reskinCStrings';
 import { titled3 } from '../lib/titleCase';
 import { usage } from '../usage/logger';
 
@@ -90,6 +91,7 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
   const { state, store } = useApp();
   const t = c056Strings[lang];
   const k = c048Strings[lang];
+  const rc = reskinCStrings[lang].ai;
   const [text, setText] = useState('');
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [run, setRun] = useState(0);
@@ -173,9 +175,11 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
 
   return (
     <section className="stack cmd-screen" data-testid="voice-command">
-      {/* Change 65: the logo and name from the main screen, under the title bar; it scrolls away with the page. */}
-      <h2 className="brand brand-strip cmd-brand" aria-label={strings[lang].appName} data-testid="cmd-brand">
-        <IconLogo size={66} big /><span className="wordmark"><span>{strings[lang].appNameA}</span><em>{strings[lang].appNameB}</em></span>
+      {/* Change 65: a strip under the title bar that scrolls away with the page. Reskin Phase C (mockup 5): the gold robot
+          and "Your Personal Real Estate Assistant" instead of the logo and name (still about a tenth of the screen). */}
+      <h2 className="cmd-hero cmd-brand" aria-label={`${strings[lang].appName}: ${rc.title}`} data-testid="cmd-brand">
+        <span className="cmd-hero-robot"><IconRobot size={76} /></span>
+        <span className="cmd-hero-text"><span className="cmd-hero-title">{rc.title}</span><small className="cmd-hero-sub">{rc.sub}</small></span>
       </h2>
 
       <div className="stack-sm voice-cmd minimal" data-testid="voice-cmd">
@@ -222,6 +226,20 @@ export function VoiceCommand({ lang, go }: { lang: Lang; go: Go }) {
           onSaved={(msg, back, next) => { saved(msg, back, next); if (st.kind === 'contact' && next?.contactId) setMade({ index: i, id: next.contactId, name: st.cmd.name ?? '' }); }}
           onClose={() => setClosed(c => ({ ...c, [i]: true }))} />
       ))}
+
+      {/* Reskin Phase C (mockup 5): one gold-edged row per kind of command; a tap puts its example in the box. */}
+      {quiet && !text.trim() && (
+        <div className="stack-sm" data-testid="cmd-suggest">
+          <small className="muted">{rc.try}</small>
+          <div className="cmd-suggest">
+            {t.groups.map(g => (
+              <button key={g.title} type="button" className="cmd-suggest-row" data-testid="cmd-suggest-row" onClick={() => setText(g.examples[0])}>
+                <span className="cmd-suggest-icon" aria-hidden="true">✦</span><span>{g.title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Change 62: suggestions from the saved data, and the last commands. Only when nothing else is open. */}
       {quiet && chips.length > 0 && (
