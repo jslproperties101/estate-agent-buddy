@@ -4,6 +4,7 @@ import type {
   Account, AcctAttendance, AcctEinvoice, AcctInvoice, AcctJournal, AcctLead, AcctPayrun, AcctSale, AcctStaff, JournalLine,
   JournalSource, Party, PayMethod, Payslip, SaleLine,
 } from './model';
+import { payslipFor } from './payroll';
 
 export const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -18,6 +19,7 @@ export const ACCOUNTS: Account[] = [
   { code: '2310', name: 'SOCSO payable', type: 'liability' },
   { code: '2320', name: 'EIS payable', type: 'liability' },
   { code: '2330', name: 'PCB (MTD) payable', type: 'liability' },
+  { code: '2340', name: 'Zakat payable', type: 'liability' },
   { code: '3000', name: "Owner's capital", type: 'equity' },
   { code: '3100', name: 'Retained earnings', type: 'equity' },
   { code: '4000', name: 'Agency commission income', type: 'income' },
@@ -145,26 +147,25 @@ export function balanceSheet(journals: AcctJournal[], to?: string) {
   return { assets, liabilities, equity, profit, totalAssets: tA, totalLiabilities: tL, totalEquity: tE, balanced: r2(tL + tE) === tA };
 }
 
-// ---------- payroll (estimates) ----------
-/** Flat-rate ESTIMATES: EPF 11% employee, 13% employer (12% above RM5,000); SOCSO 0.5% / 1.75% and EIS 0.2% / 0.2% on
- *  wages up to RM6,000; PCB as entered. Live payroll must use the official KWSP, PERKESO and LHDN schedules. */
-export function payslip(s: AcctStaff): Payslip {
-  const gross = r2(s.basic + s.allowance + s.commission), base = Math.min(gross, 6000);
-  const epfEe = Math.ceil(gross * 0.11), epfEr = Math.ceil(gross * (gross <= 5000 ? 0.13 : 0.12));
-  const socsoEe = r2(base * 0.005), socsoEr = r2(base * 0.0175), eisEe = r2(base * 0.002), eisEr = r2(base * 0.002), pcb = r2(s.pcb || 0);
-  return { staffId: s.id, name: s.name, gross, epfEe, epfEr, socsoEe, socsoEr, eisEe, eisEr, pcb, net: r2(gross - epfEe - socsoEe - eisEe - pcb) };
+// ---------- payroll (Batch 7b: official rules, see payroll.ts) ----------
+/** One person's slip for a month; earlier payroll of the same year feeds the PCB formula. */
+export function payslip(s: AcctStaff, month = new Date().toISOString().slice(0, 7), payruns: AcctPayrun[] = []): Payslip {
+  return payslipFor(s, month, payruns);
 }
 export const monthEnd = (m: string) => { const [y, mm] = m.split('-').map(Number); return new Date(Date.UTC(y, mm, 0)).toISOString().slice(0, 10); };
 export function runPayroll(ids: Ids, month: string, staff: AcctStaff[], payruns: AcctPayrun[], journals: AcctJournal[]): { payrun: AcctPayrun; journal: AcctJournal } {
   if (payruns.some(p => p.month === month)) throw new BuddyError('already-run');
-  const slips = staff.filter(s => s.active).map(payslip);
+  const slips = staff.filter(s => s.active).map(s => payslip(s, month, payruns));
   if (!slips.length) throw new BuddyError('empty');
-  const T = (k: keyof Payslip) => r2(slips.reduce((s, p) => s + (p[k] as number), 0));
+  const T = (k: keyof Payslip) => r2(slips.reduce((s, p) => s + ((p[k] as number | undefined) ?? 0), 0));
   const lines: JournalLine[] = [
     { acc: '6400', dr: T('gross'), cr: 0 }, { acc: '6410', dr: r2(T('epfEr') + T('socsoEr') + T('eisEr')), cr: 0 },
     { acc: '2300', dr: 0, cr: r2(T('epfEe') + T('epfEr')) }, { acc: '2310', dr: 0, cr: r2(T('socsoEe') + T('socsoEr')) },
     { acc: '2320', dr: 0, cr: r2(T('eisEe') + T('eisEr')) }, { acc: '2330', dr: 0, cr: T('pcb') }, { acc: '1010', dr: 0, cr: T('net') },
   ];
+  // SKBBK is paid to PERKESO with SOCSO; zakat deducted through payroll is owed to the zakat body.
+  if (T('skbbk')) lines[3] = { acc: '2310', dr: 0, cr: r2(T('socsoEe') + T('socsoEr') + T('skbbk')) };
+  if (T('zakat')) lines.splice(6, 0, { acc: '2340', dr: 0, cr: T('zakat') });
   const journal = posted(ids, journals, { date: monthEnd(month), memo: `Payroll ${month} – ${slips.length} staff`, ref: `PAY-${month}`, source: 'payroll', lines });
   const t = ids.now();
   return { payrun: { id: ids.id(), created: t, updated: t, month, journalNo: journal.no!, slips }, journal };

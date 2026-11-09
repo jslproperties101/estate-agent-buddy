@@ -100,12 +100,13 @@ test('e-Invoice: checks, consolidated receipts by tax rate, UBL totals and the 7
   assert.equal(shareUrl(valid), 'https://preprod.myinvois.hasil.gov.my/U1/share/L1');
 });
 
-test('payroll: estimate rates, one posted run per month, balanced journal', () => {
+test('payroll: official rules (Batch 7b; details in batch7-payroll.test.ts), one posted run per month, balanced journal', () => {
   const st: AcctStaff = { id: 's1', created: 0, updated: 0, name: 'Aisyah', role: 'Admin', basic: 3200, allowance: 200, commission: 0, pcb: 0, active: true };
-  const p = payslip(st);
-  assert.deepEqual([p.gross, p.epfEe, p.epfEr, p.socsoEe, p.eisEe, p.net], [3400, 374, 442, 17, 6.8, 3002.2]);
-  const hi = payslip({ ...st, basic: 7000 });
-  assert.equal(hi.epfEr, Math.ceil(7200 * 0.12)); assert.equal(hi.socsoEe, 30, 'SOCSO wage ceiling RM6,000');
+  const p = payslip(st, '2026-10');
+  // SOCSO / EIS on the RM3,300.01-3,400 step (RM3,350); SKBBK 0.75% from June 2026
+  assert.deepEqual([p.gross, p.epfEe, p.epfEr, p.socsoEe, p.eisEe, p.skbbk, p.net], [3400, 374, 442, 16.75, 6.7, 25.5, 2977.05]);
+  const hi = payslip({ ...st, basic: 7000 }, '2026-10');
+  assert.equal(hi.epfEr, 864); assert.equal(hi.socsoEe, 29.75, 'SOCSO wage ceiling RM6,000'); assert.equal(hi.skbbk, 45);
   const { payrun, journal } = runPayroll(ids, '2026-10', [st, { ...st, id: 's2', active: false }], [], []);
   assert.equal(payrun.slips.length, 1); assert.equal(journal.date, '2026-10-31'); assert.ok(balanced(journal.lines));
   assert.throws(() => runPayroll(ids, '2026-10', [st], [payrun], [journal]), (e: unknown) => e instanceof BuddyError && e.code === 'already-run');

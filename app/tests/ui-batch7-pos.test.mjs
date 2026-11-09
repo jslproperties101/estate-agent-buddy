@@ -140,3 +140,27 @@ test('N3 an agent sees the way but cannot change it; signed out (no database) th
   assert.equal(await firstReceipt(out.page), 'POS-0001');
   await out.ctx.close();
 });
+
+test('P1 payroll by the official rules: a new staff member is worked out (EPF Third Schedule, SOCSO step, SKBBK), and the screen says what to check', async () => {
+  const { page, ctx, errors } = await phone({ mode: 'device' }, 'owner', false);
+  await tab(page, 'People');
+  await page.getByTestId('bp-add-staff').click();
+  await page.getByTestId('bp-staff-name').fill('Siti');
+  await page.getByTestId('bp-staff-form').locator('label.ff', { hasText: 'Basic salary' }).locator('input').fill('5500');
+  assert.equal(await page.getByTestId('bp-staff-taxcat').inputValue(), '1', 'new staff: PCB worked out, category 1');
+  await page.getByTestId('bp-staff-taxcat').selectOption('3');
+  await page.getByTestId('bp-staff-children').fill('3');
+  await page.getByTestId('bp-staff-save').click();
+  const row = page.getByTestId('bp-slip').first();
+  await row.waitFor();
+  const t = await row.innerText();
+  assert.match(t, /605\.00 \/ 660\.00/, 'EPF 11% / 12% on RM5,500');
+  assert.match(t, /27\.25 \/ 95\.35/, 'SOCSO on the RM5,450 step');
+  assert.match(t, /41\.25/, 'SKBBK 0.75%');
+  assert.match(await page.getByTestId('bp-payroll').innerText(), /check them against the official PERKESO table/);
+  const over = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  assert.equal(over, false, 'nothing sticks out sideways');
+  await page.screenshot({ path: `${SHOTS}buddy-payroll-official.png`, fullPage: true });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});

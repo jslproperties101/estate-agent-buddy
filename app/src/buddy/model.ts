@@ -102,15 +102,25 @@ export interface AcctLead extends Base {
 export interface AcctStaff extends Base {
   name: string; role: string;
   basic: number; allowance: number; commission: number;
-  /** Monthly PCB (MTD) entered by hand until the official schedule is built in. */
+  /** Monthly PCB (MTD) entered by hand; used only when taxCat is not set. */
   pcb: number;
   active: boolean;
+  // Batch 7b (official payroll rules). Older records have none of these: under 60, Malaysian, PCB entered by hand.
+  over60?: boolean; foreign?: boolean; skbbkOptOut?: boolean;
+  /** PCB worked out by LHDN's formula: 1 single; 2 married, spouse has no income; 3 married with working spouse, divorced or widowed. */
+  taxCat?: 1 | 2 | 3; children?: number; disabled?: boolean; spouseDisabled?: boolean;
+  /** Zakat deducted through payroll each month (RM), and other reliefs claimed on form TP1 each month (RM). */
+  zakat?: number; tp1?: number;
 }
 export interface AcctAttendance extends Base { staffId: string; date: string; in: string; out?: string }
 
 export interface Payslip {
   staffId: string; name: string;
   gross: number; epfEe: number; epfEr: number; socsoEe: number; socsoEr: number; eisEe: number; eisEr: number; pcb: number; net: number;
+  // Batch 7b: rules 2 = official rules (buddy/payroll.ts); missing = the Phase 1 flat estimates.
+  rules?: 2; skbbk?: number; pcbAuto?: boolean; pcbK?: number; zakat?: number; lp?: number;
+  /** What a person should confirm: 'socso-table' (worked-out PERKESO rule), 'socso-low-wage', 'skbbk-rate'. */
+  checks?: string[];
 }
 export interface AcctPayrun extends Base { month: string; journalNo: string; slips: Payslip[] }
 

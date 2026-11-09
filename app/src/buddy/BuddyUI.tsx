@@ -411,6 +411,7 @@ function People({ s }: { s: BuddyStrings }) {
   const [edit, setEdit] = useState<AcctStaff | null>(null);
   const active = books.staff.filter(x => x.active);
   const done = books.payruns.find(p => p.month === month);
+  const slips = done ? done.slips : active.map(x => payslip(x, month, books.payruns));
   const t0 = Date.now();
   const money0 = (k: keyof AcctStaff, label: string) => edit && <label className="ff">{label}<MoneyInput value={edit[k] as number} onChange={n => setEdit({ ...edit, [k]: n ?? 0 })} /></label>;
   return (
@@ -433,21 +434,36 @@ function People({ s }: { s: BuddyStrings }) {
             <label className="ff">{s.p.name}<input data-testid="bp-staff-name" value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} /></label>
             <label className="ff">{s.role}<input value={edit.role} onChange={e => setEdit({ ...edit, role: e.target.value })} /></label>
             <div className="two">{money0('basic', s.basic)}{money0('allowance', s.allowance)}</div>
-            <div className="two">{money0('commission', s.commission)}{money0('pcb', s.pcb)}</div>
+            <div className="two">{money0('commission', s.commission)}{!edit.taxCat && money0('pcb', s.pcb)}</div>
+            <label className="ff">{s.taxCat}<Select data-testid="bp-staff-taxcat" value={String(edit.taxCat ?? 0)} onChange={e => { const v = +e.target.value; setEdit({ ...edit, taxCat: v ? v as 1 | 2 | 3 : undefined }); }}>
+              {[1, 2, 3, 0].map(c => <option key={c} value={c}>{s.taxCats[c]}</option>)}
+            </Select></label>
+            {!!edit.taxCat && <>
+              {edit.taxCat !== 1 && <label className="ff">{s.children}<input data-testid="bp-staff-children" inputMode="numeric" value={String(edit.children ?? 0)} onChange={e => setEdit({ ...edit, children: Math.min(20, +e.target.value.replace(/\D/g, '') || 0) })} /></label>}
+              <div className="two">{money0('zakat', s.zakat)}{money0('tp1', s.tp1)}</div>
+              <label className="check"><input type="checkbox" checked={!!edit.disabled} onChange={e => setEdit({ ...edit, disabled: e.target.checked })} /> {s.disabledSelf}</label>
+              {edit.taxCat === 2 && <label className="check"><input type="checkbox" checked={!!edit.spouseDisabled} onChange={e => setEdit({ ...edit, spouseDisabled: e.target.checked })} /> {s.spouseDisabled}</label>}
+            </>}
+            <label className="check"><input type="checkbox" data-testid="bp-staff-over60" checked={!!edit.over60} onChange={e => setEdit({ ...edit, over60: e.target.checked })} /> {s.over60}</label>
+            <label className="check"><input type="checkbox" data-testid="bp-staff-foreign" checked={!!edit.foreign} onChange={e => setEdit({ ...edit, foreign: e.target.checked })} /> {s.foreign}</label>
+            {!edit.foreign && <label className="check"><input type="checkbox" checked={!!edit.skbbkOptOut} onChange={e => setEdit({ ...edit, skbbkOptOut: e.target.checked })} /> {s.skbbkOptOut}</label>}
             <label className="check"><input type="checkbox" checked={edit.active} onChange={e => setEdit({ ...edit, active: e.target.checked })} /> {s.active}</label>
             <div className="two"><button className="btn secondary" onClick={() => setEdit(null)}>{s.hide}</button>
               <button className="btn primary" data-testid="bp-staff-save" disabled={!edit.name.trim()} onClick={() => run(() => { store.upsert('acctStaff', edit); setEdit(null); return s.saved; })}>{s.saveStaff}</button></div>
           </div>
         ) : <>
           {books.staff.map(st => <button key={st.id} className="btn secondary bp-staff" onClick={() => setEdit(st)}>{st.name} · {money(st.basic)}{st.active ? '' : ` · ${s.status.cancelled}`}</button>)}
-          <button className="btn small primary" data-testid="bp-add-staff" onClick={() => setEdit({ id: newId(), created: t0, updated: t0, name: '', role: '', basic: 0, allowance: 0, commission: 0, pcb: 0, active: true })}>{s.addStaff}</button>
+          <button className="btn small primary" data-testid="bp-add-staff" onClick={() => setEdit({ id: newId(), created: t0, updated: t0, name: '', role: '', basic: 0, allowance: 0, commission: 0, pcb: 0, active: true, taxCat: 1 })}>{s.addStaff}</button>
         </>}
       </Card>
       <Card title={s.payrollFor(month)} testId="bp-payroll">
         {!active.length ? <Empty>{s.noStaff}</Empty> : <div className="bp-table"><table>
-          <thead><tr><th>{s.p.name}</th><th className="n">{s.gross}</th><th className="n">{s.epf}</th><th className="n">{s.socso}</th><th className="n">{s.eis}</th><th className="n">PCB</th><th className="n">{s.net}</th></tr></thead>
-          <tbody>{(done ? done.slips : active.map(payslip)).map(p => <tr key={p.staffId}><td>{p.name}</td><td className="n">{fig(p.gross)}</td><td className="n">{fig(p.epfEe)} / {fig(p.epfEr)}</td><td className="n">{fig(p.socsoEe)} / {fig(p.socsoEr)}</td><td className="n">{fig(p.eisEe)} / {fig(p.eisEr)}</td><td className="n">{fig(p.pcb)}</td><td className="n">{fig(p.net)}</td></tr>)}</tbody>
+          <thead><tr><th>{s.p.name}</th><th className="n">{s.gross}</th><th className="n">{s.epf}</th><th className="n">{s.socso}</th><th className="n">{s.eis}</th><th className="n">SKBBK</th><th className="n">PCB</th><th className="n">{s.net}</th></tr></thead>
+          <tbody>{slips.map(p => <tr key={p.staffId} data-testid="bp-slip"><td>{p.name}</td><td className="n">{fig(p.gross)}</td><td className="n">{fig(p.epfEe)} / {fig(p.epfEr)}</td><td className="n">{fig(p.socsoEe)} / {fig(p.socsoEr)}</td><td className="n">{fig(p.eisEe)} / {fig(p.eisEr)}</td><td className="n">{fig(p.skbbk ?? 0)}</td><td className="n" data-testid="bp-slip-pcb">{fig(p.pcb)}{p.zakat ? ` + Z ${fig(p.zakat)}` : ''}</td><td className="n">{fig(p.net)}</td></tr>)}</tbody>
         </table></div>}
+        {slips.some(p => p.checks?.includes('socso-low-wage')) && <small className="muted" data-testid="bp-check-low">{s.payrollLowWage}</small>}
+        {slips.some(p => p.checks?.includes('skbbk-rate')) && <small className="muted">{s.payrollSkbbkRate}</small>}
+        {slips.some(p => !p.rules) && <small className="muted">{s.payrollOldRules}</small>}
         {done ? <span className="bp-pill ok" data-testid="bp-payroll-done">{s.payrollPosted(done.journalNo)}</span>
           : <button className="btn primary" data-testid="bp-post-payroll" disabled={!active.length} onClick={() => post({ JV: 1 }, ids => { const r = runPayroll(ids, month, books.staff, books.payruns, books.journals); store.upsert('acctJournals', r.journal); store.upsert('acctPayruns', r.payrun); return s.payrollPosted(r.journal.no!); })}>{s.postPayroll(month)}</button>}
         <small className="muted">{s.payrollNote}</small>
