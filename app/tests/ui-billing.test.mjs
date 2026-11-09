@@ -99,7 +99,7 @@ test('BU1 switch off by default: Settings shows the switch, no plans card, and t
   await ctx.close();
 });
 
-test('BU2 switch on: the card says test mode, shows both products as not active, the three ways to pay and the proposed prices', async () => {
+test('BU2 switch on: the card says test mode, shows both products as not active, the website’s two ways to pay and the proposed prices', async () => {
   const { page, ctx, errors } = await phone({ billing: [] });
   await openSettings(page);
   await page.getByTestId('billing-toggle').check();
@@ -111,10 +111,10 @@ test('BU2 switch on: the card says test mode, shows both products as not active,
   assert.match(card, /Pro, monthly[\s\S]*RM 49 per month/); assert.match(card, /Pro, yearly[\s\S]*RM 490 per year/); assert.match(card, /AI Buddy POS, monthly[\s\S]*RM 39 per month/);
   assert.match(card, /proposals until the owner approves/);
   assert.match(await page.getByTestId('billing-trial-pro').innerText(), /Start 14-day free trial/);
-  for (const id of ['fpx', 'stripe', 'google_play']) assert.equal(await page.getByTestId(`billing-provider-${id}`).count(), 1);
-  await page.getByTestId('billing-provider-google_play').click();
-  assert.match(await page.getByTestId('billing-provider-note').innerText(), /Only in the Android app/);
-  assert.equal(await page.getByTestId('billing-pay-pro_monthly').isDisabled(), true, 'cannot pay by Google Play in a browser');
+  // Batch 5 (Google Play rules): the website offers FPX and card; Google Play only exists inside the Android app, where it is
+  // the ONLY way offered (tests/batch5.test.ts A-1)
+  for (const id of ['fpx', 'stripe']) assert.equal(await page.getByTestId(`billing-provider-${id}`).count(), 1);
+  assert.equal(await page.getByTestId('billing-provider-google_play').count(), 0);
   await page.getByTestId('billing-provider-fpx').click();
   assert.equal(await page.getByTestId('billing-pay-pro_monthly').isDisabled(), false);
   await page.screenshot({ path: `${SHOTS}billing-card.png`, fullPage: true });

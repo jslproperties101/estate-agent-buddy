@@ -7,7 +7,9 @@ export interface BillingRow {
   product: Product; plan_id: PlanId | null; status: RowStatus; provider: PayProvider | 'trial'; env: 'sandbox' | 'live';
   trial_end: string | null; period_end: string | null; cancel_at_period_end: boolean;
 }
-export interface BillingCache { userId: string; rows: BillingRow[]; at: number }
+// newsPaid (Batch 5): the server's "Market News is paid" switch (eab_billing_public). While it is on, the server itself leaves
+// news out for agents without a news plan, so the phone shows the subscription box instead of an empty list.
+export interface BillingCache { userId: string; rows: BillingRow[]; at: number; newsPaid?: boolean }
 
 /**
  * none      nothing bought or tried

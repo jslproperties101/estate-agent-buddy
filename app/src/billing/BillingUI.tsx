@@ -10,7 +10,7 @@ import { useToast } from '../ui/toast';
 import { BillingError, cachedRows, refreshBilling, startTrial } from './api';
 import { canPurchase, resolveEntitlement, type Line } from './entitlement';
 import { TRIAL_DAYS, plansOf, rm, type PayProvider, type Product } from './plans';
-import { PROVIDER_IDS, availability, startPayment } from './providers';
+import { availability, offeredProviders, startPayment } from './providers';
 import { billingStrings, type BillingStrings } from './strings';
 
 // The Market News plans ('news') are not offered here: they are Google Play only and shown on their own screen (NewsPaywall).
@@ -34,7 +34,8 @@ export function BillingCard({ lang }: { lang: Lang }) {
   const s = billingStrings[lang];
   const cfg = config(state.settings);
   const me = state.meta.syncSession;
-  const [provider, setProvider] = useState<PayProvider>('fpx');
+  const offered = offeredProviders();
+  const [provider, setProvider] = useState<PayProvider>(offered[0]);
   const [busy, setBusy] = useState(false);
   const ent = resolveEntitlement(cachedRows(store), Date.now());
 
@@ -82,7 +83,7 @@ export function BillingCard({ lang }: { lang: Lang }) {
           })}
           <div className="card-title">{s.payWith}</div>
           <div className="seg" role="group" aria-label={s.payWith}>
-            {PROVIDER_IDS.map(id => <button key={id} data-testid={`billing-provider-${id}`} aria-pressed={provider === id} onClick={() => setProvider(id)}>{s.providers[id]}</button>)}
+            {offered.map(id => <button key={id} data-testid={`billing-provider-${id}`} aria-pressed={provider === id} onClick={() => setProvider(id)}>{s.providers[id]}</button>)}
           </div>
           <small className="muted" data-testid="billing-provider-note">{avail.ok ? s.providerNote[provider] : s.unavailable[avail.reason]}</small>
           {PRODUCTS.flatMap(p => plansOf(p)).map(plan => {

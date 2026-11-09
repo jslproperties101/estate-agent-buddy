@@ -63,14 +63,33 @@ export async function refreshBilling(store: Store, cfg: SyncConfig, fetchFn: Fet
   if (!s || !configured(cfg)) return false;
   try {
     const j = await rpc<unknown>(store, cfg, 'eab_my_billing', {}, fetchFn);
+    const newsPaid = await readNewsPaid(store, cfg, fetchFn, s.userId);
     if (store.getState().meta.syncSession?.userId !== s.userId) return false;   // signed out or switched meanwhile
-    store.setSingleton('meta', { billing: { userId: s.userId, rows: Array.isArray(j) ? j.filter(isRow) : [], at: Date.now() } });
+    store.setSingleton('meta', { billing: { userId: s.userId, rows: Array.isArray(j) ? j.filter(isRow) : [], at: Date.now(), newsPaid } });
     return true;
   } catch (e) {
     // The function is not on this database: no plans (the app as before). Offline or refused: keep the last answer.
     if (e instanceof TeamError && e.code === 'unavailable') store.setSingleton('meta', { billing: { userId: s.userId, rows: [], at: Date.now() } });
     return false;
   }
+}
+
+/** Batch 5: the server's "Market News is paid" switch. A database without the function: off. Offline: the last answer. */
+async function readNewsPaid(store: Store, cfg: SyncConfig, fetchFn: FetchFn, userId: string): Promise<boolean> {
+  try {
+    const j = await rpc<{ news_paid?: unknown } | null>(store, cfg, 'eab_billing_public', {}, fetchFn);
+    return j?.news_paid === true;
+  } catch (e) {
+    if (e instanceof TeamError && e.code === 'unavailable') return false;
+    const b = store.getState().meta.billing;
+    return b?.userId === userId && b.newsPaid === true;
+  }
+}
+
+/** True when the server says Market News is paid (last answer heard for the person signed in now). */
+export function serverNewsPaid(store: Store): boolean {
+  const st = store.getState(); const b = st.meta.billing; const me = st.meta.syncSession?.userId;
+  return !!(b && me && b.userId === me && b.newsPaid === true);
 }
 
 /** The plans last heard for the person signed in now (another account's are never used). */

@@ -94,7 +94,12 @@ test('T-4 tokens_verify: checked with Google, the pack’s own tokens credited o
     const r = await handleBilling(post({ action: 'tokens_verify', packId: pack.id, purchaseToken: TOKEN, tokens: 999999, amount: 1, userId: 'someone-else' }), w.deps);
     assert.equal(r.status, 200, pack.id);
     assert.deepEqual(await r.json(), { result: 'applied', tokens: pack.tokens, env: 'sandbox', consumed: true });
-    const rpc = rpcCalls(w); assert.equal(rpc.length, 1); assert.ok(rpc[0].url.endsWith('/rpc/eab_tokens_credit'));
+    const all = rpcCalls(w); const rpc = all.filter(c => c.url.endsWith('/rpc/eab_tokens_credit')); assert.equal(rpc.length, 1);
+    // Batch 5: the purchase is remembered as this agent's (a hash of the token), for Google's later refund notices
+    const link = all.filter(c => c.url.endsWith('/rpc/eab_play_purchase_link')); assert.equal(link.length, 1); assert.equal(all.length, 2);
+    const ls = JSON.parse(link[0].body);
+    assert.deepEqual([ls.p_user, ls.p_kind, ls.p_product], [U1, 'inapp', pack.id]); assert.match(ls.p_token_hash, /^[0-9a-f]{64}$/);
+    assert.ok(!link[0].body.includes(TOKEN), 'the purchase token itself is never stored');
     const sent = JSON.parse(rpc[0].body);
     assert.equal(sent.p_user, U1); assert.equal(sent.p_pack, pack.id); assert.equal(sent.p_tokens, pack.tokens, 'the server’s count, never the phone’s');
     assert.equal(sent.p_amount_cents, pack.amountCents); assert.equal(sent.p_env, 'sandbox');

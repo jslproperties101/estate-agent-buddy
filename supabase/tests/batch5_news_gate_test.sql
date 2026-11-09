@@ -5,18 +5,17 @@ do $test$
 declare
   a uuid; b uuid; item uuid; proj uuid;
   pass int := 0; fail int := 0; msgs text := '';
-  r text; n int; j jsonb; t timestamptz;
+  r text; n int; j jsonb;
   ok boolean;
 begin
   select id into a from auth.users u where public.eab_account_ok(u.id) order by created_at limit 1;
   select id into b from auth.users u where public.eab_account_ok(u.id) and id <> a order by created_at limit 1;
   if a is null or b is null then raise exception 'needs 2 active users in auth.users'; end if;
+  if exists (select 1 from public.eab_billing_entitlements where user_id in (a, b) and product = 'news') then raise exception 'leftover news plan rows'; end if;
   insert into public.eab_feed_items (kind, title_en, body_en, audience, status, published_at, push_alert)
   values ('news', 'Batch5 test news', 'Paid market insight', 'all', 'published', now() - interval '1 minute', true) returning id into item;
   insert into public.eab_feed_items (kind, title_en, audience, status, published_at, project)
   values ('project', 'Batch5 test project', 'all', 'published', now() - interval '1 minute', '{}'::jsonb) returning id into proj;
-  -- make sure no news plan is left over for either agent in this run
-  delete from public.eab_billing_entitlements where user_id in (a, b) and product = 'news';
   update public.eab_billing_settings set news_paid = false, live = false where id;
 
   -- 1. switch off (the default): everybody sees news, exactly as before

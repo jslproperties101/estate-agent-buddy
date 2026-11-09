@@ -67,8 +67,9 @@ export function MarketNewsScreen({ lang, openId }: { lang: Lang; openId?: string
   const { store, cfg } = useFeed();
   const on = billingEnabled(store);
   const me = store.getState().meta.syncSession?.userId;
-  // Billing on: read this account's plans when the screen opens, so a new or ended subscription shows at once.
-  useEffect(() => { if (on && me) void refreshBilling(store, cfg); }, [on, me]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Read this account's plans (and, Batch 5, the server's "news is paid" switch) when the screen opens, so a new or ended
+  // subscription, or the switch, shows at once.
+  useEffect(() => { if (me) void refreshBilling(store, cfg); }, [on, me]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!featureAllowed(store, 'marketNews')) return <section className="stack" data-testid="market-news"><NewsPaywall lang={lang} /></section>;
   return <NewsFeed lang={lang} openId={openId} />;
 }

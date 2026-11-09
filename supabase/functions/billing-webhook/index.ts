@@ -6,6 +6,10 @@
 //   Stripe: add an endpoint  https://<project>.supabase.co/functions/v1/billing-webhook?p=stripe  for customer.subscription.created,
 //           customer.subscription.updated and customer.subscription.deleted.
 //   Billplz: the bill's callback address is set by the billing function (?p=fpx).
+//   Google Play (Batch 5): supabase secrets set PLAY_RTDN_TOKEN=<long random text> (plus PLAY_PACKAGE_NAME and
+//           PLAY_SERVICE_ACCOUNT_* from billing/index.ts). Pub/Sub push subscription endpoint:
+//           https://<project>.supabase.co/functions/v1/billing-webhook?p=google_play&k=<PLAY_RTDN_TOKEN>
+//           (steps: docs/BATCH5_PAYMENTS_HARDENING.md).
 // NOT DEPLOYED AND NEVER CALLED BY STRIPE OR BILLPLZ YET: deploy it to the TEST Supabase project only.
 import { handleWebhook } from './handler.ts';
 

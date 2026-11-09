@@ -282,3 +282,42 @@ export async function googleServiceJwt(clientEmail: string, privateKeyPem: strin
   const body = b64url(JSON.stringify({ iss: clientEmail, scope, aud, iat: nowSec, exp: nowSec + 3300 }));
   return `${head}.${body}.${b64url(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, enc.encode(`${head}.${body}`)))}`;
 }
+
+// ── Batch 5 (9 Nov 2026): Google Play real-time developer notifications (RTDN) ──────────────────────────────────────
+// Google Play sends them through Google Cloud Pub/Sub, which POSTs { message: { data: base64(JSON) } } to billing-webhook
+// ?p=google_play. A notice is only a nudge: billing-webhook reads the purchase back from Google before changing anything,
+// and only for a purchase already linked to an agent (eab_play_purchases). Nothing in the notice itself is trusted.
+export type PlayNotice =
+  | { kind: 'test' }
+  | { kind: 'subscription'; token: string; productId: string; type: number }
+  | { kind: 'voided'; token: string; productType: number; orderId: string }
+  | { kind: 'other'; what: string };
+const PLAY_TOKEN = /^[\w.-]{20,4000}$/;
+
+/** The decoded notice, or why it cannot be used. packageName must be this app's package. */
+export function parsePlayNotice(body: J, packageName: string): PlayNotice | { bad: string } {
+  const data = str(body?.message?.data);
+  if (!data) return { bad: 'no-data' };
+  let n: J;
+  try { n = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(data.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)))); }
+  catch { return { bad: 'not-json' }; }
+  if (!packageName || str(n?.packageName) !== packageName) return { bad: 'other-package' };
+  if (n?.testNotification) return { kind: 'test' };
+  const s = n?.subscriptionNotification;
+  if (s) {
+    if (!PLAY_TOKEN.test(str(s.purchaseToken))) return { bad: 'token' };
+    return { kind: 'subscription', token: s.purchaseToken, productId: str(s.subscriptionId), type: Number(s.notificationType) || 0 };
+  }
+  const v = n?.voidedPurchaseNotification;
+  if (v) {
+    if (!PLAY_TOKEN.test(str(v.purchaseToken))) return { bad: 'token' };
+    return { kind: 'voided', token: v.purchaseToken, productType: Number(v.productType) || 0, orderId: str(v.orderId) };
+  }
+  if (n?.oneTimeProductNotification) return { kind: 'other', what: 'one-time-product' };   // the phone's tokens_verify handles purchases
+  return { kind: 'other', what: 'unknown' };
+}
+
+/** The ledger reference of a token-pack purchase (same as the billing function's tokens_verify). */
+export const tokenPurchaseRef = (tokenHashHex: string) => `gp:${tokenHashHex.slice(0, 40)}`;
+/** The event id of one state of one Google Play subscription (same as play_verify, so the two never apply it twice). */
+export const playSubEventId = (tokenHashHex: string, latestOrderId: string, state: string) => `${tokenHashHex.slice(0, 32)}:${latestOrderId}:${state}`;

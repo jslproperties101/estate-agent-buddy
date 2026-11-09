@@ -9,9 +9,10 @@
 // never go into the app. Nothing here grants access from a card or bank answer alone: access is written by
 // billing-webhook (Stripe, Billplz) or by the verified Google answer below.
 import {
-  BILLPLZ_SANDBOX, PLANS, TOKEN_PACKS, TRIAL_DAYS, applyParams, creditParams, googleServiceJwt, isPackId, isPlanId, isTrialProduct, isUuid,
-  liveRefusal, mapPlayProduct, mapPlaySubscription, safeReturnUrl, webPayable, type Env, type PackId, type Product,
+  BILLPLZ_SANDBOX, PLANS, TOKEN_PACKS, TRIAL_DAYS, applyParams, creditParams, isPackId, isPlanId, isTrialProduct, isUuid,
+  liveRefusal, mapPlayProduct, mapPlaySubscription, playSubEventId, safeReturnUrl, tokenPurchaseRef, webPayable, type Env, type PackId, type Product,
 } from '../_shared/billing.ts';
+import { playApi } from '../_shared/play.ts';
 
 export interface Deps { env: (k: string) => string; fetch: typeof fetch; now: () => number }
 
@@ -87,12 +88,19 @@ async function fpxBill(d: Deps, c: Cfg, user: { id: string; email: string }, pla
 
 /** A Play Developer API access token and the app's API address, or the answer to send when that is not possible. */
 async function googlePlay(d: Deps, c: Cfg): Promise<{ access: string; base: string } | Response> {
-  if (!c.playPackage || !c.playEmail || !c.playKey || !c.url) return json({ error: 'not-configured' }, 503);
-  const jwt = await googleServiceJwt(c.playEmail, c.playKey, 'https://www.googleapis.com/auth/androidpublisher', Math.floor(d.now() / 1000));
-  const tr = await d.fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }) });
-  if (!tr.ok) return json({ error: 'google-auth', status: tr.status }, 502);
-  const access = str((await tr.json().catch(() => null))?.access_token);
-  return { access, base: `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(c.playPackage)}` };
+  if (!c.url) return json({ error: 'not-configured' }, 503);
+  const g = await playApi(d.fetch, d.now(), { packageName: c.playPackage, email: c.playEmail, privateKey: c.playKey });
+  if ('error' in g) return g.error === 'not-configured' ? json({ error: 'not-configured' }, 503) : json({ error: 'google-auth', status: g.status }, 502);
+  return g;
+}
+
+/**
+ * Batch 5: remember which agent this Google Play purchase belongs to (a hash of the token, never the token), so Google's
+ * later notices (renewal, cancellation, refund) can be matched to the agent. Google has just confirmed the purchase carries
+ * this agent's id. A database without the function (before the Batch 5 SQL) only loses that matching, not the purchase.
+ */
+async function linkPurchase(d: Deps, c: Cfg, tokenHash: string, user: string, kind: 'subs' | 'inapp', productId: string): Promise<void> {
+  try { await rpc(d, c, 'eab_play_purchase_link', { p_token_hash: tokenHash, p_user: user, p_kind: kind, p_product: productId }); } catch { /* see above */ }
 }
 
 async function playVerify(d: Deps, c: Cfg, user: { id: string }, planId: keyof typeof PLANS, token: string): Promise<Response> {
@@ -104,11 +112,13 @@ async function playVerify(d: Deps, c: Cfg, user: { id: string }, planId: keyof t
   const sub = await gr.json().catch(() => null);
   // The purchase must have been made for THIS agent: the app puts a hash of the agent's id on the purchase, and Google returns it.
   if (str(sub?.externalAccountIdentifiers?.obfuscatedExternalAccountId) !== await sha256Hex(user.id)) return json({ error: 'not-linked' }, 403);
-  const eventId = `${(await sha256Hex(token)).slice(0, 32)}:${str(sub?.latestOrderId)}:${str(sub?.subscriptionState)}`;
+  const tokenHash = await sha256Hex(token);
+  const eventId = playSubEventId(tokenHash, str(sub?.latestOrderId), str(sub?.subscriptionState));
   const m = mapPlaySubscription(sub, { userId: user.id, planId, eventId }, d.now());
   if ('ignored' in m) return json({ error: 'not-applicable', reason: m.ignored }, 422);
   if (m.applied.env === 'live' && !c.allowLive) return json({ error: 'live-refused' }, 403);
   const result = await rpc(d, c, 'eab_billing_apply', applyParams(m.applied));
+  await linkPurchase(d, c, tokenHash, user.id, 'subs', planId);
   if (sub?.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING' && (m.applied.status === 'active' || m.applied.status === 'trialing')) {
     await d.fetch(`${base}/purchases/subscriptions/${encodeURIComponent(planId)}/tokens/${encodeURIComponent(token)}:acknowledge`, { method: 'POST', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' }, body: '{}' });
   }
@@ -130,10 +140,12 @@ async function tokensVerify(d: Deps, c: Cfg, user: { id: string }, packId: PackI
   if (!gr.ok) return json({ error: 'google', status: gr.status }, gr.status === 404 || gr.status === 400 ? 404 : 502);
   const p = await gr.json().catch(() => null);
   if (str(p?.obfuscatedExternalAccountId) !== await sha256Hex(user.id)) return json({ error: 'not-linked' }, 403);
-  const m = mapPlayProduct(p, { userId: user.id, packId, ref: `gp:${(await sha256Hex(token)).slice(0, 40)}` });
+  const tokenHash = await sha256Hex(token);
+  const m = mapPlayProduct(p, { userId: user.id, packId, ref: tokenPurchaseRef(tokenHash) });
   if ('ignored' in m) return json({ error: 'not-applicable', reason: m.ignored }, m.ignored === 'pending' ? 202 : 422);
   if (m.credit.env === 'live' && !c.allowLive) return json({ error: 'live-refused' }, 403);
   const result = await rpc(d, c, 'eab_tokens_credit', creditParams(m.credit));
+  await linkPurchase(d, c, tokenHash, user.id, 'inapp', packId);
   let consumed = m.credit.consumed;
   if (!consumed && (result === 'applied' || result === 'duplicate')) {
     const cr = await d.fetch(`${path}:consume`, { method: 'POST', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' }, body: '{}' });

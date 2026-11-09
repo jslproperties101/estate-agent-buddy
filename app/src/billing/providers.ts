@@ -13,11 +13,19 @@ type FetchFn = typeof fetch;
 
 export const PROVIDER_IDS: PayProvider[] = ['fpx', 'stripe', 'google_play'];
 
-export type Availability = { ok: true } | { ok: false; reason: 'android-only' | 'plugin-missing' };
+export type Availability = { ok: true } | { ok: false; reason: 'android-only' | 'plugin-missing' | 'not-in-app' };
+
+/**
+ * Batch 5, Google Play payments policy (checked 9 Nov 2026; Joe's decision D-7N-4): an app installed from Google Play must use
+ * Google Play Billing for anything bought inside it, and must not lead people to another way to pay. Malaysia is not in
+ * Google's billing-choice programmes. So the Android app offers ONLY Google Play; FPX and card are for the website and for
+ * agency sales made outside the app. The app does not mention those other ways (that would itself break the rule).
+ */
+export const offeredProviders = (): PayProvider[] => (platform() === 'android' ? ['google_play'] : ['fpx', 'stripe']);
 
 /** Can this provider be used on this phone right now? (The server decides whether it is configured.) */
 export function availability(id: PayProvider): Availability {
-  if (id !== 'google_play') return { ok: true };
+  if (id !== 'google_play') return platform() === 'android' ? { ok: false, reason: 'not-in-app' } : { ok: true };
   if (platform() !== 'android') return { ok: false, reason: 'android-only' };
   return pluginMissing('PlayBilling') ? { ok: false, reason: 'plugin-missing' } : { ok: true };
 }

@@ -58,6 +58,11 @@ async function phone(db = {}, settings = {}, { signedIn = true } = {}) {
       if (m[1] === 'eab_public_settings') return route.fulfill({ status: 200, headers: cors, body: '{}' });
       if (m[1] === 'eab_my_feed') return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(FEED) });
       if (m[1] === 'eab_my_flags') return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(db.flags ?? {}) });
+      // Batch 5: the server's "Market News is paid" switch (db.newsPaid undefined = the function is not on the database)
+      if (m[1] === 'eab_billing_public') {
+        if (db.newsPaid === undefined) return route.fulfill({ status: 404, headers: cors, body: '{"code":"PGRST202","message":"Could not find the function public.eab_billing_public"}' });
+        return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({ news_paid: db.newsPaid, live: false }) });
+      }
       if (m[1] === 'eab_my_billing') {
         if (db.billing === undefined) return route.fulfill({ status: 404, headers: cors, body: '{"code":"PGRST202","message":"Could not find the function public.eab_my_billing"}' });
         return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(typeof db.billing === 'function' ? db.billing() : db.billing) });
@@ -92,9 +97,30 @@ test('NP1 billing off (the default): Market News exactly as before, with its unr
   await waitFor(async () => (await page.getByTestId('news-card').count()) === 2);
   assert.equal(await page.getByTestId('news-paywall').count(), 0);
   await page.waitForTimeout(300);
-  assert.ok(!calls.includes('eab_my_billing'), 'the database is never asked for plans while billing is off');
+  // Batch 5: opening the screen reads the plans and the server's "news is paid" switch; with the switch off nothing changes
+  assert.ok(calls.includes('eab_my_billing') && calls.includes('eab_billing_public'));
+  assert.equal(await page.getByTestId('news-paywall').count(), 0);
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+test('NP10 Batch 5: the server switched "Market News is paid" on: the box shows with the phone switch off; a news plan opens the news', async () => {
+  const { page, ctx, errors } = await phone({ billing: [], newsPaid: true });
+  await openNews(page);
+  await page.getByTestId('news-paywall').waitFor();
+  const text = await page.locator('body').innerText();
+  assert.ok(!/SECRET HEADLINE|PAID BODY/.test(text), 'no post shown');
+  await ctx.close();
+  const paid = await phone({ billing: [newsRow()], newsPaid: true });
+  await openNews(paid.page);
+  await waitFor(async () => (await paid.page.getByTestId('news-card').count()) === 2);
+  assert.equal(await paid.page.getByTestId('news-paywall').count(), 0);
+  // switch off on the server: news as before, even without a plan
+  const off = await phone({ billing: [], newsPaid: false });
+  await openNews(off.page);
+  await waitFor(async () => (await off.page.getByTestId('news-card').count()) === 2);
+  assert.deepEqual([...errors, ...paid.errors, ...off.errors], []);
+  await paid.ctx.close(); await off.ctx.close();
 });
 
 test('NP2 billing on, no plan: the subscription box replaces the news; no post title, body or unread number is shown anywhere', async () => {
