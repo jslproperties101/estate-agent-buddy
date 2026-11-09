@@ -33,7 +33,7 @@ export const ACCOUNTS: Account[] = [
 ];
 export const accountOf = (code: string) => ACCOUNTS.find(a => a.code === code);
 
-export class BuddyError extends Error { constructor(public code: 'unbalanced' | 'not-draft' | 'not-posted' | 'empty' | 'already-run' | 'nothing-to-consolidate' | 'needs-buyer', message?: string) { super(message ?? code); } }
+export class BuddyError extends Error { constructor(public code: 'unbalanced' | 'not-draft' | 'not-posted' | 'empty' | 'already-run' | 'nothing-to-consolidate' | 'needs-buyer' | 'needs-numbers', message?: string) { super(message ?? code); } }
 
 // ---------- journals ----------
 export const sumDr = (ls: JournalLine[]) => r2(ls.reduce((s, l) => s + (l.dr || 0), 0));
@@ -51,25 +51,31 @@ export function nextNo(prefix: string, used: (string | undefined)[]): string {
 }
 export const counted = (j: AcctJournal) => j.status === 'posted' || j.status === 'reversed';
 
-type Ids = { id: () => string; now: () => number };
+/** Batch 7: where a posted entry's number comes from. Without one the phone counts on its own (as before); with one it is
+ *  the business's chosen way (buddy/numbering.ts): the phone's own letter, or numbers handed out by the server. */
+export type Series = 'JV' | 'INV' | 'POS';
+export type Numberer = (series: Series, used: (string | undefined)[]) => string;
+const numberFor = (num: Numberer | undefined, series: Series, used: (string | undefined)[]) => (num ? num(series, used) : nextNo(series, used));
+
+type Ids = { id: () => string; now: () => number; num?: Numberer };
 
 export function newJournal(ids: Ids, o: { date: string; memo: string; lines: JournalLine[]; source?: JournalSource; ref?: string }): AcctJournal {
   const t = ids.now();
   return { id: ids.id(), created: t, updated: t, date: o.date, memo: o.memo.trim(), ref: o.ref, source: o.source ?? 'manual', lines: cleanLines(o.lines), status: 'draft' };
 }
-export function postJournal(j: AcctJournal, all: AcctJournal[], now: number): AcctJournal {
+export function postJournal(j: AcctJournal, all: AcctJournal[], now: number, num?: Numberer): AcctJournal {
   if (j.status !== 'draft') throw new BuddyError('not-draft');
   if (!balanced(j.lines)) throw new BuddyError('unbalanced');
-  return { ...j, status: 'posted', no: nextNo('JV', all.map(x => x.no)), postedAt: now };
+  return { ...j, status: 'posted', no: numberFor(num, 'JV', all.map(x => x.no)), postedAt: now };
 }
 /** A new posted journal with debits and credits swapped; the original is marked reversed (and stays in the ledger). */
 export function reverseJournal(ids: Ids, j: AcctJournal, all: AcctJournal[], date: string): { original: AcctJournal; reversal: AcctJournal } {
   if (j.status !== 'posted') throw new BuddyError('not-posted');
   const draft = newJournal(ids, { date, memo: `Reversal of ${j.no} – ${j.memo}`, ref: j.no, source: 'reversal', lines: j.lines.map(l => ({ acc: l.acc, dr: l.cr, cr: l.dr })) });
-  const reversal = postJournal(draft, all, ids.now());
+  const reversal = postJournal(draft, all, ids.now(), ids.num);
   return { original: { ...j, status: 'reversed', reversedBy: reversal.no }, reversal };
 }
-const posted = (ids: Ids, all: AcctJournal[], o: Parameters<typeof newJournal>[1]) => postJournal(newJournal(ids, o), all, ids.now());
+const posted = (ids: Ids, all: AcctJournal[], o: Parameters<typeof newJournal>[1]) => postJournal(newJournal(ids, o), all, ids.now(), ids.num);
 
 // ---------- sales lines, invoices, POS ----------
 export function totals(ls: Pick<SaleLine, 'qty' | 'price' | 'taxPct'>[]) {
@@ -88,7 +94,7 @@ export function postInvoice(ids: Ids, inv: AcctInvoice, invoices: AcctInvoice[],
   const t = totals(inv.lines);
   if (t.total <= 0) throw new BuddyError('empty');
   if (!inv.buyer.name.trim()) throw new BuddyError('needs-buyer');
-  const no = nextNo('INV', invoices.map(i => i.no));
+  const no = numberFor(ids.num, 'INV', invoices.map(i => i.no));
   const journal = posted(ids, journals, { date: inv.date, memo: `Invoice ${no} – ${inv.buyer.name}`, ref: no, source: 'invoice', lines: saleLines(inv.lines, '1100', t.total) });
   return { invoice: { ...inv, no, status: 'posted', journalNo: journal.no }, journal };
 }
@@ -104,7 +110,7 @@ export function makeSale(ids: Ids, o: { date: string; time: string; lines: SaleL
   const t = totals(o.lines);
   if (t.total <= 0) throw new BuddyError('empty');
   if (t.total > SINGLE_EINV_LIMIT && !(o.buyer?.name && o.buyer.tin)) throw new BuddyError('needs-buyer');
-  const no = nextNo('POS', sales.map(s => s.no));
+  const no = numberFor(ids.num, 'POS', sales.map(s => s.no));
   const journal = posted(ids, journals, { date: o.date, memo: `POS sale ${no}${o.buyer ? ' – ' + o.buyer.name : ''}`, ref: no, source: 'pos', lines: saleLines(o.lines, o.method === 'cash' ? '1000' : '1010', t.total) });
   const at = ids.now();
   return { sale: { id: ids.id(), created: at, updated: at, no, date: o.date, time: o.time, lines: o.lines, method: o.method, ...t, buyer: o.buyer, journalNo: journal.no! }, journal };

@@ -358,6 +358,8 @@ export interface Meta {
     companyName?: string; supportEmail?: string | null; address?: string | null; checkedAt: number };
   /** MainForAdmin-D: the last feed the database gave this account (Market News, pushed Projects, announcements). */
   feed?: { userId: string; lang: string; items: import('../feed/feed').FeedItem[]; at: number };
+  /** Batch 7: how the AI Buddy POS business numbers its entries and the numbers this phone holds (buddy/numbering.ts). */
+  acctNumbering?: import('../buddy/numbering').NumState;
   /** JoyChange010-04: files shared into the app from WhatsApp or another app, waiting in the Shared Documents tray
    *  (this phone only; moved into a property's document folder by the agent). */
   sharedInbox?: import('../share/inbox').SharedFile[];

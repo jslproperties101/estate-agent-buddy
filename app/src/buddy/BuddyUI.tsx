@@ -19,7 +19,10 @@ import type {
 import {
   ACCOUNTS, BuddyError, balanced, balanceSheet, cleanLines, hoursWorked, insights, makeSale, monthEnd, newJournal, nextStage, payInvoice, payslip,
   postInvoice, postJournal, profitAndLoss, r2, reverseJournal, runPayroll, sumCr, sumDr, totals, trialBalance, SINGLE_EINV_LIMIT, type Insight,
+  type Numberer, type Series,
 } from './engine';
+import { SERIES, left, numState, numberer, prepareNumbers, setNumberingMode, type NumMode } from './numbering';
+import { TeamError } from '../team/api';
 import { STATE_CODES, buildUBL, canCancel, check, consolidate, einvFromInvoice, einvFromSale, shareUrl } from './einvoice';
 import { MyinvoisError, applyAnswer, cancelEinvoice, einvoiceStatus, submitEinvoice } from './myinvoisClient';
 import { sampleBooks, DEFAULT_PRODUCTS } from './sample';
@@ -44,6 +47,29 @@ function useRun(s: BuddyStrings) {
       if (e instanceof AccessError) { toast(s.locked, 'error'); return false; }
       throw e;
     }
+  };
+}
+
+/**
+ * Batch 7: posts with the business's numbering. First makes sure this phone holds the numbers the posting needs (asking
+ * the server when online), then runs it like useRun; the numbers count as used only when the entry was posted.
+ */
+type PostIds = typeof ids & { num?: Numberer };
+function usePost(s: BuddyStrings, books: ReturnType<typeof useBooks>['books']) {
+  const run = useRun(s);
+  const { store } = useApp();
+  const toast = useToast();
+  return async (need: Partial<Record<Series, number>>, fn: (x: PostIds) => string | void) => {
+    try {
+      await prepareNumbers(store, config(store.getState().settings), need,
+        { JV: books.journals.map(j => j.no), INV: books.invoices.map(i => i.no), POS: books.sales.map(x => x.no) });
+    } catch (e) {
+      if (!(e instanceof BuddyError) && !(e instanceof TeamError)) throw e;
+      toast(e instanceof BuddyError ? (s.err[e.code] ?? e.code) : e.code === 'not-allowed' ? s.numNotAllowed : s.err['numbers-failed'], 'error');
+      return false;
+    }
+    const { num, commit } = numberer(store);
+    return run(() => { const out = fn({ ...ids, num }); commit(); return out; });
   };
 }
 
@@ -181,8 +207,8 @@ function Pos({ s }: { s: BuddyStrings }) {
   const over = t.total > SINGLE_EINV_LIMIT, need = wants || over;
   const add = (pid: string) => setCart(c => c.some(x => x.pid === pid) ? c.map(x => (x.pid === pid ? { ...x, qty: x.qty + 1 } : x)) : [...c, { pid, qty: 1 }]);
   const step = (pid: string, d: number) => setCart(c => c.map(x => (x.pid === pid ? { ...x, qty: x.qty + d } : x)).filter(x => x.qty > 0));
-  const charge = () => run(() => {
-    if (need && !(buyer.name.trim() && buyer.tin.trim())) throw new BuddyError('needs-buyer');
+  const post = usePost(s, books);
+  const charge = () => (need && !(buyer.name.trim() && buyer.tin.trim()) ? run(() => { throw new BuddyError('needs-buyer'); }) : post({ POS: 1, JV: 1 }, ids => {
     const r = makeSale(ids, { date: ymd(new Date()), time: nowHms(), lines, method, buyer: need ? { ...buyer, tin: buyer.tin.trim().toUpperCase() } : undefined }, books.sales, books.journals);
     store.upsert('acctJournals', r.journal);
     let sale = r.sale;
@@ -190,7 +216,7 @@ function Pos({ s }: { s: BuddyStrings }) {
     store.upsert('acctSales', sale);
     setCart([]); setWants(false); setBuyer(emptyParty('10'));
     return s.charged(sale.no, money(sale.total));
-  });
+  }));
   const recent = [...books.sales].sort((a, b) => (a.no < b.no ? 1 : -1)).slice(0, 20);
   return (
     <>
@@ -228,13 +254,16 @@ function InvoiceForm({ s, start, onDone }: { s: BuddyStrings; start: AcctInvoice
   const [d, setD] = useState<AcctInvoice>(start);
   const t = totals(d.lines);
   const setLine = (i: number, patch: Partial<SaleLine>) => setD(x => ({ ...x, lines: x.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)) }));
-  const save = (post: boolean) => run(() => {
+  const postIt = usePost(s, books);
+  const save = (post: boolean) => {
     const inv = { ...d, lines: d.lines.filter(l => l.desc.trim() || l.price) };
-    if (!post) { store.upsert('acctInvoices', inv); onDone(); return s.draftSaved; }
-    const r = postInvoice(ids, inv, books.invoices, books.journals);
-    store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); onDone();
-    return s.posted(r.invoice.no!);
-  });
+    if (!post) return run(() => { store.upsert('acctInvoices', inv); onDone(); return s.draftSaved; });
+    return postIt({ INV: 1, JV: 1 }, ids => {
+      const r = postInvoice(ids, inv, books.invoices, books.journals);
+      store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); onDone();
+      return s.posted(r.invoice.no!);
+    });
+  };
   return (
     <Card title={books.invoices.some(i => i.id === start.id) ? s.editInvoice : s.newInvoice} testId="bp-invoice-form">
       <div className="two">
@@ -276,6 +305,7 @@ const newInvoice = (buyer?: Partial<Party>, line?: Partial<SaleLine>, leadId?: s
 function Invoices({ s, set, lang }: { s: BuddyStrings; set: (t: BuddyTab) => void; lang: Lang }) {
   const { store, books } = useBooks();
   const run = useRun(s);
+  const post = usePost(s, books);
   const [form, setForm] = useState<AcctInvoice | null>(null);
   const [del, setDel] = useState<string | null>(null);
   if (form) return <InvoiceForm s={s} start={form} onDone={() => setForm(null)} />;
@@ -293,10 +323,10 @@ function Invoices({ s, set, lang }: { s: BuddyStrings; set: (t: BuddyTab) => voi
             <div className="chip-row">
               {i.status === 'draft' && <>
                 <button className="btn small secondary" onClick={() => setForm(i)}>{s.edit}</button>
-                <button className="btn small primary" data-testid="bp-inv-post-row" onClick={() => run(() => { const r = postInvoice(ids, i, books.invoices, books.journals); store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); return s.posted(r.invoice.no!); })}>{s.post}</button>
+                <button className="btn small primary" data-testid="bp-inv-post-row" onClick={() => post({ INV: 1, JV: 1 }, ids => { const r = postInvoice(ids, i, books.invoices, books.journals); store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); return s.posted(r.invoice.no!); })}>{s.post}</button>
                 <button className="btn small secondary" onClick={() => setDel(i.id)}>{s.delete}</button>
               </>}
-              {i.status === 'posted' && <button className="btn small secondary" data-testid="bp-inv-pay" onClick={() => run(() => { const r = payInvoice(ids, i, books.journals, ymd(new Date())); store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); return s.paid(r.journal.no!); })}>{s.recordPayment}</button>}
+              {i.status === 'posted' && <button className="btn small secondary" data-testid="bp-inv-pay" onClick={() => post({ JV: 1 }, ids => { const r = payInvoice(ids, i, books.journals, ymd(new Date())); store.upsert('acctJournals', r.journal); store.upsert('acctInvoices', r.invoice); return s.paid(r.journal.no!); })}>{s.recordPayment}</button>}
               {i.status !== 'draft' && !e && <button className="btn small secondary" data-testid="bp-inv-einv" onClick={() => run(() => { const x = einvFromInvoice(ids, i); store.upsert('acctEinvoices', x); store.upsert('acctInvoices', { ...i, einvId: x.id }); set('einvoice'); })}>{s.makeEinv}</button>}
               {e && <button className="btn small secondary" onClick={() => set('einvoice')}>{s.viewEinv}</button>}
             </div>
@@ -376,6 +406,7 @@ function Customers({ s, set }: { s: BuddyStrings; set: (t: BuddyTab) => void }) 
 function People({ s }: { s: BuddyStrings }) {
   const { store, books } = useBooks();
   const run = useRun(s);
+  const post = usePost(s, books);
   const today = ymd(new Date()), month = today.slice(0, 7);
   const [edit, setEdit] = useState<AcctStaff | null>(null);
   const active = books.staff.filter(x => x.active);
@@ -418,7 +449,7 @@ function People({ s }: { s: BuddyStrings }) {
           <tbody>{(done ? done.slips : active.map(payslip)).map(p => <tr key={p.staffId}><td>{p.name}</td><td className="n">{fig(p.gross)}</td><td className="n">{fig(p.epfEe)} / {fig(p.epfEr)}</td><td className="n">{fig(p.socsoEe)} / {fig(p.socsoEr)}</td><td className="n">{fig(p.eisEe)} / {fig(p.eisEr)}</td><td className="n">{fig(p.pcb)}</td><td className="n">{fig(p.net)}</td></tr>)}</tbody>
         </table></div>}
         {done ? <span className="bp-pill ok" data-testid="bp-payroll-done">{s.payrollPosted(done.journalNo)}</span>
-          : <button className="btn primary" data-testid="bp-post-payroll" disabled={!active.length} onClick={() => run(() => { const r = runPayroll(ids, month, books.staff, books.payruns, books.journals); store.upsert('acctJournals', r.journal); store.upsert('acctPayruns', r.payrun); return s.payrollPosted(r.journal.no!); })}>{s.postPayroll(month)}</button>}
+          : <button className="btn primary" data-testid="bp-post-payroll" disabled={!active.length} onClick={() => post({ JV: 1 }, ids => { const r = runPayroll(ids, month, books.staff, books.payruns, books.journals); store.upsert('acctJournals', r.journal); store.upsert('acctPayruns', r.payrun); return s.payrollPosted(r.journal.no!); })}>{s.postPayroll(month)}</button>}
         <small className="muted">{s.payrollNote}</small>
       </Card>
     </>
@@ -429,6 +460,7 @@ function People({ s }: { s: BuddyStrings }) {
 function Journal({ s, lang }: { s: BuddyStrings; lang: Lang }) {
   const { store, books } = useBooks();
   const run = useRun(s);
+  const postJ = usePost(s, books);
   const [form, setForm] = useState<AcctJournal | null>(null);
   const [rev, setRev] = useState<AcctJournal | null>(null);
   const [del, setDel] = useState<string | null>(null);
@@ -436,12 +468,11 @@ function Journal({ s, lang }: { s: BuddyStrings; lang: Lang }) {
   if (form) {
     const ls = form.lines, ok = balanced(cleanLines(ls));
     const setL = (i: number, p: Partial<JournalLine>) => setForm({ ...form, lines: ls.map((l, j) => (j === i ? { ...l, ...p } : l)) });
-    const save = (post: boolean) => run(() => {
+    const save = (post: boolean) => {
       const j = { ...form, memo: form.memo.trim(), lines: cleanLines(ls) };
-      const out = post ? postJournal(j, books.journals, Date.now()) : j;
-      store.upsert('acctJournals', out); setForm(null);
-      return post ? s.posted(out.no!) : s.draftSaved;
-    });
+      if (!post) return run(() => { store.upsert('acctJournals', j); setForm(null); return s.draftSaved; });
+      return postJ({ JV: 1 }, ids => { const out = postJournal(j, books.journals, Date.now(), ids.num); store.upsert('acctJournals', out); setForm(null); return s.posted(out.no!); });
+    };
     return (
       <Card title={books.journals.some(j => j.id === form.id) ? s.editEntry : s.newEntry} testId="bp-journal-form">
         <div className="two"><label className="ff">{s.date}<input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
@@ -473,14 +504,14 @@ function Journal({ s, lang }: { s: BuddyStrings; lang: Lang }) {
           <div className="chip-row">
             {j.status === 'draft' && <>
               <button className="btn small secondary" onClick={() => setForm(j)}>{s.edit}</button>
-              <button className="btn small primary" data-testid="bp-j-post-row" onClick={() => run(() => { const p = postJournal(j, books.journals, Date.now()); store.upsert('acctJournals', p); return s.posted(p.no!); })}>{s.post}</button>
+              <button className="btn small primary" data-testid="bp-j-post-row" onClick={() => postJ({ JV: 1 }, ids => { const p = postJournal(j, books.journals, Date.now(), ids.num); store.upsert('acctJournals', p); return s.posted(p.no!); })}>{s.post}</button>
               <button className="btn small secondary" onClick={() => setDel(j.id)}>{s.delete}</button>
             </>}
             {j.status === 'posted' && j.source !== 'reversal' && <button className="btn small secondary" data-testid="bp-j-reverse" onClick={() => setRev(j)}>{s.reverse}</button>}
           </div>
         </div>))}
       {rev && <Confirm lang={lang} title={s.confirmReverse} body={s.confirmReverseBody} okLabel={s.reverse} onOk={() => {
-        run(() => { const r = reverseJournal(ids, rev, books.journals, ymd(new Date())); store.upsert('acctJournals', r.reversal); store.upsert('acctJournals', r.original); return s.reversal(r.reversal.no!); }); setRev(null);
+        void postJ({ JV: 1 }, ids => { const r = reverseJournal(ids, rev, books.journals, ymd(new Date())); store.upsert('acctJournals', r.reversal); store.upsert('acctJournals', r.original); return s.reversal(r.reversal.no!); }); setRev(null);
       }} onCancel={() => setRev(null)} />}
       {del && <Confirm lang={lang} title={s.confirmDelete} okLabel={s.delete} onOk={() => { run(() => { store.remove('acctJournals', del); return s.deleted; }); setDel(null); }} onCancel={() => setDel(null)} />}
     </>
@@ -589,6 +620,45 @@ function Reports({ s }: { s: BuddyStrings }) {
 }
 
 // ---------- setup ----------
+/** Batch 7: how this business numbers journals, invoices and receipts; the owner or an admin changes it. */
+function Numbering({ s }: { s: BuddyStrings }) {
+  const { store } = useApp();
+  const toast = useToast();
+  const st = store.getState();
+  const sess = st.meta.syncSession;
+  const n = numState(store);
+  const boss = sess?.role === 'owner' || sess?.role === 'admin';
+  const [pick, setPick] = useState<NumMode>(n && n.mode !== 'local' ? n.mode : 'device');
+  const [busy, setBusy] = useState(false);
+  const [, tick] = useState(0);
+  const go = async (fn: () => Promise<void>, ok: string) => {
+    setBusy(true);
+    try { await fn(); toast(ok); }
+    catch (e) {
+      if (e instanceof BuddyError) toast(s.err[e.code] ?? e.code, 'error');
+      else if (e instanceof TeamError) toast(e.code === 'not-allowed' ? s.numNotAllowed : s.err['numbers-failed'], 'error');
+      else throw e;
+    } finally { setBusy(false); tick(x => x + 1); }
+  };
+  const cfg = () => config(store.getState().settings);
+  if (!sess?.workspaceId) return <Card title={s.numTitle} testId="bp-numbering"><p className="muted" data-testid="bp-num-local">{s.numLocal}</p></Card>;
+  return (
+    <Card title={s.numTitle} testId="bp-numbering">
+      {n ? <p data-testid="bp-num-now">{s.numMode[n.mode]}{n.mode === 'device' && n.letter ? ` · ${s.numLetter(n.letter)}` : ''}</p>
+        : <p className="muted" data-testid="bp-num-unknown">{s.numUnknown}</p>}
+      {n && (n.mode === 'blocks' || n.mode === 'server') && <small className="muted" data-testid="bp-num-left">{s.numLeft(SERIES.map(x => `${x} ${left(n.pools[x])}`).join(' · '))}</small>}
+      <button className="btn secondary" data-testid="bp-num-check" disabled={busy} onClick={() => go(() => prepareNumbers(store, cfg(), {}, {}), s.numChecked)}>{s.numCheck}</button>
+      {n?.mode === 'local' ? null : boss ? <>
+        <label className="ff">{s.numChange}<Select data-testid="bp-num-mode" value={pick} onChange={e => setPick(e.target.value as NumMode)}>
+          {(['device', 'blocks', 'server'] as NumMode[]).map(m => <option key={m} value={m}>{s.numMode[m]}</option>)}
+        </Select></label>
+        <small className="muted">{s.numHint}</small>
+        <button className="btn primary" data-testid="bp-num-save" disabled={busy || pick === n?.mode} onClick={() => go(() => setNumberingMode(store, cfg(), pick), s.numSaved)}>{s.numSave}</button>
+      </> : <small className="muted">{s.numNotAllowed}</small>}
+    </Card>
+  );
+}
+
 function Setup({ s }: { s: BuddyStrings }) {
   const { store, books, company } = useBooks();
   const run = useRun(s);
@@ -621,6 +691,7 @@ function Setup({ s }: { s: BuddyStrings }) {
           }}>{s.addService}</button>
         </>}
       </Card>
+      <Numbering s={s} />
       <Card title={s.sandboxTitle} testId="bp-sandbox"><ol className="bp-list">{s.sandboxSteps.map((x, i) => <li key={i}>{x}</li>)}</ol><small className="muted">{s.einvHint}</small></Card>
       <Card title={s.sampleTitle}>
         <div className="two">

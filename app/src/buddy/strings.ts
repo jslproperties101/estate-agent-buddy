@@ -86,6 +86,11 @@ const en = {
   // setup
   company: 'Company (supplier on every e-Invoice)', msic: 'MSIC code', msicDesc: 'MSIC description', saveCompany: 'Save company details', saved: 'Saved',
   msicHint: 'Confirm your MSIC code against the LHDN list.', servicesTitle: 'POS services', addService: 'Add service', serviceName: 'Service', saveService: 'Save service', hideService: 'Hide', showService: 'Show',
+  numTitle: 'Document numbers', numLocal: 'Not signed in to a business: this phone numbers its own invoices and receipts.', numUnknown: 'Not checked with the server yet.',
+  numMode: { device: 'Own series per phone (INV-A-0001)', blocks: 'One series, 50 numbers at a time per phone', server: 'One series, each number from the server (needs internet)', local: 'The business database does not give out numbers yet: this phone numbers on its own.' } as Record<string, string>,
+  numLetter: (l: string) => `this phone is ${l}`, numLeft: (x: string) => `Numbers held on this phone: ${x}`, numCheck: 'Check with the server', numChecked: 'Numbering is up to date',
+  numChange: 'How this business numbers', numHint: 'Applies to entries posted from now on. Numbers already used stay as they are.', numSave: 'Change numbering', numSaved: 'Numbering changed',
+  numNotAllowed: 'Only the owner or an admin can change how the business numbers.',
   sandboxTitle: 'LHDN MyInvois sandbox',
   sandboxSteps: [
     'Register on the MyInvois sandbox (preprod) portal and create an ERP client ID and secret.',
@@ -96,6 +101,7 @@ const en = {
   err: {
     unbalanced: 'Debits and credits must match and be above zero before posting.', 'not-draft': 'Only a draft can be posted.', 'not-posted': 'Only a posted entry can be reversed or paid.',
     empty: 'Add at least one priced line first.', 'already-run': 'Payroll for that month is already posted.', 'nothing-to-consolidate': 'Nothing to consolidate.', 'needs-buyer': 'Enter the buyer name and TIN.',
+    'needs-numbers': 'This phone needs document numbers from your business first. Connect to the internet and try again.', 'numbers-failed': 'Could not get document numbers from the server. Try again.',
   } as Record<string, string>,
   locked: 'Posted records are locked. Correct them with a reversal or a credit note.',
   acc: {
@@ -184,6 +190,11 @@ const bm: BuddyStrings = {
   bsOk: 'Seimbang', bsBad: 'Tidak seimbang', tb: (d: string) => `Imbangan duga · hingga ${d}`, totals: 'Jumlah', reportsHint: 'Dibina daripada catatan yang diposkan sahaja. Draf tidak dikira.',
   company: 'Syarikat (pembekal pada setiap e-Invois)', msic: 'Kod MSIC', msicDesc: 'Keterangan MSIC', saveCompany: 'Simpan butiran syarikat', saved: 'Disimpan',
   msicHint: 'Sahkan kod MSIC anda dengan senarai LHDN.', servicesTitle: 'Perkhidmatan POS', addService: 'Tambah perkhidmatan', serviceName: 'Perkhidmatan', saveService: 'Simpan perkhidmatan', hideService: 'Sembunyi', showService: 'Tunjuk',
+  numTitle: 'Nombor dokumen', numLocal: 'Tidak log masuk ke perniagaan: telefon ini menomborkan invois dan resitnya sendiri.', numUnknown: 'Belum disemak dengan pelayan.',
+  numMode: { device: 'Siri sendiri bagi setiap telefon (INV-A-0001)', blocks: 'Satu siri, 50 nombor sekali gus bagi setiap telefon', server: 'Satu siri, setiap nombor daripada pelayan (perlu internet)', local: 'Pangkalan data perniagaan belum memberi nombor: telefon ini menomborkan sendiri.' } as Record<string, string>,
+  numLetter: (l: string) => `telefon ini ${l}`, numLeft: (x: string) => `Nombor dipegang telefon ini: ${x}`, numCheck: 'Semak dengan pelayan', numChecked: 'Penomboran terkini',
+  numChange: 'Cara perniagaan ini menomborkan', numHint: 'Terpakai pada catatan yang diposkan mulai sekarang. Nombor yang sudah digunakan kekal.', numSave: 'Tukar penomboran', numSaved: 'Penomboran ditukar',
+  numNotAllowed: 'Hanya pemilik atau admin boleh menukar cara perniagaan menomborkan.',
   sandboxTitle: 'Kotak pasir LHDN MyInvois',
   sandboxSteps: [
     'Daftar di portal kotak pasir (preprod) MyInvois dan cipta ID klien dan rahsia ERP.',
@@ -194,6 +205,7 @@ const bm: BuddyStrings = {
   err: {
     unbalanced: 'Debit dan kredit mesti sama dan melebihi sifar sebelum diposkan.', 'not-draft': 'Hanya draf boleh diposkan.', 'not-posted': 'Hanya catatan yang diposkan boleh diterbalikkan atau dibayar.',
     empty: 'Tambah sekurang-kurangnya satu baris berharga dahulu.', 'already-run': 'Gaji bulan itu sudah diposkan.', 'nothing-to-consolidate': 'Tiada apa-apa untuk disatukan.', 'needs-buyer': 'Masukkan nama dan TIN pembeli.',
+    'needs-numbers': 'Telefon ini perlukan nombor dokumen daripada perniagaan anda dahulu. Sambung ke internet dan cuba lagi.', 'numbers-failed': 'Tidak dapat nombor dokumen daripada pelayan. Cuba lagi.',
   },
   locked: 'Rekod yang diposkan dikunci. Betulkan dengan pembalikan atau nota kredit.',
   acc: {
@@ -281,6 +293,11 @@ const zh: BuddyStrings = {
   bsOk: '已平衡', bsBad: '不平衡', tb: (d: string) => `试算表 · 至 ${d}`, totals: '合计', reportsHint: '只计入已过账分录，不含草稿。',
   company: '公司（每张电子发票的卖方）', msic: 'MSIC 代码', msicDesc: 'MSIC 说明', saveCompany: '保存公司资料', saved: '已保存',
   msicHint: '请对照 LHDN 名单确认您的 MSIC 代码。', servicesTitle: 'POS 服务', addService: '新增服务', serviceName: '服务', saveService: '保存服务', hideService: '隐藏', showService: '显示',
+  numTitle: '单据编号', numLocal: '未登录企业：此手机自行为发票和收据编号。', numUnknown: '尚未与服务器核对。',
+  numMode: { device: '每部手机各自一个系列（INV-A-0001）', blocks: '同一系列，每部手机每次取 50 个号码', server: '同一系列，每个号码由服务器发出（需联网）', local: '企业数据库尚未发出号码：此手机自行编号。' } as Record<string, string>,
+  numLetter: (l: string) => `此手机为 ${l}`, numLeft: (x: string) => `此手机持有的号码：${x}`, numCheck: '与服务器核对', numChecked: '编号已是最新',
+  numChange: '本企业的编号方式', numHint: '适用于从现在起过账的记录。已使用的号码保持不变。', numSave: '更改编号方式', numSaved: '编号方式已更改',
+  numNotAllowed: '只有拥有者或管理员可以更改企业的编号方式。',
   sandboxTitle: 'LHDN MyInvois 沙盒',
   sandboxSteps: [
     '在 MyInvois 沙盒（preprod）门户注册，并创建 ERP 客户端 ID 和密钥。',
@@ -291,6 +308,7 @@ const zh: BuddyStrings = {
   err: {
     unbalanced: '过账前借贷必须相等且大于零。', 'not-draft': '只有草稿可以过账。', 'not-posted': '只有已过账的记录可以冲销或收款。',
     empty: '请先加入至少一行有金额的明细。', 'already-run': '该月薪资已过账。', 'nothing-to-consolidate': '没有可合并的内容。', 'needs-buyer': '请填写买方名称和 TIN。',
+    'needs-numbers': '此手机需要先从您的企业取得单据编号。请连接网络后再试。', 'numbers-failed': '无法从服务器取得单据编号。请再试一次。',
   },
   locked: '已过账记录已锁定，请用冲销或贷项通知单更正。',
   acc: {
