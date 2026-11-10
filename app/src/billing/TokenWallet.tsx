@@ -10,11 +10,12 @@ import { BillingError } from './api';
 import { TOKEN_PACKS, usd } from './plans';
 import { availability } from './providers';
 import { billingStrings } from './strings';
+import { LookupsEntry } from '../lookups/LookupsUI';
 import { buyTokens, cachedTokens, refreshTokens, restoreTokens, tokenBalance, walletEnv } from './tokens';
 
 type Msg = { text: string; tone: 'ok' | 'error' | 'info' } | null;
 
-export function TokenWallet({ lang }: { lang: Lang }) {
+export function TokenWallet({ lang, onLookups }: { lang: Lang; onLookups?: () => void }) {
   const { state, store } = useApp();
   const s = billingStrings[lang]; const t = s.tokens;
   const cfg = config(state.settings);
@@ -78,6 +79,7 @@ export function TokenWallet({ lang }: { lang: Lang }) {
             <button type="button" className="btn small secondary" data-testid="token-restore" disabled={busy || !avail.ok} onClick={() => void restore()}>{t.restore}</button>
             <button type="button" className="btn small secondary" data-testid="token-refresh" disabled={busy} onClick={() => void refresh()}>{t.refresh}</button>
           </div>
+          {onLookups && <LookupsEntry lang={lang} onOpen={onLookups} />}
           <div className="card-title">{t.history}</div>
           {history.length === 0 ? <small className="muted" data-testid="token-history-empty">{t.noHistory}</small> : (
             <div className="stack-sm" data-testid="token-history">

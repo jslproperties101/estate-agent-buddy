@@ -36,6 +36,8 @@ export type Screen =
   | { name: 'projects'; openId?: string }
   // MainForAdmin-E: openId = a post opened from a tapped push alert
   | { name: 'marketNews'; openId?: string }
+  // Batch C: Oneharta property lookups paid with Ai Buddy Tokens (only while billing is switched on)
+  | { name: 'lookups' }
   // JoyChange010-04: files shared into the app, waiting to be moved into a property
   | { name: 'sharedDocs' }
   | { name: 'projectDetail'; id: string }

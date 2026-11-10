@@ -244,6 +244,8 @@ test('BU-A1 website, agency owner: licence and seats, seats moved, a plan priced
   await openSettings(page);
   await page.getByTestId('billing-toggle').check();
   await page.getByTestId('agency-card').waitFor();
+  // The plan state arrives from the database a moment after the card shows (Batch C: wait for it instead of reading at once).
+  await page.getByTestId('billing-state-pro').filter({ hasText: /Included in your agency's licence until/ }).waitFor({ timeout: 10000 });
   assert.match(await page.getByTestId('billing-state-pro').innerText(), /Included in your agency's licence until/);
   assert.match(await page.getByTestId('agency-state').innerText(), /Agency licence until .* · test/);
   assert.match(await page.getByTestId('agency-seats').innerText(), /2 of 3 seats in use/);

@@ -323,7 +323,7 @@ export function SettingsScreen({ lang, go }: { lang: Lang; go: Go }) {
         <small className="muted">{billingStrings[lang].switchHint}</small>
       </div>
       {billingEnabled(store) && <BillingCard lang={lang} />}
-      {billingEnabled(store) && <TokenWallet lang={lang} />}
+      {billingEnabled(store) && <TokenWallet lang={lang} onLookups={() => go({ name: 'lookups' })} />}
       <div className="card stack-sm">
         <div className="card-title">{t.language}</div>
         <div className="seg" role="group" aria-label={t.language}>

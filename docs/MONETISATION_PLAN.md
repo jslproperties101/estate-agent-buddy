@@ -20,7 +20,7 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Google Play | Server side: checks a purchase with Google (service account), requires that it was made for this agent (a hash of the agent's id is put on the purchase), applies it once, acknowledges it. Phone side: the interface to a native `PlayBilling` plugin. | **Server side IMPLEMENTED BUT NOT PROVEN. The Android plugin is NOT DONE**: no Android code was added, so the Google Play button says "this APK does not include Google Play Billing yet". |
 | Safety rails | A live Stripe key or the live Billplz address is refused by both functions unless `BILLING_ALLOW_LIVE=true` is set on purpose; the Billplz callback without its X Signature key is refused in live mode; return addresses must be https or the app's own scheme; no secrets in the phone's code (a test checks it); no logging of tokens. | IMPLEMENTED |
 | Screens | A "Plans (test mode)" card in Settings: test-mode banner, state per product, trial button, provider choice, plans with prices, Pay (test), Refresh. English, Malay, Chinese. | IMPLEMENTED |
-| One Harta API | Explained by the owner on 30 Oct 2026 (oneharta.com API: land tax, company, sale/rental and InfoSearch lookups charged in One Harta credits). Agents will pay for lookups with Ai Buddy Tokens (Batch B wallet, below); the lookups themselves are **Batch C, not built yet**. | NOT DONE (Batch C) |
+| One Harta API | Explained by the owner on 30 Oct 2026 (oneharta.com API). **Batch C (10 Nov 2026)**: land tax, company, sale / rental and InfoSearch lookups, paid with Ai Buddy Tokens at 3 tokens per Oneharta credit (section below). Owner confirmed with Oneharta that lookups may be resold to the app's agents through the API. | BUILT (test mode; not deployed) |
 
 ## Batch A (30 Oct 2026): Market News and Intelligence "access" plans
 
@@ -43,6 +43,18 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Database | `supabase/proposed/20261103000000_tokens_sandbox.sql` (+ rollback + `supabase/tests/tokens_sandbox_test.sql`): `eab_token_ledger` (every change; one credit per purchase), `eab_token_balances` (per agent **and per environment**, never below zero), `eab_my_tokens()` for the phone, `eab_tokens_credit()` for the server only. Test-mode tokens never become real tokens. Not applied to any Supabase project. |
 | Screen | Settings, below the Plans card, only while the billing switch is on: balance, the four packs with USD prices, Buy, **Restore purchases** (sends any paid purchase Google Play still holds to the server, e.g. after a lost connection; never credits twice), Refresh balance, last changes. English, Malay and Chinese (Malay and Chinese are drafts). |
 | Not done | **Spending tokens** (Batch C: Oneharta lookups, each charged in tokens on the server). Google's real-time notifications for refunds (a refunded pack is not taken back from the balance yet). A bonus on larger packs (owner to decide). |
+
+## Batch C (10 Nov 2026): Oneharta property lookups, paid with Ai Buddy Tokens
+
+| | |
+|---|---|
+| Price | **3 Ai Buddy Tokens per Oneharta credit** really charged (owner's choice, 10 Nov 2026). One credit costs the owner MYR 1.25; 3 tokens are USD 0.75. Most per lookup: InfoSearch, Sale search, Rental search 3 tokens; Cukai Tanah (one lot or title), Company (one number), Sale names, Rental names 9 tokens. Nothing found = nothing charged. |
+| How it is paid | The new `lookup` server function holds the most the lookup can cost (`eab_lookup_begin`), asks Oneharta with the owner's key, then keeps 3 tokens per credit Oneharta says it charged and gives the rest back at once (`eab_lookup_finish`). A company Oneharta later finds no data for (and refunds) gives the tokens back too (`eab_lookup_refund`). If Oneharta never answers, the tokens stay held and the lookup is marked "unknown" for the office to check in Oneharta's call log. |
+| Limits | Per Malaysia day, counted in Oneharta credits: **30 per agent** (`ONEHARTA_AGENT_DAILY_CREDITS`) and **100 for the whole app** (`ONEHARTA_APP_DAILY_CREDITS`). Every lookup spends real credits even while tokens are in test mode, so these limits protect the owner's Oneharta balance. |
+| Not offered | Title-number ranges, map parcels and batches (an HSD / HSM title costs 20 to 50 credits), Request Search. |
+| Personal data | Results (owner names, IC numbers, phones) are shown on the phone only and kept in that screen's memory: never stored in the database, on the phone or synced. The database keeps the kind of lookup, a short note without personal details, the cost, and the Oneharta reference needed to reopen a land tax record or company for free. The screen carries a PDPA notice. |
+| Where | Settings, token card, "Property lookups"; and the top of Market News and Intelligence. Both only while the billing switch is on. (Not on the home grid: the 15 home buttons are fixed; the owner can decide to add one.) |
+| Files | `supabase/functions/lookup/`, `_shared/oneharta.ts`, `supabase/proposed/20261110200000_oneharta_lookups.sql` (+ rollback, + `supabase/tests/oneharta_lookups_test.sql`), `app/src/lookups/`. Not deployed; the key is a function secret (`ONEHARTA_API_KEY`) and never goes into the app. |
 
 ## Which features to charge for: a proposal (only Market News is gated, Batch A)
 
