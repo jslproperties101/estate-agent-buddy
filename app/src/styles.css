@@ -1749,3 +1749,30 @@ html.website .home nav.grid.dash > .tile, html.website .home nav.grid.dash > .ti
 .tabs.seg-tabs button.on { background: var(--gold-grad); }
 .act-item { border-radius: 14px; border-left: 3px solid var(--gold-soft); background: linear-gradient(180deg, #17171A, #101012); }
 .sc-large .sc-tx { font-size: 14px; }
+
+/* ===== EA AI Buddy reskin, Phase C: Calendar & To-Do, Calculator, Market News, Track My Sales, AI Assistant ===== */
+/* Track My Sales: gold-framed number tiles; the first (commission received) is the wide hero tile. */
+.kpi-grid .kpi { border: 1px solid var(--gold-soft); border-radius: 16px; padding: 12px; background: linear-gradient(180deg, #1B1810, #101012); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.kpi-grid .kpi:first-child { grid-column: 1 / -1; padding: 16px; }
+.kpi-grid .kpi strong { font-size: 20px; }
+.kpi-grid .kpi:first-child strong { font-size: 30px; background: var(--gold-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* Calculator: the answer card is a gold-edged panel with big figures; the mode switch is a gold pill. */
+.calc .calc-out { border: 1px solid var(--gold-soft); border-left: 4px solid var(--gold); border-radius: 16px; background: linear-gradient(180deg, #1B1810, #101012); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.calc .calc-out strong { color: var(--gold-hi); }
+.calc .seg { border-radius: 999px; padding: 3px; gap: 3px; background: #121214; }
+.calc .seg button { border-radius: 999px; }
+/* Calendar & To-Do: round day buttons, gold selected day, pill switch. */
+.cal-day { border-radius: 14px; background: linear-gradient(180deg, #17171A, #101012); }
+.cal-day.today { border-width: 2px; }
+.cal-day.sel { box-shadow: 0 0 0 2px var(--gold-hi), 0 2px 10px rgba(0,0,0,.4); }
+.task-list > li, .task-list > * { border-radius: 14px; }
+/* Market News: cards with a gold edge, unread ones glow. */
+.feed-card { border-radius: 16px; border-left: 4px solid var(--gold-soft); background: linear-gradient(180deg, #17171A, #101012); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.feed-card.unread { border-color: var(--gold); border-left-color: var(--gold-hi); }
+.feed-head strong { font-size: 17px; }
+.new-badge { border-radius: 999px; }
+/* AI Assistant: the robot-house logo gets a gold glow; the main buttons are full-width pills. */
+.cmd-brand .logo-img, .cmd-brand img { filter: drop-shadow(0 0 14px rgba(240, 200, 90, .45)); }
+.cmd-screen .btn.primary, .cmd-screen .btn.ai-process { border-radius: 999px; }
+.cmd-screen .btn.secondary { border-radius: 999px; }
+.kpi-grid .kpi:last-child:nth-child(even) { grid-column: 1 / -1; }

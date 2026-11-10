@@ -16,7 +16,7 @@ mockups; advert directly above the new tab bar; header "EA AI Buddy" + tagline w
 | Bottom tab bar: Home, Projects, AI Buddy (centre), Inquiries, More; advert directly above it | DONE in browser; native AdMob banner position NOT PROVEN on a phone |
 | More screen: profile card, Settings, Notifications, Team Workspace, Send Feedback, About | DONE |
 | Phase B (Projects, Property Details, Contacts, Inquiries & Viewings) | IMPLEMENTED (look and layout only; browser-tested, not yet seen on a phone) — see below |
-| Phase C (Calendar, Calculator, News, Track My Sales, AI Assistant) | NOT DONE (next phase, after review) |
+| Phase C (Calendar & To-Do, Calculator, Market News, Track My Sales, AI Assistant) | IMPLEMENTED (look only; browser-tested, not yet seen on a phone) — see below |
 
 ## What stays the same on purpose
 
@@ -65,3 +65,14 @@ Look and layout only; no data, saving, sync or rules changed.
 - Tests: `app/tests/ui-reskin-b.test.mjs` (EB1-EB4). EB3 finds no projects in the sample data, so the filter itself is NOT exercised yet.
 - Not done on purpose: the mockup's Map View, Floor Plan / Gallery tabs on a property and a photo on every Projects card (they need
   data the app does not have or new features). The existing gap under the title bar on list screens (Change 74) is unchanged.
+
+## Phase C (10 Nov 2026) — what changed
+
+Look only; no data, saving or logic changed. Owner chose to keep the Change 74 gap under the title bar.
+- Track My Sales: gold-framed number tiles, Commission Received as the wide hero tile.
+- Calculator: gold-edged answer cards; Calendar & To-Do: rounded day buttons, gold selected day.
+- Market News: gold-edged cards, unread ones glow. AI Assistant: gold glow on the logo and pill buttons.
+- Tests: `app/tests/ui-reskin-c.test.mjs` (EC1-EC5).
+- Not done: the mockup's "Suggested" prompt list (the assistant already has its own suggestion chips; the mockup's prompts are not
+  commands the assistant is known to understand), Calendar day-agenda timeline, Calculator ROI / Affordability tabs, news photos
+  (only if an admin post carries one), Track My Sales bar chart and recent-activity list, Map View.
