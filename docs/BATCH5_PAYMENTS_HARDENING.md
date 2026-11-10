@@ -80,3 +80,52 @@ licence tester — section 6).
 - Agency licences sold by FPX / card outside the app (seats, invoices) — next part of Batch 5.
 - Admin EAB screen for the news switch and the token refund shortfalls.
 - Batch C (Oneharta lookups paid by tokens).
+
+---
+
+# Batch 5 — part 2: agency licences (10 Nov 2026, branch `feature/qa-agency-payments`)
+
+SANDBOX / TEST MODE ONLY. Joe's answers (10 Nov): charge **both** ways (per agent seat, and one price for the whole agency);
+pay **both** ways (a checkout page on the website, and an invoice with a pay link). "New branch": built on a new branch; the
+SQL was tested on a local PostgreSQL only, because EAB-QA-Test is paused (the free plan's second slot is held by "Aura Beauty").
+
+## Google Play rules, checked again on 10 Nov 2026
+Google's billing choice programme (support.google.com/googleplay/android-developer/answer/17161464) covers the UK and EEA
+(30 Jun 2026), Australia and Japan (30 Sep 2026), and the US under its own programmes. **Malaysia is still not covered.** So
+nothing changes from part 1: inside the Android app only Google Play is offered; agency licences are sold on the website and
+by invoice, and the Android app shows the licence and its seats but **no prices, pay buttons, links or invoices**.
+
+## How it works
+- One licence per agency (team workspace): `seats` (N agents bought, RM per agent) or `agency` (one price, covers up to a set
+  number of agents). 30 or 365 days per payment, added after the current period. Nothing renews by itself.
+- Every payment starts as an invoice row (`eab_agency_invoices`, numbered AGI-00001…): the website checkout makes one, and
+  the platform owner raises one in Admin EAB (Company Money → Agency licences). The amount the provider reports must equal the
+  invoice's; each provider event applies once; a payment for a void or already-paid invoice, or of the wrong amount, is
+  recorded for the owner to refund (`eab_admin_agency_problems`).
+- Seats: filled automatically from the agency's members when a payment is applied (owner and admins first; 'limited'
+  members never); the agency owner or an admin moves seats in Settings → Plans → Agency licence. A seat counts as Pro
+  (`eab_billing_has`, `eab_my_billing` row with provider `agency`); not the POS add-on.
+- Ways to pay an invoice: FPX (a Billplz bill, link does not expire), card (a link to `billing-webhook?p=pay&i=…&t=…` that
+  opens a fresh Stripe page each time), or **marked paid by the owner** after a bank transfer (with the bank reference).
+- Prices are PLACEHOLDERS (RM 49 per agent a month, RM 490 a year; RM 399 a month / RM 3,990 a year for up to 15 agents)
+  until Joe sets them in Admin EAB.
+
+## Files
+- `supabase/proposed/20261110100000_agency_licences.sql` (+ `_rollback.sql`); test `supabase/tests/agency_licences_test.sql`
+  (local: `supabase/tests/local/run-agency.sh` with `local/agency_stubs.sql`).
+- `supabase/functions/_shared/agency.ts`; `billing/handler.ts` (agency_checkout, agency_invoice);
+  `billing-webhook/handler.ts` (agency FPX bills and Stripe Checkout; GET `?p=pay`).
+- App: `app/src/billing/{agency.ts, AgencyUI.tsx, agencyStrings.ts}`, `entitlement.ts` (best line wins; no personal Pro sold
+  on top of an agency seat), `api.ts`, `BillingUI.tsx`, `strings.ts`. Tests `app/tests/batch5b-agency.test.ts`, `ui-billing.test.mjs` BU-A1…A3.
+- Admin EAB (`feature/admin-batch-014`): Money → Agency licences (invoices, raise, mark paid, void, problems, prices).
+
+## Owner steps (TEST project only)
+1. Free a Supabase slot for EAB-QA-Test (pause "Aura Beauty" or upgrade the plan), then apply this SQL there and run its test.
+2. Deploy `billing` and `billing-webhook` to EAB-QA-Test with the Billplz sandbox and Stripe test secrets (part 1, section 6);
+   in Stripe add the events `checkout.session.completed` and `checkout.session.async_payment_succeeded` to the webhook.
+3. Set the real prices in Admin EAB before selling anything.
+
+## Not in part 2
+- Batch C (One Harta lookups paid with tokens): needs One Harta's API documents, an API key and the token price of each lookup.
+- Automatic renewal (subscriptions) for agencies; e-mailing invoices (send the links yourself); pro-rata for seats bought mid-period
+  (raise an invoice with your own amount).

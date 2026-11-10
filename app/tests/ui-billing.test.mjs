@@ -58,6 +58,13 @@ async function phone(db = {}, settings = {}) {
       if (m[1] === 'eab_public_settings') return route.fulfill({ status: 200, headers: cors, body: '{}' });
       if (m[1] === 'eab_my_feed') return route.fulfill({ status: 200, headers: cors, body: '[]' });
       if (m[1] === 'eab_my_flags') return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(db.flags ?? {}) });
+      // Batch 5 part 2: the agency licence (db.agency: what eab_my_agency answers; undefined = not on the database)
+      if (m[1] === 'eab_my_agency') {
+        if (db.agency === undefined) return route.fulfill({ status: 404, headers: cors, body: '{"code":"PGRST202","message":"Could not find the function public.eab_my_agency"}' });
+        return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(typeof db.agency === 'function' ? db.agency() : db.agency) });
+      }
+      if (m[1] === 'eab_agency_price_list') return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(db.prices ?? []) });
+      if (m[1] === 'eab_agency_seat_set') { const b = JSON.parse(req.postData() || '{}'); (db.seatCalls ??= []).push(b); return route.fulfill({ status: 200, headers: cors, body: '1' }); }
       if (m[1] === 'eab_my_billing') {
         if (db.billing === undefined) return route.fulfill({ status: 404, headers: cors, body: '{"code":"PGRST202","message":"Could not find the function public.eab_my_billing"}' });
         return route.fulfill({ status: 200, headers: cors, body: JSON.stringify(typeof db.billing === 'function' ? db.billing() : db.billing) });
@@ -215,4 +222,82 @@ test('BU10 the card is readable in Malay and Chinese', async () => {
     assert.match(await page.getByTestId('billing-banner').innerText(), banner);
     await ctx.close();
   }
+});
+
+// ── Batch 5 part 2: the agency licence ──────────────────────────────────────────────────────────────────────────────
+const PRICES = [
+  { plan: 'agency_monthly', style: 'agency', amount_sen: 39900, days: 30, seats_included: 15 }, { plan: 'agency_seat_monthly', style: 'seats', amount_sen: 4900, days: 30, seats_included: null },
+  { plan: 'agency_seat_yearly', style: 'seats', amount_sen: 49000, days: 365, seats_included: null }, { plan: 'agency_yearly', style: 'agency', amount_sen: 399000, days: 365, seats_included: 15 },
+];
+const TOKEN = 'ab'.repeat(32);
+const ownerView = () => ({
+  role: 'owner', my_seat: true, seats_used: 2,
+  licence: { plan: 'agency_seat_monthly', style: 'seats', seats: 3, status: 'active', env: 'sandbox', period_end: new Date(Date.now() + 20 * DAY).toISOString(), provider: 'fpx', in_force: true },
+  members: [{ user_id: 'u-me', email: 'me@x.com', role: 'owner', seat: true }, { user_id: 'u-ali', email: 'ali@x.com', role: 'agent', seat: true }, { user_id: 'u-siti', email: 'siti@x.com', role: 'agent', seat: false }],
+  invoices: [{ id: '44444444-4444-4444-8444-444444444444', no: 'AGI-00003', plan: 'agency_seat_monthly', seats: 3, amount_sen: 14700, days: 30, status: 'open', created_at: new Date().toISOString(), paid_at: null, origin: 'invoice', fpx_url: 'https://www.billplz-sandbox.com/bills/bill3', pay_token: TOKEN }],
+});
+
+test('BU-A1 website, agency owner: licence and seats, seats moved, a plan priced and paid by FPX, an open invoice with its two links', async () => {
+  const db = { billing: [row({ provider: 'agency', plan_id: 'agency_seat_monthly', cancel_at_period_end: true })], agency: ownerView, prices: PRICES,
+    fn: b => (b.action === 'agency_checkout' ? { status: 200, json: { url: `${PAY}/bills/new`, env: 'sandbox', invoice: { id: 'x', no: 'AGI-00004', amount_sen: 14700, seats: 3, days: 30 } } } : { status: 404, json: {} }) };
+  const { page, ctx, fnCalls, errors } = await phone(db);
+  await openSettings(page);
+  await page.getByTestId('billing-toggle').check();
+  await page.getByTestId('agency-card').waitFor();
+  assert.match(await page.getByTestId('billing-state-pro').innerText(), /Included in your agency's licence until/);
+  assert.match(await page.getByTestId('agency-state').innerText(), /Agency licence until .* · test/);
+  assert.match(await page.getByTestId('agency-seats').innerText(), /2 of 3 seats in use/);
+  assert.equal(await page.getByTestId('agency-member').count(), 3);
+  await page.getByTestId('agency-member').filter({ hasText: 'ali@x.com' }).getByTestId('agency-take').click();
+  await waitFor(async () => (db.seatCalls ?? []).length === 1);
+  assert.deepEqual(db.seatCalls[0], { p_ws: 'ws1', p_user: 'u-ali', p_on: false });
+  // buying: per agent, 3 agents, monthly
+  await page.getByTestId('agency-style-seats').click();
+  await page.getByTestId('agency-seat-count').fill('3');
+  assert.match(await page.getByTestId('agency-total').innerText(), /RM 147 for 30 days/);
+  await page.getByTestId('agency-style-agency').click();
+  assert.match(await page.getByTestId('agency-total').innerText(), /RM 399 for 30 days/);
+  assert.match(await page.getByTestId('agency-card').innerText(), /Covers up to 15 agents/);
+  await page.getByTestId('agency-style-seats').click();
+  // the open invoice: FPX bill and the card link
+  const inv = page.getByTestId('agency-invoice');
+  assert.match(await inv.innerText(), /AGI-00003 · RM 147 · 30d/);
+  assert.equal(await inv.getByRole('link', { name: 'Pay by FPX' }).getAttribute('href'), 'https://www.billplz-sandbox.com/bills/bill3');
+  assert.equal(await inv.getByRole('link', { name: 'Pay by card' }).getAttribute('href'), `${SB}/functions/v1/billing-webhook?p=pay&i=44444444-4444-4444-8444-444444444444&t=${TOKEN}`);
+  await page.getByTestId('agency-card').screenshot({ path: `${SHOTS}agency-card-owner.png` });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, 'nothing sticks out sideways');
+  assert.deepEqual(errors, []);
+  // paying opens the payment page (the website goes there in the same tab)
+  await page.getByTestId('agency-pay-fpx').click();
+  await waitFor(async () => fnCalls.some(c => c.action === 'agency_checkout'));
+  assert.deepEqual(fnCalls.find(c => c.action === 'agency_checkout'), { action: 'agency_checkout', workspaceId: 'ws1', plan: 'agency_seat_monthly', seats: 3, provider: 'fpx' });
+  await page.waitForURL(`${PAY}/bills/new`);
+  await ctx.close();
+});
+
+test('BU-A2 an agent of the agency: covered, told who manages it; no members, prices, payments or invoices', async () => {
+  const db = { billing: [row({ provider: 'agency', plan_id: 'agency_monthly', cancel_at_period_end: true })], prices: PRICES,
+    agency: { role: 'agent', my_seat: true, seats_used: 4, licence: { plan: 'agency_monthly', style: 'agency', seats: 15, status: 'active', env: 'sandbox', period_end: new Date(Date.now() + 20 * DAY).toISOString(), provider: 'manual', in_force: true } } };
+  const { page, ctx, calls, errors } = await phone(db);
+  await openSettings(page);
+  await page.getByTestId('billing-toggle').check();
+  await page.getByTestId('agency-card').waitFor();
+  assert.match(await page.getByTestId('agency-my-seat').innerText(), /You hold a seat: Pro is included/);
+  const t = await page.getByTestId('agency-card').innerText();
+  assert.match(t, /The agency owner and admins manage this licence/);
+  for (const id of ['agency-member', 'agency-pay-fpx', 'agency-pay-card', 'agency-invoice', 'agency-total']) assert.equal(await page.getByTestId(id).count(), 0, id);
+  assert.ok(!calls.includes('eab_agency_price_list'), 'prices are not even asked for');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('BU-A3 a database without agency licences: no agency card, the Plans card as before', async () => {
+  const { page, ctx, errors } = await phone({ billing: [] });
+  await openSettings(page);
+  await page.getByTestId('billing-toggle').check();
+  await page.getByTestId('billing-card').waitFor();
+  await page.waitForTimeout(500);
+  assert.equal(await page.getByTestId('agency-card').count(), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });

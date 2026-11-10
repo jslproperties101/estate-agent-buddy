@@ -8,12 +8,17 @@
 //               trusted: the purchase must already be linked to an agent (eab_play_purchases), it is read back from Google with
 //               the service account, and only Google's answer is applied. A refunded token pack takes its tokens back
 //               (eab_tokens_refund) after Google's voided-purchases list confirms it.
+//   GET ?p=pay&i=<invoice>&t=<token>  Batch 5 part 2: the card link printed on an agency invoice. Opens a fresh Stripe page
+//               for that invoice (Stripe pages expire after a day) and sends the browser there. Nothing is granted here.
+// Agency payments (Batch 5 part 2: a Billplz bill or Stripe Checkout made for an agency invoice) go to eab_agency_apply, which
+// checks the amount against the invoice and applies each payment once.
 // Whatever the call says, the change is applied by the database function eab_billing_apply, once per provider event id.
 import {
   BILLPLZ_SANDBOX, applyParams, isPlanId, liveRefusal, mapBillplzBill, mapPlaySubscription, mapStripeEvent, parsePlayNotice, playSubEventId,
   safeEqual, tokenPurchaseRef, verifyBillplzSignature, verifyStripeSignature, type Env, type Mapped,
 } from '../_shared/billing.ts';
 import { isVoided, playApi, playCfg } from '../_shared/play.ts';
+import { agencyApplyParams, isPayToken, mapAgencyBill, mapAgencyStripe, stripeAgencyBody, type AgencyInvoice, type AgencyMapped } from '../_shared/agency.ts';
 
 export interface Deps { env: (k: string) => string; fetch: typeof fetch; now: () => number }
 
@@ -86,7 +91,43 @@ async function playNotice(req: Request, raw: string, d: Deps, url: string, servi
   }
 }
 
+const text = (msg: string, status: number) => new Response(msg, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+
+/** The card link on an agency invoice: a fresh Stripe page for an open invoice whose token matches. */
+async function payLink(req: Request, d: Deps, url: string, service: string): Promise<Response> {
+  const q = new URL(req.url).searchParams;
+  const id = q.get('i') ?? ''; const token = q.get('t') ?? '';
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !isPayToken(token)) return text('This payment link is not valid.', 404);
+  const key = d.env('STRIPE_SECRET_KEY'); const ret = d.env('BILLING_RETURN_URL');
+  if (!key || !/^https:\/\//.test(ret)) return text('Card payment is not set up yet.', 503);
+  let inv: AgencyInvoice | null;
+  try { inv = await rpc(d, url, service, 'eab_agency_invoice_get', { p_id: id, p_token: token }) as AgencyInvoice | null; }
+  catch { return text('Please try again in a minute.', 503); }
+  if (!inv) return text('This payment link is not valid.', 404);
+  if (inv.status !== 'open') return text(inv.status === 'paid' ? 'This invoice is already paid. Thank you.' : 'This invoice was cancelled.', 410);
+  const r = await d.fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(stripeAgencyBody(inv, ret)).toString() });
+  const j = r.ok ? await r.json().catch(() => null) : null;
+  const to = str(j?.url);
+  if (!to.startsWith('https://')) return text('The card payment page could not be opened. Please try again.', 502);
+  try { await rpc(d, url, service, 'eab_agency_invoice_links', { p_id: id, p_bill_id: null, p_fpx_url: null, p_session_id: str(j?.id) || null }); } catch { /* the link still works */ }
+  return new Response(null, { status: 303, headers: { location: to, 'cache-control': 'no-store' } });
+}
+
+/** An agency payment: applied by the database against its invoice. 500 when the database could not be reached (retried). */
+async function agencyPaid(m: AgencyMapped, d: Deps, url: string, service: string, allowLive: boolean): Promise<Response> {
+  if (!m) return json({ error: 'not-agency' }, 400);
+  if ('ignored' in m) return json({ result: 'ignored', reason: m.ignored });
+  if (m.paid.env === 'live' && !allowLive) return json({ result: 'ignored', reason: 'live-refused' });
+  try { return json({ result: await rpc(d, url, service, 'eab_agency_apply', agencyApplyParams(m.paid)) }); }
+  catch { return json({ error: 'database' }, 500); }
+}
+
 export async function handleWebhook(req: Request, d: Deps): Promise<Response> {
+  if (req.method === 'GET' && new URL(req.url).searchParams.get('p') === 'pay') {
+    const u = d.env('SUPABASE_URL').replace(/\/+$/, ''); const sv = d.env('SUPABASE_SERVICE_ROLE_KEY');
+    if (!u || !sv) return text('Not set up.', 503);
+    return await payLink(req, d, u, sv);
+  }
   if (req.method !== 'POST') return json({ error: 'method' }, 405);
   const allowLive = d.env('BILLING_ALLOW_LIVE') === 'true';
   const url = d.env('SUPABASE_URL').replace(/\/+$/, ''); const service = d.env('SUPABASE_SERVICE_ROLE_KEY');
@@ -107,6 +148,8 @@ export async function handleWebhook(req: Request, d: Deps): Promise<Response> {
     if (!await verifyStripeSignature(raw, req.headers.get('stripe-signature'), secret, d.now())) return json({ error: 'bad-signature' }, 400);
     let ev: unknown;
     try { ev = JSON.parse(raw); } catch { return json({ error: 'bad request' }, 400); }
+    const agency = mapAgencyStripe(ev);
+    if (agency) return await agencyPaid(agency, d, url, service, allowLive);
     mapped = mapStripeEvent(ev);
   } else if (provider === 'fpx') {
     const params = Object.fromEntries(new URLSearchParams(raw)) as Record<string, string>;
@@ -119,7 +162,11 @@ export async function handleWebhook(req: Request, d: Deps): Promise<Response> {
     if (!key || !collection) return json({ error: 'not-configured' }, 503);
     const br = await d.fetch(`${billplzBase}/api/v3/bills/${encodeURIComponent(id)}`, { headers: { authorization: `Basic ${btoa(`${key}:`)}` } });
     if (!br.ok) return json({ error: 'billplz', status: br.status }, 502);   // Billplz retries a callback that is not answered 200
-    mapped = mapBillplzBill(await br.json().catch(() => null), collection, (billplzBase === BILLPLZ_SANDBOX ? 'sandbox' : 'live') as Env);
+    const bill = await br.json().catch(() => null);
+    const fpxEnv = (billplzBase === BILLPLZ_SANDBOX ? 'sandbox' : 'live') as Env;
+    const agency = mapAgencyBill(bill, collection, fpxEnv);
+    if (agency) return await agencyPaid(agency, d, url, service, allowLive);
+    mapped = mapBillplzBill(bill, collection, fpxEnv);
   } else {
     return json({ error: 'bad request' }, 400);
   }

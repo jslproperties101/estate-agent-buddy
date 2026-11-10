@@ -16,7 +16,7 @@ export type CheckoutAnswer = { url: string; env: 'sandbox' | 'live' };
 export type TrialAnswer = { result: 'started' | 'already-used' | 'unknown-user' };
 export type PlayAnswer = { result: string; status: string; env: 'sandbox' | 'live' };
 
-async function call<T>(store: Store, cfg: SyncConfig, body: Record<string, unknown>, fetchFn: FetchFn): Promise<T> {
+export async function billingCall<T>(store: Store, cfg: SyncConfig, body: Record<string, unknown>, fetchFn: FetchFn): Promise<T> {
   if (!configured(cfg)) throw new BillingError('not-configured');
   const s0 = store.getState().meta.syncSession;
   if (!s0) throw new BillingError('not-signed-in');
@@ -38,23 +38,23 @@ async function call<T>(store: Store, cfg: SyncConfig, body: Record<string, unkno
 }
 
 export const startCheckout = (store: Store, cfg: SyncConfig, provider: 'stripe' | 'fpx', planId: PlanId, fetchFn: FetchFn = fetch) =>
-  call<CheckoutAnswer>(store, cfg, { action: 'checkout', provider, planId }, fetchFn);
+  billingCall<CheckoutAnswer>(store, cfg, { action: 'checkout', provider, planId }, fetchFn);
 export const startTrial = (store: Store, cfg: SyncConfig, product: Product, fetchFn: FetchFn = fetch) =>
-  call<TrialAnswer>(store, cfg, { action: 'trial', product }, fetchFn);
+  billingCall<TrialAnswer>(store, cfg, { action: 'trial', product }, fetchFn);
 export const verifyPlayPurchase = (store: Store, cfg: SyncConfig, planId: PlanId, purchaseToken: string, fetchFn: FetchFn = fetch) =>
-  call<PlayAnswer>(store, cfg, { action: 'play_verify', planId, purchaseToken }, fetchFn);
+  billingCall<PlayAnswer>(store, cfg, { action: 'play_verify', planId, purchaseToken }, fetchFn);
 
 /** Batch B: the server's answer to one token-pack purchase. Pending purchases answer reason 'pending' and add nothing yet. */
 export type TokenAnswer = { result?: string; tokens?: number; env?: 'sandbox' | 'live'; consumed?: boolean; error?: string; reason?: string };
 export const verifyTokenPurchase = (store: Store, cfg: SyncConfig, packId: string, purchaseToken: string, fetchFn: FetchFn = fetch) =>
-  call<TokenAnswer>(store, cfg, { action: 'tokens_verify', packId, purchaseToken }, fetchFn);
+  billingCall<TokenAnswer>(store, cfg, { action: 'tokens_verify', packId, purchaseToken }, fetchFn);
 
 const PROVIDERS: PayProvider[] = ['stripe', 'fpx', 'google_play'];
 const PRODUCTS: Product[] = ['pro', 'pos', 'news'];
 const isRow = (r: unknown): r is BillingRow => {
   const x = r as Record<string, unknown> | null;
   return !!x && PRODUCTS.includes(x.product as Product) && typeof x.status === 'string'
-    && (x.provider === 'trial' || PROVIDERS.includes(x.provider as PayProvider)) && (x.env === 'sandbox' || x.env === 'live');
+    && (x.provider === 'trial' || x.provider === 'agency' || PROVIDERS.includes(x.provider as PayProvider)) && (x.env === 'sandbox' || x.env === 'live');
 };
 
 /** Reads this account's plans from the database and keeps them (for the account signed in now). False when nothing could be read. */

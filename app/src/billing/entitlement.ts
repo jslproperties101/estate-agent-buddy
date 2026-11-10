@@ -4,7 +4,8 @@ import { BILLING_LIVE, FEATURE_PRODUCT, GRACE_DAYS, type PayProvider, type PlanI
 
 export type RowStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired';
 export interface BillingRow {
-  product: Product; plan_id: PlanId | null; status: RowStatus; provider: PayProvider | 'trial'; env: 'sandbox' | 'live';
+  // provider 'agency' (Batch 5 part 2): Pro through a seat in the agency's licence; plan_id is then an agency plan.
+  product: Product; plan_id: PlanId | null; status: RowStatus; provider: PayProvider | 'trial' | 'agency'; env: 'sandbox' | 'live';
   trial_end: string | null; period_end: string | null; cancel_at_period_end: boolean;
 }
 // newsPaid (Batch 5): the server's "Market News is paid" switch (eab_billing_public). While it is on, the server itself leaves
@@ -27,10 +28,14 @@ const DAY = 86_400_000;
 const ms = (x: string | null): number | undefined => { const t = x ? Date.parse(x) : NaN; return Number.isFinite(t) ? t : undefined; };
 
 export function resolveLine(rows: BillingRow[], product: Product, now: number, live: boolean = BILLING_LIVE): Line {
-  const none: Line = { product, state: 'none', active: false, sandbox: false };
-  // While the app is live, a sandbox (test) purchase never counts.
-  const row = rows.find(r => r.product === product && (!live || r.env === 'live'));
-  if (!row) return none;
+  // While the app is live, a sandbox (test) purchase never counts. With more than one row (the agent's own plan and an agency
+  // seat, Batch 5 part 2) the one that allows the most wins: in force before not, then the later end.
+  const lines = rows.filter(r => r.product === product && (!live || r.env === 'live')).map(r => rowLine(r, product, now));
+  if (!lines.length) return { product, state: 'none', active: false, sandbox: false };
+  return lines.reduce((a, b) => (Number(b.active) - Number(a.active) || (b.until ?? 0) - (a.until ?? 0)) > 0 ? b : a);
+}
+
+function rowLine(row: BillingRow, product: Product, now: number): Line {
   const base = { product, provider: row.provider, planId: row.plan_id ?? undefined, sandbox: row.env === 'sandbox' };
   const expired: Line = { ...base, state: 'expired', active: false };
   const trialEnd = ms(row.trial_end); const periodEnd = ms(row.period_end);
@@ -73,6 +78,7 @@ export function canUse(feature: string, ent: Entitlement, billingOn: boolean, ta
  */
 export function canPurchase(line: Line, provider: PayProvider): boolean {
   if (!line.active || line.provider === 'trial' || line.state === 'grace') return true;
+  if (line.provider === 'agency') return false;                         // the agency already pays for it
   if (line.provider === 'fpx') return provider === 'fpx';
   return false;
 }

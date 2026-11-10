@@ -3,6 +3,10 @@
 //   trial        start the one free trial of Pro or the POS add-on (none for the Market News plans)
 //   checkout     start a Stripe (test) Checkout or a Billplz (sandbox) FPX bill; answers the page address to open
 //   play_verify  check a Google Play purchase with Google and apply it (also the Market News plans news_monthly / news_yearly)
+//   agency_checkout  Batch 5 part 2: the agency owner or an admin buys an agency licence on the website (FPX or card); the
+//                database makes the invoice first and the payment is checked against it
+//   agency_invoice   Batch 5 part 2: the platform owner (Admin EAB) raises an invoice for an agency; answers its FPX link and
+//                its card link (called with the owner's own sign-in, so the database's owner check applies)
 //   tokens_verify  Batch B: check a Google Play one-time purchase of an Ai Buddy Token pack, credit the tokens once, then
 //                consume it (consuming also acknowledges it, and lets the agent buy the same pack again)
 // The price always comes from this server (_shared/billing.ts), never from the app. Provider keys are function secrets and
@@ -13,6 +17,7 @@ import {
   liveRefusal, mapPlayProduct, mapPlaySubscription, playSubEventId, safeReturnUrl, tokenPurchaseRef, webPayable, type Env, type PackId, type Product,
 } from '../_shared/billing.ts';
 import { playApi } from '../_shared/play.ts';
+import { billplzAgencyBody, cardPayLink, isAgencyPlan, stripeAgencyBody, type AgencyInvoice } from '../_shared/agency.ts';
 
 export interface Deps { env: (k: string) => string; fetch: typeof fetch; now: () => number }
 
@@ -84,6 +89,79 @@ async function fpxBill(d: Deps, c: Cfg, user: { id: string; email: string }, pla
   const j = await r.json().catch(() => null);
   const url = str(j?.url);
   return url.startsWith(`${c.billplzBase}/`) ? json({ url, env: c.billplzBase === BILLPLZ_SANDBOX ? 'sandbox' : 'live' }) : json({ error: 'billplz' }, 502);
+}
+
+/** A database function called with the caller's own sign-in (the database checks who they are). */
+async function rpcAs(d: Deps, c: Cfg, auth: string, name: string, body: Record<string, unknown>): Promise<{ ok: boolean; status: number; body: unknown }> {
+  const r = await d.fetch(`${c.url}/rest/v1/rpc/${name}`, { method: 'POST', headers: { apikey: c.anon, authorization: auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) };
+}
+
+/** A Billplz bill (FPX) for an agency invoice; its id and page are kept on the invoice. */
+async function agencyBill(d: Deps, c: Cfg, inv: AgencyInvoice, email: string, name: string): Promise<string | Response> {
+  if (!c.billplzKey || !c.billplzCollection || !c.returnUrl) return json({ error: 'not-configured' }, 503);
+  const r = await d.fetch(`${c.billplzBase}/api/v3/bills`, {
+    method: 'POST', headers: { authorization: `Basic ${btoa(`${c.billplzKey}:`)}`, 'content-type': 'application/x-www-form-urlencoded' },
+    body: form(billplzAgencyBody(inv, c.billplzCollection, `${c.url}/functions/v1/billing-webhook?p=fpx`, c.returnUrl, email, name)),
+  });
+  if (!r.ok) return json({ error: 'billplz', status: r.status }, 502);
+  const j = await r.json().catch(() => null);
+  const url = str(j?.url);
+  if (!url.startsWith(`${c.billplzBase}/`)) return json({ error: 'billplz' }, 502);
+  await rpc(d, c, 'eab_agency_invoice_links', { p_id: inv.id, p_bill_id: str(j?.id) || null, p_fpx_url: url, p_session_id: null });
+  return url;
+}
+
+/** A Stripe Checkout page (one payment) for an agency invoice. */
+async function agencyCard(d: Deps, c: Cfg, inv: AgencyInvoice, email?: string): Promise<string | Response> {
+  if (!c.stripeKey || !c.returnUrl) return json({ error: 'not-configured' }, 503);
+  const r = await d.fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', headers: { authorization: `Bearer ${c.stripeKey}`, 'content-type': 'application/x-www-form-urlencoded' }, body: form(stripeAgencyBody(inv, c.returnUrl, email)) });
+  if (!r.ok) return json({ error: 'stripe', status: r.status }, 502);
+  const j = await r.json().catch(() => null);
+  const url = str(j?.url);
+  if (!url.startsWith('https://')) return json({ error: 'stripe' }, 502);
+  await rpc(d, c, 'eab_agency_invoice_links', { p_id: inv.id, p_bill_id: null, p_fpx_url: null, p_session_id: str(j?.id) || null });
+  return url;
+}
+
+/** Website: the agency owner or an admin pays for a licence now. */
+async function agencyCheckout(d: Deps, c: Cfg, user: { id: string; email: string }, body: Record<string, unknown>): Promise<Response> {
+  const ws = body.workspaceId; const plan = body.plan; const seats = Number(body.seats ?? 1);
+  if (!isUuid(ws) || !isAgencyPlan(plan) || !Number.isInteger(seats) || seats < 1 || seats > 500) return json({ error: 'bad request' }, 400);
+  if (body.provider !== 'fpx' && body.provider !== 'stripe') return json({ error: 'bad request' }, 400);
+  if (body.provider === 'fpx' ? !(c.billplzKey && c.billplzCollection && c.returnUrl) : !(c.stripeKey && c.returnUrl)) return json({ error: 'not-configured' }, 503);
+  if (!user.email && body.provider === 'fpx') return json({ error: 'no-email' }, 400);
+  const role = await rpc(d, c, 'eab_agency_member_role', { p_ws: ws, p_user: user.id });
+  if (role !== 'owner' && role !== 'admin') return json({ error: 'not-allowed' }, 403);
+  const inv = await rpc(d, c, 'eab_agency_open_checkout', { p_ws: ws, p_user: user.id, p_plan: plan, p_seats: seats, p_env: c.env }) as AgencyInvoice;
+  const url = body.provider === 'fpx' ? await agencyBill(d, c, inv, user.email, str(inv.workspace)) : await agencyCard(d, c, inv, user.email || undefined);
+  if (url instanceof Response) return url;
+  return json({ url, env: c.env, invoice: { id: inv.id, no: inv.no, amount_sen: inv.amount_sen, seats: inv.seats, days: inv.days } });
+}
+
+/** Admin EAB: the platform owner raises an invoice; answers its FPX link (when FPX is set up) and its card link. */
+async function agencyInvoice(d: Deps, c: Cfg, auth: string, body: Record<string, unknown>): Promise<Response> {
+  const ws = body.workspaceId; const plan = body.plan; const seats = body.seats == null ? null : Number(body.seats);
+  const amount = body.amountSen == null ? null : Number(body.amountSen);
+  const email = str(body.payerEmail).trim();
+  if (!isUuid(ws) || !isAgencyPlan(plan) || (seats !== null && (!Number.isInteger(seats) || seats < 1 || seats > 500))
+      || (amount !== null && (!Number.isInteger(amount) || amount < 100)) || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) {
+    return json({ error: 'bad request' }, 400);
+  }
+  const r = await rpcAs(d, c, auth, 'eab_admin_agency_invoice_create', {
+    p_ws: ws, p_plan: plan, p_seats: seats, p_amount_sen: amount, p_env: c.env, p_bill_to: str(body.billTo) || null, p_note: str(body.note) || null,
+    p_reason: str(body.reason), p_device: str(body.device) || null,
+  });
+  if (!r.ok) return json({ error: r.status === 403 || /not allowed/.test(JSON.stringify(r.body)) ? 'not-allowed' : 'refused', detail: (r.body as { message?: string } | null)?.message }, r.status === 403 ? 403 : 400);
+  const inv = r.body as AgencyInvoice;
+  let fpxUrl: string | null = null;
+  if (c.billplzKey && c.billplzCollection && c.returnUrl) {
+    const u = await agencyBill(d, c, inv, email, str(body.billTo) || str(inv.workspace));
+    if (u instanceof Response) return u;
+    fpxUrl = u;
+  }
+  return json({ invoice: { id: inv.id, no: inv.no, amount_sen: inv.amount_sen, seats: inv.seats, days: inv.days, plan: inv.plan },
+    fpxUrl, cardUrl: c.stripeKey && inv.pay_token ? cardPayLink(c.url, inv.id, inv.pay_token) : null, env: c.env });
 }
 
 /** A Play Developer API access token and the app's API address, or the answer to send when that is not possible. */
@@ -183,6 +261,8 @@ export async function handleBilling(req: Request, d: Deps): Promise<Response> {
       if (!isPlanId(body.planId) || !/^[\w.-]{20,4000}$/.test(token)) return json({ error: 'bad request' }, 400);
       return await playVerify(d, c, user, body.planId, token);
     }
+    if (body.action === 'agency_checkout') return await agencyCheckout(d, c, user, body);
+    if (body.action === 'agency_invoice') return await agencyInvoice(d, c, req.headers.get('authorization') ?? '', body);
     if (body.action === 'tokens_verify') {
       const token = str(body.purchaseToken);
       if (!isPackId(body.packId) || !/^[\w.-]{20,4000}$/.test(token)) return json({ error: 'bad request' }, 400);

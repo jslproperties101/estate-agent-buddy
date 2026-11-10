@@ -16,7 +16,7 @@
 const enc = new TextEncoder();
 const b64 = (u: Uint8Array) => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
 const unb64 = (s: string) => Uint8Array.from(atob(s.replace(/\s+/g, '')), c => c.charCodeAt(0));
-const sha256 = async (u: Uint8Array) => new Uint8Array(await crypto.subtle.digest('SHA-256', u));
+const sha256 = async (u: Uint8Array) => new Uint8Array(await crypto.subtle.digest('SHA-256', u as BufferSource));
 export const textBase64 = (s: string) => b64(enc.encode(s));
 export const sha256Hex = async (s: string) => [...await sha256(enc.encode(s))].map(x => x.toString(16).padStart(2, '0')).join('');
 
@@ -83,7 +83,7 @@ function pkcs1to8(pkcs1: Uint8Array): Uint8Array {
 }
 export async function importKey(pem: string): Promise<CryptoKey> {
   const der = /BEGIN RSA PRIVATE KEY/.test(pem) ? pkcs1to8(pemBody(pem, 'RSA PRIVATE KEY')) : pemBody(pem, 'PRIVATE KEY');
-  return crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.importKey('pkcs8', der as BufferSource, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
 }
 
 // ---------- signing ----------

@@ -12,12 +12,14 @@ import { canPurchase, resolveEntitlement, type Line } from './entitlement';
 import { TRIAL_DAYS, plansOf, rm, type PayProvider, type Product } from './plans';
 import { availability, offeredProviders, startPayment } from './providers';
 import { billingStrings, type BillingStrings } from './strings';
+import { AgencyCard } from './AgencyUI';
 
 // The Market News plans ('news') are not offered here: they are Google Play only and shown on their own screen (NewsPaywall).
 const PRODUCTS: Product[] = ['pro', 'pos'];
 
 function lineText(s: BillingStrings, l: Line, lang: Lang): string {
   const d = fmtDate(l.until, lang);
+  if (l.provider === 'agency' && l.active) return s.state.agency(d);
   switch (l.state) {
     case 'trialing': return s.state.trialing(d);
     case 'active': return s.state.active(d);
@@ -97,6 +99,7 @@ export function BillingCard({ lang }: { lang: Lang }) {
           })}
           {avail.ok && PRODUCTS.flatMap(p => plansOf(p)).some(p => !canPurchase(ent[p.product], provider)) && <small className="muted">{s.alreadyPaid}</small>}
           <small className="muted">{s.proposal}</small>
+          {me.workspaceId && <AgencyCard lang={lang} workspaceId={me.workspaceId} />}
           <button className="btn small secondary" data-testid="billing-refresh" disabled={busy} onClick={refresh}>{s.refresh}</button>
         </>
       )}
