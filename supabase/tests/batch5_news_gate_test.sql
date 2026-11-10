@@ -100,14 +100,14 @@ begin
   exception when others then pass := pass + 1; end;
 
   -- 8. token refunds: whatever is left is taken back, never below zero, once
-  r := public.eab_tokens_credit(a, 'tokens_100', 100, 2500, 'sandbox', 'google_play', 'gp:b5refund');
+  r := public.eab_tokens_credit(a, 'tokens_100', 105, 2500, 'sandbox', 'google_play', 'gp:b5refund');
   update public.eab_token_balances set balance = balance - 30 where user_id = a and env = 'sandbox';   -- stands in for spending (Batch C)
   insert into public.eab_token_ledger (user_id, env, delta, kind) values (a, 'sandbox', -30, 'spend');
   select balance into n from public.eab_token_balances where user_id = a and env = 'sandbox';
   j := public.eab_tokens_refund('gp:b5refund');
-  if j->>'result' = 'applied' and (j->>'due')::int = 100 and (j->>'taken')::int = least(100, n) then pass := pass + 1;
+  if j->>'result' = 'applied' and (j->>'due')::int = 105 and (j->>'taken')::int = least(105, n) then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || E'\n8a refund: ' || j::text; end if;
-  if (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = n - least(100, n) then pass := pass + 1;
+  if (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = n - least(105, n) then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || E'\n8b balance after refund'; end if;
   j := public.eab_tokens_refund('gp:b5refund');
   if j->>'result' = 'duplicate' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n8c second refund: ' || j::text; end if;

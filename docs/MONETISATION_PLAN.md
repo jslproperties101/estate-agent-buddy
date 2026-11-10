@@ -56,6 +56,17 @@ live is switched on: no real money, no production migration, no merge to `main` 
 | Where | Settings, token card, "Property lookups"; and the top of Market News and Intelligence. Both only while the billing switch is on. (Not on the home grid: the 15 home buttons are fixed; the owner can decide to add one.) |
 | Files | `supabase/functions/lookup/`, `_shared/oneharta.ts`, `supabase/proposed/20261110200000_oneharta_lookups.sql` (+ rollback, + `supabase/tests/oneharta_lookups_test.sql`), `app/src/lookups/`. Not deployed; the key is a function secret (`ONEHARTA_API_KEY`) and never goes into the app. |
 
+## Batch D (10–11 Nov 2026): Admin EAB tools for tokens and lookups; one home button; bonus tokens
+
+| | |
+|---|---|
+| Admin EAB | Money › **Tokens & lookups** (Admin EAB repo, branch feature/admin-batch-014): Oneharta credits used today and per day with their cost at RM 1.25 a credit, tokens sold, today's busiest agents, recent lookups, every agent's token balance and last 100 changes. |
+| Settling | A lookup Oneharta never answered ("unknown"), or one left running more than 10 minutes, holds the agent's tokens. Owner or Admin checks Oneharta's call log and records "charged N credits" (agent pays 3 x N tokens, gets the rest back) or "not charged" (all back). Reason required; logged. |
+| Add / take tokens | **Owner only**, with a reason, never below zero, at most 10,000 at a time; test and real tokens kept apart; logged. A Google refund of a pack is still taken back by itself (Batch 5). |
+| Database | `supabase/proposed/20261110300000_admin_lookups_tokens.sql` (+ rollback, + `supabase/tests/admin_lookups_tokens_test.sql`); local run of all token / lookup / admin SQL tests: `supabase/tests/local/run-lookups.sh`. |
+| Bonus tokens | Owner's choice (11 Nov 2026): **+5% / +10% / +15%** on the bigger packs: USD 5 = 20, USD 25 = **105**, USD 100 = **440**, USD 250 = **1,150** tokens. Google Play product ids unchanged. One list in the database (`eab_token_packs()` in `supabase/proposed/20261111100000_token_pack_bonus.sql`, + rollback), the same on the server and in the app (a test keeps the three equal). Packs bought before keep what they got; a Google refund takes back exactly what its purchase added. The wallet shows e.g. "100 + 5 bonus (+5%)". |
+| Home button | While billing is switched on, the home **Market News** button asks "Market News or Property Lookups?" (like Calendar & To-Do). Billing off: it opens Market News as before. The grid keeps 15 buttons; the button inside Market News (Batch C) was removed. |
+
 ## Which features to charge for: a proposal (only Market News is gated, Batch A)
 
 The app has no limits today, so a paywall would take something away from people who have it free. Two ways, both need your decision:

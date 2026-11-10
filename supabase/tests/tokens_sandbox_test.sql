@@ -1,4 +1,5 @@
--- Tests for supabase/proposed/20261103000000_tokens_sandbox.sql (Batch B, Ai Buddy Tokens). Run in the SQL editor of the TEST
+-- Tests for supabase/proposed/20261103000000_tokens_sandbox.sql (Batch B, Ai Buddy Tokens) with the Batch D pack bonus
+-- (20261111100000_token_pack_bonus.sql: 20 / 105 / 440 / 1,150 tokens) applied after it. Run in the SQL editor of the TEST
 -- project, after the migration. Everything is rolled back: the block ends by raising 'TEST RESULT ...'. Needs 2+ users in
 -- auth.users.
 do $test$
@@ -18,13 +19,18 @@ begin
   if r = 'duplicate' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n1b same purchase again: ' || r; end if;
   if (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 20 then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || E'\n1c balance after a duplicate is not 20'; end if;
-  r := public.eab_tokens_credit(a, 'tokens_100', 100, 2500, 'sandbox', 'google_play', 'gp:t2');
-  r := public.eab_tokens_credit(a, 'tokens_400', 400, 10000, 'sandbox', 'google_play', 'gp:t3');
-  r := public.eab_tokens_credit(a, 'tokens_1000', 1000, 25000, 'sandbox', 'google_play', 'gp:t4');
-  if (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 1520 then pass := pass + 1;
-  else fail := fail + 1; msgs := msgs || E'\n1d four packs do not add up to 1520'; end if;
+  r := public.eab_tokens_credit(a, 'tokens_100', 105, 2500, 'sandbox', 'google_play', 'gp:t2');
+  r := public.eab_tokens_credit(a, 'tokens_400', 440, 10000, 'sandbox', 'google_play', 'gp:t3');
+  r := public.eab_tokens_credit(a, 'tokens_1000', 1150, 25000, 'sandbox', 'google_play', 'gp:t4');
+  if (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 1715 then pass := pass + 1;
+  else fail := fail + 1; msgs := msgs || E'\n1d four packs do not add up to 1715'; end if;
   select count(*) into n from public.eab_token_ledger where user_id = a;
   if n = 4 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n1e ledger rows: ' || n; end if;
+
+  begin
+    perform public.eab_tokens_credit(a, 'tokens_400', 400, 10000, 'sandbox', 'google_play', 'gp:old400');
+    fail := fail + 1; msgs := msgs || E'\n1f the old count without the bonus was accepted';
+  exception when others then pass := pass + 1; end;
 
   -- 2. test-mode tokens never become live tokens, and one agent's purchase never reaches another
   if not exists (select 1 from public.eab_token_balances where user_id = a and env = 'live') then pass := pass + 1;
@@ -70,7 +76,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
   set local role authenticated;
   j := public.eab_my_tokens();
-  if (j -> 'balances' ->> 'sandbox')::int = 1520 and jsonb_array_length(j -> 'history') = 4
+  if (j -> 'balances' ->> 'sandbox')::int = 1715 and jsonb_array_length(j -> 'history') = 4
      and (j -> 'history' -> 0 ->> 'pack_id') = 'tokens_1000' then pass := pass + 1;
   else fail := fail + 1; msgs := msgs || E'\n4a own wallet: ' || coalesce(j::text, 'null'); end if;
   begin

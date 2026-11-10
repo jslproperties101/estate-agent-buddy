@@ -4,6 +4,7 @@ import type { Lang } from '../i18n';
 
 const en = {
   title: 'Property Lookups',
+  askMarket: 'Market News or Property Lookups?',
   open: 'Property lookups',
   openHint: 'Land tax, company, sale and rental records, paid with Ai Buddy Tokens',
   banner: 'Test mode: lookups use test tokens, but every lookup is a real Oneharta search.',
@@ -55,6 +56,7 @@ export type LookupStrings = typeof en;
 
 const bm: LookupStrings = {
   title: 'Carian Hartanah',
+  askMarket: 'Berita Pasaran atau Carian Hartanah?',
   open: 'Carian hartanah',
   openHint: 'Cukai tanah, syarikat, rekod jualan dan sewaan, dibayar dengan Token Ai Buddy',
   banner: 'Mod ujian: carian menggunakan token ujian, tetapi setiap carian ialah carian Oneharta yang sebenar.',
@@ -100,6 +102,7 @@ const bm: LookupStrings = {
 
 const zh: LookupStrings = {
   title: '房产查询',
+  askMarket: '市场新闻还是房产查询？',
   open: '房产查询',
   openHint: '地税、公司、买卖和租赁记录，用 Ai Buddy 代币支付',
   banner: '测试模式：查询使用测试代币，但每次查询都是真实的 Oneharta 搜索。',

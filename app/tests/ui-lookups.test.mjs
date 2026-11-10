@@ -135,6 +135,7 @@ test('LU1 billing off (the default): no way into lookups from Settings or Market
   await page.goBack().catch(() => {});
   await page.reload(); await page.waitForSelector('nav.grid');
   await page.locator('nav.grid > button[data-key="market"]').click(); await page.getByTestId('market-news').waitFor();
+  assert.equal(await page.getByTestId('market-ask').count(), 0, 'billing off: the Market News button opens the news straight away');
   assert.equal(await page.getByTestId('open-lookups').count(), 0);
   assert.deepEqual(lk, []); assert.deepEqual(errors, []);
   await ctx.close();
@@ -239,12 +240,21 @@ test('LU4 refusals: not enough tokens and the daily limit are explained; the his
   await ctx.close();
 });
 
-test('LU5 Market News has the way in too, and the screen reads in Malay and Chinese', async () => {
+test('LU5 the home Market News button asks News or Property Lookups (Batch D), and the screen reads in Malay and Chinese', async () => {
   bal = 30;
   const { page, ctx, errors } = await phone({ billing: [], tokens: wallet, lookup: lookupFn() }, { billing: true });
-  await page.locator('nav.grid > button[data-key="market"]').click(); await page.getByTestId('market-news').waitFor();
-  await page.getByTestId('open-lookups').click();
+  const market = page.locator('nav.grid > button[data-key="market"]');
+  assert.equal(await page.locator('nav.grid > button').count(), 15, 'the home grid keeps its 15 buttons');
+  await market.click();
+  await page.getByTestId('market-ask').waitFor();
+  assert.match(await page.getByTestId('market-ask').innerText(), /Market News or Property Lookups\?[\s\S]*Market News and Intelligence[\s\S]*Property Lookups/);
+  await page.getByTestId('market-lookups-pick').click();
   await page.getByTestId('lookups').waitFor();
+  await page.goBack(); await page.waitForSelector('nav.grid');
+  await market.click();
+  await page.getByTestId('market-news-pick').click();
+  await page.getByTestId('market-news').waitFor();
+  assert.equal(await page.getByTestId('open-lookups').count(), 0, 'no second button inside Market News');
   assert.deepEqual(errors, []);
   await ctx.close();
   for (const [lang, re] of [['bm', /Token anda: 30/], ['zh', /您的代币：30/]]) {

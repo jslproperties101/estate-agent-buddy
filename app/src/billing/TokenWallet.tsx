@@ -7,7 +7,7 @@ import { useApp } from '../data/useStore';
 import { config } from '../config';
 import { fmtDateTime } from '../lib/dates';
 import { BillingError } from './api';
-import { TOKEN_PACKS, usd } from './plans';
+import { TOKEN_PACKS, packBonus, usd } from './plans';
 import { availability } from './providers';
 import { billingStrings } from './strings';
 import { LookupsEntry } from '../lookups/LookupsUI';
@@ -69,6 +69,7 @@ export function TokenWallet({ lang, onLookups }: { lang: Lang; onLookups?: () =>
               <div className="stack-sm">
                 <strong>{t.pack(p.tokens)}</strong>
                 <small className="muted" data-testid={`token-price-${p.id}`}>{usd(p.amountCents)}</small>
+                {packBonus(p) > 0 && <small className="ok-text" data-testid={`token-bonus-${p.id}`}>{t.bonus(p.tokens - packBonus(p), packBonus(p))}</small>}
               </div>
               <button type="button" className="btn small primary" data-testid={`token-buy-${p.id}`} disabled={busy || !avail.ok} onClick={() => void buy(p.id)}>{t.buy}</button>
             </div>

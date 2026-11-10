@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { Capacitor } from '@capacitor/core';
 import { MemoryBackend } from '../src/data/backend';
 import { Store } from '../src/data/store';
-import { BILLING_LIVE, TOKEN_PACKS, TOKEN_USD_CENTS, packById, usd } from '../src/billing/plans';
+import { BILLING_LIVE, TOKEN_PACKS, TOKEN_USD_CENTS, packBonus, packById, usd } from '../src/billing/plans';
 import { BillingError } from '../src/billing/api';
 import { buyTokens, cachedTokens, refreshTokens, restoreTokens, tokenBalance, walletEnv } from '../src/billing/tokens';
 import { billingStrings } from '../src/billing/strings';
@@ -25,14 +25,14 @@ const PKG = 'com.jslproperties.eaaibuddy.qa';
 const GP = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PKG}`;
 
 // ── packs ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-test('T-1 four packs at 1 token = USD 0.25, the same on the phone, the server and in the database function', () => {
+test('T-1 four packs at 1 token = USD 0.25 plus the Batch D bonus, the same on the phone, the server and in the database', () => {
   assert.equal(TOKEN_USD_CENTS, 25); assert.equal(S.TOKEN_USD_CENTS, 25);
-  assert.deepEqual(TOKEN_PACKS.map(p => [p.id, p.tokens, p.amountCents]), [['tokens_20', 20, 500], ['tokens_100', 100, 2500], ['tokens_400', 400, 10000], ['tokens_1000', 1000, 25000]]);
-  for (const p of TOKEN_PACKS) assert.equal(p.tokens * TOKEN_USD_CENTS, p.amountCents, `${p.id} is priced at USD 0.25 a token`);
+  assert.deepEqual(TOKEN_PACKS.map(p => [p.id, p.tokens, p.amountCents]), [['tokens_20', 20, 500], ['tokens_100', 105, 2500], ['tokens_400', 440, 10000], ['tokens_1000', 1150, 25000]]);
+  assert.deepEqual(TOKEN_PACKS.map(p => packBonus(p)), [0, 5, 40, 150], 'bonus +0 / +5% / +10% / +15% on top of USD 0.25 a token');
   assert.deepEqual(TOKEN_PACKS.map(p => ({ ...p })), Object.values(S.TOKEN_PACKS));
-  const sql = readFileSync(new URL('../../supabase/proposed/20261103000000_tokens_sandbox.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../supabase/proposed/20261111100000_token_pack_bonus.sql', import.meta.url), 'utf8');
   const inSql = [...sql.matchAll(/\('(tokens_\d+)', (\d+), (\d+)\)/g)].map(m => [m[1], Number(m[2]), Number(m[3])]);
-  assert.deepEqual(inSql, TOKEN_PACKS.map(p => [p.id, p.tokens, p.amountCents]), 'eab_tokens_credit holds the same list');
+  assert.deepEqual(inSql, TOKEN_PACKS.map(p => [p.id, p.tokens, p.amountCents]), 'eab_token_packs holds the same list');
   assert.equal(usd(500), 'USD 5'); assert.equal(usd(25000), 'USD 250'); assert.equal(usd(250), 'USD 2.50');
   assert.equal(packById('tokens_free'), undefined);
   assert.ok(S.isPackId('tokens_400')); assert.ok(!S.isPackId('tokens_5')); assert.ok(!S.isPackId('toString'));
@@ -53,7 +53,7 @@ const product = (o: Record<string, unknown> = {}) => ({ purchaseState: 0, consum
 test('T-3 mapPlayProduct: only a purchased pack, quantity 1, for exactly the pack asked for; a tester purchase is sandbox', () => {
   const ctx = { userId: U1, packId: 'tokens_100' as const, ref: 'gp:x' };
   const ok = S.mapPlayProduct(product(), ctx);
-  assert.ok('credit' in ok); assert.deepEqual(ok.credit, { userId: U1, packId: 'tokens_100', tokens: 100, amountCents: 2500, env: 'sandbox', ref: 'gp:x', consumed: false });
+  assert.ok('credit' in ok); assert.deepEqual(ok.credit, { userId: U1, packId: 'tokens_100', tokens: 105, amountCents: 2500, env: 'sandbox', ref: 'gp:x', consumed: false });
   const live = S.mapPlayProduct(product({ purchaseType: undefined }), ctx); assert.ok('credit' in live && live.credit.env === 'live');
   assert.deepEqual(S.mapPlayProduct(product({ purchaseState: 1 }), ctx), { ignored: 'canceled' });
   assert.deepEqual(S.mapPlayProduct(product({ purchaseState: 2 }), ctx), { ignored: 'pending' });
@@ -61,7 +61,7 @@ test('T-3 mapPlayProduct: only a purchased pack, quantity 1, for exactly the pac
   assert.deepEqual(S.mapPlayProduct(product({ quantity: 3 }), ctx), { ignored: 'quantity' });
   assert.deepEqual(S.mapPlayProduct(product({ productId: 'tokens_1000' }), ctx), { ignored: 'pack-mismatch' });
   const consumed = S.mapPlayProduct(product({ consumptionState: 1 }), ctx); assert.ok('credit' in consumed && consumed.credit.consumed);
-  assert.deepEqual(S.creditParams((ok as { credit: S.TokenCredit }).credit), { p_user: U1, p_pack: 'tokens_100', p_tokens: 100, p_amount_cents: 2500, p_env: 'sandbox', p_provider: 'google_play', p_ref: 'gp:x' });
+  assert.deepEqual(S.creditParams((ok as { credit: S.TokenCredit }).credit), { p_user: U1, p_pack: 'tokens_100', p_tokens: 105, p_amount_cents: 2500, p_env: 'sandbox', p_provider: 'google_play', p_ref: 'gp:x' });
 });
 
 // ── server: the billing function's tokens_verify action ─────────────────────────────────────────────────────────────

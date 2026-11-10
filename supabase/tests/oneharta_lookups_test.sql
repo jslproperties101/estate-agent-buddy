@@ -43,7 +43,7 @@ begin
   if j ->> 'result' = 'not-enough-tokens' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n2d test tokens spent as live: ' || j::text; end if;
 
   -- 3. daily limits in credits (per agent, and for the whole app)
-  perform public.eab_tokens_credit(a, 'tokens_100', 100, 2500, 'sandbox', 'google_play', 'gp:lk-test-a2');   -- balance 102
+  perform public.eab_tokens_credit(a, 'tokens_100', 105, 2500, 'sandbox', 'google_play', 'gp:lk-test-a2');   -- balance 107 (Batch D bonus)
   j := public.eab_lookup_begin(a, 'sandbox', 'ct_search', 3, 'x', 8, 100);   -- used today: 3 + 0 + 3 = 6; +3 > 8
   if j ->> 'result' = 'agent-limit' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n3a agent limit: ' || j::text; end if;
   j := public.eab_lookup_begin(a, 'sandbox', 'infosearch', 1, 'x', 8, 6);    -- the whole app has used 6
@@ -53,21 +53,21 @@ begin
   if j ->> 'result' = 'ok' and public.eab_lookup_credits_today(a) = 7 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n3c a pending lookup counts at its most: ' || public.eab_lookup_credits_today(a); end if;
   j := public.eab_lookup_finish(l4, null, 'unknown', null);
   bal := (select balance from public.eab_token_balances where user_id = a and env = 'sandbox');
-  if j ->> 'result' = 'unknown' and bal = 99 and public.eab_lookup_credits_today(a) = 7 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n3d no answer keeps the tokens held: ' || j::text || ' ' || bal; end if;
+  if j ->> 'result' = 'unknown' and bal = 104 and public.eab_lookup_credits_today(a) = 7 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n3d no answer keeps the tokens held: ' || j::text || ' ' || bal; end if;
 
   -- 4. a company Oneharta refunded: everything back, once; only finished lookups
   j := public.eab_lookup_begin(a, 'sandbox', 'company', 3, 'Company 201901000005', 30, 100);
   j := public.eab_lookup_finish((j ->> 'id')::uuid, 3, 'done', '201901000005');
   l2 := (select id from public.eab_lookups where user_id = a and kind = 'company');
   j := public.eab_lookup_refund(l2);
-  if (j ->> 'refunded')::int = 9 and (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 99 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n4a refund: ' || j::text; end if;
+  if (j ->> 'refunded')::int = 9 and (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 104 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n4a refund: ' || j::text; end if;
   j := public.eab_lookup_refund(l2);
-  if j ->> 'result' = 'already' and (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 99 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n4b refunded twice'; end if;
+  if j ->> 'result' = 'already' and (select balance from public.eab_token_balances where user_id = a and env = 'sandbox') = 104 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n4b refunded twice'; end if;
   j := public.eab_lookup_refund(l4);
   if j ->> 'result' = 'not-finished' then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n4c refund of an unknown lookup: ' || j::text; end if;
 
   -- 5. every token change is in the ledger and adds up to the balance
-  if (select sum(delta) from public.eab_token_ledger where user_id = a and env = 'sandbox') = 99 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n5a ledger does not add up'; end if;
+  if (select sum(delta) from public.eab_token_ledger where user_id = a and env = 'sandbox') = 104 then pass := pass + 1; else fail := fail + 1; msgs := msgs || E'\n5a ledger does not add up'; end if;
 
   -- 6. bad input is refused
   begin perform public.eab_lookup_begin(a, 'sandbox', 'ct_search', 50, 'x', 30, 100); fail := fail + 1; msgs := msgs || E'\n6a 50 credits accepted';

@@ -86,7 +86,13 @@ async function phone(db = {}, settings = {}, { signedIn = true } = {}) {
   await page.reload(); await page.waitForSelector('nav.grid');
   return { page, ctx, calls, fnCalls, errors };
 }
-const openNews = async page => { await page.locator('nav.grid > button[data-key="market"]').click(); await page.getByTestId('market-news').waitFor(); };
+// Batch D: while billing is on, the Market News button first asks "Market News or Property Lookups?".
+const openNews = async page => {
+  await page.locator('nav.grid > button[data-key="market"]').click();
+  await Promise.race([page.getByTestId('market-ask').waitFor(), page.getByTestId('market-news').waitFor()]);
+  if (await page.getByTestId('market-ask').count()) await page.getByTestId('market-news-pick').click();
+  await page.getByTestId('market-news').waitFor();
+};
 async function waitFor(f, timeout = 10000) { const end = Date.now() + timeout; while (!(await f())) { if (Date.now() > end) throw new Error('timed out'); await new Promise(r => setTimeout(r, 50)); } }
 
 test('NP1 billing off (the default): Market News exactly as before, with its unread badge; no paywall and no plans asked for', async () => {

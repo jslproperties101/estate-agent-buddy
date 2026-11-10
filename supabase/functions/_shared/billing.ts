@@ -43,9 +43,10 @@ export interface PackDef { id: PackId; tokens: number; amountCents: number; curr
 export const TOKEN_USD_CENTS = 25;
 export const TOKEN_PACKS: Record<PackId, PackDef> = {
   tokens_20: { id: 'tokens_20', tokens: 20, amountCents: 500, currency: 'USD' },
-  tokens_100: { id: 'tokens_100', tokens: 100, amountCents: 2500, currency: 'USD' },
-  tokens_400: { id: 'tokens_400', tokens: 400, amountCents: 10000, currency: 'USD' },
-  tokens_1000: { id: 'tokens_1000', tokens: 1000, amountCents: 25000, currency: 'USD' },
+  // Batch D (11 Nov 2026, owner): bonus +5% / +10% / +15% on the bigger packs (ids unchanged; the database list matches).
+  tokens_100: { id: 'tokens_100', tokens: 105, amountCents: 2500, currency: 'USD' },
+  tokens_400: { id: 'tokens_400', tokens: 440, amountCents: 10000, currency: 'USD' },
+  tokens_1000: { id: 'tokens_1000', tokens: 1150, amountCents: 25000, currency: 'USD' },
 };
 export const isPackId = (x: unknown): x is PackId => typeof x === 'string' && Object.prototype.hasOwnProperty.call(TOKEN_PACKS, x);
 

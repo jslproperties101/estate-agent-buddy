@@ -25,6 +25,7 @@ import { onFeedTap } from './native/push';
 import { setCrashKeys, setCrashUser, startCrashReporting } from './native/crash';
 import { MarketNewsScreen, AnnouncementBanners, AnnouncementPopup, BlockingNotice, SoftUpdateBanner, usePublicSettings, useUnreadNews } from './feed/FeedUI';
 import { LookupsScreen } from './lookups/LookupsUI';
+import { billingEnabled } from './billing/access';
 import { lookupStrings } from './lookups/strings';
 import { feedStrings } from './feed/strings';
 import { BUILD as BUILD_INFO } from './native/updates';
@@ -682,7 +683,7 @@ function ScreenView({ screen: s, lang, go, back }: { screen: Screen; lang: Lang;
     case 'finance': return <FinanceScreen lang={lang} go={go} />;
     case 'buddy': return <BuddyScreen key={s.tab ?? 'overview'} lang={lang} go={go} tab={s.tab} />;
     case 'projects': return <ProjectList key={s.openId ?? ''} lang={lang} go={go} openId={s.openId} />;
-    case 'marketNews': return <MarketNewsScreen key={s.openId ?? ''} lang={lang} openId={s.openId} go={go} />;
+    case 'marketNews': return <MarketNewsScreen key={s.openId ?? ''} lang={lang} openId={s.openId} />;
     case 'lookups': return <LookupsScreen lang={lang} />;
     case 'sharedDocs': return <SharedDocsScreen lang={lang} />;
     case 'projectDetail': return <ProjectDetail lang={lang} id={s.id} go={go} />;
@@ -746,6 +747,8 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
   const invite = pendingInviteToken() && !state.meta.team?.members.some(m => m.userId !== state.meta.syncSession?.userId);
   const x1 = cc001Strings[lang];
   const [askAgenda, setAskAgenda] = useState(false);
+  // Batch D (owner, 10 Nov 2026): while billing is switched on, the Market News button asks News or Property Lookups.
+  const [askMarket, setAskMarket] = useState(false);
   const tileLabel = (key: string) => t.tiles[key];
   const unreadNews = useUnreadNews();
   const now = new Date();
@@ -785,7 +788,7 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
       <h2 className="section-head">{r.quick}</h2>
       <nav className="grid dash" aria-label={t.home}>
         {TILES.map((tile, i) => tileHidden(flags, tile.key) ? null : (
-          <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''} ${tile.key === 'agenda' || tile.key === 'property' ? 'wide-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : go(tile.target))}
+          <button key={tile.key} className={`tile ${GOLD_TILES.has(tile.key) ? 'voice-tile gold-tile' : ''} ${tile.key === 'voice' ? 'robot-tile' : ''} ${tile.key === 'agenda' || tile.key === 'property' ? 'wide-tile' : ''}`} data-tile={i + 1} data-key={tile.key} onClick={() => (tile.key === 'agenda' ? setAskAgenda(true) : tile.key === 'market' && billingEnabled(store) ? setAskMarket(true) : go(tile.target))}
             aria-label={tile.key === 'opportunities' && teamBadgeCount(state) > 0 ? `${tileLabel(tile.key)} · ${teamStrings[lang].newInvites(teamBadgeCount(state))}` : tileLabel(tile.key)}
             style={tile.key === 'property' ? { backgroundImage: `linear-gradient(90deg, rgba(19,19,22,.97) 30%, rgba(19,19,22,.55) 100%), url(${heroHouse})` } : undefined}>
             <span className="tile-icon">{tile.icon()}</span>
@@ -802,6 +805,12 @@ function Home({ lang, go }: { lang: Lang; go: Go }) {
         <ChoiceDialog lang={lang} title={x1.agendaQ} testId="agenda-ask" onCancel={() => setAskAgenda(false)} choices={[
           { label: x1.calendar, primary: true, testId: 'agenda-calendar', onPick: () => { setAskAgenda(false); go({ name: 'calendar' }); } },
           { label: x1.todo, primary: true, testId: 'agenda-todo', onPick: () => { setAskAgenda(false); go({ name: 'todo' }); } },
+        ]} />
+      )}
+      {askMarket && (
+        <ChoiceDialog lang={lang} title={lookupStrings[lang].askMarket} testId="market-ask" onCancel={() => setAskMarket(false)} choices={[
+          { label: feedStrings[lang].marketTitle, primary: true, testId: 'market-news-pick', onPick: () => { setAskMarket(false); go({ name: 'marketNews' }); } },
+          { label: lookupStrings[lang].title, primary: true, testId: 'market-lookups-pick', onPick: () => { setAskMarket(false); go({ name: 'lookups' }); } },
         ]} />
       )}
     </section>

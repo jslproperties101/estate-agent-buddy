@@ -1,7 +1,5 @@
 // MainForAdmin-D screens: Market News and Intelligence, Admin-pushed Projects with invitation codes, announcements
 // (banner / pop-up), force update and maintenance mode. Everything shown comes from the company's database (feed.ts).
-import type { Go } from '../nav';
-import { LookupsEntry } from '../lookups/LookupsUI';
 import { useEffect, useRef, useState } from 'react';
 import { reskinCStrings } from '../ui/reskinCStrings';
 import { IconNews } from '../icons';
@@ -67,17 +65,16 @@ function Links({ item, lang }: { item: FeedItem; lang: Lang }) {
 // ---------- Market News and Intelligence ----------
 /** Batch A: with billing switched on, Market News needs an active 'news' plan; without one the subscription box is shown and
  *  no post (title, body, picture, unread count) is drawn. With billing off (the default) the screen is exactly as before. */
-export function MarketNewsScreen({ lang, openId, go }: { lang: Lang; openId?: string; go?: Go }) {
+export function MarketNewsScreen({ lang, openId }: { lang: Lang; openId?: string }) {
   const { store, cfg } = useFeed();
   const on = billingEnabled(store);
   const me = store.getState().meta.syncSession?.userId;
   // Read this account's plans (and, Batch 5, the server's "news is paid" switch) when the screen opens, so a new or ended
   // subscription, or the switch, shows at once.
   useEffect(() => { if (me) void refreshBilling(store, cfg); }, [on, me]);   // eslint-disable-line react-hooks/exhaustive-deps
-  // Batch C: property lookups (paid with tokens, not with the news plan) open from here while billing is switched on.
-  const lookups = on && go ? <LookupsEntry lang={lang} onOpen={() => go({ name: 'lookups' })} /> : null;
-  if (!featureAllowed(store, 'marketNews')) return <section className="stack" data-testid="market-news">{lookups}<NewsPaywall lang={lang} /></section>;
-  return <>{lookups}<NewsFeed lang={lang} openId={openId} /></>;
+  // Batch C put a Property Lookups button here; Batch D (owner, 10 Nov 2026) moved it to the home Market News button, which asks.
+  if (!featureAllowed(store, 'marketNews')) return <section className="stack" data-testid="market-news"><NewsPaywall lang={lang} /></section>;
+  return <NewsFeed lang={lang} openId={openId} />;
 }
 
 function NewsFeed({ lang, openId: tapped }: { lang: Lang; openId?: string }) {

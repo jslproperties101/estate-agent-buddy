@@ -58,12 +58,15 @@ export const yearlySaving = (monthly: Plan, yearly: Plan): number => {
 // gives; a test keeps the three lists equal. Spending tokens (Oneharta lookups) is Batch C.
 export type PackId = 'tokens_20' | 'tokens_100' | 'tokens_400' | 'tokens_1000';
 export interface TokenPack { id: PackId; tokens: number; amountCents: number; currency: 'USD' }
+/** Batch D: bonus tokens on top of 1 token per USD 0.25 (0 for the USD 5 pack). */
+export const packBonus = (p: TokenPack): number => p.tokens - p.amountCents / TOKEN_USD_CENTS;
 export const TOKEN_USD_CENTS = 25;
 export const TOKEN_PACKS: TokenPack[] = [
   { id: 'tokens_20', tokens: 20, amountCents: 500, currency: 'USD' },
-  { id: 'tokens_100', tokens: 100, amountCents: 2500, currency: 'USD' },
-  { id: 'tokens_400', tokens: 400, amountCents: 10000, currency: 'USD' },
-  { id: 'tokens_1000', tokens: 1000, amountCents: 25000, currency: 'USD' },
+  // Batch D (11 Nov 2026, owner): bonus +5% / +10% / +15% on the bigger packs. The Play product ids do not change.
+  { id: 'tokens_100', tokens: 105, amountCents: 2500, currency: 'USD' },
+  { id: 'tokens_400', tokens: 440, amountCents: 10000, currency: 'USD' },
+  { id: 'tokens_1000', tokens: 1150, amountCents: 25000, currency: 'USD' },
 ];
 export const packById = (id: string): TokenPack | undefined => TOKEN_PACKS.find(p => p.id === id);
 /** "USD 5", "USD 2.50": a USD amount in cents as written on screen. */

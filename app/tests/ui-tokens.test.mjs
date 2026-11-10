@@ -122,7 +122,12 @@ test('TU2 billing on: the wallet shows the test-mode balance and history from th
     assert.equal(await page.getByTestId(`token-price-${id}`).innerText(), p);
     assert.equal(await page.getByTestId(`token-buy-${id}`).isDisabled(), true, `${id}: not in a browser`);
   }
-  assert.match(await page.getByTestId(`token-pack-tokens_1000`).innerText(), /1,000 tokens/);
+  assert.match(await page.getByTestId(`token-pack-tokens_1000`).innerText(), /1,150 tokens/);
+  // Batch D: the bonus is shown on the bigger packs only
+  assert.equal(await page.getByTestId('token-bonus-tokens_20').count(), 0);
+  assert.equal(await page.getByTestId('token-bonus-tokens_100').innerText(), '100 + 5 bonus (+5%)');
+  assert.equal(await page.getByTestId('token-bonus-tokens_400').innerText(), '400 + 40 bonus (+10%)');
+  assert.equal(await page.getByTestId('token-bonus-tokens_1000').innerText(), '1,000 + 150 bonus (+15%)');
   assert.equal(await page.getByTestId('token-restore').isDisabled(), true);
   assert.match(await page.getByTestId('token-unavailable').innerText(), /Only in the Android app/);
   // only test-mode rows; the live row is a separate balance and is not shown while billing is not live
